@@ -113,13 +113,13 @@ These are data from the crispr-trip.snake script, and a text file that has has b
 
 ```{r}
 # First I load the statistics data from the mapping.
-setwd("~/mydata/projects/CRISPR_TRIP/20180918_TRIP_5106/data/processed/parsed/")
+setwd("/DATA/projects/DSBrepair/data/5280_DrugScreen/processed/parsed/")
 
-file.list <- list.files(pattern='indel*.*statistics.txt')
+file.list <- list.files(pattern='mutation*.*statistics.txt')
 indel.statistics.list <- lapply(file.list, 
                                 read.table, 
                                 header = TRUE)
-names(indel.statistics.list)<- gsub('indel.(.*?).statistics.txt', 
+names(indel.statistics.list)<- gsub('mutation.(.*?).statistics.txt', 
                                     '\\1', 
                                     file.list)
 # we need to remove the index column for the time being
@@ -144,7 +144,7 @@ It's an overall check of the PCR and sequencing quality.
 ```{r}
 rownames(indel.statistics.df)
 mypalette<-brewer.pal(5,"Greens")
-barplot(as.matrix(t(indel.statistics.df[c(89:98, 1:6),c(1,3,6:8)])), 
+barplot(as.matrix(t(indel.statistics.df[c(1:96),c(1,3,6:8)])), 
         col = mypalette,
         beside = T, 
         main = "Read parsing statistics", 
@@ -155,7 +155,7 @@ barplot(as.matrix(t(indel.statistics.df[c(89:98, 1:6),c(1,3,6:8)])),
         cex.axis = 0.6,
         args.legend = list(x = "topright", cex = 0.6))
 
-barplot(as.matrix(t(indel.statistics.df[c(7:18),c(1,3,6:8)])), 
+barplot(as.matrix(t(indel.statistics.df[c(96:192),c(1,3,6:8)])), 
         col = mypalette,
         beside = T, 
         main = "Read parsing statistics", 
