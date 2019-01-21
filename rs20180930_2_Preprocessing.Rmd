@@ -253,7 +253,6 @@ mean(not.clear.df$nc_fraction)
 median(not.clear.df$nc_fraction)
 # What is the maximum not clear fraction in our samples?
 max(not.clear.df$nc_fraction)
-
 ```
   
 We have max 3.25% on not clear in our samples. The mean and median are both less than 2%, that is good.
