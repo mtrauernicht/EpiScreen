@@ -113,13 +113,13 @@ These are data from the crispr-trip.snake script, and a text file that has has b
 
 ```{r}
 # First I load the statistics data from the mapping.
-setwd("~/mydata/projects/CRISPR_TRIP/20180918_TRIP_5106/data/processed/parsed/")
+setwd("/DATA/projects/DSBrepair/data/5280_DrugScreen/processed/parsed/")
 
-file.list <- list.files(pattern='indel*.*statistics.txt')
+file.list <- list.files(pattern='mutation*.*statistics.txt')
 indel.statistics.list <- lapply(file.list, 
                                 read.table, 
                                 header = TRUE)
-names(indel.statistics.list)<- gsub('indel.(.*?).statistics.txt', 
+names(indel.statistics.list)<- gsub('mutation.(.*?).statistics.txt', 
                                     '\\1', 
                                     file.list)
 # we need to remove the index column for the time being
