@@ -86,6 +86,8 @@ library(RColorBrewer)
 library(ggplot2)
 library(magrittr)
 library(platetools)
+library(grid)
+library(gridExtra)
 ```
  
 ## Custom functions  
@@ -151,11 +153,10 @@ indel.statistics.df$concentration <- gsub("^(.*)_rep.*", "\\1", indel.statistics
 indel.statistics.df$replicate <- gsub("^.*_(.*?)_.*", "\\1", indel.statistics.df$sample.well)
 indel.statistics.df$plate <- as.character(rep(c(1:18), each = 96))
 indel.statistics.df$sample <- gsub("(.*_.*_.*?)_.*_.*$", "\\1", indel.statistics.df$sample.well)
-indel.statistics.df$well <- gsub(".*_.*_(.*?)_[0-9]*", "\\1", indel.statistics.df$sample.well)
-indel.statistics.df$row <- gsub("[0-9]*", "\\1", indel.statistics.df$well)
+indel.statistics.df$well <- gsub(".*_.*_(.*?)_[0-999]*", "\\1", indel.statistics.df$sample.well)
+indel.statistics.df$row <- gsub("[0-999]", "\\1", indel.statistics.df$well)
 indel.statistics.df$column <- gsub("[A-Z]", "\\1", indel.statistics.df$well)
-
-
+indel.statistics.df$drug <- gsub(".*_([0-999])", "\\1", indel.statistics.df$sample.well)
 ```
 
 ### Indel parsing  
@@ -164,7 +165,6 @@ indel.statistics.df$column <- gsub("[A-Z]", "\\1", indel.statistics.df$well)
 ```{r}
 low.reads.indel.stat.df <- indel.statistics.df[order(indel.statistics.df[, "reads"]), ][1:100, ]
 mypalette5<-brewer.pal(5,"Greens")
-
 
 barplot(as.matrix(t(low.reads.indel.stat.df[c(1:20),c(1,3,6:8)])), 
         col = mypalette5,
@@ -215,7 +215,8 @@ indel.statistics.df %>% group_by(column) %>% summarise(reads = sum(reads))
 # How many reads per well (for the 96 index)?
 well.statistics <- indel.statistics.df %>% group_by(well) %>% summarise(reads = sum(reads))
 well.statistics
-
+raw_map(well.statistics$reads, 
+                 well.statistics$well) + scale_fill_distiller(type = "div", name = "reads")
 
 # % of reads written from the total reads :
 indelreadswritten.vec <- indel.statistics.df$reads_written/indel.statistics.df$reads*100
@@ -226,33 +227,27 @@ barplot(indelreadswritten.vec,
 
 ```
 
-```{r}
+```{r, fig.width = 12, fig.height = 4}
 for (i in 1:18) {
   
   # Select the flowjo data set
   data <- indel.statistics.df[indel.statistics.df$plate == i, ]
   
   # Find reasonable limits 
-  limits <- quantile(data$reads, probs = c(0.05, 0.95))
-  margin <- (limits[2] - limits[1]) * 0.75
-  limits[1] <- limits[1] - margin
-  limits[2] <- limits[2] + margin
-
-  limits[1] <- 2000
-  # plate$mean_score[which(plate$mean_score > limits[2])] <- limits[2]
+  limits <- c(2000, 25000)
 
   # Plot this, first the PI staining with a custom color-coded density
-  # y <- density(data$PI_area, n = 2^10)
-  # plt1 <- ggplot(data.frame(x = y$x, y = y$y), 
-  #                aes(x = x, y = y)) +
-  #   geom_line() + 
-  #   geom_segment(aes(xend = x, yend = 0, colour = x)) + 
-  #   xlim(limits) +
-  #   ggtitle(paste("Cell cycle -",
-  #                 experiments$name[i])) +
-  #   scale_color_distiller(type = "div", limits = limits, name = "PI_area") +
-  #   theme_bw() + 
-  #   theme(legend.position="none")
+  y <- density(data$reads)
+  plt1 <- ggplot(data.frame(x = y$x, y = y$y),
+                 aes(x = x, y = y)) +
+    geom_line() +
+    geom_segment(aes(xend = x, yend = 0, colour = x)) +
+    xlim(limits) +
+    ggtitle(paste("Cell cycle -",
+                unique(data$sample))) +
+    scale_color_distiller(type = "div", limits = limits, name = "PI_area") +
+    theme_bw() +
+    theme(legend.position="none")
   
   # Then the plate with color-coded wells
   plt2 <- raw_map(data$reads, 
@@ -260,8 +255,7 @@ for (i in 1:18) {
     ggtitle(unique(data$sample)) +
     scale_fill_distiller(type = "div", limits = limits, name = "reads")
   plt2
-  # grid.arrange(plt2, ncol = 2, widths = c(1, 1.3))
-  
+  grid.arrange(plt1, plt2, ncol = 2, widths = c(1, 1.3))
 }
 ```
 
