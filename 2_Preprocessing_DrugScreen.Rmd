@@ -69,7 +69,9 @@ StartTime <-Sys.time()
 Date <- substr(gsub("-","",Sys.time()),1,8) 
 
 # libraries:
-library(rtracklayer)
+# library(devtools)
+# install_github("lawremi/rtracklayer")
+# install_github("cran/gtools")
 library(tidyr)
 library(plyr)
 library(dplyr)
@@ -78,6 +80,7 @@ library(ggplot2)
 library(car)
 library(parallel)
 library(gtools)
+# library(rtracklayer)
 ```
 ## Custom functions
 Functions used
@@ -88,6 +91,27 @@ SetFileName <- function(filename, initials) {
   initials <- substitute(initials)
   filename <- paste0(initials, substr(gsub("-","",Sys.time()),1,8), filename)
   filename
+}
+
+CallTrueBarcodes <- function(df) {
+  df <- df[df$V2 %in% barcodes.list,]
+  df
+}
+
+RemoveLowReads <- function(reads) {
+  if (sum(reads$V1) < 2000) {
+    reads <- NULL
+  } else {
+    reads 
+  } 
+}
+
+RemoveEmptyDfs <- function(rem) {
+  if (is.null(rem) == TRUE) {
+    rm(rem)
+  } else {
+    rem
+  }
 }
 
 
@@ -267,10 +291,13 @@ CalculateDeletions <- function(deletions) {
 Data import from mapping. These files were generated on 30.09.2018, with a minimum of 500 reads per barcode in the mutation calling.
 ```{r import}
 # Set directory to the mutation output folder of the CRISPR-TRIP snakemake script
-setwd("/home/r.schep/mydata/projects/CRISPR_TRIP/20180918_TRIP_5106/data/processed_20181107/mutation_counts/")
+setwd("/DATA/projects/DSBrepair/data/5280_DrugScreen/processed/mutation_counts")
 # Import files in list and make individual tables
 # I use this if all the samples are good. Here however I do not use all the samples. 
-file.list <- list.files(pattern='*[.]mapped_count.table')
+file.list <- list.files(pattern='*[.]raw_count.table')
+
+# Import barcode list
+barcodes.list <- c("AGGGCGTAAAATATTT", "TATGGCTGTCGGGTAG", "TGTCCCTTAGTACTTT", "AGAAAATAATATGACG","CGGCCTGAAGGTCAGG","TTGAACGCGGGCTCGG","GCTAACATCACGAATC","GCGCACCCTTTAATTG","ACTGTCGAGTTGTCCG","CCGGGGACGTATGCAC","TCTTTTGAGGAGCTGA","ATATCGTTGCTGGAGA","CATCCACCACACTTCA","ACCCCTAAAGGCGCTG","ATACTATATTTAACGG","CATTTCTGATCAATAA","CTCTTAATCGCTGCC","GAGCGCGTCACCGGGT","GTACCTCTCGATAGTG","TGGCCAATATTTGTCT")
 
 # import the data
 df.list <- mclapply(file.list, read.table, mc.cores = 20, stringsAsFactors = FALSE)
@@ -282,16 +309,34 @@ names(df.list)
 n.samples <- length(df.list)
 ```
 
+## Select true barcodes and exclude low read counts
+```{r}
+# Call true barcodes
+df.list <- lapply(df.list, CallTrueBarcodes)
+
+# Remove samples with low read counts
+df.list2 <- lapply(df.list, RemoveLowReads)
+
+# Remove empty dfs
+df.list3 <- lapply(df.list2, RemoveEmptyDfs)
+
+df.list4 <- Filter(function(x) ncol(x) == 5, df.list2)
+
+df.list4 <- df.list2[sapply(df.list2, function(x) dim(x)[[1]]) > 0]
+```
+
+
+
 ### Some data pre-processing
 Set everything in a datafram that contains the barcodes, indel ratios, and efficiencies.
 ```{r indeldataframe}
 # To be able to setup the functions in a general way. This means in cases where we have A
 # and B samples. 
-A <- grep("_A_",  names(df.list))
-B <- grep("_B_",  names(df.list))
-# Rename the barcodes
-df.list <- RenameBarcodes(df.list, pool = A)
-df.list <- RenameBarcodes(df.list, pool = B)
+# A <- grep("_A_",  names(df.list))
+# B <- grep("_B_",  names(df.list))
+# # Rename the barcodes
+# df.list <- RenameBarcodes(df.list, pool = A)
+# df.list <- RenameBarcodes(df.list, pool = B)
 
 # Total reads per barcode
 total.reads.list <- mclapply(df.list, Read_Counts, mc.cores = 10)
@@ -303,7 +348,10 @@ point.mut.list <- mclapply(df.list, Point_Mut_Counts, mc.cores = 10)
 # Now remove these samples from all the mutations lists before we make the indel dataframes
 indel.list <- mclapply(df.list, IndelsOnly, mc.cores = 10)
 
-mutations.list <- mclapply(indel.list, MutationsToDataframe, mc.cores = 10)
+# Remove dataframes without data (leftovers from the low reads removal)
+
+
+mutations.list <- lapply(indel.list, MutationsToDataframe)
 total.reads.mutations.list <- mclapply(indel.list, Read_Counts, mc.cores = 10)
 # We need to get the total reads in each sample, here I'll get the sum of all the columns and rows from each dataframe.
 ```
