@@ -302,27 +302,23 @@ barcodes.list <- c("AGGGCGTAAAATATTT", "TATGGCTGTCGGGTAG", "TGTCCCTTAGTACTTT", "
 # import the data
 df.list <- mclapply(file.list, read.table, mc.cores = 20, stringsAsFactors = FALSE)
 # rename the lists
-names(df.list) <- gsub('(*?)[.]ma.*', '\\1', file.list)
+names(df.list) <- gsub('(*?)[.]ra.*', '\\1', file.list)
 # these are the samples
-names(df.list)
+head(names(df.list))
 # count the sample number
 n.samples <- length(df.list)
 ```
 
-## Select true barcodes and exclude low read counts
+### Select true barcodes and exclude low read counts
 ```{r}
 # Call true barcodes
-df.list <- lapply(df.list, CallTrueBarcodes)
+df.list <- mclapply(df.list, CallTrueBarcodes, mc.cores = 10)
 
 # Remove samples with low read counts
-df.list2 <- lapply(df.list, RemoveLowReads)
+df.list <- mclapply(df.list, RemoveLowReads, mc.cores = 10)
 
 # Remove empty dfs
-df.list3 <- lapply(df.list2, RemoveEmptyDfs)
-
-df.list4 <- Filter(function(x) ncol(x) == 5, df.list2)
-
-df.list4 <- df.list2[sapply(df.list2, function(x) dim(x)[[1]]) > 0]
+df.list <- Filter(Negate(function(x) is.null(unlist(x))), df.list)
 ```
 
 
@@ -348,12 +344,9 @@ point.mut.list <- mclapply(df.list, Point_Mut_Counts, mc.cores = 10)
 # Now remove these samples from all the mutations lists before we make the indel dataframes
 indel.list <- mclapply(df.list, IndelsOnly, mc.cores = 10)
 
-# Remove dataframes without data (leftovers from the low reads removal)
-
-
 mutations.list <- lapply(indel.list, MutationsToDataframe)
-total.reads.mutations.list <- mclapply(indel.list, Read_Counts, mc.cores = 10)
 # We need to get the total reads in each sample, here I'll get the sum of all the columns and rows from each dataframe.
+total.reads.mutations.list <- mclapply(indel.list, Read_Counts, mc.cores = 10)
 ```
 
 Next we will work on a long dataframe that will include all the ratios (deletions, insertions, +1/-7 etc) for each barcode in each sample.
@@ -408,9 +401,8 @@ non.indels.df[order(non.indels.df$nc_fraction, decreasing = T)[1:30],]
 
 ```
 
-It seems that most of the not clear reads come from one specific barcode. CATGAGTATTGGGACG.A
-Surprisingly it's also the sample that is shifted (where the WT is considered a +4 and the +1 a +5).
-Easiest is to discard this barcode for all further analysis.
+It seems that most of the not clear reads (and also the fewest reads) come from one specific barcode: ACCCCTAAAGGCGCTG
+Discard this barcode for all further analysis?
 
 Quick look at the amount of point mutations per sample. 
 
@@ -428,25 +420,26 @@ mean_pm[order(mean_pm$value, decreasing = T)[1:20],]
 non.indels.df[order(non.indels.df$pm_fraction, decreasing = T)[1:20],]
 ```
 
-Most of the samples that have a higher average point mutation count are the negative control samples. 
+Again the same barcode pops up.
 
 This all looks good to me. But before we continue let's remove the barcode with the weird indels. 
+This can be done in case we want to get rid of the low-reads barcode.
 
 ```{r}
-mutations.list <- lapply(mutations.list, 
-                         RemoveBarcodeFromList_RN , 
-                         barcode = c("CATGAGTATTGGGACG.A"))
-mutations.list <- lapply(mutations.list, 
-                         RemoveBarcodeFromList_RN , 
-                         barcode = c("CCCACCCAGCCCACGT.A"))
-
-total.reads.mutations.list <- lapply(total.reads.mutations.list, 
-                                     RemoveBarcodeFromList_barcode, 
-                                     barcode = c("CATGAGTATTGGGACG.A"))
-total.reads.mutations.list <- lapply(total.reads.mutations.list, 
-                                     RemoveBarcodeFromList_barcode, 
-                                     barcode = c("CCCACCCAGCCCACGT.A"))
-dim(total.reads.mutations.list$`indel_9_B_LBR2_-`)
+# mutations.list <- lapply(mutations.list, 
+#                          RemoveBarcodeFromList_RN , 
+#                          barcode = c("CATGAGTATTGGGACG.A"))
+# mutations.list <- lapply(mutations.list, 
+#                          RemoveBarcodeFromList_RN , 
+#                          barcode = c("CCCACCCAGCCCACGT.A"))
+# 
+# total.reads.mutations.list <- lapply(total.reads.mutations.list, 
+#                                      RemoveBarcodeFromList_barcode, 
+#                                      barcode = c("CATGAGTATTGGGACG.A"))
+# total.reads.mutations.list <- lapply(total.reads.mutations.list, 
+#                                      RemoveBarcodeFromList_barcode, 
+#                                      barcode = c("CCCACCCAGCCCACGT.A"))
+# dim(total.reads.mutations.list$`indel_9_B_LBR2_-`)
 ```
 
 
@@ -465,9 +458,17 @@ mutations.dt.list <- lapply(mutations.dt.list, setDT, keep.rownames = TRUE)
 # Make the sample lists: 
 ##### LBR2 and DMSO #####
 # Select the samples (in a ugly way but it works..)
-samples.names <- names(norm.mutations.dt.list)
-LBR2.64h.samples <- samples.names[-grep("si|NU|GSK|BIX|92|88|16|ODN3|GFP|LBR1|-guide", samples.names)]
+# LBR2.64h.samples <- samples.names[-grep("si|NU|GSK|BIX|92|88|16|ODN3|GFP|LBR1|-guide", samples.names)]
+samples.names <- names(mutations.dt.list)
+
+
 # take the samples - bind rows - remove NA's - group by barcode - sum the same barcodes - tib to DT
+alles.tib <- mutations.dt.list %>% 
+  bind_rows() %>% NAToZero() %>% group_by(rn) %>% summarise_all(.funs = sum) %>% as.data.table()
+
+ggplot(alles.tib) +
+  geom_bar(aes(x=))
+
 LBR2.64h.tib <- norm.mutations.dt.list[LBR2.64h.samples] %>% 
   bind_rows() %>% NAToZero() %>% group_by(rn) %>% summarise_all(.funs = sum) %>% as.data.table()
 
