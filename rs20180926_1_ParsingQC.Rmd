@@ -144,7 +144,7 @@ It's an overall check of the PCR and sequencing quality.
 ```{r}
 rownames(indel.statistics.df)
 mypalette<-brewer.pal(5,"Greens")
-barplot(as.matrix(t(indel.statistics.df[c(89:98, 1:6),c(1,3,6:8)])), 
+barplot(as.matrix(t(indel.statistics.df[c(1:96),c(1,3,6:8)])), 
         col = mypalette,
         beside = T, 
         main = "Read parsing statistics", 
@@ -155,7 +155,7 @@ barplot(as.matrix(t(indel.statistics.df[c(89:98, 1:6),c(1,3,6:8)])),
         cex.axis = 0.6,
         args.legend = list(x = "topright", cex = 0.6))
 
-barplot(as.matrix(t(indel.statistics.df[c(7:18),c(1,3,6:8)])), 
+barplot(as.matrix(t(indel.statistics.df[c(96:192),c(1,3,6:8)])), 
         col = mypalette,
         beside = T, 
         main = "Read parsing statistics", 

@@ -1,0 +1,583 @@
+---
+title: "Parsing_QC"
+author: "Ruben Schep"
+date: "`r format(Sys.time(), '%Y-%m-%d')`"
+output: 
+  html_document:
+    theme: journal #cerulean
+    highlight: monochrome
+    toc: true
+    toc_float: true
+    code_folding: show
+  editor_options:
+    chunk_output_type: console
+---
+
+knitr document van Steensel lab
+
+# Parsing and starcode quality control
+# Introduction
+After demultiplexing all the samples from the sequencing data, the data has been processed by the CRISPR-TRIP snakemake script. This script maps the barcodes from the iPCR (iPCR from 5 feb 2018). It calls the true barcodes with the starcode script for both the mutation and mapping reads. It call the mutations on all the mutation samples and spits them in mapped, unmapped and non genuine.
+
+`zcat 4803_iPCR_2000_A_1_R1.fq.gz 4803_iPCR_2000_A_2_R1.fq.gz | gzip -c - > `
+  `4803_iPCR_2000_A_R1.fq.gz ; `
+`zcat 4803_iPCR_2000_A_1_R2.fq.gz 4803_iPCR_2000_A_2_R2.fq.gz | gzip -c - > `
+  `4803_iPCR_2000_A_R2.fq.gz ; `
+`zcat 4803_iPCR_2000_B_1_R1.fq.gz 4803_iPCR_2000_B_2_R1.fq.gz | gzip -c - > `
+  `4803_iPCR_2000_B_R1.fq.gz ; `
+`zcat 4803_iPCR_2000_B_1_R2.fq.gz 4803_iPCR_2000_B_2_R2.fq.gz | gzip -c - > `
+  `4803_iPCR_2000_B_R2.fq.gz`
+`zless ../data/raw/4803_iPCR_2000_A_R1.fq.gz`
+
+Here we want to do a QC of the parsing of the mapping, the barcodes and mutations. We will load the statistics data of all the files. We will also look at barcode counts from the table files (those list the barcodes from the starcode stript). I obtained the counts though shell with 
+`cd ~/mydata/projects/CRISPR_TRIP/20180918_TRIP_5106/data/processed_20181107/mutation`
+`wc -l * > ~/mydata/projects/CRISPR_TRIP/20180918_TRIP_5106/data/processed_20181107/rs20181107_starcode_barcode_counts.txt`
+
+Pasted the result in a text editor and changes all `^ ` and changed the spaces to `\t`, removed the last total row, removed `.table` at the end and saved as text file. 
+I will export a bed file also containing the broad integrations for the generation of mean chip values over the integration sites. 
+
+## Description of Data
+The statistics files look like this for the mapping:
+```{r table1, echo=FALSE, message=FALSE, warnings=FALSE, results='asis'}
+tabl <- "
+|	reads	|	bp	|	reads_written	|	bp_written	|	n_tooshort	|	index	|	map_pat1a	|	const_bar	|	rev_map_complement	|	rev_map	|	fwd_map_complement|
+|----|----|----|----|----|----|----|----|----|----|----|
+|19828607	|	5869267672	|	13923655	|	1901947251	|	0	|	19828607	|	19159557	|	14908545	|	8002804	|	13923655	|	7831360|
+
+"
+cat(tabl) # output the table in a format good for HTML/PDF/docx conversion
+```
+
+And like this for the mutations : 
+```{r table2, echo=FALSE, message=FALSE, warnings=FALSE, results='asis'}
+tabl <- "
+|	reads	|	bp	|	reads_written	|	bp_written	|	n_tooshort	|	pat1	|	barcode	|	pat2|
+|----|----|----|----|----|----|----|----|
+|	1917323	|	268435236	|	1523275	|	146262106	|	0	|	1802163	|	1802150	|	1523275|
+"
+cat(tabl) # output the table in a format good for HTML/PDF/docx conversion
+```
+
+For the genuine (mapped and unmapped) and non-genuine barcode counts I will just get the line counts of the files.   
+
+679811      indel_1_A_GFP_DMSO_t16.genuine_mapped  
+695310      indel_1_A_GFP_DMSO_t16.genuine_unmapped  
+452964      indel_1_A_GFP_DMSO_t16.not_genuine  
+1828085    	indel_1_A_GFP_DMSO_t16.raw  
+422130      indel_1_A_GFP_DMSO_t64.genuine_mapped  
+331931    	indel_1_A_GFP_DMSO_t64.genuine_unmapped  
+337248    	indel_1_A_GFP_DMSO_t64.not_genuine   
+
+# Data loading and processing 
+
+## Path, Libraries, Parameters and Useful Functions  
+
+```{r message=FALSE}
+StartTime <-Sys.time()
+
+# 6-digit Date tag:
+Date <- substr(gsub("-","",Sys.time()),1,8) 
+
+# libraries:
+library(plyr)
+library(dplyr)
+library(GenomicRanges)
+library(RColorBrewer)
+library(ggplot2)
+library(magrittr)
+```
+ 
+## Custom functions  
+
+Functions used in this script:   
+
+```{r}
+MakeGranges <- function(x) {
+  x$end_pos <- as.numeric(as.character(x$start_pos+3))
+  colnames(x) <- c("name",
+                   "seqname", 
+                   "strand", 
+                   "start",
+                   "total_mapped", 
+                   "mapq_sum1", 
+                   "reads1", 
+                   "mapq_sum2", 
+                   "reads2", 
+                   "seq", 
+                   "end")
+  gr <- makeGRangesFromDataFrame(x, keep.extra.columns = T)
+  return(gr)
+}
+
+BarcodeOverlap <- function(read1, read2) {
+  counts <- c(nrow(read1), 
+              nrow(read2), 
+              sum(read2$barcode %in% read1$barcode), 
+              sum(!read1$barcode %in% read2$barcode),
+              sum(!read2$barcode %in% read1$barcode))
+}
+
+SetFileName <- function(filename, initials) {
+  # Set filename with extension and initials to make filename with date integrated.
+  filename <- substitute(filename)
+  initials <- substitute(initials)
+  filename <- paste0(initials, substr(gsub("-","",Sys.time()),1,8), filename)
+  filename
+}
+```
+
+## Data loading  
+
+These are data from the crispr-trip.snake script, and a text file that has has been obtained as explained above.  
+
+```{r}
+# First I load the statistics data from the mapping.
+setwd("/home/r.schep/mydata/projects/CRISPR_TRIP/20180918_TRIP_5106/data/processed_20181107/parsed/")
+file.list <- list.files(pattern='mapping*.*statistics.txt')
+mapping.statistics.list <- lapply(file.list, read.table, 
+                                  header = TRUE)
+names(mapping.statistics.list)<- gsub('mapping.(.*?).statistics.txt', 
+                                      '\\1', 
+                                      file.list)
+mapping.statistics.df <- do.call(rbind.data.frame, 
+                                 mapping.statistics.list)
+
+file.list <- list.files(pattern='indel*.*statistics.txt')
+indel.statistics.list <- lapply(file.list, 
+                                read.table, 
+                                header = TRUE)
+names(indel.statistics.list)<- gsub('indel.(.*?).statistics.txt', 
+                                    '\\1', 
+                                    file.list)
+# we need to remove the index column for the time being
+indel.statistics.list <- lapply(indel.statistics.list, function(x) { x["index"] <- NULL; x })
+indel.statistics.df <- do.call(rbind.data.frame, 
+                               indel.statistics.list)
+
+# I also want to load the mapping data
+setwd("/home/r.schep/mydata/projects/CRISPR_TRIP/20180918_TRIP_5106/data/processed_20181107/table/")
+file.list <- list.files(pattern='*.table')
+mapping.list <- lapply(file.list, read.table,
+                       header = TRUE)
+names(mapping.list)<- gsub('mapping.2000(.*?).table', 
+                           '\\1', 
+                           file.list)
+# Unlist the dataframes into separate dataframes (A.1, A.2, etc)
+list2env(mapping.list ,.GlobalEnv)
+
+# Let's load the starcode count data 
+setwd("/home/r.schep/mydata/projects/CRISPR_TRIP/20180918_TRIP_5106/data/processed_20181107/")
+starcode.counts <- read.table("rs20181107_starcode_barcode_counts.txt", 
+                              header = FALSE)
+starcode.counts$sample <- gsub("\\..*","", starcode.counts$V2)
+starcode.counts$type <- gsub(".*\\.","", starcode.counts$V2)
+starcode.counts <- starcode.counts[, c(1,3,4)]
+```
+
+## Some data pre-processing  
+
+```{r}
+# For the read 1 and read 2 overlap I want to create a table with the number of overlapping barcodes, 
+# and different ones for eacht read. After that I will only take the overlapping ones to check the 
+# quality of the ligation.
+# For this I would like to work with granges objects. Let's create them.
+grmapping.list <- lapply(FUN = MakeGranges, X = mapping.list)
+grnames <- paste0(names(grmapping.list), ".gr")
+names(grmapping.list) <- grnames
+list2env(grmapping.list ,.GlobalEnv)
+
+readsA <- BarcodeOverlap(A.1, A.2)
+readsB <- BarcodeOverlap(B.1, B.2)
+Read1Read2Overlap <- rbind(readsA, readsB)
+colnames(Read1Read2Overlap) <- c("Read1", 
+                                 "Read2",
+                                 "Both", 
+                                 "Only read1", 
+                                 "Only read2")
+# I want to add columns for the starcode count to seperate them by experiment, guide, condition and time point. 
+starcode.counts$exp <- gsub("indel_(.*?)_.*", "\\1", starcode.counts$sample)
+starcode.counts$pool <- gsub("indel_.*?_(.*?)_.*", "\\1", starcode.counts$sample)
+starcode.counts$guide <- gsub("indel_.*?_.*?_(.*?)_.*", "\\1", starcode.counts$sample)
+starcode.counts$guide <- gsub("indel_.*?_.*?_(.*?)$", "\\1", starcode.counts$guide)
+starcode.counts$cond <- gsub("indel_.*?_.*?_.*?_.*?(.*?)", "\\1", starcode.counts$sample)
+
+
+
+```
+  
+# Analysis  
+
+## Parsing QC  
+
+This data is pulled form the statistics files in `/parsed/`  
+
+Here we want to look at the porportion of reads that contain the sequences (constant and barcodes) that we expect.   
+It's an overall check of the PCR and sequencing quality.  
+
+### Mapping parsing  
+
+```{r}
+#Plot the read statistics for the 2000 pool
+barplot(as.matrix(t(mapping.statistics.df[,c(1,3,6:11)])), 
+        col = brewer.pal(8, "Set1"),
+        beside = T, 
+        main = "Read parsing statistics", 
+        ylab = "reads", 
+        legend = colnames(mapping.statistics.df[,c(1,3,6:11)]), 
+        args.legend = list(x = "topright", cex = 0.6))
+
+# % of reads written from the total reads :
+mapping.statistics.df$reads_written/mapping.statistics.df$reads*100
+
+# Plot the overlap of the mappability of read 1 and read 2. 
+barplot(as.matrix(t(Read1Read2Overlap)),
+        col = brewer.pal(5, "Set1"),
+        beside = T, 
+        main = "Read 1 and Read 2 overlaps", 
+        ylab = "Barcodes", 
+        legend = colnames(Read1Read2Overlap),
+        args.legend = list(x = "topright", cex = 0.70))
+```
+  
+### Indel parsing  
+
+
+```{r}
+rownames(indel.statistics.df)
+mypalette<-brewer.pal(5,"Greens")
+barplot(as.matrix(t(indel.statistics.df[c(89:98, 1:6),c(1,3,6:8)])), 
+        col = mypalette,
+        beside = T, 
+        main = "Read parsing statistics", 
+        ylab = "reads", 
+        legend = colnames(indel.statistics.df[,c(1,3,6:8)]), 
+        las = 2,
+        cex.names = 0.4,
+        cex.axis = 0.6,
+        args.legend = list(x = "topright", cex = 0.6))
+
+barplot(as.matrix(t(indel.statistics.df[c(7:18),c(1,3,6:8)])), 
+        col = mypalette,
+        beside = T, 
+        main = "Read parsing statistics", 
+        ylab = "reads", 
+        legend = colnames(indel.statistics.df[,c(1,3,6:8)]), 
+        las = 2,
+        cex.names = 0.4,
+        cex.axis = 0.6,
+        args.legend = list(x = "topright", cex = 0.6))
+
+barplot(as.matrix(t(indel.statistics.df[c(19:48),c(1,3,6:8)])), 
+        col = mypalette,
+        beside = T, 
+        main = "Read parsing statistics", 
+        ylab = "reads", 
+        legend = colnames(indel.statistics.df[,c(1,3,6:8)]), 
+        las = 2,
+        cex.names = 0.4,
+        cex.axis = 0.6,
+        args.legend = list(x = "topright", cex = 0.6))
+
+barplot(as.matrix(t(indel.statistics.df[c(49:64),c(1,3,6:8)])), 
+        col = mypalette,
+        beside = T, 
+        main = "Read parsing statistics", 
+        ylab = "reads", 
+        legend = colnames(indel.statistics.df[,c(1,3,6:8)]), 
+        las = 2,
+        cex.names = 0.4,
+        cex.axis = 0.6,
+        args.legend = list(x = "topright", cex = 0.6))
+
+barplot(as.matrix(t(indel.statistics.df[c(65:76),c(1,3,6:8)])), 
+        col = mypalette,
+        beside = T, 
+        main = "Read parsing statistics", 
+        ylab = "reads", 
+        legend = colnames(indel.statistics.df[,c(1,3,6:8)]), 
+        las = 2,
+        cex.names = 0.4,
+        cex.axis = 0.6,
+        args.legend = list(x = "topright", cex = 0.6))
+
+barplot(as.matrix(t(indel.statistics.df[c(77:88),c(1,3,6:8)])), 
+        col = mypalette,
+        beside = T, 
+        main = "Read parsing statistics", 
+        ylab = "reads", 
+        legend = colnames(indel.statistics.df[,c(1,3,6:8)]), 
+        las = 2,
+        cex.names = 0.4,
+        cex.axis = 0.6,
+        args.legend = list(x = "topright", cex = 0.6))
+
+# % of reads written from the total reads :
+indelreadswritten.vec <- indel.statistics.df$reads_written/indel.statistics.df$reads*100
+names(indelreadswritten.vec) <- rownames(indel.statistics.df)
+barplot(indelreadswritten.vec, 
+        las=2, 
+        cex.names = 0.4)
+
+```
+
+ 
+## Mapping QC  
+
+Here we will have a look at the mapping quality and some conflicts.
+These conflicts can be of different nature:
+- mismatch in the barcode
+- multiple alignments
+- barcode present in both pools
+ 
+### Diplicated integrations (mismatch in the barcode)  
+  
+```{r preprocess}
+######################## Filtering the mapping files for mapping quality
+# I need to filter for the correct mapping, ie. min 10 mapped reads, min 90% of 
+# these reads on mapped on location 1 (freq1), and max 2.5% on location 2 (freq2)
+mapping.df <- ldply(mapping.list, data.frame)
+mapping.df$barcode <- paste(mapping.df$barcode, substr(mapping.df$.id, 1,1), sep= ".")
+mapping.df$mapq_1 <- mapping.df$mapq_sum1/mapping.df$reads1
+mapping.df$mapq_2 <- mapping.df$mapq_sum2/mapping.df$reads2
+mapping.df$freq1 <- mapping.df$reads1/mapping.df$total_mapped
+mapping.df$freq2 <- mapping.df$reads2/mapping.df$total_mapped
+dim(mapping.df)
+filtered_mapping.df <- mapping.df[mapping.df$mapq_1 > 10 & 
+                           mapping.df$total_mapped > 3 & 
+                           mapping.df$freq1 > 0.95 & 
+                           mapping.df$freq2 < 0.025, ]
+filtered_mapping.df <- filtered_mapping.df[, -c(9,10, 13, 15)]
+dim(filtered_mapping.df)
+head(filtered_mapping.df)
+filtered_mapping.df <- filtered_mapping.df[with(filtered_mapping.df, order(start_pos, -mapq_1)), ]
+```
+
+```{r}
+# take only the barcode and the seq_name 
+mappedbarcodes.df <- filtered_mapping.df[, c("barcode", "seqname")]
+# count the barcode frequencies with table
+mappedbarcodes.df <- as.data.frame(table(mappedbarcodes.df))
+# remove the counts of one barcode on another chromosome
+mappedbarcodes.df <- mappedbarcodes.df[mappedbarcodes.df$Freq!=0, ]
+# are there any barcodes that are mapped more than 2x to a chromosome ? 
+mappedbarcodes.df[mappedbarcodes.df$Freq > 2, ]
+
+## What are the barcodes that are present in both A and B pools?
+# take only the barcode and the seq_name 
+mappedbarcodes.df <- filtered_mapping.df[, c("barcode", "seqname")]
+# remove the .A and .B after the barcode.
+mappedbarcodes.df$barcode <- gsub("\\..*","", mappedbarcodes.df$barcode)
+# count the barcode frequencies with table
+mappedbarcodes.df <- as.data.frame(table(mappedbarcodes.df)) 
+# remove the counts of one barcode on another chromosome
+mappedbarcodes.df <- mappedbarcodes.df[mappedbarcodes.df$Freq!=0, ] 
+# check if there are any barcodes that occur more than 2 times (2x + F and R read for each 
+# pool, 4 occurences means the barcode is present in both pools)
+mappedbarcodes.df[mappedbarcodes.df$Freq > 2, ] 
+bothpools.vec <- as.character(mappedbarcodes.df[mappedbarcodes.df$Freq > 2, ]$barcode)
+# These barcodes are present in both pool A and pool B.
+bothpools.vec
+# add the .A and .B again to see if they have similar read counts,
+# which whould hint that they come from the same clone.
+bothpools.vec <- c(paste0(bothpools.vec, ".A"), paste0(bothpools.vec, ".B"))
+filtered_mapping.df[filtered_mapping.df$barcode %in% bothpools.vec, ]
+
+
+#with this way you will only find the barcodes that are mapped to the same location in both pools
+```
+
+It is not clear if these barcode are from one clone of from several, it loook like there are at least 2 clones that are present in both the A and B pools.
+
+#### Manual curation
+
+Are there duplicated start positions. Basically the same integration but with a different barcode (due to sequencing/PCR errors)?  
+
+
+```{r}
+# Get all the locations that are at least once duplicated
+dupli.vec <- unique(filtered_mapping.df[duplicated(filtered_mapping.df$start_pos, 
+                                                   fromLast=TRUE), 
+                                        'start_pos' ])
+# Filter the mapping data frame on these positions to get all of them 
+# The duplicated function only returns the "extra" ones
+dupli.df <- filtered_mapping.df[filtered_mapping.df$start_pos %in% dupli.vec, ]
+# how many duplicated integrations do we have ? 
+nrow(dupli.df)
+# Remove the set of intergrations that are both in the A and B pools.  #why???
+dupli.df <- dupli.df[!dupli.df$barcode %in% bothpools.vec, ]
+# How many duplications are we left with? 
+nrow(dupli.df)
+# as you can see the duplicated ones all have a lot of reads in one of the barcodes and very
+#few in the others, we can retrieve the barcodes from this list to remove them from the mapping
+# list. This is the list: 
+dupli.df[ , c(1:6)]
+# pick out the barcodes with less than 20 reads. They are the wrongs ones.
+dupli.bc.vec <- as.character(dupli.df[dupli.df$total_mapped<20, ]$barcode)
+dupli.df[!dupli.df$barcode %in% dupli.bc.vec,  c(1:6)]
+
+# there is one last duplicate in there, but has a good amount of reads, 
+# let's keep it as it may have many indel reads too.
+
+filtered_mapping.df <- filtered_mapping.df[!filtered_mapping.df$barcode %in% 
+                                           dupli.bc.vec, ]
+dupli.vec.test <- unique(filtered_mapping.df[duplicated(filtered_mapping.df$start_pos, 
+                                                        fromLast=TRUE), 
+                                             'start_pos' ])
+length(dupli.vec.test)
+dupli.vec.test
+# Are most of these duplicated the ones from the cells in both pools? 
+table(dupli.vec.test %in% 
+        filtered_mapping.df[filtered_mapping.df$barcode %in% 
+                                                bothpools.vec, ]$start_pos)
+# Yes, the data looks good like this. There are only 2 reads that are mapped exactly to the
+# same location, one in A & B with different barcodes, and one with similar looking BC.
+# We end up with this many integrations (taking into account only read 2):
+nrow(filtered_mapping.df[filtered_mapping.df$.id %in% c("A.2", "B.2"), ])
+```
+
+### Differential mapping of certain integrations.  
+Before we go further I wanted to check what distance we should expect to have similar mapping.    
+```{r}
+# Next I want to check if both reads map to the same chromosome
+distance_mapping.df <- filtered_mapping.df[, c(".id", 
+                                               "barcode", 
+                                               "seqname", 
+                                               "ori", 
+                                               "start_pos", 
+                                               "total_mapped")]
+FandR_reads.vec <- unique(filtered_mapping.df[duplicated(filtered_mapping.df$barcode, 
+                                                         fromLast=TRUE), 
+                                              'barcode' ])
+
+tib_distance_mapping <- as_tibble(distance_mapping.df[distance_mapping.df$barcode %in% 
+                                                        FandR_reads.vec, ])
+
+tib_dist <- tib_distance_mapping[, c(".id", "barcode", "start_pos")] %>% 
+  group_by(barcode) %>% 
+  dplyr::summarise(dist = diff(start_pos))
+
+tib_dist$trans <- as.integer(tib_dist$dist > 1000)
+
+# I can quickly visualise how close read 1 and 2 align. Here I plot the amount of barcodes
+# that have a set distance
+ggplot(tib_dist, aes(barcode, sort(log10(dist))), fill = trans) + 
+  geom_bar(stat = "identity") + 
+  theme(axis.text.x = element_blank(), axis.ticks.x = element_blank())
+
+
+# Which are the barcodes that map so far ? 
+head(arrange(tib_dist, desc(dist)), n = 10L)
+tib_longdist <- tib_dist[tib_dist$dist > 1100, ]
+vec_longdistBC <- tib_longdist$barcode
+
+# Let's check those on the distance mapping data frame.
+arrange(filtered_mapping.df[filtered_mapping.df$barcode %in% vec_longdistBC, ], barcode)
+length(vec_longdistBC)
+```
+
+
+There is a good amount of barcodes that have F and R reads in close proximity (max 1kb away). The 9 integrations (out of 1893) that have higher distances also map to different chromosomes, these were bad ligations and we trust the reverse read the the correct integration (read .2).
+
+The ratio of bad ligations is very low here, already visible from plot 2 in the mapping QC. 
+
+# Indel barcode counts  
+  
+## Raw, non genuine, mapped and unmapped barcodes.    
+```{r}
+# Let's group the starcode barcodes by experiment. 
+p <- ggplot(starcode.counts, aes(x=sample, y=V1, fill=type))
+for (i in 1:length(unique(starcode.counts$exp))) {
+  plot <- p +  geom_bar(stat="identity", 
+                        position=position_dodge(), 
+                        data = subset(starcode.counts , exp == i)) + 
+          theme(axis.text.x=element_text(angle=45,hjust=1,vjust=1)) + 
+          facet_grid(type ~ .)
+  print(plot)
+}
+
+
+for (i in 1:length(unique(starcode.counts$exp))) {
+  plot <- p +  geom_bar(stat="identity", 
+                        data = subset(starcode.counts , 
+                                      exp == i & 
+                                        type != "raw")) + 
+          theme(axis.text.x=element_text(angle = 45, 
+                                         hjust = 1, 
+                                         vjust = 1, 
+                                         size=5))
+  print(plot)
+}
+
+for (i in 1:length(unique(starcode.counts$exp))) {
+  plot <- p +  geom_bar(stat="identity", 
+                        position = "fill",
+                        data = subset(starcode.counts , 
+                                      exp == i & 
+                                        type != "raw")) + 
+          theme(axis.text.x=element_text(angle = 45, 
+                                         hjust = 1, 
+                                         vjust = 1, 
+                                         size=5))
+  print(plot)
+}
+```
+## Data output pour the next scripts
+We need bedfiles of 1kb surrounding the integration sites for all the barcodes. The mapped barcodes from read 2 (A.2 and B.2)
+```{r}
+# Filter out the mapping from read 1, keep read 2. 
+mapped.integrations.df <- filtered_mapping.df[filtered_mapping.df$.id %in% c("A.2", "B.2"), ]
+mapped.integrations.df$seqname <- as.character(mapped.integrations.df$seqname)
+
+# Make start and end 1kb apart.
+mapped.integrations.df$end_pos <- mapped.integrations.df$start_pos+500
+mapped.integrations.df$start_pos <- mapped.integrations.df$start_pos-500
+
+# Organise the columns for bed file export.
+bed.mapped.integrations.df <- mapped.integrations.df[, c("seqname", 
+                                                         "start_pos", 
+                                                         "end_pos", 
+                                                         "barcode", 
+                                                         "ori")]
+
+# Let's export this data frame to a bed file for the means chip script and hidden domains from christ
+setwd("/DATA/projects/DSBrepair/data/")
+filename <- SetFileName("_Mapping_RSTP2_2000_broad.bed", "rs")
+write.table(bed.mapped.integrations.df, 
+            file=filename, 
+            quote=F, 
+            sep="\t", 
+            row.names=F, 
+            col.names=F)
+
+# Let's also make a data file for the chromatin analysis.
+setwd("/DATA/projects/DSBrepair/data/R/")
+analysis.mapped.integrations.df <- mapped.integrations.df[, c("seqname", 
+                                                              "start_pos", 
+                                                              "end_pos", 
+                                                              "ori", 
+                                                              "barcode", 
+                                                              "reads1", 
+                                                              "mapq_1", 
+                                                              "freq1")]
+
+filename <- SetFileName("_Analyis_Mapping_RSTP2_2000.txt", "rs")
+write.table(analysis.mapped.integrations.df, 
+            file=filename, 
+            quote=F, 
+            sep="\t", 
+            row.names=F, 
+            col.names=T)
+
+# RData for the next scripts
+filename <- SetFileName("_Analyis_Mapping_RSTP2_2000.RData", "rs")
+save(analysis.mapped.integrations.df, file = filename)
+```
+
+# Session Info  
+```{r}
+sessionInfo()
+getwd()
+date()
+paste("Run time: ",format(Sys.time()-StartTime))
+
+```
