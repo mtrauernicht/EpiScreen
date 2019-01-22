@@ -155,7 +155,6 @@ indel.statistics.df$replicate <- gsub("^.*_(.*?)_.*", "\\1", rownames(indel.stat
 
 
 ```{r}
-rownames(indel.statistics.df)
 low.reads.indel.stat.df <- indel.statistics.df[order(indel.statistics.df[, "reads"]), ][1:100, ]
 mypalette5<-brewer.pal(5,"Greens")
 
