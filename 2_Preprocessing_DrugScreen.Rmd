@@ -310,7 +310,7 @@ n.samples <- length(df.list)
 ```
 
 ### Select true barcodes and exclude low read counts
-```{r}
+```{r preprocessing}
 # Call true barcodes
 df.list <- mclapply(df.list, CallTrueBarcodes, mc.cores = 10)
 
@@ -393,8 +393,6 @@ nc_pm_fraction.df %>% group_by(variable) %>% summarise(mean = mean(value), media
 
 ```
   
-In this plot we see that on average we have a very acceptable amount of not-clear reads. There are some peaks, what are they from?
-  
 ```{r}
 # What are the top non clear barcodes?
 non.indels.df[order(non.indels.df$nc_fraction, decreasing = T)[1:30],]
@@ -422,202 +420,159 @@ non.indels.df[order(non.indels.df$pm_fraction, decreasing = T)[1:20],]
 
 Again the same barcode pops up.
 
-This all looks good to me. But before we continue let's remove the barcode with the weird indels. 
-This can be done in case we want to get rid of the low-reads barcode.
+We can remove the barcode in case we want to get rid of it.
 
 ```{r}
 # mutations.list <- lapply(mutations.list, 
 #                          RemoveBarcodeFromList_RN , 
-#                          barcode = c("CATGAGTATTGGGACG.A"))
+#                          barcode = c("ACCCCTAAAGGCGCTG"))
 # mutations.list <- lapply(mutations.list, 
 #                          RemoveBarcodeFromList_RN , 
-#                          barcode = c("CCCACCCAGCCCACGT.A"))
+#                          barcode = c("ACCCCTAAAGGCGCTG"))
 # 
 # total.reads.mutations.list <- lapply(total.reads.mutations.list, 
 #                                      RemoveBarcodeFromList_barcode, 
-#                                      barcode = c("CATGAGTATTGGGACG.A"))
+#                                      barcode = c("ACCCCTAAAGGCGCTG"))
 # total.reads.mutations.list <- lapply(total.reads.mutations.list, 
 #                                      RemoveBarcodeFromList_barcode, 
-#                                      barcode = c("CCCACCCAGCCCACGT.A"))
+#                                      barcode = c("ACCCCTAAAGGCGCTG"))
 # dim(total.reads.mutations.list$`indel_9_B_LBR2_-`)
 ```
 
 
 ```{r}
-# Let's make the sums of all the standard LBR2 samples (no drugs, DMSO, 64h)
-norm.mutations.list <- lapply(mutations.list, function(df) {
-  df <- df/sum(df)
-  df
-})
+# Let's make the sums of different sample groups
+# norm.mutations.list <- lapply(mutations.list, function(df) {
+#   df <- df/sum(df)
+#   df
+# })
 
 # transform rownames to 1 column in all the samples
-norm.mutations.dt.list <- copy(norm.mutations.list)
-norm.mutations.dt.list <- lapply(norm.mutations.dt.list, setDT, keep.rownames = TRUE)
+# norm.mutations.dt.list <- copy(norm.mutations.list)
+# norm.mutations.dt.list <- lapply(norm.mutations.dt.list, setDT, keep.rownames = TRUE)
 mutations.dt.list <- copy(mutations.list)
 mutations.dt.list <- lapply(mutations.dt.list, setDT, keep.rownames = TRUE)
+
 # Make the sample lists: 
-##### LBR2 and DMSO #####
+##### Rep 1,2,3 #####
 # Select the samples (in a ugly way but it works..)
-# LBR2.64h.samples <- samples.names[-grep("si|NU|GSK|BIX|92|88|16|ODN3|GFP|LBR1|-guide", samples.names)]
 samples.names <- names(mutations.dt.list)
+rep1.10um.samples <- samples.names[-grep("rep2|rep3|1um|100nm", samples.names)]
+rep1.1um.samples <- samples.names[-grep("rep2|rep3|10um|100nm", samples.names)]
+rep1.100nm.samples <- samples.names[-grep("rep1|rep3|10um|1um", samples.names)]
+rep2.10um.samples <- samples.names[-grep("rep1|rep3|1um|100nm", samples.names)]
+rep2.1um.samples <- samples.names[-grep("rep1|rep3|10um|100nm", samples.names)]
+rep2.100nm.samples <- samples.names[-grep("rep1|rep3|10um|1um", samples.names)]
+rep3.10um.samples <- samples.names[-grep("rep1|rep2|1um|100nm", samples.names)]
+rep3.1um.samples <- samples.names[-grep("rep1|rep2|10um|100nm", samples.names)]
+rep3.100nm.samples <- samples.names[-grep("rep1|rep2|10um|1um", samples.names)]
 
 
 # take the samples - bind rows - remove NA's - group by barcode - sum the same barcodes - tib to DT
 alles.tib <- mutations.dt.list %>% 
   bind_rows() %>% NAToZero() %>% group_by(rn) %>% summarise_all(.funs = sum) %>% as.data.table()
 
-ggplot(alles.tib) +
-  geom_bar(aes(x=))
-
-LBR2.64h.tib <- norm.mutations.dt.list[LBR2.64h.samples] %>% 
+rep1.10um.tib <- mutations.dt.list[rep1.10um.samples] %>% 
   bind_rows() %>% NAToZero() %>% group_by(rn) %>% summarise_all(.funs = sum) %>% as.data.table()
 
-LBR2.64h.reads <- total.reads.mutations.list[LBR2.64h.samples] %>% 
+rep1.1um.tib <- mutations.dt.list[rep1.1um.samples] %>% 
+  bind_rows() %>% NAToZero() %>% group_by(rn) %>% summarise_all(.funs = sum) %>% as.data.table()
+
+rep1.100nm.tib <- mutations.dt.list[rep1.100nm.samples] %>% 
+  bind_rows() %>% NAToZero() %>% group_by(rn) %>% summarise_all(.funs = sum) %>% as.data.table()
+
+rep2.10um.tib <- mutations.dt.list[rep2.10um.samples] %>% 
+  bind_rows() %>% NAToZero() %>% group_by(rn) %>% summarise_all(.funs = sum) %>% as.data.table()
+
+rep2.1um.tib <- mutations.dt.list[rep2.1um.samples] %>% 
+  bind_rows() %>% NAToZero() %>% group_by(rn) %>% summarise_all(.funs = sum) %>% as.data.table()
+
+rep2.100nm.tib <- mutations.dt.list[rep2.100nm.samples] %>% 
+  bind_rows() %>% NAToZero() %>% group_by(rn) %>% summarise_all(.funs = sum) %>% as.data.table()
+
+rep3.10um.tib <- mutations.dt.list[rep3.10um.samples] %>% 
+  bind_rows() %>% NAToZero() %>% group_by(rn) %>% summarise_all(.funs = sum) %>% as.data.table()
+
+rep3.1um.tib <- mutations.dt.list[rep3.1um.samples] %>% 
+  bind_rows() %>% NAToZero() %>% group_by(rn) %>% summarise_all(.funs = sum) %>% as.data.table()
+
+rep3.100nm.tib <- mutations.dt.list[rep3.100nm.samples] %>% 
+  bind_rows() %>% NAToZero() %>% group_by(rn) %>% summarise_all(.funs = sum) %>% as.data.table()
+
+
+#### Controls: PAO, DMSO, Mirin, DNA-PKi ####
+# Select the samples (in a ugly way but it works..)
+samples.names <- names(mutations.dt.list)
+PAO.samples <- samples.names[grep("A1_|A12_", samples.names)]
+DMSO.samples <- samples.names[grep("B1_|B12_", samples.names)]
+Mirin.samples <- samples.names[grep("C1_|C12_", samples.names)]
+DNA.PKi.samples <- samples.names[grep("D1_|D12_", samples.names)]
+
+# take the samples - bind rows - remove NA's - group by barcode - sum the same barcodes - tib to DT
+PAO.tib <- mutations.dt.list[PAO.samples] %>% 
+  bind_rows() %>% NAToZero() %>% group_by(rn) %>% summarise_all(.funs = sum) %>% as.data.table()
+
+DMSO.tib <- mutations.dt.list[DMSO.samples] %>% 
+  bind_rows() %>% NAToZero() %>% group_by(rn) %>% summarise_all(.funs = sum) %>% as.data.table()
+
+DMSO.reads <- total.reads.mutations.list[DMSO.samples] %>% 
   bind_rows() %>% group_by(barcode) %>% summarise_all(.funs = sum) %>% as.data.table()
-dim(LBR2.64h.reads)
+dim(DMSO.reads)
 
-##### LBR2 #####
-# Select the samples (in a ugly way but it works..)
-samples.names <- names(norm.mutations.dt.list)
-LBR2._.64h.samples <- samples.names[-grep("si|NU|GSK|BIX|92|88|16|ODN3|GFP|LBR1|-guide|DMSO", samples.names)]
-# take the samples - bind rows - remove NA's - group by barcode - sum the same barcodes - tib to DT
-LBR2._.64h.tib <- norm.mutations.dt.list[LBR2._.64h.samples] %>% 
+Mirin.tib <- mutations.dt.list[Mirin.samples] %>% 
   bind_rows() %>% NAToZero() %>% group_by(rn) %>% summarise_all(.funs = sum) %>% as.data.table()
 
-LBR2._.64h.reads <- total.reads.mutations.list[LBR2._.64h.samples] %>% 
-  bind_rows() %>% group_by(barcode) %>% summarise_all(.funs = sum) %>% as.data.table()
-dim(LBR2._.64h.reads)
-
-#### DMSO ####
-# Select the samples (in a ugly way but it works..)
-samples.names <- names(norm.mutations.dt.list)
-LBR2.DMSO.64h.samples <- samples.names[-grep("si|NU|GSK|BIX|92|88|16|ODN3|GFP|LBR1|-guide", samples.names)]
-LBR2.DMSO.64h.samples <- LBR2.DMSO.64h.samples[grep("DMSO", LBR2.DMSO.64h.samples)]
-# take the samples - bind rows - remove NA's - group by barcode - sum the same barcodes - tib to DT
-LBR2.DMSO.64h.tib <- norm.mutations.dt.list[LBR2.DMSO.64h.samples] %>% 
+DNA.PKi.tib <- mutations.dt.list[DNA.PKi.samples] %>% 
   bind_rows() %>% NAToZero() %>% group_by(rn) %>% summarise_all(.funs = sum) %>% as.data.table()
 
-LBR2.DMSO.64h.reads <- total.reads.mutations.list[LBR2.DMSO.64h.samples] %>% 
-  bind_rows() %>% group_by(barcode) %>% summarise_all(.funs = sum) %>% as.data.table()
-dim(LBR2.DMSO.64h.reads)
 
-##### LBR2 NU #####
-# Select the samples (in a ugly way but it works..)
-LBR2.NU7441.64h.samples <- samples.names[grep("NU", samples.names)]
-LBR2.NU7441.64h.samples <- LBR2.NU7441.64h.samples[-grep("si|GSK|BIX|92|88|16|ODN3|GFP|LBR1|-guide", LBR2.NU7441.64h.samples)]
-LBR2.NU7441.64h.list <- norm.mutations.dt.list[LBR2.NU7441.64h.samples]
-# take the samples - bind rows - remove NA's - group by barcode - sum the same barcodes - tib to DT
-LBR2.NU7441.64h.tib <- norm.mutations.dt.list[LBR2.NU7441.64h.samples] %>% 
-  bind_rows() %>% NAToZero() %>% group_by(rn) %>% summarise_all(.funs = sum) %>% as.data.table()
 
-LBR2.NU7441.64h.reads <- total.reads.mutations.list[LBR2.NU7441.64h.samples] %>% 
-  bind_rows() %>% group_by(barcode) %>% summarise_all(.funs = sum) %>%
-  as.data.table()
-dim(LBR2.NU7441.64h.reads)
 
-##### LBR ssODN #####
-# Select the samples (in a ugly way but it works..)
-LBR2.ssODN.DMSO.64h.samples <- samples.names[grep("ODN3", samples.names)]
-LBR2.ssODN.DMSO.64h.samples <- LBR2.ssODN.DMSO.64h.samples[-grep("si|NU|GSK|BIX|92|88|16|GFP", LBR2.ssODN.DMSO.64h.samples)]
-# take the samples - bind rows - remove NA's - group by barcode - sum the same barcodes - tib to DT
-LBR2.ssODN.DMSO.64h.list <- norm.mutations.dt.list[LBR2.ssODN.DMSO.64h.samples]
-LBR2.ssODN.DMSO.64h.tib <- norm.mutations.dt.list[LBR2.ssODN.DMSO.64h.samples] %>% 
-  bind_rows() %>% NAToZero() %>% group_by(rn) %>% summarise_all(.funs = sum) %>%
-  as.data.table()
+control.indel.list <- list(PAO.tib,
+                          DMSO.tib,
+                          Mirin.tib,
+                          DNA.PKi.tib)
 
-LBR2.ssODN.DMSO.64h.reads <- total.reads.mutations.list[LBR2.ssODN.DMSO.64h.samples] %>% 
-  bind_rows() %>% group_by(barcode) %>% summarise_all(.funs = sum) %>%
-  as.data.table()
-dim(LBR2.ssODN.DMSO.64h.reads)
+names(control.indel.list) <- c("indel_PAO",
+                              "indel_DMSO",
+                              "indel_Mirin", 
+                              "indel_DNA.PKi")
 
-##### LBR ssODN NU #####
-# Select the samples (in a ugly way but it works..)
-LBR2.ssODN.NU7441.64h.samples <- samples.names[grep("ODN3", samples.names)]
-LBR2.ssODN.NU7441.64h.samples <- 
-  LBR2.ssODN.NU7441.64h.samples[-grep("si|GSK|BIX|92|88|16|GFP|DMSO",
-                                      LBR2.ssODN.NU7441.64h.samples)]
-# take the samples - bind rows - remove NA's - group by barcode - sum the same barcodes - tib to DT
-LBR2.ssODN.NU7441.64h.list <- norm.mutations.dt.list[LBR2.ssODN.NU7441.64h.samples]
-LBR2.ssODN.NU7441.64h.tib <- norm.mutations.dt.list[LBR2.ssODN.NU7441.64h.samples] %>% 
-  bind_rows() %>% NAToZero() %>% group_by(rn) %>% summarise_all(.funs = sum) %>% 
-  as.data.table()
+control.reads.list <- list(PAO.reads,
+                          DMSO.reads,
+                          Mirin.reads,
+                          DNA.PKi.reads)
 
-LBR2.ssODN.NU7441.64h.reads <- total.reads.mutations.list[LBR2.ssODN.NU7441.64h.samples] %>% 
-  bind_rows() %>% group_by(barcode) %>% summarise_all(.funs = sum) %>%
-  as.data.table()
-dim(LBR2.ssODN.NU7441.64h.reads)
+names(control.reads.list) <- c("indel_PAO",
+                              "indel_DMSO",
+                              "indel_Mirin", 
+                              "indel_DNA.PKi")
 
-##### LBR late #####
-# Select the samples (in a ugly way but it works..)
-LBR2.88h.samples <- samples.names[-grep("si|NU|GSK|BIX|64|16|ODN3|GFP|-guide|LBR1", 
-                                        samples.names)]
-LBR2.88h.samples <- LBR2.88h.samples[grep("88|92", LBR2.88h.samples)]
-# take the samples - bind rows - remove NA's - group by barcode - sum the same barcodes - tib to DT
-LBR2.88h.tib <- norm.mutations.dt.list[LBR2.88h.samples] %>% 
-  bind_rows() %>% NAToZero() %>% group_by(rn) %>% summarise_all(.funs = sum) %>% as.data.table()
+control.mutations.dt.list <- c(control.indel.list, mutations.dt.list)
 
-LBR2.88h.reads <- total.reads.mutations.list[LBR2.88h.samples] %>% 
-  bind_rows() %>% group_by(barcode) %>% summarise_all(.funs = sum) %>%
-  as.data.table()
-dim(LBR2.88h.reads)
+control.reads.dt.list <- c(control.reads.list, total.reads.mutations.list)
 
-summed.indel.list <- list(LBR2.64h.tib,
-                          LBR2._.64h.tib,
-                          LBR2.DMSO.64h.tib,
-                          LBR2.NU7441.64h.tib, 
-                          LBR2.ssODN.DMSO.64h.tib, 
-                          LBR2.ssODN.NU7441.64h.tib, 
-                          LBR2.88h.tib)
-
-names(summed.indel.list) <- c("indel_sum_AB_LBR2_64h",
-                              "indel_sum_AB_LBR2_-_64h",
-                              "indel_sum_AB_LBR2_DMSO_64h", 
-                              "indel_sum_AB_LBR2_NU7441_64h", 
-                              "indel_sum_AB_LBR2_ssODN3_DMSO_64h", 
-                              "indel_sum_AB_LBR2_ssODN3_NU7441_64h", 
-                              "indel_sum_AB_LBR2_88h")
-
-summed.reads.list <- list(LBR2.64h.reads, 
-                          LBR2._.64h.reads,
-                          LBR2.DMSO.64h.reads, 
-                          LBR2.NU7441.64h.reads, 
-                          LBR2.ssODN.DMSO.64h.reads, 
-                          LBR2.ssODN.NU7441.64h.reads, 
-                          LBR2.88h.reads)
-
-names(summed.reads.list) <- c("indel_sum_AB_LBR2_64h", 
-                              "indel_sum_AB_LBR2_-_64h",
-                              "indel_sum_AB_LBR2_DMSO_64h",
-                              "indel_sum_AB_LBR2_NU7441_64h", 
-                              "indel_sum_AB_LBR2_ssODN3_DMSO_64h", 
-                              "indel_sum_AB_LBR2_ssODN3_NU7441_64h", 
-                              "indel_sum_AB_LBR2_88h")
-
-all.norm.mutations.dt.list <- c(summed.indel.list, norm.mutations.dt.list)
-
-all.norm.reads.dt.list <- c(summed.reads.list, total.reads.mutations.list)
-
-all.mutations.df.list <- lapply(all.norm.mutations.dt.list, function(x) {
-  x <- as.data.frame(x)
-  x <- x[ , mixedsort(colnames(x))]
-  rownames(x) <- x[, "rn"]
-  x$rn <- NULL
-  x
-})
+# control.mutations.df.list <- lapply(control.mutations.dt.list, function(x) {
+#   x <- as.data.frame(x)
+#   x <- x[ , mixedsort(colnames(x))]
+#   rownames(x) <- x[, "rn"]
+#   x$rn <- NULL
+#   x
+# })
 
 # ### STILL WORKING ON THIS -- how to multiply each row by the same row in the other list.
-all.norm.mutations.df.list <- mapply(function(x, y) {
-  df <- x*y$sum
-  df}, x = all.mutations.df.list, 
-  y = all.norm.reads.dt.list) 
+# control.mutations.df.list <- mapply(function(x, y) {
+#   df <- x*y$sum
+#   df}, x = all.mutations.df.list, 
+#   y = all.norm.reads.dt.list) 
 
 ```
 
 
 ```{r}
-total.reads.mutations.df <- ldply(all.norm.reads.dt.list, data.frame)
-all.indels.norm.df <- ldply(all.norm.mutations.df.list, data.frame)
-summarise(total.reads.mutations.df)
+reads.df <- ldply(total.reads.mutations.list, data.frame)
+indels.df <- ldply(mutations.dt.list, data.frame)
+# ? summarise(control.reads.df)
 # Merge them all together
 
 
@@ -625,29 +580,49 @@ summarise(total.reads.mutations.df)
 
 
 # Indel proportions data frame. 
-We will not calculate the +1 / -7 ratios, we will count the proportion of -22, -14 -7, +1 and +2. I want to have the total insertions, total deletions and efficiences. 
+ 
 ```{r calculate_ratios}
-RSTP2_2000_mutations.df <- total.reads.mutations.df
+RSTP2_2000_indels.df <- indels.df
 # Assing condition and plasmid tranfection from the sample names to a column.
-RSTP2_2000_mutations.df$experiment <- gsub("indel_(.*?)_.*", "\\1", 
-                                            RSTP2_2000_mutations.df$.id)
-RSTP2_2000_mutations.df$condition <- gsub("indel_.*?_.*?_.*?_.*?(.*?)", "\\1", 
-                                           RSTP2_2000_mutations.df$.id)
-RSTP2_2000_mutations.df$plasmid <- gsub("indel_.*?_.*?_(.*?)_.*", "\\1", 
-                                         RSTP2_2000_mutations.df$.id)
-# Adding the timepoints
-RSTP2_2000_mutations.df$time <- 64
-RSTP2_2000_mutations.df$time[grep(".*_t16$", RSTP2_2000_mutations.df$.id)] <- 16
-RSTP2_2000_mutations.df$time[grep(".*_t88$", RSTP2_2000_mutations.df$.id)] <- 88
-RSTP2_2000_mutations.df$time[grep(".*_t92$", RSTP2_2000_mutations.df$.id)] <- 88
+RSTP2_2000_indels.df$rep <- gsub(".*m_rep(.*?)_.*", "\\1", 
+                                            RSTP2_2000_indels.df$.id)
+RSTP2_2000_indels.df$plate <- gsub(".*_plate(.*?)_.*", "\\1", 
+                                           RSTP2_2000_indels.df$.id)
+RSTP2_2000_indels.df$conc <- gsub("_rep.*", "\\1", 
+                                         RSTP2_2000_indels.df$.id)
+RSTP2_2000_indels.df$Number <- gsub(".*_plate.*_.*(.*?)","\\1", RSTP2_2000_indels.df$.id)
+
+# Import the drugs and match with the df
+drugs.list <- read.delim("mt20190123_EpigeneticDrugList.txt")
+RSTP2_2000_indels.df <- merge(drugs.list, RSTP2_2000_indels.df)
+
+# Calculate the +1/-7 ratio
+RSTP2_2000_indels.df$ratio <- RSTP2_2000_indels.df$X1 / RSTP2_2000_indels.df$X.7
+
+# Calculate the overall indel ratio
+RSTP2_2000_indels.df <- mutate_all(RSTP2_2000_indels.df, funs(replace(., is.na(.), 0)))
+RSTP2_2000_indels.df$all.indels <- rowSums(RSTP2_2000_indels.df[,c(7:53,55:118)])
+RSTP2_2000_indels.df$overall.ratio <- RSTP2_2000_indels.df[,"X0"] / (RSTP2_2000_indels.df[,"X0"] + RSTP2_2000_indels.df[,"all.indels"])
+# Calculate the efficiency
+RSTP2_2000_indels.df$efficiency <- (1 - RSTP2_2000_indels.df[,"overall.ratio"])
+
+
+
+
+
+
+
+
+
+
 
 # Let's plot the distribution of the amount of reads per barcode
-p <- ggplot(RSTP2_2000_mutations.df, aes(log10(sum)))
+p <- ggplot(RSTP2_2000_indels.df, aes(log10(sum)))
 p + geom_density()
 
 # We can repeat all this for the efficiencies. 
 # Fist make one dataframe for all the effiencies, deletions and insertions
-efficiency.df <- lapply(all.norm.mutations.df.list, CalculateEfficiencies) %>% 
+efficiency.df <- lapply(mutations.dt.list, CalculateEfficiencies) %>% 
   ldply(., data.frame)
 
 deletions.df <- lapply(all.norm.mutations.df.list, CalculateDeletions) %>% 
@@ -752,7 +727,7 @@ save(tib_indel_ratios, file = filename)
 ## Processed data export
 The files will be saved in the processed data folder.
 ```{r export}
-setwd("/DATA/projects/DSBrepair/data/R/")
+setwd("/DATA/usr/m.trauernicht/EpiScreen/epigenetic-screening-on-trip-clone")
 # The mutations list that can be loaded for the indel spectra plots.
 filename <- SetFileName("_All.IndelFreqData.RData", "rs")
 save(all.norm.mutations.df.list, file = filename)
