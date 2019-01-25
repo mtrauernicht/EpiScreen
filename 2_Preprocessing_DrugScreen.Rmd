@@ -1,6 +1,6 @@
 ---
 title: "Indels Preprocessing"
-author: "Ruben Schep"
+author: "Max Trauernicht & Ruben Schep"
 date: "`r format(Sys.time(), '%Y-%m-%d')`"
 output: 
   html_document:
@@ -71,7 +71,6 @@ Date <- substr(gsub("-","",Sys.time()),1,8)
 # libraries:
 # library(devtools)
 # install_github("lawremi/rtracklayer")
-# install_github("cran/gtools")
 library(tidyr)
 library(plyr)
 library(dplyr)
@@ -80,10 +79,10 @@ library(ggplot2)
 library(car)
 library(parallel)
 library(gtools)
-# library(rtracklayer)
+library(rtracklayer)
 ```
 ## Custom functions
-Functions used
+Functions used include all functions that have been used previously by Ruben (some of them might not be needed anymore, but are kept anyway). Functions 'CallTrueBarcodes' & 'RemoveLowReads' have been added by Max.
 ```{r functions}
 SetFileName <- function(filename, initials) {
   # Set filename with extension and initials to make filename with date integrated.
@@ -105,15 +104,6 @@ RemoveLowReads <- function(reads) {
     reads 
   } 
 }
-
-RemoveEmptyDfs <- function(rem) {
-  if (is.null(rem) == TRUE) {
-    rm(rem)
-  } else {
-    rem
-  }
-}
-
 
 Read_Counts <- function(x) {
   #This function sums all the reads per barcode
@@ -288,23 +278,30 @@ CalculateDeletions <- function(deletions) {
 ```
 
 ## Data import
-Data import from mapping. These files were generated on 30.09.2018, with a minimum of 500 reads per barcode in the mutation calling.
+Data import from mapping, files were generated on 21.01.2019.
 ```{r import}
 # Set directory to the mutation output folder of the CRISPR-TRIP snakemake script
 setwd("/DATA/projects/DSBrepair/data/5280_DrugScreen/processed/mutation_counts")
+
 # Import files in list and make individual tables
-# I use this if all the samples are good. Here however I do not use all the samples. 
 file.list <- list.files(pattern='*[.]raw_count.table')
 
-# Import barcode list
+# Import RSTP2 clone 5 barcode list (in total 20 barcodes)
 barcodes.list <- c("AGGGCGTAAAATATTT", "TATGGCTGTCGGGTAG", "TGTCCCTTAGTACTTT", "AGAAAATAATATGACG","CGGCCTGAAGGTCAGG","TTGAACGCGGGCTCGG","GCTAACATCACGAATC","GCGCACCCTTTAATTG","ACTGTCGAGTTGTCCG","CCGGGGACGTATGCAC","TCTTTTGAGGAGCTGA","ATATCGTTGCTGGAGA","CATCCACCACACTTCA","ACCCCTAAAGGCGCTG","ATACTATATTTAACGG","CATTTCTGATCAATAA","CTCTTAATCGCTGCC","GAGCGCGTCACCGGGT","GTACCTCTCGATAGTG","TGGCCAATATTTGTCT")
 
-# import the data
+# Import drug list 
+setwd("/DATA/usr/m.trauernicht/EpiScreen/epigenetic-screening-on-trip-clone/Data/")
+drugs.list <- read.delim("mt20190123_EpigeneticDrugList.txt")
+
+# Create a df with all the mutation_count data
 df.list <- mclapply(file.list, read.table, mc.cores = 20, stringsAsFactors = FALSE)
+
 # rename the lists
 names(df.list) <- gsub('(*?)[.]ra.*', '\\1', file.list)
+
 # these are the samples
 head(names(df.list))
+
 # count the sample number
 n.samples <- length(df.list)
 ```
@@ -361,10 +358,12 @@ I found out that some barcodes overlap in A and B but do not have the same integ
 total.reads.df <- ldply(total.reads.list, data.frame)
 point.mut.df <- ldply(point.mut.list, data.frame)
 not.clear.df <- ldply(not.clear.list, data.frame)
+
 # Merge them all together
 non.indels.df <- list(total.reads.df, point.mut.df, not.clear.df) %>% 
   join_all(., by = c(".id", "barcode"),  match = "first")  %>%
   mutate_all(funs(replace(., is.na(.), 0)))
+
 # Calculate the fraction of not clear
 non.indels.df$nc_fraction <- non.indels.df$not_clear/non.indels.df$sum*100
 non.indels.df$pm_fraction <- non.indels.df$point_mut/non.indels.df$sum*100
@@ -593,7 +592,6 @@ RSTP2_2000_indels.df$conc <- gsub("_rep.*", "\\1",
 RSTP2_2000_indels.df$Number <- gsub(".*_plate.*_.*(.*?)","\\1", RSTP2_2000_indels.df$.id)
 
 # Import the drugs and match with the df
-drugs.list <- read.delim("mt20190123_EpigeneticDrugList.txt")
 RSTP2_2000_indels.df <- merge(drugs.list, RSTP2_2000_indels.df)
 
 # Calculate the +1/-7 ratio
@@ -601,7 +599,9 @@ RSTP2_2000_indels.df$ratio <- RSTP2_2000_indels.df$X1 / RSTP2_2000_indels.df$X.7
 
 # Calculate the overall indel ratio
 RSTP2_2000_indels.df <- mutate_all(RSTP2_2000_indels.df, funs(replace(., is.na(.), 0)))
-RSTP2_2000_indels.df$all.indels <- rowSums(RSTP2_2000_indels.df[,c(7:53,55:118)])
+RSTP2_2000_indels.df$read.count <- rowSums(RSTP2_2000_indels.df[,c(7:118)])
+RSTP2_2000_indels.df$read.count1.7 <- rowSums(RSTP2_2000_indels.df[,c(47,55)])
+RSTP2_2000_indels.df$all.indels <- rowSums(RSTP2_2000_indels.df[,c(7:53,56:118)])
 RSTP2_2000_indels.df$overall.ratio <- RSTP2_2000_indels.df[,"X0"] / (RSTP2_2000_indels.df[,"X0"] + RSTP2_2000_indels.df[,"all.indels"])
 # Calculate the efficiency
 RSTP2_2000_indels.df$efficiency <- (1 - RSTP2_2000_indels.df[,"overall.ratio"])
@@ -729,8 +729,8 @@ The files will be saved in the processed data folder.
 ```{r export}
 setwd("/DATA/usr/m.trauernicht/EpiScreen/epigenetic-screening-on-trip-clone")
 # The mutations list that can be loaded for the indel spectra plots.
-filename <- SetFileName("_All.IndelFreqData.RData", "rs")
-save(all.norm.mutations.df.list, file = filename)
+filename <- SetFileName("RSTP2_2000_indels.df", "mt")
+save(RSTP2_2000_indels.df, file = filename)
 
 # The ratios data that can be loaded for the chromatin analysis.
 filename <- SetFileName("_All.and.mean.Ratios.RData", "rs")
