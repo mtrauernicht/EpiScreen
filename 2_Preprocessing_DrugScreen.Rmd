@@ -294,7 +294,7 @@ setwd("/DATA/usr/m.trauernicht/EpiScreen/epigenetic-screening-on-trip-clone/Data
 drugs.list <- read.delim("mt20190123_EpigeneticDrugList.txt")
 
 # Create a df with all the mutation_count data
-df.list <- mclapply(file.list, read.table, mc.cores = 20, stringsAsFactors = FALSE)
+df.list <- lapply(file.list, read.table, stringsAsFactors = FALSE)
 
 # rename the lists
 names(df.list) <- gsub('(*?)[.]ra.*', '\\1', file.list)
@@ -729,7 +729,7 @@ The files will be saved in the processed data folder.
 ```{r export}
 setwd("/DATA/usr/m.trauernicht/EpiScreen/epigenetic-screening-on-trip-clone")
 # The mutations list that can be loaded for the indel spectra plots.
-filename <- SetFileName("RSTP2_2000_indels.df", "mt")
+filename <- SetFileName("_RSTP2_2000_indels.df", "mt")
 save(RSTP2_2000_indels.df, file = filename)
 
 # The ratios data that can be loaded for the chromatin analysis.
