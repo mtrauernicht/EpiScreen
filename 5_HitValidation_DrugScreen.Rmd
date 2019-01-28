@@ -56,58 +56,59 @@ SetFileName <- function(filename, initials) {
 
 
 ## Data import
-```{r}
-# Reading in ChIP counts?
-setwd("~/mydata/Mapping_Clone5_9/chip_counts")
-file.list <- list.files(pattern='*.txt')
-mapping.list1 <- lapply(file.list, read.table,
-                       header = TRUE)
+```{r Data Import}
+setwd("~/mydata/EpiScreen/epigenetic-screening-on-trip-clone/Data/")
 
-# Reading in Domain Means
-setwd("~/mydata/Mapping_Clone5_9/domain_means")
-file.list <- list.files(pattern='*.txt')
-mapping.list2 <- lapply(file.list, read.table,
-                       header = TRUE)
+# Import data from preprocessing script
+indel.data <- get(load("mt20190128_indel.data"))
+findhits.data <- indel.data
 
-# Reading in Means
-setwd("~/mydata/Mapping_Clone5_9/means")
-file.list <- list.files(pattern='*.txt')
-mapping.list3 <- lapply(file.list, read.table,
-                       header = TRUE)
-
-# Reading in Nearest Domains 1000
-setwd("~/mydata/Mapping_Clone5_9/nearest_domains-1000-0.9")
-file.list <- list.files(pattern='*.txt')
-mapping.list4 <- lapply(file.list, read.table,
-                       header = TRUE)
+outlier.df <- get(load("mt20190128_outlier.df"))
 ```
 
-# Analysis
-names(mapping.list1)<- gsub('mapping.2000(.*?).table', 
-                           '\\1', 
-                           file.list)
-                           
-names(mapping.list2)<- gsub('mapping.2000(.*?).table', 
-                           '\\1', 
-                           file.list)   
+## Analysis
+```{r Analysis}
+# Divide data in 'closed', 'permissive', and 'open' barcodes (based on eyeballing)
+findhits.data$chr.state <- "permissive"
+findhits.data[grep("CATCCACCACACTTCA|CATTTCTGATCAATAA|ACTGTCGAGTTGTCCG|GTACCTCTCGATAGTG|TCTTTTGAGGAGCTGA|TGGCCAATATTTGTCT", findhits.data$barcode),]$chr.state <- "closed"
+findhits.data[grep("AGAAAATAATATGACG|AGGGCGTAAAATATTT|ATACTATATTTAACGG|GCTAACATCACGAATC|ATATCGTTGCTGGAGA", findhits.data$barcode),]$chr.state <- "open"
 
-names(mapping.list3)<- gsub('mapping.2000(.*?).table', 
-                           '\\1', 
-                           file.list) 
+# The same with outlier.df
+outlier.df$chr.state <- "permissive"
+outlier.df[grep("CATCCACCACACTTCA|CATTTCTGATCAATAA|ACTGTCGAGTTGTCCG|GTACCTCTCGATAGTG|TCTTTTGAGGAGCTGA|TGGCCAATATTTGTCT", outlier.df$barcode),]$chr.state <- "closed"
+outlier.df[grep("AGAAAATAATATGACG|AGGGCGTAAAATATTT|ATACTATATTTAACGG|GCTAACATCACGAATC|ATATCGTTGCTGGAGA", outlier.df$barcode),]$chr.state <- "open"
 
-names(mapping.list4)<- gsub('mapping.2000(.*?).table', 
-                           '\\1', 
-                           file.list) 
+outlier.df$chr.state <- "permissive"
+outlier.df[grep("CATCCACCACACTTCA|CATTTCTGATCAATAA|ACTGTCGAGTTGTCCG|GTACCTCTCGATAGTG|TCTTTTGAGGAGCTGA|TGGCCAATATTTGTCT", outlier.df$barcode),]$chr.state <- "closed"
+outlier.df[grep("AGAAAATAATATGACG|AGGGCGTAAAATATTT|ATACTATATTTAACGG|GCTAACATCACGAATC|ATATCGTTGCTGGAGA", outlier.df$barcode),]$chr.state <- "open"
 
-list2env (mapping.list1 ,.GlobalEnv)
+# Find drugs that have effect on one chr.state but not on the other
+# Make open, permissive & closed dfs
+open.df <- outlier.df[grep("open",outlier.df$chr.state),]
+permissive.df <- outlier.df[grep("permissive",outlier.df$chr.state),]
+closed.df <- outlier.df[grep("closed",outlier.df$chr.state),]
 
-list2env (mapping.list2 ,.GlobalEnv)
+# Make list with drugs that are outliers in open & closed state
+x1 <- intersect(open.df$Drug, closed.df$Drug)
+x2 <- intersect(open.df$Drug, permissive.df$Drug)
+x3 <- intersect(closed.df$Drug, permissive.df$Drug)
 
-list2env (mapping.list3 ,.GlobalEnv)
 
-list2env (mapping.list4 ,.GlobalEnv)
+# Delete these drugs from the outlier.df to keep interesting drugs
+outlier.df2 <- outlier.df[!outlier.df %in% x]
+xx <- outlier.df[setdiff(names(outlier.df$Drug), x)]
+outlier.df2 <- unique(grep(paste(x, collapse = "|"), outlier.df$Drug, value = TRUE))
+
+
+HDM.df <- findhits.data[grep("Histone demethylase|Negative control", findhits.data$Target),]
+ERD.df <- indel.data[grep("Epigenetic Reader Domain|Negative control", findhits.data$Target),]
+
+
+```
+
+
 ## Visualisation
-```{r}
+```{r Visualization}
 ```
 
 # Results
