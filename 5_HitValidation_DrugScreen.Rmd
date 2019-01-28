@@ -1,0 +1,132 @@
+---
+title: "Clone identification"
+author: "Ruben Schep"
+date: "`r format(Sys.time(), '%Y-%m-%d')`"
+output: 
+  html_document:
+    theme: journal #cerulean
+    highlight: monochrome
+    toc: true
+    toc_float: true
+    code_folding: show
+  editor_options:
+    chunk_output_type: console
+---
+
+# knitr document van Steensel lab
+
+# TRIP Clone identification
+
+# Introduction
+
+## Description of Data
+How to make a good rendering table: 
+```{r table1, echo=FALSE, message=FALSE, warnings=FALSE, results='asis'}
+tabl <- "
+| column1	|	column2	|	column3	|	
+|----|----|----|
+|1	|	2	|	3	|	
+|a	|	b	|	c	|	
+"
+cat(tabl) # output the table in a format good for HTML/PDF/docx conversion
+```
+
+# Data processing
+## Path, Libraries, Parameters and Useful Functions
+```{r setup}
+knitr::opts_chunk$set(echo = TRUE)
+StartTime <-Sys.time()
+
+# 8-digit Date tag:
+Date <- substr(gsub("-","",Sys.time()),1,8) 
+# libraries:
+```
+
+### Custom functions
+Functions used thoughout this script.
+```{r}
+SetFileName <- function(filename, initials) {
+  # Set filename with extension and initials to make filename with date integrated.
+  filename <- substitute(filename)
+  initials <- substitute(initials)
+  filename <- paste0(initials, Date, filename)
+  filename
+}
+```
+
+
+## Data import
+```{r}
+# Reading in ChIP counts?
+setwd("~/mydata/Mapping_Clone5_9/chip_counts")
+file.list <- list.files(pattern='*.txt')
+mapping.list1 <- lapply(file.list, read.table,
+                       header = TRUE)
+
+# Reading in Domain Means
+setwd("~/mydata/Mapping_Clone5_9/domain_means")
+file.list <- list.files(pattern='*.txt')
+mapping.list2 <- lapply(file.list, read.table,
+                       header = TRUE)
+
+# Reading in Means
+setwd("~/mydata/Mapping_Clone5_9/means")
+file.list <- list.files(pattern='*.txt')
+mapping.list3 <- lapply(file.list, read.table,
+                       header = TRUE)
+
+# Reading in Nearest Domains 1000
+setwd("~/mydata/Mapping_Clone5_9/nearest_domains-1000-0.9")
+file.list <- list.files(pattern='*.txt')
+mapping.list4 <- lapply(file.list, read.table,
+                       header = TRUE)
+```
+
+# Analysis
+names(mapping.list1)<- gsub('mapping.2000(.*?).table', 
+                           '\\1', 
+                           file.list)
+                           
+names(mapping.list2)<- gsub('mapping.2000(.*?).table', 
+                           '\\1', 
+                           file.list)   
+
+names(mapping.list3)<- gsub('mapping.2000(.*?).table', 
+                           '\\1', 
+                           file.list) 
+
+names(mapping.list4)<- gsub('mapping.2000(.*?).table', 
+                           '\\1', 
+                           file.list) 
+
+list2env (mapping.list1 ,.GlobalEnv)
+
+list2env (mapping.list2 ,.GlobalEnv)
+
+list2env (mapping.list3 ,.GlobalEnv)
+
+list2env (mapping.list4 ,.GlobalEnv)
+## Visualisation
+```{r}
+```
+
+# Results
+```{r}
+```
+
+# Conclusions
+```{r}
+```
+
+## Exporting potential data. 
+```{r}
+```
+
+# Session Info
+```{r}
+paste("Run time: ",format(Sys.time()-StartTime))
+getwd()
+date()
+sessionInfo()
+```
+
