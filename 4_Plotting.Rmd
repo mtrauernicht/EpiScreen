@@ -2,15 +2,13 @@
 title: "Plotting of the epigenetic screening results"
 author: "Max Trauernicht"
 date: "`r format(Sys.time(), '%Y-%m-%d')`"
-output:
-  pdf_document:
-    toc: yes
+output: 
   html_document:
-    code_folding: show
+    theme: journal #cerulean
     highlight: monochrome
-    theme: journal
-    toc: yes
-    toc_float: yes
+    toc: true
+    toc_float: true
+    code_folding: show
   editor_options:
     chunk_output_type: console
 ---
@@ -182,7 +180,6 @@ StatSmoothFunc <- ggproto("StatSmooth", Stat,
 
 ## Data import
 ```{r data import}
-
 setwd("~/mydata/EpiScreen/epigenetic-screening-on-trip-clone/Data/")
 
 # Import data from preprocessing script
@@ -199,6 +196,7 @@ mean.ratio.data <- read.delim("mt20190124_meanratiosperbarcode")
 # Add viability data to indel.data
 indel.data <- merge(viability.data, indel.data) 
 indel.data <- merge(mean.ratio.data, indel.data)
+
 setnames(indel.data, old = ".id", new = "condition")
 setnames(indel.data, old = "rn", new = "barcode")
 
@@ -211,9 +209,11 @@ indel.data <- indel.data[indel.data$viability > 7200,]
 # Also, we want to exclude remaining barcodes with very low reads
 indel.data <- indel.data[indel.data$read.count1.7 > 20,]
 
+
 # Remove 0, NAs, Infs
 indel.data <- indel.data[is.finite(indel.data$ratio),]
 indel.data <- indel.data[indel.data$ratio != 0,]
+
 
 # Add plate specifier
 indel.data$plate.nr <- "1"
@@ -243,6 +243,7 @@ indel.data[grep("1um_.*_plate1", indel.data$condition),]$rep.group <- "3"
 indel.data[grep("1um_.*_plate2", indel.data$condition),]$rep.group <- "4"
 indel.data[grep("100nm_.*_plate1", indel.data$condition),]$rep.group <- "5"
 indel.data[grep("100nm_.*_plate2", indel.data$condition),]$rep.group <- "6"
+
 ```
 
 
@@ -281,6 +282,52 @@ ERD.df <- indel.data[grep("Epigenetic Reader Domain|Negative control", indel.dat
 # Create an outlier dataframe
 outlier.df <- indel.data[indel.data$chisq > 3.841,] 
 outlier.df <- outlier.df[-grep("DNA-PK", outlier.df$Target),]
+indel.data$mean.ratio.new <- ave(indel.data$ratio, indel.data$barcode, FUN = function(x) mean(x))
+
+# Calculate the chi square scores
+indel.data$chisq <- ave(indel.data$logratio, indel.data$barcode, 
+                      FUN=function(x) scores(x, type = "chisq"))
+
+# Add plate specifier
+# indel.data$plate.nr <- "1"
+# indel.data[grep("10um_rep1_plate2", indel.data$.id),]$plate.nr <- "2"
+# indel.data[grep("10um_rep2_plate1", indel.data$.id),]$plate.nr <- "3"
+# indel.data[grep("10um_rep2_plate2", indel.data$.id),]$plate.nr <- "4"
+# indel.data[grep("10um_rep3_plate1", indel.data$.id),]$plate.nr <- "5"
+# indel.data[grep("10um_rep3_plate2", indel.data$.id),]$plate.nr <- "6"
+# indel.data[grep("1um_rep1_plate1", indel.data$.id),]$plate.nr <- "7"
+# indel.data[grep("1um_rep1_plate2", indel.data$.id),]$plate.nr <- "8"
+# indel.data[grep("1um_rep2_plate1", indel.data$.id),]$plate.nr <- "9"
+# indel.data[grep("1um_rep2_plate2", indel.data$.id),]$plate.nr <- "10"
+# indel.data[grep("1um_rep3_plate1", indel.data$.id),]$plate.nr <- "11"
+# indel.data[grep("1um_rep3_plate2", indel.data$.id),]$plate.nr <- "12"
+# indel.data[grep("100nm_rep1_plate1", indel.data$.id),]$plate.nr <- "13"
+# indel.data[grep("100nm_rep1_plate2", indel.data$.id),]$plate.nr <- "14"
+# indel.data[grep("100nm_rep2_plate1", indel.data$.id),]$plate.nr <- "15"
+# indel.data[grep("100nm_rep2_plate2", indel.data$.id),]$plate.nr <- "16"
+# indel.data[grep("100nm_rep3_plate1", indel.data$.id),]$plate.nr <- "17"
+# indel.data[grep("100nm_rep3_plate2", indel.data$.id),]$plate.nr <- "18"
+
+# Select reps
+indel.data$classifier <- gsub("_rep[0-9]", "\\1", indel.data$.id)
+
+indel.data$rep.group <- "1"
+indel.data[grep("10um_.*_plate2", indel.data$.id),]$rep.group <- "2"
+indel.data[grep("1um_.*_plate1", indel.data$.id),]$rep.group <- "3"
+indel.data[grep("1um_.*_plate2", indel.data$.id),]$rep.group <- "4"
+indel.data[grep("100nm_.*_plate1", indel.data$.id),]$rep.group <- "5"
+indel.data[grep("100nm_.*_plate2", indel.data$.id),]$rep.group <- "6"
+
+
+indel.data.rep1 <- indel.data[grep("rep1", indel.data$.id),]
+indel.data.rep2 <- indel.data[grep("rep2", indel.data$.id),]
+indel.data.rep3 <- indel.data[grep("rep3", indel.data$.id),]
+indel.data.rep2 <- indel.data.rep2[,c(1,15,18,19)]
+indel.data.rep3 <- indel.data.rep3[,c(1,15,18,19)]
+setnames(indel.data.rep2, old = "logratio", new = "rep2_logratio")
+setnames(indel.data.rep3, old = "logratio", new = "rep3_logratio")
+indel.data.rep4 <- merge(indel.data.rep1, indel.data.rep2)
+indel.data.rep4 <- merge(indel.data.rep4, indel.data.rep3)
 
 ```
 
@@ -341,6 +388,14 @@ ggplot(data = indel.data, aes(x=viability, y=efficiency)) +
 # Correlation efficiency vs +1/-7 ratio
 ggplot(data = indel.data) +
   geom_point(mapping = aes(x=logratio, y=efficiency, colour = Target))
+# Mean efficiency vs. mean ratio per target
+ggplot(data = indel.data, aes(x=mean.ratio.new, y=mean.eff)) + 
+  geom_point() + geom_smooth(method = lm) + 
+  stat_smooth_func(geom="text",method="lm",hjust=0,parse=TRUE)
+
+# Correlation plot viability vs. efficiency
+ggplot(data = indel.data) +
+  geom_point(mapping = aes(x=viability, y=efficiency, colour = Target))
 
 # Correlation viability vs. +1/-7 ratio
 ggplot(data = indel.data) +
@@ -387,6 +442,11 @@ ggplot(data = outlier.df, aes(x = barcode, y = logratio, colour = Target)) +
   geom_point() + theme(axis.text.x = element_text(angle = 90, hjust = 1.0, vjust = 0))
 ```
 We can see that there is a very high correlation between all 3 replicates, even when you look at the plates which have shifted amounts of reads (some wells have very low amount of reads and others have very high amounts of reads), meaning that we can use the data of all 3 replicates.
+=======
+  geom_point() + geom_smooth(method = lm) + stat_smooth_func(geom="text",method="lm",hjust=0,parse=TRUE) 
+```
+
+>>>>>>> 17dae7db6a314af4012aac1f44689dc1ac4099a6
 
 # Results
 ```{r}
