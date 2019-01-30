@@ -60,14 +60,10 @@ SetFileName <- function(filename, initials) {
 setwd("~/mydata/EpiScreen/epigenetic-screening-on-trip-clone/Data/")
 
 # Import data from preprocessing script
-indel.data <- get(load("mt20190129_indel.data"))
+indel.data <- get(load("mt20190128_indel.data"))
 findhits.data <- indel.data
 
 outlier.df <- get(load("mt20190129_outlier.df"))
-
-mapping.data <- get(load("rs20190116_RSTP2.2000.Chromatin.RData"))
-
-clone.list <- read.delim("mt20181121_barcodes_vs_clones.txt")
 ```
 
 ## Analysis
@@ -75,31 +71,30 @@ clone.list <- read.delim("mt20181121_barcodes_vs_clones.txt")
 # Divide data in 'closed', 'permissive', and 'open' barcodes (based on eyeballing)
 findhits.data$chr.state <- "permissive"
 findhits.data[grep("CATCCACCACACTTCA|CATTTCTGATCAATAA|ACTGTCGAGTTGTCCG|GTACCTCTCGATAGTG|TCTTTTGAGGAGCTGA|TGGCCAATATTTGTCT", findhits.data$barcode),]$chr.state <- "closed"
-findhits.data[grep("AGAAAATAATATGACG|AGGGCGTAAAATATTT|ATACTATATTTAACGG|GCTAACATCACGAATC", findhits.data$barcode),]$chr.state <- "open"
+findhits.data[grep("AGAAAATAATATGACG|AGGGCGTAAAATATTT|ATACTATATTTAACGG|GCTAACATCACGAATC|ATATCGTTGCTGGAGA", findhits.data$barcode),]$chr.state <- "open"
 
 # The same with outlier.df
 outlier.df$chr.state <- "permissive"
 outlier.df[grep("CATCCACCACACTTCA|CATTTCTGATCAATAA|ACTGTCGAGTTGTCCG|GTACCTCTCGATAGTG|TCTTTTGAGGAGCTGA|TGGCCAATATTTGTCT", outlier.df$barcode),]$chr.state <- "closed"
-outlier.df[grep("AGAAAATAATATGACG|AGGGCGTAAAATATTT|ATACTATATTTAACGG|GCTAACATCACGAATC", outlier.df$barcode),]$chr.state <- "open"
+outlier.df[grep("AGAAAATAATATGACG|AGGGCGTAAAATATTT|ATACTATATTTAACGG|GCTAACATCACGAATC|ATATCGTTGCTGGAGA", outlier.df$barcode),]$chr.state <- "open"
 
 outlier.df$chr.state <- "permissive"
 outlier.df[grep("CATCCACCACACTTCA|CATTTCTGATCAATAA|ACTGTCGAGTTGTCCG|GTACCTCTCGATAGTG|TCTTTTGAGGAGCTGA|TGGCCAATATTTGTCT", outlier.df$barcode),]$chr.state <- "closed"
-outlier.df[grep("AGAAAATAATATGACG|AGGGCGTAAAATATTT|ATACTATATTTAACGG|GCTAACATCACGAATC", outlier.df$barcode),]$chr.state <- "open"
+outlier.df[grep("AGAAAATAATATGACG|AGGGCGTAAAATATTT|ATACTATATTTAACGG|GCTAACATCACGAATC|ATATCGTTGCTGGAGA", outlier.df$barcode),]$chr.state <- "open"
 
 # Find drugs that have effect on one chr.state but not on the other
 # Make open, permissive & closed dfs
 open.df <- outlier.df[grep("open",outlier.df$chr.state),]
-open.df <- open.df[!duplicated(open.df$logratio.mean),]
 permissive.df <- outlier.df[grep("permissive",outlier.df$chr.state),]
-permissive.df <- permissive.df[!duplicated(permissive.df$logratio.mean),]
 closed.df <- outlier.df[grep("closed",outlier.df$chr.state),]
-closed.df <- closed.df[!duplicated(closed.df$logratio.mean),]
 
 # Make list with drugs that are outliers in open & closed state
 x1 <- intersect(open.df$Drug, closed.df$Drug)
 x2 <- intersect(open.df$Drug, permissive.df$Drug)
 x3 <- intersect(closed.df$Drug, permissive.df$Drug)
-
+x1 <- x1[!is.na(x1)]
+x2 <- x2[!is.na(x2)]
+x3 <- x3[!is.na(x3)]
 
 # Delete these drugs from the outlier.df to keep interesting drugs
 outlier.open.df <- open.df[-grep(paste(x1, collapse = "|"), open.df$Drug),]
@@ -117,20 +112,6 @@ ERD.df <- indel.data[grep("Epigenetic Reader Domain|Negative control", findhits.
 
 
 ```
-
-## Load ChIP data
-```{r}
-# Remove not needed columns
-mapping.data <- mapping.data[,c(1,77:99,101)]
-
-# Remove duplicate rows
-mapping.data <- mapping.data[!duplicated(mapping.data), ]
-
-# Filter out clone 5 barcodes
-clone.list <- clone.list[grep("clone 5", clone.list$Clone),]
-mapping.data <- merge(clone.list, mapping.data, by.x = "Barcode", by.y = "barcode")
-```
-
 
 
 ## Visualisation
