@@ -286,15 +286,15 @@ setwd("/DATA/projects/DSBrepair/data/5280_DrugScreen/processed/mutation_counts")
 # Import files in list and make individual tables
 file.list <- list.files(pattern='*[.]raw_count.table')
 
+# Create a df with all the mutation_count data
+df.list <- mclapply(file.list, read.table, mc.cores = 20, stringsAsFactors = FALSE)
+
 # Import RSTP2 clone 5 barcode list (in total 20 barcodes)
 barcodes.list <- c("AGGGCGTAAAATATTT", "TATGGCTGTCGGGTAG", "TGTCCCTTAGTACTTT", "AGAAAATAATATGACG","CGGCCTGAAGGTCAGG","TTGAACGCGGGCTCGG","GCTAACATCACGAATC","GCGCACCCTTTAATTG","ACTGTCGAGTTGTCCG","CCGGGGACGTATGCAC","TCTTTTGAGGAGCTGA","ATATCGTTGCTGGAGA","CATCCACCACACTTCA","ACCCCTAAAGGCGCTG","ATACTATATTTAACGG","CATTTCTGATCAATAA","CTCTTAATCGCTGCC","GAGCGCGTCACCGGGT","GTACCTCTCGATAGTG","TGGCCAATATTTGTCT")
 
 # Import drug list 
 setwd("/DATA/usr/m.trauernicht/EpiScreen/epigenetic-screening-on-trip-clone/Data/")
 drugs.list <- read.delim("mt20190123_EpigeneticDrugList.txt")
-
-# Create a df with all the mutation_count data
-df.list <- lapply(file.list, read.table, stringsAsFactors = FALSE)
 
 # rename the lists
 names(df.list) <- gsub('(*?)[.]ra.*', '\\1', file.list)
