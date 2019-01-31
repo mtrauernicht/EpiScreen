@@ -47,7 +47,6 @@ library(outliers)
 library(ggplot2)
 library(ggbeeswarm)
 library(data.table)
-library(modelr)
 ```
 
 ### Custom functions
@@ -264,37 +263,69 @@ indel.data$mean.viability <- ave(indel.data$viability, indel.data$Target, FUN = 
 
 # Plate normalization: substract log(DMSO.mean) for each drug per plate
 for (i in 1:18) {
-  dmso.mean <- mean(indel.data$logratio[indel.data$Drug == "DMSO" & indel.data$plate.nr == i])
-  indel.data$logratio.platenorm[indel.data$plate.nr == i] <- indel.data$logratio[indel.data$plate.nr == i] - dmso.mean
+  for (j in unique(indel.data$barcode)) {
+  dmso.mean <- mean(indel.data$logratio[indel.data$Drug == 
+                        "DMSO" & indel.data$plate.nr == 
+                        i & indel.data$barcode == j])
+  print(dmso.mean)
+  indel.data$logratio.platenorm[indel.data$plate.nr == i & indel.data$barcode == j] <- 
+    indel.data$logratio[indel.data$plate.nr == i & indel.data$barcode == j] -
+    dmso.mean
+  print(indel.data$logratio)
+  }
 }
-
 
 
 # t-test
-indel.data$barcode <- as.character(indel.data$barcode)
 indel.data$classifier <- gsub("_rep[0-9]", "\\1", indel.data$condition)
-indel.data$classi.bc <- paste(indel.data$barcode,indel.data$classifier)
 indel.data$classifier.bc <- do.call(paste, c(indel.data[c("classifier", "barcode")], sep = "_")) 
 
-ppvalue <- replicate(0, NULL)
-for (i in unique(indel.data$classi.bc)){
-  x <- indel.data[indel.data$Drug == "DMSO",]
-  y <- indel.data[indel.data$classi.bc == i,]
-  ppvalue[[i]] <- t.test(x$logratio.platenorm, y$logratio.platenorm)
+
+for (i in unique(indel.data$barcode)) {
+  
+    for (j in unique(indel.data$classifier)) {
+    x <- indel.data[indel.data$Drug == "DMSO" & indel.data$barcode == i,]
+    y <- indel.data[indel.data$classifier == j & indel.data$barcode == i,]
+    
+  if (nrow(y)>1) {
+    
+    indel.data$p.value[indel.data$classifier == j & indel.data$barcode == i] <- 
+      t.test(x$logratio.platenorm, y$logratio.platenorm)$p.value
+    
+    indel.data$statistic[indel.data$classifier == j & indel.data$barcode == i] <- 
+      t.test(x$logratio.platenorm, y$logratio.platenorm)$statistic
+  
+    indel.data$conf.int1[indel.data$classifier == j & indel.data$barcode == i] <- 
+      t.test(x$logratio.platenorm, y$logratio.platenorm)$conf.int[1]
+  
+    indel.data$conf.int2[indel.data$classifier == j & indel.data$barcode == i] <- 
+      t.test(x$logratio.platenorm, y$logratio.platenorm)$conf.int[2]
+    
+  }
+    else {
+      indel.data$p.value[indel.data$classifier == j & indel.data$barcode == i] <- 
+      t.test(x$logratio.platenorm, mu = y$logratio.platenorm)$p.value
+      
+      indel.data$statistic[indel.data$classifier == j & indel.data$barcode == i] <- 
+      t.test(x$logratio.platenorm, mu = y$logratio.platenorm)$statistic
+      
+      indel.data$conf.int1[indel.data$classifier == j & indel.data$barcode == i] <- 
+      t.test(x$logratio.platenorm, mu = y$logratio.platenorm)$conf.int[1]
+      
+      indel.data$conf.int2[indel.data$classifier == j & indel.data$barcode == i] <- 
+      t.test(x$logratio.platenorm, mu = y$logratio.platenorm)$conf.int[2]
+      
+      indel.data$conf.int <- abs(indel.data$conf.int2 - indel.data$conf.int1)
+    }
+}
 }
 
-t.list.p.value <- sapply(ppvalue, '[[', "p.value")
-t.list.statistic <- sapply(ppvalue, '[[', "statistic")
-t.list.conf.int <- sapply(ppvalue, '[', "conf.int")
+# Adjust p-values for multiple testing
+indel.data$p.value.adjust <- p.adjust(indel.data$p.value, n = 
+                                            length(indel.data$p.value))
 
-
-
-
-
-
-# t outlier df (based on 1-tail 95% confidence interval, df=10)
-t.outlier.df <- indel.data[abs(indel.data$t) > 1.8125,]
-t.outlier.df <- outlier.df[-grep("DNA-PK", t.outlier.df$Target),]
+# t outlier df
+t.outlier.df <- indel.data[abs(indel.data$statistic) > 5,]
 
 # Calculate the mean of the three replicates
 indel.data$logratio.mean <- ave(indel.data$logratio.platenorm, indel.data$classifier, indel.data$barcode, FUN = function(x) mean(x))
@@ -315,30 +346,70 @@ chi.outlier.df <- chi.outlier.df[-grep("DNA-PK", chi.outlier.df$Target),]
 
 ## Visualization
 ```{r visualization}
+# Density plots t-distribution, only Mirin & DNA-PKi
+ggplot(data = indel.data[indel.data$Drug == c("DMSO","DNA-PKi","Mirin"),], aes(x = statistic, fill = Target)) + geom_density() +
+geom_vline(data=indel.data, aes(xintercept=5),linetype="dashed", size=1) + geom_vline(data=indel.data, aes(xintercept=-5),linetype="dashed", size=1)
+
+# Density plots t-distribution
+ggplot(data = indel.data, aes(x = statistic, fill = Target)) + geom_density() +
+geom_vline(data=indel.data, aes(xintercept=4),linetype="dashed", size=1) + geom_vline(data=indel.data, aes(xintercept=-4),linetype="dashed", size=1)
+
+
+# Total amount of drugs per target group
+ggplot(indel.data, aes(x = reorder(Target,Target, function(x)-length(x)))) +
+  geom_bar()+
+  theme(axis.text.x = element_text(angle = 90, hjust = 1.0, vjust = 0))+ 
+  ylab("amount outliers") + xlab("target group")
+
+# Total amount of drugs per target group in outlier df
+ggplot(t.outlier.df, aes(x = reorder(Target,Target, function(x)-length(x)))) +
+  geom_bar()+
+  theme(axis.text.x = element_text(angle = 90, hjust = 1.0, vjust = 0))+ 
+  ylab("amount outliers") + xlab("target group")
+
+# Total amount of drugs per target group in outlier df, no DNA-PKi
+ggplot(t.outlier.df[t.outlier.df$Drug != "DNA-PKi",], aes(x = reorder(Target,Target, function(x)-length(x)))) +
+  geom_bar()+
+  theme(axis.text.x = element_text(angle = 90, hjust = 1.0, vjust = 0))+ 
+  ylab("amount outliers") + xlab("target group")
+
+
+
+
+
+
+
+
+
+
+
 # Make a beeswarm plot with alternative colors for outliers based on chi square scores
 ggplot(data = indel.data) +
-  geom_quasirandom(mapping = aes(x = barcode, y = logratio.mean, 
-                                 colour = ifelse(chisq > 3.841,'blue','red'))) +
+  geom_quasirandom(mapping = 
+                     aes(x = barcode, y = logratio.mean, 
+                         colour = ifelse(abs(statistic) > 4,
+                                         "outlier","non-outlier"))) +
   theme(axis.text.x = element_text(angle = 90, hjust = 1.0, vjust = 0)) + 
-  ylab("log2(+1/-7 ratio)") + xlab("Barcode") + labs(fill="titel")
+  ylab("log2(+1/-7 ratio)") + xlab("Barcode") + labs(title = "Outlier plot", colour = "Outlier based on t-statistic value > 4") + scale_color_manual(values=c("#999999", "#E69F00"))
 
 # ggplot specifying group of drugs
 ggplot(data = indel.data) +
-  geom_quasirandom(mapping = aes(x = barcode, y = logratio.comb, colour = Target)) +
+  geom_quasirandom(mapping = aes(x = barcode, y = logratio.mean, colour = Target)) +
   theme(axis.text.x = element_text(angle = 90, hjust = 1.0, vjust = 0))+ 
-  ylab("log2(+1/-7 ratio)") + xlab("Barcode") + labs(fill="titel")
+  ylab("log2(+1/-7 ratio)") + xlab("Barcode") 
 
 # ggplot specifying the drug ratio
-ggplot(data = indel.data, aes(x = barcode, y = logratio.comb, colour = conc)) +
+ggplot(data = indel.data, aes(x = barcode, y = logratio.mean, colour = conc)) +
   geom_quasirandom() +
   theme(axis.text.x = element_text(angle = 90, hjust = 1.0, vjust = 0)) + 
   ylab("log2(+1/-7 ratio)") + xlab("Barcode")
+
 
 # Make a loop of plots, plotting the ratio per drug target group together with DMSO
 for (i in unique(indel.data$Target)) {
   data <- indel.data[indel.data$Target == c(i,"Negative control"), ]
   p <- ggplot(data = data) +
-    geom_quasirandom(mapping = aes(x = barcode, y = logratio.comb, colour = Target)) +
+    geom_quasirandom(mapping = aes(x = barcode, y = logratio.mean, colour = Target)) +
     theme(axis.text.x = element_text(angle = 90, hjust = 1.0, vjust = 0))+ 
     ylab("log2(+1/-7 ratio)") + xlab("Barcode") + labs(fill="titel")
   print(p)
@@ -354,7 +425,7 @@ indel.data[grep("AGAAAATAATATGACG|AGGGCGTAAAATATTT|ATACTATATTTAACGG|GCTAACATCACG
 
 
 for (i in unique(indel.data$Target)) {
-  data <- indel.data[indel.data$Target == c(i,"Negative control"), ]
+  data <- indel.data[indel.data$Target == sort.list(c(i,"Negative control")), ]
   p <- ggplot(data = data) +
     geom_quasirandom(mapping = aes(x = logratio.comb, y = efficiency, colour = Target, size = chr.state)) +
     ylab("cutting efficiency") + xlab("log2(+1/-7 ratio)") + labs(fill="titel")
