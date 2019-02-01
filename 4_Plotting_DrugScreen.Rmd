@@ -198,6 +198,8 @@ mean.ratio.data <- read.delim("mt20190124_meanratiosperbarcode")
 # Add viability data to indel.data
 indel.data <- merge(viability.data, indel.data) 
 indel.data <- merge(mean.ratio.data, indel.data)
+all.indel.data <- merge(mean.ratio.data, indel.data)
+
 
 setnames(indel.data, old = ".id", new = "condition")
 setnames(indel.data, old = "rn", new = "barcode")
@@ -236,6 +238,20 @@ indel.data[grep("100nm_rep2_plate1", indel.data$condition),]$plate.nr <- "15"
 indel.data[grep("100nm_rep2_plate2", indel.data$condition),]$plate.nr <- "16"
 indel.data[grep("100nm_rep3_plate1", indel.data$condition),]$plate.nr <- "17"
 indel.data[grep("100nm_rep3_plate2", indel.data$condition),]$plate.nr <- "18"
+
+## Compute some useful entities for data analysis
+# Take log values of ratio
+indel.data$logratio <- ave(indel.data$ratio, FUN = function(x) log2(x))
+
+# Compute relative viability
+indel.data$viability <- ave(indel.data$viability, FUN = function(x) x/max(x))
+
+# Divide barcodes over 3 chromatin states based on cutting efficiency
+indel.data$chr.state <- "intermediate"
+indel.data$mean.efficiency.bc <- ave(indel.data$efficiency, indel.data$barcode, FUN = function (x) mean(x))
+indel.data$chr.state[indel.data$mean.efficiency.bc > 0.6] <- "open"
+indel.data$chr.state[indel.data$mean.efficiency.bc < 0.4] <- "closed"
+
 ```
 
 
@@ -243,24 +259,7 @@ indel.data[grep("100nm_rep3_plate2", indel.data$condition),]$plate.nr <- "18"
 
 ## Data analysis
 ```{r data analysis}
-# Perform statistical test to remove not significant hits
-# Take log values of ratio
-indel.data$logratio <- ave(indel.data$ratio, FUN = function(x) log2(x))
-
-# Compute relative viability
-indel.data$viability <- ave(indel.data$viability, FUN = function(x) x/max(x))
-
-# Calculate mean values per group
-# Mean ratio per barcode
-indel.data$mean.ratio.new <- ave(indel.data$ratio, indel.data$barcode, FUN = function(x) mean(x))
-# Mean ratio per target group
-indel.data$mean.ratio.target <- ave(indel.data$ratio, indel.data$Target, FUN = function(x) mean(x))
-# Mean efficiency per target group
-indel.data$mean.eff.n <- ave(indel.data$efficiency, indel.data$Target, FUN = function(x) mean(x))
-# Mean viability per target group
-indel.data$mean.viability <- ave(indel.data$viability, indel.data$Target, FUN = function(x) mean(x))
-
-
+## Normalize the data
 # Plate normalization: substract log(DMSO.mean) for each drug per plate
 for (i in 1:18) {
   for (j in unique(indel.data$barcode)) {
@@ -271,16 +270,30 @@ for (i in 1:18) {
   indel.data$logratio.platenorm[indel.data$plate.nr == i & indel.data$barcode == j] <- 
     indel.data$logratio[indel.data$plate.nr == i & indel.data$barcode == j] -
     dmso.mean
-  print(indel.data$logratio)
+  print(indel.data$logratio.platenorm)
+  }
+}
+
+# Plate normalization for efficiency
+for (i in 1:18) {
+  for (j in unique(indel.data$barcode)) {
+  dmso.eff.mean <- mean(indel.data$efficiency[indel.data$Drug == 
+                        "DMSO" & indel.data$plate.nr == 
+                        i & indel.data$barcode == j])
+  print(dmso.eff.mean)
+  indel.data$efficiency.platenorm[indel.data$plate.nr == i & indel.data$barcode == j] <-
+    indel.data$efficiency[indel.data$plate.nr == i & indel.data$barcode == j] -
+    dmso.eff.mean
+  print(indel.data$efficiency.platenorm)
   }
 }
 
 
-# t-test
+## Perform t-test
+# Create classifier, needed for subsequent t-test analysis
 indel.data$classifier <- gsub("_rep[0-9]", "\\1", indel.data$condition)
-indel.data$classifier.bc <- do.call(paste, c(indel.data[c("classifier", "barcode")], sep = "_")) 
 
-
+# Run t-test within each well for each barcode
 for (i in unique(indel.data$barcode)) {
   
     for (j in unique(indel.data$classifier)) {
@@ -324,12 +337,17 @@ for (i in unique(indel.data$barcode)) {
 indel.data$p.value.adjust <- p.adjust(indel.data$p.value, n = 
                                             length(indel.data$p.value))
 
-# t outlier df
-t.outlier.df <- indel.data[abs(indel.data$statistic) > 5,]
+# Create outlier df based on t-statistic
+t.outlier.df <- indel.data[abs(indel.data$statistic) > 4,]
 
 # Calculate the mean of the three replicates
-indel.data$logratio.mean <- ave(indel.data$logratio.platenorm, indel.data$classifier, indel.data$barcode, FUN = function(x) mean(x))
-indel.data$efficiency.mean <- ave(indel.data$efficiency, indel.data$classifier, indel.data$barcode, FUN = function(x) mean(x))
+indel.data$logratio.mean <- 
+  ave(indel.data$logratio.platenorm, 
+      indel.data$classifier, indel.data$barcode, FUN = function(x) mean(x))
+
+indel.data$efficiency.mean <- 
+  ave(indel.data$efficiency.platenorm, 
+      indel.data$classifier, indel.data$barcode, FUN = function(x) mean(x))
 # indel.data2 <- indel.data[!duplicated(indel.data$logratio.mean),]
 
 # Calculate the chi square scores
@@ -344,16 +362,75 @@ chi.outlier.df <- chi.outlier.df[-grep("DNA-PK", chi.outlier.df$Target),]
 
 ```
 
-## Visualization
-```{r visualization}
+## Visualization: checking quality of data
+```{r visualization quality data}
+## Make some density plots to get a feeling for the data
+# Density plot logratio of the controls
+ggplot(data = indel.data[indel.data$Drug == c("DMSO","DNA-PKi","Mirin"),], aes(x = logratio.platenorm, fill = Target)) + geom_density() + xlab("logratio") + labs(title = "logratio density of the controls")
+
+# Density plot logratio 
+ggplot(data = indel.data, aes(x = logratio.platenorm, fill = Target)) + geom_density() + xlab("logratio")+ labs(title = "logratio density of all targets")
+
+# Integral of logratio density plot per target group
+ggplot(data = indel.data, 
+       aes(x = logratio.platenorm)) +
+  xlab("logratio") + ylab("acumulative value")+ stat_ecdf(aes(colour = Target))+ labs(title = "accumulative logratio of all targets")
+
+# Integral of logratio density plot per barcode group
+ggplot(data = indel.data, 
+       aes(x = logratio)) +
+    xlab("logratio") + ylab("accumulative value") + stat_ecdf(aes(colour = chr.state))+ labs(title = "accumulative logratio of all targets")
+
+# Density plot logratio per target
+ggplot(data = indel.data, 
+       aes(x = logratio.platenorm, fill = Target)) + geom_density()+
+  xlab("logratio") + facet_wrap(~ Target, nrow = 4)
+
+# Density plot logratio per barcode
+ggplot(data = indel.data, 
+       aes(x = logratio.platenorm, fill = Target)) + geom_density()+
+  xlab("logratio") + facet_wrap(~ barcode, nrow = 6, scales = "free")
+
+# Density plot logratio in the three chromatin states
+ggplot(data = indel.data, 
+       aes(x = logratio, fill = Target)) + geom_density()+
+  xlab("logratio") + facet_wrap(~ chr.state, nrow = 3)
+
+# Density plot efficiency
+ggplot(data = indel.data, aes(x = efficiency, fill = Target)) + geom_density() +
+xlab("efficiency")
+
+# Density plot efficiency per target
+ggplot(data = indel.data, 
+       aes(x = efficiency.platenorm, fill = Target)) + geom_density()+
+  xlab("efficiency: normalized over plate") + facet_grid(rows = vars(Target))
+
+# Density plot efficiency per barcode
+ggplot(data = indel.data, 
+       aes(x = efficiency.platenorm, fill = Target)) + geom_density()+
+  xlab("efficiency: normalized over plate") + facet_wrap(~ Target, nrow = 4)
+
+# Integral of density plot
+ggplot(data = indel.data, 
+       aes(x = efficiency.platenorm)) +
+  xlab("efficiency: normalized over plate") + stat_ecdf(aes(colour = Target))
+
+# Density plot normalized efficiency of the controls
+ggplot(data = indel.data[indel.data$Drug == c("DMSO","DNA-PKi","Mirin"),], 
+       aes(x = efficiency.platenorm, fill = Target)) + geom_density() +
+  xlab("efficiency: normalized over plate")
+
 # Density plots t-distribution, only Mirin & DNA-PKi
 ggplot(data = indel.data[indel.data$Drug == c("DMSO","DNA-PKi","Mirin"),], aes(x = statistic, fill = Target)) + geom_density() +
-geom_vline(data=indel.data, aes(xintercept=5),linetype="dashed", size=1) + geom_vline(data=indel.data, aes(xintercept=-5),linetype="dashed", size=1)
+geom_vline(data=indel.data, aes(xintercept=4),linetype="dashed", size=1) + geom_vline(data=indel.data, aes(xintercept=-4),linetype="dashed", size=1)+ xlab("t-statistic")
 
 # Density plots t-distribution
 ggplot(data = indel.data, aes(x = statistic, fill = Target)) + geom_density() +
-geom_vline(data=indel.data, aes(xintercept=4),linetype="dashed", size=1) + geom_vline(data=indel.data, aes(xintercept=-4),linetype="dashed", size=1)
+geom_vline(data=indel.data, aes(xintercept=4),linetype="dashed", size=1) + geom_vline(data=indel.data, aes(xintercept=-4),linetype="dashed", size=1)+ xlab("t-statistic")
 
+# Density plot t-statistic + facet_wrap
+ ggplot(data = indel.data, aes(x = statistic, fill = Target)) + geom_density() +
++     geom_vline(data=indel.data, aes(xintercept=4),linetype="dashed", size=1) + geom_vline(data=indel.data, aes(xintercept=-4),linetype="dashed", size=1)+ xlab("t-statistic") + facet_wrap(~Target, nrow = 4, scales = "free")
 
 # Total amount of drugs per target group
 ggplot(indel.data, aes(x = reorder(Target,Target, function(x)-length(x)))) +
@@ -367,30 +444,51 @@ ggplot(t.outlier.df, aes(x = reorder(Target,Target, function(x)-length(x)))) +
   theme(axis.text.x = element_text(angle = 90, hjust = 1.0, vjust = 0))+ 
   ylab("amount outliers") + xlab("target group")
 
-# Total amount of drugs per target group in outlier df, no DNA-PKi
-ggplot(t.outlier.df[t.outlier.df$Drug != "DNA-PKi",], aes(x = reorder(Target,Target, function(x)-length(x)))) +
-  geom_bar()+
+# Relative amount of drugs in outlier df
+ggplot(NULL,aes(x = reorder(Target,Target,function(x)-length(x)))) + 
+      geom_bar(aes(fill="amount non-outliers"), data = indel.data, alpha = 0.5)+
+  geom_bar(aes(fill="amount outlier"), data = t.outlier.df, alpha = 0.5)+
   theme(axis.text.x = element_text(angle = 90, hjust = 1.0, vjust = 0))+ 
-  ylab("amount outliers") + xlab("target group")
+  ylab("count") + xlab("target group") + labs(title = "outlier vs. non-outlier distribution per drug category", fill = "groups")
+
+
+# Density plot of reads.count using only PAO data -> these are the input reads
+ggplot(data = all.indel.data[all.indel.data$Drug == c("PAO","DMSO"),], aes(x = read.count, fill = Drug, group = Drug)) + geom_density() + facet_wrap(~rn, nrow = 6)
+
+```
 
 
 
 
-
-
-
-
-
-
-
+## Visualizaton: 
+```{r visualization}
 # Make a beeswarm plot with alternative colors for outliers based on chi square scores
 ggplot(data = indel.data) +
   geom_quasirandom(mapping = 
                      aes(x = barcode, y = logratio.mean, 
-                         colour = ifelse(abs(statistic) > 4,
-                                         "outlier","non-outlier"))) +
+                         colour = ifelse(abs(statistic) < 4,
+                                         "non-outlier","outlier"))) +
   theme(axis.text.x = element_text(angle = 90, hjust = 1.0, vjust = 0)) + 
   ylab("log2(+1/-7 ratio)") + xlab("Barcode") + labs(title = "Outlier plot", colour = "Outlier based on t-statistic value > 4") + scale_color_manual(values=c("#999999", "#E69F00"))
+
+# Boxplot of efficiencies 
+ggplot(data = indel.data) +
+  geom_boxplot(mapping = aes(x = barcode, y = efficiency)) +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1.0, vjust = 0)) 
+
+# Boxplot of efficiencies normalized
+ggplot(data = indel.data) +
+  geom_boxplot(mapping = aes(x = barcode, y = efficiency.platenorm)) +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1.0, vjust = 0)) 
+
+# Beeswarm plot of efficiencies
+ggplot(data = indel.data) +
+  geom_quasirandom(mapping = 
+                     aes(x = barcode, y = efficiency.mean, 
+                         colour = ifelse(abs(statistic) < 4,
+                                         "non-outlier","outlier"))) +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1.0, vjust = 0)) + 
+  ylab("efficiency") + xlab("barcode") + labs(title = "Efficiency plot, outliers (based on logratio) in yellow", colour = "Logratio outlier based on t-statistic value > 4") + scale_color_manual(values=c("#999999", "#E69F00"))
 
 # ggplot specifying group of drugs
 ggplot(data = indel.data) +
@@ -404,7 +502,6 @@ ggplot(data = indel.data, aes(x = barcode, y = logratio.mean, colour = conc)) +
   theme(axis.text.x = element_text(angle = 90, hjust = 1.0, vjust = 0)) + 
   ylab("log2(+1/-7 ratio)") + xlab("Barcode")
 
-
 # Make a loop of plots, plotting the ratio per drug target group together with DMSO
 for (i in unique(indel.data$Target)) {
   data <- indel.data[indel.data$Target == c(i,"Negative control"), ]
@@ -416,46 +513,25 @@ for (i in unique(indel.data$Target)) {
 }
 
 
-# Make chr.states
-
-indel.data$chr.state <- "intermediate"
-indel.data[grep("CATCCACCACACTTCA|CATTTCTGATCAATAA|ACTGTCGAGTTGTCCG|GTACCTCTCGATAGTG|TCTTTTGAGGAGCTGA|TGGCCAATATTTGTCT", indel.data$barcode),]$chr.state <- "closed"
-indel.data[grep("AGAAAATAATATGACG|AGGGCGTAAAATATTT|ATACTATATTTAACGG|GCTAACATCACGAATC", indel.data$barcode),]$chr.state <- "open"
-
-
-
 for (i in unique(indel.data$Target)) {
   data <- indel.data[indel.data$Target == sort.list(c(i,"Negative control")), ]
   p <- ggplot(data = data) +
-    geom_quasirandom(mapping = aes(x = logratio.comb, y = efficiency, colour = Target, size = chr.state)) +
+    geom_quasirandom(mapping = aes(x = logratio.mean, y = efficiency, colour = Target, size = chr.state)) +
     ylab("cutting efficiency") + xlab("log2(+1/-7 ratio)") + labs(fill="titel")
   print(p)
 }
+```
 
 
-# Same as before, colour indicates number of reads
-for (i in unique(indel.data$Target)) {
-  data <- indel.data[indel.data$Target == c(i,"Negative control"), ]
-  p <- ggplot(data = data) +
-    geom_quasirandom(mapping = aes(x = barcode, y = logratio, shape = Target, colour = read.count1.7)) +
-    theme(axis.text.x = element_text(angle = 90, hjust = 1.0, vjust = 0))+ 
-    ylab("log2(+1/-7 ratio)") + xlab("Barcode") + labs(fill="titel")
-  print(p)
-}
-
-# Boxplot of efficiencies 
-ggplot(data = indel.data) +
-  geom_boxplot(mapping = aes(x = barcode, y = efficiency)) +
-  theme(axis.text.x = element_text(angle = 90, hjust = 1.0, vjust = 0)) 
-
-
+## Visualization: correlation plots
+```{r}
 # Correlation efficiency vs +1/-7 ratio
 ggplot(data = indel.data) +
   geom_point(mapping = aes(x=logratio, y=efficiency, colour = Target))
 
 # Correlation mean efficiency vs mean ratio
-ggplot(data = indel.data, aes(x=mean.ratio.target, y=mean.eff.n)) +
-    geom_point() + geom_smooth(method = lm) + 
+ggplot(data = indel.data[indel.data$Drug != "DNA-PKi",], aes(x=mean.logratio.target, y=mean.efficiency.target)) +
+    geom_point(mapping = aes(colour = Target)) + geom_smooth(method = lm) + 
   stat_smooth_func(geom="text",method="lm",hjust=0,parse=TRUE)
 
 # Correlation plot viability vs. efficiency
@@ -468,7 +544,7 @@ ggplot(data = indel.data, aes(x=mean.viability, y=mean.eff)) +
   stat_smooth_func(geom="text",method="lm",hjust=0,parse=TRUE)
 
 # Correlation plot mean viability vs. mean ratio
-ggplot(data = indel.data, aes(x=mean.viability, y=mean.ratio.target)) +
+ggplot(data = indel.data, aes(x=mean.viability, y=mean.logratio.target)) +
   geom_point() + geom_smooth(method = lm) + 
   stat_smooth_func(geom="text",method="lm",hjust=0,parse=TRUE)
 
@@ -477,7 +553,7 @@ ggplot(data = indel.data) +
   geom_point(mapping = aes(x=viability, y=logratio, colour = Target))
 
 # Correlation old (predicted) +1/-7 ratio vs. +1/-7 ratio of this experiment 
-ggplot(data = indel.data[indel.data$Target == "Negative control",], aes(x=log2(mean.ratio), y=log2(mean.ratio.new))) +
+ggplot(data = indel.data[indel.data$Target == "Negative control",], aes(x=log2(mean.ratio), y=log2(mean.ratio.bc))) +
   geom_point() + geom_smooth(method = lm) + stat_smooth_func(geom="text",method="lm",hjust=0,parse=TRUE) + scale_x_continuous(breaks=c(2, 4, 6, 8))
 
 # Correlation IC50 vs viability
@@ -517,6 +593,9 @@ ggplot(data = outlier.df) +
   geom_point(mapping = aes(x = barcode, y = logratio, colour = Target)) + 
   geom_step(data = indel.data, mapping = aes(x = barcode, y = logratio)) +
   theme(axis.text.x = element_text(angle = 90, hjust = 1.0, vjust = 0))
+```
+
+
 ```
 We can see that there is a very high correlation between all 3 replicates, even when you look at the plates which have shifted amounts of reads (some wells have very low amount of reads and others have very high amounts of reads), meaning that we can use the data of all 3 replicates.
 # Results
