@@ -60,58 +60,76 @@ SetFileName <- function(filename, initials) {
 setwd("~/mydata/EpiScreen/epigenetic-screening-on-trip-clone/Data/")
 
 # Import data from preprocessing script
-indel.data <- get(load("mt20190128_indel.data"))
-findhits.data <- indel.data
+indel.data <- get(load("mt20190204_indel.data"))
+t.outlier.df <- get(load("mt20190204_t.outlier.df"))
+chi.outlier.df <- get(load("mt20190204_chi.outlier.df"))
 
-outlier.df <- get(load("mt20190129_outlier.df"))
+# Load ChIP data
+setwd("~/mydata/Mapping_Clone5_9/nearest_domains-1000-0.9")
+file.list <- list.files(pattern = '*.txt')
+ChIP.list <- lapply(file.list, read.table, header = TRUE)
+ChIP.df <- as.data.frame(ChIP.list)
+
+# Load Lmnb1 data
+setwd("~/mydata/Mapping_Clone5_9")
+lmn.df <- get(load("rs20190116_RSTP2.2000.Chromatin.RData"))
+
+# Load clone 5 barcode data
+clone5.bc <- read.delim("mt20190204_clone5_barcodes.txt")
 ```
+
+## Pre-processing: Importing ChIP data
+```{r}
+# Remove not needed data
+ChIP.df <- select(ChIP.df, ends_with("e"), contains("Distance"))
+
+# Rename variables 
+names(ChIP.df)[2:38] <- gsub(".*_.*_(.*?)_.*.txt", "\\1", file.list)
+
+# Process lmn dataset
+lmn.df <- lmn.df[,c(1,101)]
+lmn.df <- lmn.df[!duplicated(lmn.df), ]
+lmn.df <- merge(lmn.df, clone5.bc)
+setnames(ChIP.df, old = "Barcode", new = "barcode")
+ChIP.df <- merge(ChIP.df, clone5.bc)
+
+# Combine the two chr. state dfs
+ChIP.df <- merge(lmn.df, ChIP.df, all = TRUE)
+
+# Change from distance to integration: yes (1) or no (0)
+ChIP.df[,3:ncol(ChIP.df)] <- ifelse(ChIP.df[,3:ncol(ChIP.df)] > 0, 0, 1)
+ChIP.df[,2] <- ifelse(ChIP.df[,2] == "AD", 1, 0)
+
+# Remove .B from barcode
+ChIP.df$barcode <- gsub(".B","",ChIP.df$barcode)
+```
+
 
 ## Analysis
 ```{r Analysis}
-# Divide data in 'closed', 'permissive', and 'open' barcodes (based on eyeballing)
-findhits.data$chr.state <- "permissive"
-findhits.data[grep("CATCCACCACACTTCA|CATTTCTGATCAATAA|ACTGTCGAGTTGTCCG|GTACCTCTCGATAGTG|TCTTTTGAGGAGCTGA|TGGCCAATATTTGTCT", findhits.data$barcode),]$chr.state <- "closed"
-findhits.data[grep("AGAAAATAATATGACG|AGGGCGTAAAATATTT|ATACTATATTTAACGG|GCTAACATCACGAATC|ATATCGTTGCTGGAGA", findhits.data$barcode),]$chr.state <- "open"
+# Import chromatin data
+indel.data <- merge(indel.data, ChIP.df, all = TRUE)
 
-# The same with outlier.df
-outlier.df$chr.state <- "permissive"
-outlier.df[grep("CATCCACCACACTTCA|CATTTCTGATCAATAA|ACTGTCGAGTTGTCCG|GTACCTCTCGATAGTG|TCTTTTGAGGAGCTGA|TGGCCAATATTTGTCT", outlier.df$barcode),]$chr.state <- "closed"
-outlier.df[grep("AGAAAATAATATGACG|AGGGCGTAAAATATTT|ATACTATATTTAACGG|GCTAACATCACGAATC|ATATCGTTGCTGGAGA", outlier.df$barcode),]$chr.state <- "open"
+# Make df more sexy
+indel.data <- indel.data[,c(-2,-5,-8:-14,-16,-17,-22,-25,-32:-38)]
 
-outlier.df$chr.state <- "permissive"
-outlier.df[grep("CATCCACCACACTTCA|CATTTCTGATCAATAA|ACTGTCGAGTTGTCCG|GTACCTCTCGATAGTG|TCTTTTGAGGAGCTGA|TGGCCAATATTTGTCT", outlier.df$barcode),]$chr.state <- "closed"
-outlier.df[grep("AGAAAATAATATGACG|AGGGCGTAAAATATTT|ATACTATATTTAACGG|GCTAACATCACGAATC|ATATCGTTGCTGGAGA", outlier.df$barcode),]$chr.state <- "open"
+# Compute mean of logratio per barcode and drug
+indel.data$mean.logratio.bc.drug <- ave(indel.data$logratio.platenorm, indel.data$barcode, indel.data$Drug, FUN = function(x) mean(x))
+
+# Remove columns
+indel.data <- indel.data[,c(1,4,19:57)]
+indel.data <- indel.data[-grep("ACCCCTAAAGGCGCTG", indel.data$barcode),]
+
+# Heatmap
+# combine column 1&2, to row names, heatmap
+
+
 
 # Find drugs that have effect on one chr.state but not on the other
-# Make open, permissive & closed dfs
-open.df <- outlier.df[grep("open",outlier.df$chr.state),]
-permissive.df <- outlier.df[grep("permissive",outlier.df$chr.state),]
-closed.df <- outlier.df[grep("closed",outlier.df$chr.state),]
-
-# Make list with drugs that are outliers in open & closed state
-x1 <- intersect(open.df$Drug, closed.df$Drug)
-x2 <- intersect(open.df$Drug, permissive.df$Drug)
-x3 <- intersect(closed.df$Drug, permissive.df$Drug)
-x1 <- x1[!is.na(x1)]
-x2 <- x2[!is.na(x2)]
-x3 <- x3[!is.na(x3)]
-
-# Delete these drugs from the outlier.df to keep interesting drugs
-outlier.open.df <- open.df[-grep(paste(x1, collapse = "|"), open.df$Drug),]
-outlier.open.df <- outlier.open.df[-grep(paste(x2, collapse = "|"), outlier.open.df$Drug),]
-outlier.permissive.df <- permissive.df[-grep(paste(x2, collapse = "|"), permissive.df$Drug),]
-outlier.permissive.df <- outlier.permissive.df[-grep(paste(x3, collapse = "|"), outlier.permissive.df$Drug),]
-outlier.closed.df <- closed.df[-grep(paste(x1, collapse = "|"), closed.df$Drug),]
-outlier.closed.df <- outlier.closed.df[-grep(paste(x3, collapse = "|"), outlier.closed.df$Drug),]
-
-
-
-
-HDM.df <- findhits.data[grep("Histone demethylase|Negative control", findhits.data$Target),]
-ERD.df <- indel.data[grep("Epigenetic Reader Domain|Negative control", findhits.data$Target),]
 
 
 ```
+
 
 
 ## Visualisation
