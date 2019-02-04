@@ -266,11 +266,9 @@ for (i in 1:18) {
   dmso.mean <- mean(indel.data$logratio[indel.data$Drug == 
                         "DMSO" & indel.data$plate.nr == 
                         i & indel.data$barcode == j])
-  print(dmso.mean)
   indel.data$logratio.platenorm[indel.data$plate.nr == i & indel.data$barcode == j] <- 
     indel.data$logratio[indel.data$plate.nr == i & indel.data$barcode == j] -
     dmso.mean
-  print(indel.data$logratio.platenorm)
   }
 }
 
@@ -280,11 +278,9 @@ for (i in 1:18) {
   dmso.eff.mean <- mean(indel.data$efficiency[indel.data$Drug == 
                         "DMSO" & indel.data$plate.nr == 
                         i & indel.data$barcode == j])
-  print(dmso.eff.mean)
   indel.data$efficiency.platenorm[indel.data$plate.nr == i & indel.data$barcode == j] <-
     indel.data$efficiency[indel.data$plate.nr == i & indel.data$barcode == j] -
     dmso.eff.mean
-  print(indel.data$efficiency.platenorm)
   }
 }
 
@@ -455,6 +451,14 @@ ggplot(NULL,aes(x = reorder(Target,Target,function(x)-length(x)))) +
 # Density plot of reads.count using only PAO data -> these are the input reads
 ggplot(data = all.indel.data[all.indel.data$Drug == c("PAO","DMSO"),], aes(x = read.count, fill = Drug, group = Drug)) + geom_density() + facet_wrap(~rn, nrow = 6)
 
+# Density plot per target group, comparing effect on opposite chromatin states
+ggplot(data = indel.data[indel.data$chr.state == c("open","closed"),], aes(x = statistic, fill = chr.state)) + 
+  geom_density(alpha = 0.5) + xlab("t-statistic") +
+  labs(title = "t-statistic density for each target, comparing chr. states") +
+  facet_wrap(~Target, nrow = 4, scales = "free")+
+  geom_vline(data=indel.data, aes(xintercept=4),linetype="dashed", size=1) +
+  geom_vline(data=indel.data, aes(xintercept=-4),linetype="dashed", size=1)
+
 ```
 
 
@@ -496,12 +500,6 @@ ggplot(data = indel.data) +
   theme(axis.text.x = element_text(angle = 90, hjust = 1.0, vjust = 0))+ 
   ylab("log2(+1/-7 ratio)") + xlab("Barcode") 
 
-# ggplot specifying the drug ratio
-ggplot(data = indel.data, aes(x = barcode, y = logratio.mean, colour = conc)) +
-  geom_quasirandom() +
-  theme(axis.text.x = element_text(angle = 90, hjust = 1.0, vjust = 0)) + 
-  ylab("log2(+1/-7 ratio)") + xlab("Barcode")
-
 # Make a loop of plots, plotting the ratio per drug target group together with DMSO
 for (i in unique(indel.data$Target)) {
   data <- indel.data[indel.data$Target == c(i,"Negative control"), ]
@@ -512,11 +510,11 @@ for (i in unique(indel.data$Target)) {
   print(p)
 }
 
-
+# Same for efficiency
 for (i in unique(indel.data$Target)) {
-  data <- indel.data[indel.data$Target == sort.list(c(i,"Negative control")), ]
+  data <- indel.data[indel.data$Target == c(i,"Negative control"), ]
   p <- ggplot(data = data) +
-    geom_quasirandom(mapping = aes(x = logratio.mean, y = efficiency, colour = Target, size = chr.state)) +
+    geom_quasirandom(mapping = aes(x = logratio.platenorm, y = efficiency.platenorm, colour = Target, size = chr.state)) +
     ylab("cutting efficiency") + xlab("log2(+1/-7 ratio)") + labs(fill="titel")
   print(p)
 }
@@ -525,45 +523,49 @@ for (i in unique(indel.data$Target)) {
 
 ## Visualization: correlation plots
 ```{r}
-# Correlation efficiency vs +1/-7 ratio
-ggplot(data = indel.data) +
-  geom_point(mapping = aes(x=logratio, y=efficiency, colour = Target))
-
 # Correlation mean efficiency vs mean ratio
+indel.data$mean.logratio.target = 
+  ave(indel.data$logratio.platenorm, indel.data$Target, FUN = function(x) mean(x))
+indel.data$mean.efficiency.target = 
+  ave(indel.data$efficiency.platenorm, indel.data$Target, FUN = function(x) mean(x))
 ggplot(data = indel.data[indel.data$Drug != "DNA-PKi",], aes(x=mean.logratio.target, y=mean.efficiency.target)) +
     geom_point(mapping = aes(colour = Target)) + geom_smooth(method = lm) + 
-  stat_smooth_func(geom="text",method="lm",hjust=0,parse=TRUE)
-
-# Correlation plot viability vs. efficiency
-ggplot(data = indel.data, aes(x=viability, y=efficiency)) +
-  geom_point() + geom_smooth(method = lm)
+  stat_smooth_func(geom="text",method="lm",hjust=0,vjust=10,parse=TRUE)+
+  labs(title="Correlation efficiency vs. logratio")
 
 # Correlation plot mean viability vs. mean efficiency
-ggplot(data = indel.data, aes(x=mean.viability, y=mean.eff)) +
-  geom_point() + geom_smooth(method = lm) + 
+indel.data$mean.viability.target = 
+  ave(indel.data$viability, indel.data$Target, FUN = function(x) mean(x))
+ggplot(data = indel.data, aes(x=mean.viability.target, y=mean.efficiency.target)) +
+  geom_point(mapping = aes(colour = Target)) + geom_smooth(method = lm) + 
   stat_smooth_func(geom="text",method="lm",hjust=0,parse=TRUE)
 
 # Correlation plot mean viability vs. mean ratio
-ggplot(data = indel.data, aes(x=mean.viability, y=mean.logratio.target)) +
+ggplot(data = indel.data, aes(x=mean.viability.target, y=mean.logratio.target)) +
   geom_point() + geom_smooth(method = lm) + 
   stat_smooth_func(geom="text",method="lm",hjust=0,parse=TRUE)
 
-# Correlation viability vs. +1/-7 ratio
-ggplot(data = indel.data) +
-  geom_point(mapping = aes(x=viability, y=logratio, colour = Target))
-
 # Correlation old (predicted) +1/-7 ratio vs. +1/-7 ratio of this experiment 
+indel.data$mean.ratio.bc <- ave(indel.data$ratio, indel.data$barcode, FUN = function(x) mean(x))
 ggplot(data = indel.data[indel.data$Target == "Negative control",], aes(x=log2(mean.ratio), y=log2(mean.ratio.bc))) +
-  geom_point() + geom_smooth(method = lm) + stat_smooth_func(geom="text",method="lm",hjust=0,parse=TRUE) + scale_x_continuous(breaks=c(2, 4, 6, 8))
+  geom_point() + geom_smooth(method = lm) +
+  stat_smooth_func(geom="text",method="lm",hjust=0,parse=TRUE) +
+  scale_x_continuous(breaks=c(2, 4, 6, 8))+ xlab("logratio previous experiments") +
+  ylab("logratio this experiment") + labs(title = "correlation of predicted and actual logratio per barcode")
 
-# Correlation IC50 vs viability
-ggplot(data = indel.data, aes(x=viability, y=IC50..µM., colour = conc)) +
-  geom_point()
+# Correlation plots of the replicates
+indel.data.rep1 <- indel.data[grep("rep1", indel.data$condition),]
+indel.data.rep1 <- indel.data.rep1[,c(1,23)]
+indel.data.rep2 <- indel.data[grep("rep2", indel.data$condition),]
+indel.data.rep2 <- indel.data.rep2[,c(1,23)]
+indel.data.rep3 <- indel.data[grep("rep3", indel.data$condition),]
+indel.data.rep3 <- indel.data.rep3[,c(1,23)]
+setnames(indel.data.rep1, old = "logratio.platenorm", new = "rep1")
+setnames(indel.data.rep2, old = "logratio.platenorm", new = "rep2")
+setnames(indel.data.rep3, old = "logratio.platenorm", new = "rep3")
+indel.data.rep <- merge(indel.data.rep1, indel.data.rep2)
 
-correlation.plot <- indel.data[,c(24,25,26)]
-pairs(correlation.plot)
 
-# Correlation rep1 vs rep2
 ggplot(data = indel.data, aes(x=logratio, y=rep2_logratio)) +
   geom_point() + geom_smooth(method = lm) + stat_smooth_func(geom="text",method="lm",hjust=0,parse=TRUE) 
 
@@ -583,19 +585,6 @@ pairs(correlation.plot.rep)
 correlation.plot.weird.plate <- indel.data[grep("1um_.*_plate1",indel.data$condition),]
 correlation.plot.weird.plate <- correlation.plot.weird.plate[,c(22,28,29)]
 pairs(correlation.plot.weird.plate)
-
-# Correlation reads vs. viability
-ggplot(data = indel.data) +
-  geom_point(mapping = aes(x=read.count, y=viability, colour = plate.nr))
-
-# Outlier plot
-ggplot(data = outlier.df) + 
-  geom_point(mapping = aes(x = barcode, y = logratio, colour = Target)) + 
-  geom_step(data = indel.data, mapping = aes(x = barcode, y = logratio)) +
-  theme(axis.text.x = element_text(angle = 90, hjust = 1.0, vjust = 0))
-```
-
-
 ```
 We can see that there is a very high correlation between all 3 replicates, even when you look at the plates which have shifted amounts of reads (some wells have very low amount of reads and others have very high amounts of reads), meaning that we can use the data of all 3 replicates.
 # Results
@@ -613,11 +602,11 @@ setwd("/DATA/usr/m.trauernicht/EpiScreen/epigenetic-screening-on-trip-clone/Data
 filename <- SetFileName("_indel.data", "mt")
 save(indel.data, file = filename)
 
-filename <- SetFileName("_indel.data2", "mt")
-save(indel.data2, file = filename)
+filename <- SetFileName("_chi.outlier.df", "mt")
+save(chi.outlier.df, file = filename)
 
-filename <- SetFileName("_outlier.df", "mt")
-save(outlier.df, file = filename)
+filename <- SetFileName("_t.outlier.df", "mt")
+save(t.outlier.df, file = filename)
 ```
 
 # Session Info
