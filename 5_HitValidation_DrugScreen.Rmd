@@ -2,13 +2,15 @@
 title: "Clone identification"
 author: "Ruben Schep"
 date: "`r format(Sys.time(), '%Y-%m-%d')`"
-output: 
+output:
+  pdf_document:
+    toc: yes
   html_document:
-    theme: journal #cerulean
-    highlight: monochrome
-    toc: true
-    toc_float: true
     code_folding: show
+    highlight: monochrome
+    theme: journal
+    toc: yes
+    toc_float: yes
   editor_options:
     chunk_output_type: console
 ---
@@ -40,6 +42,16 @@ StartTime <-Sys.time()
 # 8-digit Date tag:
 Date <- substr(gsub("-","",Sys.time()),1,8) 
 # libraries:
+library(dplyr)
+library(outliers)
+library(ggplot2)
+library(ggbeeswarm)
+library(data.table)
+library(ComplexHeatmap)
+library(circlize)
+library(pheatmap)
+library(gridGraphics)
+library(gridExtra)
 ```
 
 ### Custom functions
@@ -105,31 +117,273 @@ ChIP.df$barcode <- gsub(".B","",ChIP.df$barcode)
 ```
 
 
-## Analysis
-```{r Analysis}
+## Import chromatin data
+```{r import chromatin data}
 # Import chromatin data
 indel.data <- merge(indel.data, ChIP.df, all = TRUE)
 
 # Make df more sexy
 indel.data <- indel.data[,c(-2,-5,-8:-14,-16,-17,-22,-25,-32:-38)]
-
-# Compute mean of logratio per barcode and drug
-indel.data$mean.logratio.bc.drug <- ave(indel.data$logratio.platenorm, indel.data$barcode, indel.data$Drug, FUN = function(x) mean(x))
-
-# Remove columns
-indel.data <- indel.data[,c(1,4,19:57)]
 indel.data <- indel.data[-grep("ACCCCTAAAGGCGCTG", indel.data$barcode),]
+```
 
-# Heatmap
-# combine column 1&2, to row names, heatmap
+
+## Generate heatmap
+```{r generate heatmap}
+# Split up per concentration
+indel.data.high <- indel.data[grep("10um", indel.data$condition),]
+indel.data.med <- indel.data[grep("1um", indel.data$condition),]
+indel.data.low <- indel.data[grep("100nm", indel.data$condition),]
+
+# Compute mean of logratio per barcode and drug/target
+indel.data.high$mean.logratio.bc.drug <- ave(indel.data.high$logratio.platenorm, indel.data.high$barcode, indel.data.high$Drug, FUN = function(x) mean(x))
+indel.data.med$mean.logratio.bc.drug <- ave(indel.data.med$logratio.platenorm, indel.data.med$barcode, indel.data.med$Drug, FUN = function(x) mean(x))
+indel.data.low$mean.logratio.bc.drug <- ave(indel.data.low$logratio.platenorm, indel.data.low$barcode, indel.data.low$Drug, FUN = function(x) mean(x))
+
+indel.data.high$mean.logratio.bc.target <- ave(indel.data.high$logratio.platenorm, indel.data.high$barcode, indel.data.high$Target, FUN = function(x) mean(x))
+indel.data.med$mean.logratio.bc.target <- ave(indel.data.med$logratio.platenorm, indel.data.med$barcode, indel.data.med$Target, FUN = function(x) mean(x))
+indel.data.low$mean.logratio.bc.target <- ave(indel.data.low$logratio.platenorm, indel.data.low$barcode, indel.data.low$Target, FUN = function(x) mean(x))
+
+## Heatmap for each barcode vs each drug
+# Remove columns
+indel.data.high2 <- indel.data.high[,c(1,4,57)]
+indel.data.med2 <- indel.data.med[,c(1,4,57)]
+indel.data.low2 <- indel.data.low[,c(1,4,57)]
+indel.data.high2 <- indel.data.high2[!duplicated(indel.data.high2), ]
+indel.data.med2 <- indel.data.med2[!duplicated(indel.data.med2), ]
+indel.data.low2 <- indel.data.low2[!duplicated(indel.data.low2), ]
+
+# Transform to wide format for visualization purposes
+indel.data.low2 <- dcast(indel.data.low2, Drug ~ barcode, value.var="mean.logratio.bc.drug")
+indel.data.med2 <- dcast(indel.data.med2, Drug ~ barcode, value.var="mean.logratio.bc.drug")
+indel.data.high2 <- dcast(indel.data.high2, Drug ~ barcode, value.var="mean.logratio.bc.drug")
+
+# Color function for heatmap
+col_fun = colorRamp2(c(-2, 0, 2), c("blue", "white", "red"))
+
+# Create matrix and use heatmap function
+row.names(indel.data.high2) <- indel.data.high2$Drug
+indel.data.high2 <- indel.data.high2[,c(-1)]
+heatmap.drug.high2 <- heatmap(as.matrix(indel.data.high2, cexRow=0.5))
+
+row.names(indel.data.med2) <- indel.data.med2$Drug
+indel.data.med2 <- indel.data.med2[,c(-1)]
+heatmap.drug.med <- heatmap(as.matrix(indel.data.med2))
+
+row.names(indel.data.low2) <- indel.data.low2$Drug
+indel.data.low2 <- indel.data.low2[,c(-1)]
+heatmap.drug.low <- heatmap(as.matrix(indel.data.low2))
+
+
+
+## Heatmap for each barcode vs each target
+# Remove columns
+indel.data.high3 <- indel.data.high[,c(1,5,58)]
+indel.data.med3 <- indel.data.med[,c(1,5,58)]
+indel.data.low3 <- indel.data.low[,c(1,5,58)]
+indel.data.high3 <- indel.data.high3[!duplicated(indel.data.high3), ]
+indel.data.med3 <- indel.data.med3[!duplicated(indel.data.med3), ]
+indel.data.low3 <- indel.data.low3[!duplicated(indel.data.low3), ]
+
+
+
+# Transform to wide format for visualization purposes
+indel.data.low3 <- dcast(indel.data.low3, Target ~ barcode, value.var="mean.logratio.bc.target")
+indel.data.med3 <- dcast(indel.data.med3, Target ~ barcode, value.var="mean.logratio.bc.target")
+indel.data.high3 <- dcast(indel.data.high3, Target ~ barcode, value.var="mean.logratio.bc.target")
+
+
+# Create matrix and use heatmap function
+row.names(indel.data.high3) <- indel.data.high3$Target
+indel.data.high3 <- indel.data.high3[,c(-1)]
+heatmap.target.high <- heatmap(as.matrix(indel.data.high3))
+
+row.names(indel.data.med3) <- indel.data.med3$Target
+indel.data.med3 <- indel.data.med3[,c(-1)]
+heatmap.target.med <- heatmap(as.matrix(indel.data.med3))
+
+row.names(indel.data.low3) <- indel.data.low3$Target
+indel.data.low3 <- indel.data.low3[,c(-1)]
+heatmap.target.low <- heatmap(as.matrix(indel.data.low3))
+
+```
+
+## Export figures
+```{r}
+# Visualize heatmaps
+# Per target group
+grid.newpage()
+pushViewport(viewport(layout = grid.layout(nr = 2, nc = 2)))
+pushViewport(viewport(layout.pos.row = 1, layout.pos.col = 1))
+draw(Heatmap(as.matrix(indel.data.high3), col = col_fun, column_title = "10uM drugs administered", show_heatmap_legend = FALSE, row_names_gp = gpar(fontsize = 8), column_names_gp = gpar(fontsize = 10)), newpage = FALSE)
+upViewport()
+
+pushViewport(viewport(layout.pos.row = 1, layout.pos.col = 2))
+draw(Heatmap(as.matrix(indel.data.med3), col = col_fun, column_title = "1uM drugs administered", row_names_gp = gpar(fontsize = 8), column_names_gp = gpar(fontsize = 10), show_heatmap_legend = FALSE), newpage = FALSE)
+upViewport()
+
+pushViewport(viewport(layout.pos.row = 2, layout.pos.col = 1))
+draw(Heatmap(as.matrix(indel.data.low3), col = col_fun, column_title = "100nm drugs administered", row_names_gp = gpar(fontsize = 8), column_names_gp = gpar(fontsize = 10), show_heatmap_legend = FALSE), newpage = FALSE)
+upViewport()
+
+lgd = Legend(at = c(-2, -1, 0, 1, 2), col_fun = col_fun, title = "log2(+1/-7 indel ratio)", title_position = "topleft")
+
+pushViewport(viewport(layout.pos.row = 2, layout.pos.col = 2))
+grid.draw(lgd)
+upViewport()
+
+upViewport()
+
+# p-heatmap
+pheatmap(as.matrix(indel.data.high3))
+pheatmap(as.matrix(indel.data.med3))
+pheatmap(as.matrix(indel.data.low3))
+
+# Without DNA-PKi
+pheatmap(as.matrix(indel.data.high3[-2,]))
+pheatmap(as.matrix(indel.data.med3[-2,]))
+pheatmap(as.matrix(indel.data.low3[-2,]))
+
+
+# Heatmap per barcode
+grid.newpage()
+pushViewport(viewport(layout = grid.layout(nr = 2, nc = 2)))
+pushViewport(viewport(layout.pos.row = 1, layout.pos.col = 1))
+draw(Heatmap(as.matrix(indel.data.high2), col = col_fun, column_title = "10uM drugs administered", show_heatmap_legend = FALSE, row_names_gp = gpar(fontsize = 2), column_names_gp = gpar(fontsize = 10)), newpage = FALSE)
+upViewport()
+
+pushViewport(viewport(layout.pos.row = 1, layout.pos.col = 2))
+draw(Heatmap(as.matrix(indel.data.med2), col = col_fun, column_title = "1uM drugs administered", row_names_gp = gpar(fontsize = 2), column_names_gp = gpar(fontsize = 10), show_heatmap_legend = FALSE), newpage = FALSE)
+upViewport()
+
+pushViewport(viewport(layout.pos.row = 2, layout.pos.col = 1))
+draw(Heatmap(as.matrix(indel.data.low2), col = col_fun, column_title = "100nm drugs administered", row_names_gp = gpar(fontsize = 2), column_names_gp = gpar(fontsize = 10), show_heatmap_legend = FALSE), newpage = FALSE)
+upViewport()
+
+lgd = Legend(at = c(-2, -1, 0, 1, 2), col_fun = col_fun, title = "log2(+1/-7 indel ratio)", title_position = "topleft")
+
+pushViewport(viewport(layout.pos.row = 2, layout.pos.col = 2))
+grid.draw(lgd)
+upViewport()
+
+upViewport()
+
+# pheatmap
+pheatmap(as.matrix(indel.data.high2), show_rownames = FALSE)
+pheatmap(as.matrix(indel.data.med2), fontsize_row = 3)
+
+tiff("test.tiff", units="in", width=5, height=5, res=300)
+pheatmap(as.matrix(indel.data.low2), cellheight = 1.5, fontsize = 2)
+dev.off()
+
+
+
+# Barcode heatmap per target?
+
+
+```
+
+
 
 
 
 # Find drugs that have effect on one chr.state but not on the other
 
 
+
+## The same for t.outlier.df
+```{r}
+# # Import chromatin data
+# t.outlier.df <- merge(t.outlier.df, ChIP.df, all = TRUE)
+# 
+# # Make df more sexy
+# t.outlier.df <- t.outlier.df[-grep("ACCCCTAAAGGCGCTG", t.outlier.df$barcode),]
+# t.outlier.df <- t.outlier.df[-grep("CTCTTAATCGCTGCC", t.outlier.df$barcode),]
+# 
+# 
+# # Check which drugs inhibit all barcodes
+# for (i in unique(t.outlier.df$Drug)) {
+#     print(i)
+#     print(length(unique(t.outlier.df$barcode[t.outlier.df$Drug == i])))
+#   }
+# 
+# # Make pan-inhibitor drug df and selective inhibitor df
+# pan.inhibitor.df <- t.outlier.df[grep("GSK J4 HCl|AZD1480|AZ 960|MLN8054|AMG-900|BMN 673|Mirin|CYT387|DNA-PKi", t.outlier.df$Drug),]
+# sel.inhibitor.df <- t.outlier.df[-grep("GSK J4 HCl|AZD1480|AZ 960|MLN8054|AMG-900|BMN 673|Mirin|CYT387|DNA-PKi", t.outlier.df$Drug),]
+# sel.inhibitor.df <- sel.inhibitor.df[abs(sel.inhibitor.df$statistic) > 10,]
+# 
+# sel.inhibitor.df <- sel.inhibitor.df[-grep("Aurora Kinase", sel.inhibitor.df$Target),]
+# sel.inhibitor.df <- sel.inhibitor.df[,c(1,2,6,7,23,27)]
+# 
+# indel.data$mean.logratio.drug.bc <- ave(indel.data$logratio.platenorm, indel.data$Drug, indel.data$barcode, FUN = function(x) mean(x))
+# 
+# # Make a nice plot to see effect of selective drugs
+# for (i in unique(indel.data$Drug)) {
+#   if( i %in% sel.inhibitor.df$Drug) {
+#   data <- indel.data[indel.data$Drug == c(i,"DMSO"), ]
+#   p <- ggplot(data = data) +
+#     geom_point(mapping = aes(x = barcode, y = mean.logratio.drug.bc, colour = Drug))+
+#     geom_point(data = filter(data, statistic > 10), size = 10, colour ="red")+
+#     theme(axis.text.x = element_text(angle = 90, hjust = 1.0, vjust = 0))+ 
+#     ylab("log2(+1/-7 ratio)") + xlab("Barcode") + labs(fill="titel")
+#   print(p)
+#   }
+# }
+# 
+# colours = c("DMSO" = "#999999", i = "#FF9966")
+# 
+# 
+# 
+# 
+# 
+# 
+# t.outlier.df <- t.outlier.df[,c(-2,-5,-8:-14,-16,-17,-22,-25)]
+# 
+# 
+# # Compute mean of logratio per barcode and drug
+# t.outlier.df$mean.logratio.bc.drug <- ave(t.outlier.df$logratio.platenorm, t.outlier.df$barcode, t.outlier.df$Drug, FUN = function(x) mean(x))
+# 
+# # Rename barcode column
+# t.outlier.df$barcode<- with(t.outlier.df, paste0(barcode, Drug, collapse = "_"))
+# 
+# # Split up per concentration
+# t.outlier.df.high <- t.outlier.df[grep("10um", t.outlier.df$condition),]
+# t.outlier.df.med <- t.outlier.df[grep("1um", t.outlier.df$condition),]
+# t.outlier.df.low <- t.outlier.df[grep("100nm", t.outlier.df$condition),]
+# 
+# # Remove columns
+# t.outlier.df.high <- t.outlier.df.high[,c(1,19:56)]
+# t.outlier.df.med <- t.outlier.df.med[,c(1,19:56)]
+# t.outlier.df.low <- t.outlier.df.low[,c(1,19:56)]
+# 
+# logratio <- t.outlier.df[,c(1,57)]
+# 
+# t.outlier.df.high <- t.outlier.df.high[!duplicated(t.outlier.df.high), ]
+# t.outlier.df.med <- t.outlier.df.med[!duplicated(t.outlier.df.med), ]
+# t.outlier.df.low <- t.outlier.df.low[!duplicated(t.outlier.df.low), ]
+# 
+# 
+# 
+# t.outlier.df.high2 <- melt(t.outlier.df.high)
+# t.outlier.df.high2 <- merge(t.outlier.df.high2, logratio)
+# 
+# 
+# 
+# for (i in t.outlier.df.high$Drug) {
+#     p <- count_if(1, t.outlier.df.high$LAD_state[t.outlier.df.high$Drug == i])
+#     print(i)
+#     print(length(i))
+#     print(p)
+#   }
+
 ```
 
+## Bind version
+```{r}
+# ChIP.df <- melt(ChIP.df)
+# t.outlier.df2 <- merge(ChIP.df, t.outlier.df, all=TRUE)
+
+```
 
 
 ## Visualisation
