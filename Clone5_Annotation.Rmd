@@ -131,12 +131,15 @@ mapping_mean$barcode <- gsub(".B","",mapping_mean$barcode)
 
 ## Normalization mean values
 ```{r}
+# I am pretty sure that H3K27me3 dataset is not H3K27me3 but actually H3K27ac (since it overlaps with the other H3K27ac datasets, but not at all with the other H3K27me3 datasets)
+setnames(mapping_mean, old = "H3K27me3", new = "H3K27ac.3")
+
 # Average repetitive ChIP datasets & remove duplets
 mapping_mean$H3K79me2 <- rowMeans(mapping_mean[,c("H3K79me2","H3K79me2.1","H3K79me2.2","H3K79me2.3")])
 mapping_mean$H3K9me3 <- rowMeans(mapping_mean[,c("H3K9me3","H3K9me3.1","H3K9me3.2","H3K9me3.3","H3K9me3.4")])
 mapping_mean$H3K9me2 <- rowMeans(mapping_mean[,c("H3K9me2","H3K9me2.1","H3K9me2.2")])
-mapping_mean$H3K27ac <- rowMeans(mapping_mean[,c("H3K27ac","H3K27ac.1","H3K27ac.2")])
-mapping_mean$H3K27me3 <- rowMeans(mapping_mean[,c("H3K27me3","H3K27me3.1","H3K27me3.2")])
+mapping_mean$H3K27ac <- rowMeans(mapping_mean[,c("H3K27ac","H3K27ac.1","H3K27ac.2","H3K27ac.3")])
+mapping_mean$H3K27me3 <- rowMeans(mapping_mean[,c("H3K27me3.1","H3K27me3.2")])
 mapping_mean$H3K36me3 <- rowMeans(mapping_mean[,c("H3K36me3","H3K36me3.1","H3K36me3.2")])
 mapping_mean$H3K4me1 <- rowMeans(mapping_mean[,c("H3K4me1","H3K4me1.1","H3K4me1.2")])
 mapping_mean$PU1 <- rowMeans(mapping_mean[,c("PU1","PU1.1")])
