@@ -1,0 +1,255 @@
+---
+title: "Clone 5 annotation"
+author: "Max Trauernicht"
+date: "`r format(Sys.time(), '%Y-%m-%d')`"
+output: 
+  html_document:
+    theme: journal #cerulean
+    highlight: monochrome
+    toc: true
+    toc_float: true
+    code_folding: show
+  editor_options:
+    chunk_output_type: console
+---
+
+# knitr document van Steensel lab
+
+# TRIP Clone identification
+
+# Introduction
+
+## Description of Data
+How to make a good rendering table: 
+```{r table1, echo=FALSE, message=FALSE, warnings=FALSE, results='asis'}
+tabl <- "
+| column1	|	column2	|	column3	|	
+|----|----|----|
+|1	|	2	|	3	|	
+|a	|	b	|	c	|	
+"
+cat(tabl) # output the table in a format good for HTML/PDF/docx conversion
+```
+
+# Data processing
+## Path, Libraries, Parameters and Useful Functions
+```{r setup}
+knitr::opts_chunk$set(echo = TRUE)
+StartTime <-Sys.time()
+
+# 8-digit Date tag:
+Date <- substr(gsub("-","",Sys.time()),1,8) 
+# libraries:
+library(dplyr)
+library(data.table)
+library(devtools)
+```
+
+### Custom functions
+Functions used thoughout this script.
+```{r}
+SetFileName <- function(filename, initials) {
+  # Set filename with extension and initials to make filename with date integrated.
+  filename <- substitute(filename)
+  initials <- substitute(initials)
+  filename <- paste0(initials, Date, filename)
+  filename
+}
+```
+
+
+## Data import
+```{r}
+# Load ChIP data
+setwd("~/mydata/Mapping_Clone5_9/nearest_domains-1000-0.9")
+file.list <- list.files(pattern = '*.txt')
+ChIP.list <- lapply(file.list, read.table, header = TRUE)
+mapping_integration <- as.data.frame(ChIP.list)
+
+setwd("~/mydata/Mapping_Clone5_9/means")
+file.list_mean <- list.files(pattern = '*.txt')
+mapping.list_mean <- lapply(file.list_mean, read.table, header = TRUE)
+mapping_mean <- as.data.frame(mapping.list_mean)
+
+# Load Lmnb1 data
+setwd("~/mydata/Mapping_Clone5_9")
+lmn.df <- get(load("rs20190116_RSTP2.2000.Chromatin.RData"))
+
+# Load clone 5 barcode data
+clone5.bc <- read.delim("mt20190204_clone5_barcodes.txt")
+```
+
+# Analysis
+
+## Pre-processing mapping_integration df
+```{r}
+# Remove not needed data
+mapping_integration <- select(mapping_integration, ends_with("e"), contains("Distance"))
+
+# Rename variables 
+names(mapping_integration)[2:38] <- gsub(".*_.*_(.*?)_.*.txt", "\\1", file.list)
+
+# Process lmn dataset
+lmn.df.mean <- lmn.df[,c(1,101)]
+lmn.df.mean <- lmn.df.mean[!duplicated(lmn.df.mean), ]
+lmn.df.mean <- merge(lmn.df.mean, clone5.bc)
+setnames(mapping_integration, old = "Barcode", new = "barcode")
+mapping_integration <- merge(mapping_integration, clone5.bc)
+
+# Combine the two chr. state dfs
+mapping_integration <- merge(lmn.df.mean, mapping_integration, all = TRUE)
+
+# Change from distance to integration: yes (1) or no (0)
+mapping_integration[,3:ncol(mapping_integration)] <- ifelse(mapping_integration[,3:ncol(mapping_integration)] > 0, 0, 1)
+mapping_integration[,2] <- ifelse(mapping_integration[,2] == "AD", 1, 0)
+
+# Remove .B from barcode
+mapping_integration$barcode <- gsub(".B","",mapping_integration$barcode)
+```
+
+## Pre-processing mapping_mean df
+```{r}
+# Remove not needed data
+mapping_mean <- select(mapping_mean, ends_with("id"), starts_with("mean"))
+
+# Rename variables 
+names(mapping_mean)[2:47] <- gsub(".*_.*_(.*?)_.*.txt", "\\1", file.list)
+
+# Process mapping_mean dataset
+lmn.df <- lmn.df[,c(1,100)]
+lmn.df <- lmn.df[!duplicated(lmn.df), ]
+lmn.df <- merge(lmn.df, clone5.bc)
+setnames(mapping_mean, old = "transcript_id", new = "barcode")
+mapping_mean <- merge(mapping_mean, clone5.bc)
+
+# Combine the two chr. state dfs
+mapping_mean <- merge(lmn.df, mapping_mean, all = TRUE)
+
+# Remove .B from barcode
+mapping_mean$barcode <- gsub(".B","",mapping_mean$barcode)
+```
+
+## Normalization mean values
+```{r}
+# Average repetitive ChIP datasets & remove duplets
+mapping_mean$H3K79me2 <- rowMeans(mapping_mean[,c("H3K79me2","H3K79me2.1","H3K79me2.2","H3K79me2.3")])
+mapping_mean$H3K9me3 <- rowMeans(mapping_mean[,c("H3K9me3","H3K9me3.1","H3K9me3.2","H3K9me3.3","H3K9me3.4")])
+mapping_mean$H3K9me2 <- rowMeans(mapping_mean[,c("H3K9me2","H3K9me2.1","H3K9me2.2")])
+mapping_mean$H3K27ac <- rowMeans(mapping_mean[,c("H3K27ac","H3K27ac.1","H3K27ac.2")])
+mapping_mean$H3K27me3 <- rowMeans(mapping_mean[,c("H3K27me3","H3K27me3.1","H3K27me3.2")])
+mapping_mean$H3K36me3 <- rowMeans(mapping_mean[,c("H3K36me3","H3K36me3.1","H3K36me3.2")])
+mapping_mean$H3K4me1 <- rowMeans(mapping_mean[,c("H3K4me1","H3K4me1.1","H3K4me1.2")])
+mapping_mean$PU1 <- rowMeans(mapping_mean[,c("PU1","PU1.1")])
+mapping_mean$POL2 <- rowMeans(mapping_mean[,c("POL2","POL2.1")])
+mapping_mean$H2AFZ <- rowMeans(mapping_mean[,c("H2AFZ","H2AFZ.1")])
+mapping_mean$EZH2 <- rowMeans(mapping_mean[,c("EZH2","EZH2.1")])
+mapping_mean$H4K5acK8ac <- rowMeans(mapping_mean[,c("H4K5acK8ac","H4K5acK8ac.1")])
+mapping_mean$H3K122ac <- rowMeans(mapping_mean[,c("H3K122ac","H3K122ac.1")])
+mapping_mean$H3K122ac <- rowMeans(mapping_mean[,c("H3K122ac","H3K122ac.1")])
+mapping_mean <- select(mapping_mean, -ends_with(".1"), -ends_with(".2"), -ends_with(".3"), -ends_with(".4"))
+
+# Change df format to normalize mean values
+mapping_mean_long <- melt(mapping_mean)
+mapping_mean_long$value[is.na(mapping_mean_long$value)] <- 0
+mapping_mean_long$log <- mapping_mean_long$value
+mapping_mean_long$log[mapping_mean_long$variable != "LMNB1"] <- ave(mapping_mean_long$value[mapping_mean_long$variable != "LMNB1"], FUN = function(x) log2(x))
+mapping_mean_long$mean <- ave(mapping_mean_long$log, mapping_mean_long$variable, FUN = function(x) x/max(x))
+mapping_mean_long <- mapping_mean_long[,c(-3,-4)]
+mapping_mean <- dcast(mapping_mean_long, variable ~ barcode, value.var = "mean")
+
+# Add type of chr. mark (repressive or active)
+mapping_mean_long$type <- "Active"
+mapping_mean_long[grep("EZH2|K562|K9me|K79me3|K27me|macroH2A|BMI1|CBX2|119ub|
+                          MEL18|RING|PCGF|MEL|RCOR|LMNB", mapping_mean_long$variable),]$type <- "Repressive"
+```
+
+## Create heatmaps
+```{r}
+## mapping_mean dataset
+# Set Barcode column as rownames and remove Barcode column
+row.names(mapping_mean) <- mapping_mean$variable
+mapping_mean <- mapping_mean[,-1]
+
+# Generate heatmap
+pheatmap(as.matrix(mapping_mean)) 
+
+## mapping_mean_essent dataset
+mapping_mean_essent <- mapping_mean[c("LMNB1","EZH2","H3K79me2","H3K9me3","H3K9me2","H3K122ac","H3K27ac","H3K4me1","H3K27me3","H3K36me3","POL2"),]
+
+
+# Annotate chr. marks
+chromatin.mark_type1 <- mapping_mean_long[,c(-1,-3)]
+chromatin.mark_type1 <- chromatin.mark_type1[!duplicated(chromatin.mark_type1), ]
+chromatin.mark_type <- chromatin.mark_type1[,2]
+chromatin.mark_type1 <- chromatin.mark_type1[,-2]
+chromatin.mark_type1 <- as.data.frame(chromatin.mark_type1)
+chromatin.mark_type <- as.data.frame(chromatin.mark_type)
+row.names(chromatin.mark_type) <- chromatin.mark_type1$chromatin.mark_type1
+
+# Annotate barcodes
+LAD_integration <- mapping_integration[,c("LAD_state")]
+LAD_integration <- as.data.frame(LAD_integration)
+row.names(LAD_integration) <- mapping_integration$barcode
+LAD_integration$LAD_integration[is.na(LAD_integration$LAD_integration)] <- 0
+LAD_integration[LAD_integration$LAD_integration == 0,] <- "No"
+LAD_integration[LAD_integration$LAD_integration == 1,] <- "Yes"
+
+H3K27me3_integration <- mapping_integration[,c("H3K27me3")]
+H3K27me3_integration <- as.data.frame(H3K27me3_integration)
+row.names(H3K27me3_integration) <- mapping_integration$barcode
+H3K27me3_integration$H3K27me3_integration[is.na(H3K27me3_integration$H3K27me3_integration)] <- 0
+H3K27me3_integration[H3K27me3_integration$H3K27me3_integration == 0,] <- "No"
+H3K27me3_integration[H3K27me3_integration$H3K27me3_integration == 1,] <- "Yes"
+
+LAD_integration$H3K27me3_integration <- H3K27me3_integration$H3K27me3_integration
+
+# Change colors of annotations
+annotation_colors = list(
+  LAD_integration = c(Yes="#66CC00", No="#CCCCCC"),
+  H3K27me3_integration = c(Yes="#66CC00", No="#CCCCCC"),
+  chromatin.mark_type = c(Active="#66CC00", Repressive="#CCCCCC"))
+
+# Generate heatmap
+pheatmap(as.matrix(mapping_mean_essent), annotation_col = LAD_integration, 
+         annotation_row = chromatin.mark_type, annotation_colors = annotation_colors, legend_labels = "log2(")
+
+
+
+
+test = matrix(rnorm(200), 20, 10)
+test[1:10, seq(1, 10, 2)] = test[1:10, seq(1, 10, 2)] + 3
+test[11:20, seq(2, 10, 2)] = test[11:20, seq(2, 10, 2)] + 2
+test[15:20, seq(2, 10, 2)] = test[15:20, seq(2, 10, 2)] + 4
+colnames(test) = paste("Test", 1:10, sep = "")
+rownames(test) = paste("Gene", 1:20, sep = "")
+#plot
+annotation <- data.frame(Var1 = factor(1:10 %% 2 == 0, labels = c("Exp1", "None")), Var1 = factor(1:10 %% 2 == 0, labels = c("Exp1", "None")))
+rownames(annotation) <- colnames(test) # check out the row names of annotation
+
+
+
+
+
+
+```
+
+# Results
+```{r}
+```
+
+# Conclusions
+```{r}
+```
+
+## Exporting potential data. 
+```{r}
+```
+
+# Session Info
+```{r}
+paste("Run time: ",format(Sys.time()-StartTime))
+getwd()
+date()
+sessionInfo()
+```
+
