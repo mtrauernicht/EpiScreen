@@ -182,7 +182,7 @@ StatSmoothFunc <- ggproto("StatSmooth", Stat,
 
 ## Data import
 ```{r data import}
-setwd("~/mydata/EpiScreen/epigenetic-screening-on-trip-clone/Data/")
+setwd("/DATA/usr/m.trauernicht/EpiScreen/epigenetic-screening-on-trip-clone/Data")
 
 # Import data from preprocessing script
 RSTP2_2000_indels.df <- get(load("mt20190125RSTP2_2000_indels.df"))
