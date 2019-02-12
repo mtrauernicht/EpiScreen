@@ -61,18 +61,18 @@ SetFileName <- function(filename, initials) {
 ## Data import
 ```{r}
 # Load ChIP data
-setwd("~/mydata/Mapping_Clone5_9/nearest_domains-1000-0.9")
+setwd("/DATA/usr/m.trauernicht/Mapping_Clone5_9/nearest_domains-1000-0.9")
 file.list <- list.files(pattern = '*.txt')
 ChIP.list <- lapply(file.list, read.table, header = TRUE)
 mapping_integration <- as.data.frame(ChIP.list)
 
-setwd("~/mydata/Mapping_Clone5_9/means")
+setwd("/DATA/usr/m.trauernicht/Mapping_Clone5_9/means")
 file.list_mean <- list.files(pattern = '*.txt')
 mapping.list_mean <- lapply(file.list_mean, read.table, header = TRUE)
 mapping_mean <- as.data.frame(mapping.list_mean)
 
 # Load Lmnb1 data
-setwd("~/mydata/Mapping_Clone5_9")
+setwd("/DATA/usr/m.trauernicht/Mapping_Clone5_9")
 lmn.df <- get(load("rs20190116_RSTP2.2000.Chromatin.RData"))
 
 # Load clone 5 barcode data
@@ -212,20 +212,6 @@ annotation_colors = list(
 # Generate heatmap
 pheatmap(as.matrix(mapping_mean_essent), annotation_col = LAD_integration, 
          annotation_row = chromatin.mark_type, annotation_colors = annotation_colors, legend_labels = "log2(")
-
-
-
-
-test = matrix(rnorm(200), 20, 10)
-test[1:10, seq(1, 10, 2)] = test[1:10, seq(1, 10, 2)] + 3
-test[11:20, seq(2, 10, 2)] = test[11:20, seq(2, 10, 2)] + 2
-test[15:20, seq(2, 10, 2)] = test[15:20, seq(2, 10, 2)] + 4
-colnames(test) = paste("Test", 1:10, sep = "")
-rownames(test) = paste("Gene", 1:20, sep = "")
-#plot
-annotation <- data.frame(Var1 = factor(1:10 %% 2 == 0, labels = c("Exp1", "None")), Var1 = factor(1:10 %% 2 == 0, labels = c("Exp1", "None")))
-rownames(annotation) <- colnames(test) # check out the row names of annotation
-
 
 
 
