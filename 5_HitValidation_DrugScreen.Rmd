@@ -1,6 +1,6 @@
 ---
-title: "Clone identification"
-author: "Ruben Schep"
+title: "Validating hits from the epigenetic screening"
+author: "Max Trauernicht"
 date: "`r format(Sys.time(), '%Y-%m-%d')`"
 output:
   pdf_document:
@@ -20,6 +20,7 @@ output:
 # TRIP Clone identification
 
 # Introduction
+This script tries to find out which drugs are able to significantly alter indel pattern formation in RSTP2#5 cells in different chromatin contexts. In the end, the aim is to couple biological relevance to these changes.
 
 ## Description of Data
 How to make a good rendering table: 
@@ -69,66 +70,16 @@ SetFileName <- function(filename, initials) {
 
 ## Data import
 ```{r Data Import}
+# Import data from 5_HitValidation_DrugScreen.Rmd
 setwd("/DATA/usr/m.trauernicht/EpiScreen/epigenetic-screening-on-trip-clone/Data")
-
-# Import data from preprocessing script
+mapping_mean <- get(load("mt20190212_mapping_mean"))
+mapping_integration <- get(load("mt20190212_mapping_integration"))
 indel.data <- get(load("mt20190204_indel.data"))
-t.outlier.df <- get(load("mt20190204_t.outlier.df"))
-chi.outlier.df <- get(load("mt20190204_chi.outlier.df"))
-
-# Load ChIP data
-setwd("/DATA/usr/m.trauernicht/Mapping_Clone5_9/nearest_domains-1000-0.9")
-file.list <- list.files(pattern = '*.txt')
-ChIP.list <- lapply(file.list, read.table, header = TRUE)
-ChIP.df <- as.data.frame(ChIP.list)
-
-# Load Lmnb1 data
-setwd("/DATA/usr/m.trauernicht/Mapping_Clone5_9")
-lmn.df <- get(load("rs20190116_RSTP2.2000.Chromatin.RData"))
-
-# Load clone 5 barcode data
-clone5.bc <- read.delim("mt20190204_clone5_barcodes.txt")
-```
-
-## Pre-processing: Importing ChIP data
-```{r}
-# Remove not needed data
-ChIP.df <- select(ChIP.df, ends_with("e"), contains("Distance"))
-
-# Rename variables 
-names(ChIP.df)[2:38] <- gsub(".*_.*_(.*?)_.*.txt", "\\1", file.list)
-
-# Process lmn dataset
-lmn.df <- lmn.df[,c(1,101)]
-lmn.df <- lmn.df[!duplicated(lmn.df), ]
-lmn.df <- merge(lmn.df, clone5.bc)
-setnames(ChIP.df, old = "Barcode", new = "barcode")
-ChIP.df <- merge(ChIP.df, clone5.bc)
-
-# Combine the two chr. state dfs
-ChIP.df <- merge(lmn.df, ChIP.df, all = TRUE)
-
-# Change from distance to integration: yes (1) or no (0)
-ChIP.df[,3:ncol(ChIP.df)] <- ifelse(ChIP.df[,3:ncol(ChIP.df)] > 0, 0, 1)
-ChIP.df[,2] <- ifelse(ChIP.df[,2] == "AD", 1, 0)
-
-# Remove .B from barcode
-ChIP.df$barcode <- gsub(".B","",ChIP.df$barcode)
+mapping_integration_long <- get(load("mt20190212_mapping_integration_long"))
 ```
 
 
-## Import chromatin data
-```{r import chromatin data}
-# Import chromatin data
-indel.data <- merge(indel.data, ChIP.df, all = TRUE)
-
-# Make df more sexy
-indel.data <- indel.data[,c(-2,-5,-8:-14,-16,-17,-22,-25,-32:-38)]
-indel.data <- indel.data[-grep("ACCCCTAAAGGCGCTG", indel.data$barcode),]
-```
-
-
-## Generate heatmap
+## Bring dataframe in suitable format for heatmap function
 ```{r generate heatmap}
 # Split up per concentration
 indel.data.high <- indel.data[grep("10um", indel.data$condition),]
@@ -144,86 +95,69 @@ indel.data.high$mean.logratio.bc.target <- ave(indel.data.high$logratio.platenor
 indel.data.med$mean.logratio.bc.target <- ave(indel.data.med$logratio.platenorm, indel.data.med$barcode, indel.data.med$Target, FUN = function(x) mean(x))
 indel.data.low$mean.logratio.bc.target <- ave(indel.data.low$logratio.platenorm, indel.data.low$barcode, indel.data.low$Target, FUN = function(x) mean(x))
 
-## Heatmap for each barcode vs each drug
 # Remove columns
-indel.data.high2 <- indel.data.high[,c(1,4,57)]
-indel.data.med2 <- indel.data.med[,c(1,4,57)]
-indel.data.low2 <- indel.data.low[,c(1,4,57)]
-indel.data.high2 <- indel.data.high2[!duplicated(indel.data.high2), ]
-indel.data.med2 <- indel.data.med2[!duplicated(indel.data.med2), ]
-indel.data.low2 <- indel.data.low2[!duplicated(indel.data.low2), ]
+indel.data.high.drug <- indel.data.high[,c(1,6,39)]
+indel.data.med.drug <- indel.data.med[,c(1,6,39)]
+indel.data.low.drug <- indel.data.low[,c(1,6,39)]
+indel.data.high.drug <- indel.data.high.drug[!duplicated(indel.data.high.drug), ]
+indel.data.med.drug <- indel.data.med.drug[!duplicated(indel.data.med.drug), ]
+indel.data.low.drug <- indel.data.low.drug[!duplicated(indel.data.low.drug), ]
 
 # Transform to wide format for visualization purposes
-indel.data.low2 <- dcast(indel.data.low2, Drug ~ barcode, value.var="mean.logratio.bc.drug")
-indel.data.med2 <- dcast(indel.data.med2, Drug ~ barcode, value.var="mean.logratio.bc.drug")
-indel.data.high2 <- dcast(indel.data.high2, Drug ~ barcode, value.var="mean.logratio.bc.drug")
-
-# Color function for heatmap
-col_fun = colorRamp2(c(-2, 0, 2), c("blue", "white", "red"))
-
-# Create matrix and use heatmap function
-row.names(indel.data.high2) <- indel.data.high2$Drug
-indel.data.high2 <- indel.data.high2[,c(-1)]
-heatmap.drug.high2 <- heatmap(as.matrix(indel.data.high2, cexRow=0.5))
-
-row.names(indel.data.med2) <- indel.data.med2$Drug
-indel.data.med2 <- indel.data.med2[,c(-1)]
-heatmap.drug.med <- heatmap(as.matrix(indel.data.med2))
-
-row.names(indel.data.low2) <- indel.data.low2$Drug
-indel.data.low2 <- indel.data.low2[,c(-1)]
-heatmap.drug.low <- heatmap(as.matrix(indel.data.low2))
+indel.data.low.drug <- dcast(indel.data.low.drug, Drug ~ barcode, value.var="mean.logratio.bc.drug")
+indel.data.med.drug <- dcast(indel.data.med.drug, Drug ~ barcode, value.var="mean.logratio.bc.drug")
+indel.data.high.drug <- dcast(indel.data.high.drug, Drug ~ barcode, value.var="mean.logratio.bc.drug")
+```
 
 
-
+## The same for target group per barcode
+```{r}
 ## Heatmap for each barcode vs each target
 # Remove columns
-indel.data.high3 <- indel.data.high[,c(1,5,58)]
-indel.data.med3 <- indel.data.med[,c(1,5,58)]
-indel.data.low3 <- indel.data.low[,c(1,5,58)]
-indel.data.high3 <- indel.data.high3[!duplicated(indel.data.high3), ]
-indel.data.med3 <- indel.data.med3[!duplicated(indel.data.med3), ]
-indel.data.low3 <- indel.data.low3[!duplicated(indel.data.low3), ]
+indel.data.high.target <- indel.data.high[,c(1,7,40)]
+indel.data.med.target <- indel.data.med[,c(1,7,40)]
+indel.data.low.target <- indel.data.low[,c(1,7,40)]
+indel.data.high.target <- indel.data.high.target[!duplicated(indel.data.high.target), ]
+indel.data.med.target <- indel.data.med.target[!duplicated(indel.data.med.target), ]
+indel.data.low.target <- indel.data.low.target[!duplicated(indel.data.low.target), ]
 
 
 
 # Transform to wide format for visualization purposes
-indel.data.low3 <- dcast(indel.data.low3, Target ~ barcode, value.var="mean.logratio.bc.target")
-indel.data.med3 <- dcast(indel.data.med3, Target ~ barcode, value.var="mean.logratio.bc.target")
-indel.data.high3 <- dcast(indel.data.high3, Target ~ barcode, value.var="mean.logratio.bc.target")
-
-
-# Create matrix and use heatmap function
-row.names(indel.data.high3) <- indel.data.high3$Target
-indel.data.high3 <- indel.data.high3[,c(-1)]
-heatmap.target.high <- heatmap(as.matrix(indel.data.high3))
-
-row.names(indel.data.med3) <- indel.data.med3$Target
-indel.data.med3 <- indel.data.med3[,c(-1)]
-heatmap.target.med <- heatmap(as.matrix(indel.data.med3))
-
-row.names(indel.data.low3) <- indel.data.low3$Target
-indel.data.low3 <- indel.data.low3[,c(-1)]
-heatmap.target.low <- heatmap(as.matrix(indel.data.low3))
-
+indel.data.low.target <- dcast(indel.data.low.target, Target ~ barcode, value.var="mean.logratio.bc.target")
+indel.data.med.target <- dcast(indel.data.med.target, Target ~ barcode, value.var="mean.logratio.bc.target")
+indel.data.high.target <- dcast(indel.data.high.target, Target ~ barcode, value.var="mean.logratio.bc.target")
 ```
 
-## Export figures
+
+
+## Generate heatmap for logratio barcode vs. target group
 ```{r}
-# Visualize heatmaps
 # Per target group
+# Create matrix and use heatmap function
+row.names(indel.data.high.target) <- indel.data.high.target$Target
+indel.data.high.target <- indel.data.high.target[,c(-1)]
+
+row.names(indel.data.med.target) <- indel.data.med.target$Target
+indel.data.med.target <- indel.data.med.target[,c(-1)]
+
+row.names(indel.data.low.target) <- indel.data.low.target$Target
+indel.data.low.target <- indel.data.low.target[,c(-1)]
+
+# Using the Heatmap function, plotting in a grid format
+col_fun = colorRamp2(c(-2, 0, 2), c("blue", "white", "red"))
 grid.newpage()
 pushViewport(viewport(layout = grid.layout(nr = 2, nc = 2)))
 pushViewport(viewport(layout.pos.row = 1, layout.pos.col = 1))
-draw(Heatmap(as.matrix(indel.data.high3), col = col_fun, column_title = "10uM drugs administered", show_heatmap_legend = FALSE, row_names_gp = gpar(fontsize = 8), column_names_gp = gpar(fontsize = 10)), newpage = FALSE)
+draw(Heatmap(as.matrix(indel.data.high.target), col = col_fun, column_title = "10uM drugs administered", show_heatmap_legend = FALSE, row_names_gp = gpar(fontsize = 8), column_names_gp = gpar(fontsize = 10)), newpage = FALSE)
 upViewport()
 
 pushViewport(viewport(layout.pos.row = 1, layout.pos.col = 2))
-draw(Heatmap(as.matrix(indel.data.med3), col = col_fun, column_title = "1uM drugs administered", row_names_gp = gpar(fontsize = 8), column_names_gp = gpar(fontsize = 10), show_heatmap_legend = FALSE), newpage = FALSE)
+draw(Heatmap(as.matrix(indel.data.med.target), col = col_fun, column_title = "1uM drugs administered", row_names_gp = gpar(fontsize = 8), column_names_gp = gpar(fontsize = 10), show_heatmap_legend = FALSE), newpage = FALSE)
 upViewport()
 
 pushViewport(viewport(layout.pos.row = 2, layout.pos.col = 1))
-draw(Heatmap(as.matrix(indel.data.low3), col = col_fun, column_title = "100nm drugs administered", row_names_gp = gpar(fontsize = 8), column_names_gp = gpar(fontsize = 10), show_heatmap_legend = FALSE), newpage = FALSE)
+draw(Heatmap(as.matrix(indel.data.low.target), col = col_fun, column_title = "100nm drugs administered", row_names_gp = gpar(fontsize = 8), column_names_gp = gpar(fontsize = 10), show_heatmap_legend = FALSE), newpage = FALSE)
 upViewport()
 
 lgd = Legend(at = c(-2, -1, 0, 1, 2), col_fun = col_fun, title = "log2(+1/-7 indel ratio)", title_position = "topleft")
@@ -234,30 +168,93 @@ upViewport()
 
 upViewport()
 
-# p-heatmap
-pheatmap(as.matrix(indel.data.high3))
-pheatmap(as.matrix(indel.data.med3))
-pheatmap(as.matrix(indel.data.low3))
 
-# Without DNA-PKi
-pheatmap(as.matrix(indel.data.high3[-2,]))
-pheatmap(as.matrix(indel.data.med3[-2,]))
-pheatmap(as.matrix(indel.data.low3[-2,]))
+# Annotate barcodes
+annotate.bc <- mapping_integration_long[grep("LAD_state|H3K27me3|H3K4me1|H3K27ac", mapping_integration_long$variable),]
+annotate.bc <- dcast(annotate.bc, barcode ~ variable, value.var = "value")
+annotate.bc[is.na(annotate.bc)] <- 0
+row.names(annotate.bc) <- annotate.bc$barcode
+annotate.bc <- annotate.bc[,-1]
+
+# Change colors of annotations
+annotation_colors = list(
+  LAD_state = brewer.pal(5, "PuBu"),
+  H3K27me3 = brewer.pal(5, "PuBu"),
+  H3K4me1 = brewer.pal(5, "PuBu"),
+  H3K27ac = brewer.pal(5, "PuBu"))
 
 
+# Keeping the scale in the pheatmap function
+breaksList <- seq(-1.4,1.2,0.1)
+
+
+# Using the pheatmap function
+pheatmap(as.matrix(indel.data.high.target), annotation_col = annotate.bc, 
+         annotation_colors = annotation_colors, 
+         color = colorRampPalette(rev(brewer.pal(n = 7, name = "RdGy")))(length(breaksList)), breaks = breaksList,
+         main = "log2(+1/-7 indel ratio), 
+         10uM of drugs added")
+pheatmap(as.matrix(indel.data.med.target), annotation_col = annotate.bc,
+         color = colorRampPalette(rev(brewer.pal(n = 7, name = "RdGy")))(length(breaksList)), breaks = breaksList,
+         annotation_colors = annotation_colors, main = "log2(+1/-7 indel ratio) - 
+         1uM of drugs added")
+pheatmap(as.matrix(indel.data.low.target), annotation_col = annotate.bc, 
+         color = colorRampPalette(rev(brewer.pal(n = 7, name = "RdGy")))(length(breaksList)), breaks = breaksList,
+         annotation_colors = annotation_colors, main = "log2(+1/-7 indel ratio) - 
+         100nM of drugs added")
+
+# Using the pheatmap function, without DNA-PKi
+pheatmap(as.matrix(indel.data.high.target[-2,]), annotation_col = annotate.bc, 
+         color = colorRampPalette(rev(brewer.pal(n = 7, name = "RdGy")))(length(breaksList)), breaks = breaksList,
+         annotation_colors = annotation_colors, main = "log2(+1/-7 indel ratio) -
+         10uM of drugs added - no DNA-PKi")
+pheatmap(as.matrix(indel.data.med.target[-2,]), annotation_col = annotate.bc, 
+         color = colorRampPalette(rev(brewer.pal(n = 7, name = "RdGy")))(length(breaksList)),breaks = breaksList,
+         annotation_colors = annotation_colors, main = "log2(+1/-7 indel ratio) - 
+         1uM of drugs added - no DNA-PKi")
+pheatmap(as.matrix(indel.data.low.target[-2,]), annotation_col = annotate.bc, 
+         color = colorRampPalette(rev(brewer.pal(n = 7, name = "RdGy")))(length(breaksList)),breaks = breaksList,
+         annotation_colors = annotation_colors, main = "log2(+1/-7 indel ratio) - 
+         100nM of drugs added - no DNA-PKi")
+```
+# Conclusion heatmaps per target
+- DNA-PKi has by far the biggest effect, no other drug category can reach out to a change of that magnitude
+- Aurora kinase inhibitors and DNMT inhibitors seem to consistently elevate +1/-7 indel ratios, even more drastically than Mirin
+- Some barcodes seem more susceptible to DNMT and aurora kinase inhibitors (some overlay with H3K27me3)
+- Many drug categories do not seem to change indel patterns (HDAC activator, HIF, HAT, Other, Sirtuin)
+- HDM, ERD are comparable to MRN
+- HMT, HDAC, PARP also seem to elevate +1/-7 ratio
+- No drug categories reduce the +1/-7 ratio (maybe HDAC activators at some barcodes to a very small extent)
+- hard to say something about clustering of barcodes
+- most left barcode (CGGC...) responds to many drug categories more than other barcodes (explanation? H3K27me3?)
+-> This already reveals some cool information, more in-depth studies of individual drugs is needed, especially because the grouping of drugs into categories can be faulty and misleading (inhibitors can be either pan, or selective for a sub-group, which means that they probably affect different locations/barcodes)
+
+## Generating heatmaps per barcode
+```{r}
 # Heatmap per barcode
+row.names(indel.data.high.drug) <- indel.data.high.drug$Drug
+indel.data.high.drug <- indel.data.high.drug[,c(-1)]
+
+row.names(indel.data.med.drug) <- indel.data.med.drug$Drug
+indel.data.med.drug <- indel.data.med.drug[,c(-1)]
+
+row.names(indel.data.low.drug) <- indel.data.low.drug$Drug
+indel.data.low.drug <- indel.data.low.drug[,c(-1)]
+
+
+
 grid.newpage()
 pushViewport(viewport(layout = grid.layout(nr = 2, nc = 2)))
 pushViewport(viewport(layout.pos.row = 1, layout.pos.col = 1))
-draw(Heatmap(as.matrix(indel.data.high2), col = col_fun, column_title = "10uM drugs administered", show_heatmap_legend = FALSE, row_names_gp = gpar(fontsize = 2), column_names_gp = gpar(fontsize = 10)), newpage = FALSE)
+draw(Heatmap(as.matrix(indel.data.high.drug), col = col_fun, column_title = "10uM drugs administered", show_heatmap_legend = FALSE, row_names_gp = gpar(fontsize = 2), column_names_gp = gpar(fontsize = 10)), newpage = FALSE)
 upViewport()
 
 pushViewport(viewport(layout.pos.row = 1, layout.pos.col = 2))
-draw(Heatmap(as.matrix(indel.data.med2), col = col_fun, column_title = "1uM drugs administered", row_names_gp = gpar(fontsize = 2), column_names_gp = gpar(fontsize = 10), show_heatmap_legend = FALSE), newpage = FALSE)
+draw(Heatmap(as.matrix(indel.data.med.drug), col = col_fun, column_title = "1uM drugs administered", row_names_gp = gpar(fontsize = 2), column_names_gp = gpar(fontsize = 10), show_heatmap_legend = FALSE), newpage = FALSE)
 upViewport()
 
 pushViewport(viewport(layout.pos.row = 2, layout.pos.col = 1))
-draw(Heatmap(as.matrix(indel.data.low2), col = col_fun, column_title = "100nm drugs administered", row_names_gp = gpar(fontsize = 2), column_names_gp = gpar(fontsize = 10), show_heatmap_legend = FALSE), newpage = FALSE)
+draw(Heatmap(as.matrix(indel.data.low.drug), col = col_fun, column_title = "100nm drugs administered", row_names_gp = gpar(fontsize = 2), column_names_gp = gpar(fontsize = 10), show_heatmap_legend = FALSE), newpage = FALSE)
 upViewport()
 
 lgd = Legend(at = c(-2, -1, 0, 1, 2), col_fun = col_fun, title = "log2(+1/-7 indel ratio)", title_position = "topleft")
@@ -267,27 +264,60 @@ grid.draw(lgd)
 upViewport()
 
 upViewport()
+
+# Row annotation: annotate drugs with the target group
+target <- indel.data[,c(6,7)]
+target <- target[!duplicated(target), ]
+target$random <- c(1:158)
+row.names(target) <- target$Drug
+target2 <- target
+target <- target[,c(-1,-3)]
+target <- as.data.frame(target)
+row.names(target) <- target2$Drug
+
+# Row annotation color
+annotation_colors2 = list(
+  LAD_state = brewer.pal(5, "PuBu"),
+  H3K27me3 = brewer.pal(5, "PuBu"),
+  H3K4me1 = brewer.pal(5, "PuBu"),
+  H3K27ac = brewer.pal(5, "PuBu"),
+  target = colorRampPalette(rev(brewer.pal(7, "PuBu"))))
+
+# Keeping the scale in the pheatmap function
+breaksList2 <- seq(-3,3,0.1)
 
 # pheatmap
-pheatmap(as.matrix(indel.data.high2), show_rownames = FALSE)
-pheatmap(as.matrix(indel.data.med2), fontsize_row = 3)
-
-tiff("test.tiff", units="in", width=5, height=5, res=300)
-pheatmap(as.matrix(indel.data.low2), cellheight = 1.5, fontsize = 2)
-dev.off()
+pheatmap(as.matrix(indel.data.high.drug), fontsize_row = 2, annotation_col = annotate.bc, annotation_row = target,
+         color = colorRampPalette(rev(brewer.pal(n = 7, name = "RdGy")))(length(breaksList2)),breaks = breaksList2,
+         annotation_colors = annotation_colors, main = "log2(+1/-7 indel ratio) - 
+         10uM of drugs added - no DNA-PKi", filename = "test.png")
 
 
 
-# Barcode heatmap per target?
-
+for (i in unique(indel.data.high.drug$Target)) {
+  data <- indel.data.high.drug[indel.data.high.drug$Target == i,]
+  p <- pheatmap(as.matrix(data[,1:18]), fontsize_row = 2, annotation_col = annotate.bc, annotation_row = target,
+         color = colorRampPalette(rev(brewer.pal(n = 7, name = "RdGy")))(length(breaksList2)),breaks = breaksList2,
+         annotation_colors = annotation_colors, main = "log2(+1/-7 indel ratio) - 
+         10uM of drugs added - no DNA-PKi")
+  print(p)
+}
 
 ```
 
 
 
 
+## Import chromatin data
+```{r import chromatin data}
+# Import chromatin data
+indel.data <- merge(indel.data, ChIP.df, all = TRUE)
 
-# Find drugs that have effect on one chr.state but not on the other
+# Make df more sexy
+indel.data <- indel.data[,c(-2,-5,-8:-14,-16,-17,-22,-25,-32:-38)]
+indel.data <- indel.data[-grep("ACCCCTAAAGGCGCTG", indel.data$barcode),]
+```
+
 
 
 
@@ -364,8 +394,8 @@ dev.off()
 # 
 # 
 # 
-# t.outlier.df.high2 <- melt(t.outlier.df.high)
-# t.outlier.df.high2 <- merge(t.outlier.df.high2, logratio)
+# t.outlier.df.high.drug <- melt(t.outlier.df.high)
+# t.outlier.df.high.drug <- merge(t.outlier.df.high.drug, logratio)
 # 
 # 
 # 
