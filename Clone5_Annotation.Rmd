@@ -43,6 +43,8 @@ Date <- substr(gsub("-","",Sys.time()),1,8)
 library(dplyr)
 library(data.table)
 library(devtools)
+library(RColorBrewer)
+library(pheatmap)
 ```
 
 ### Custom functions
@@ -165,7 +167,7 @@ mapping_mean_long[grep("EZH2|K562|K9me|K79me3|K27me|macroH2A|BMI1|CBX2|119ub|
                           MEL18|RING|PCGF|MEL|RCOR|LMNB", mapping_mean_long$variable),]$type <- "Repressive"
 ```
 
-## Create heatmaps: mapping_mean
+## Create code for heatmaps: mapping_mean dataset
 ```{r}
 ## mapping_mean_essent dataset
 mapping_mean_essent <- mapping_mean[grep("LMNB1|EZH2|H3K79me2|H3K9me3|H3K9me2|H3K122ac|H3K27ac|H3K4me1|H3K27me3|H3K36me3|POL2", mapping_mean$variable),]
@@ -206,33 +208,20 @@ annotation_colors = list(
 row.names(mapping_mean_essent) <- mapping_mean_essent$variable
 mapping_mean_essent <- mapping_mean_essent[,-1]
 
-# Generate heatmap
-pheatmap(as.matrix(mapping_mean_essent), annotation_col = LAD_integration, 
-         annotation_row = chromatin.mark_type, 
-         annotation_colors = annotation_colors, main = "RSTP2#5: chromatin mark intensity per barcode")
-
-
 
 ## mapping_mean dataset
 # Set Barcode column as rownames and remove Barcode column
 row.names(mapping_mean) <- mapping_mean$variable
 mapping_mean <- mapping_mean[,-1]
 
-# Generate heatmap
-pheatmap(as.matrix(mapping_mean), annotation_col = LAD_integration, 
-         annotation_row = chromatin.mark_type, 
-         annotation_colors = annotation_colors, main = "RSTP2#5: chromatin mark intensity per barcode")
+
 
 
 
 ```
 
 
-
-
-
-
-## Create heatmaps: mapping_integration
+## Create code for heatmaps: mapping_integration dataset
 ```{r}
 # Average repetitive ChIP datasets & remove duplets
 mapping_integration$H3K79me2 <- rowMeans(mapping_integration[,c("H3K79me2","H3K79me2.1")])
@@ -251,7 +240,7 @@ mapping_integration_long <- melt(mapping_integration)
 mapping_integration <- dcast(mapping_integration_long, variable ~ barcode, value.var = "value")
 
 ## Only essentials
-mapping_integration_essent <- mapping_integration[grep("LMNB1|EZH2|H3K79me2|H3K9me3|H3K9me2|H3K122ac|H3K27ac|H3K4me1|H3K27me3|H3K36me3|POL2", mapping_integration$variable),]
+mapping_integration_essent <- mapping_integration[grep("LAD_state|EZH2|H3K79me2|H3K9me3|H3K9me2|H3K122ac|H3K27ac|H3K4me1|H3K27me3|H3K36me3|POL2", mapping_integration$variable),]
 
 # Annotation color
 chromatin.mark_type2 <- chromatin.mark_type
@@ -272,33 +261,87 @@ mapping_integration_essent[is.na(mapping_integration_essent)] <- 0
 row.names(mapping_integration_essent) <- mapping_integration_essent$variable
 mapping_integration_essent <- mapping_integration_essent[,-1]
 
-# Generate heatmap
-pheatmap(as.matrix(mapping_integration_essent), annotation_row = chromatin.mark_type3, 
-         annotation_colors = annotation_colors_2, main = "RSTP2#5: chromatin integration state per barcode")
 
-
-
+## The same for df with all ChIP datasets
 # Preprocess dataset for heatmap
 mapping_integration[is.na(mapping_integration)] <- 0
 row.names(mapping_integration) <- mapping_integration$variable
 mapping_integration <- mapping_integration[,-1]
 
 
-# Generate heatmap
-pheatmap(as.matrix(mapping_integration), annotation_row = chromatin.mark_type3, 
-         annotation_colors = annotation_colors_2, main = "RSTP2#5: chromatin integration state per barcode")
-
-
-
 ```
+
+Next, heatmaps can be visualized, using either the dataframe containing only essential ChIP data or all ChIP data.
 
 # Results
 ```{r}
+## Generate the heatmaps
+
+# The following two heatmaps represent in color the intensity of the chromatin marks at the barcodes integrated in RSTP2 clone 5
+# Each chromatin mark is annotated with either repressive or active
+# Additionally, LAD & H3K27me3 integration calling states are represented per barcode (meaning: do these barcodes reside in a LAD/H3K27me3 domain?)
+
+# Generate heatmap: chr. mark intensity of only essential ChIP datasets vs. barcodes
+pheatmap(as.matrix(mapping_mean_essent), annotation_col = LAD_integration, 
+         annotation_row = chromatin.mark_type, 
+         annotation_colors = annotation_colors, 
+         main = "RSTP2#5: chromatin mark intensity 
+         per barcode (essential ChIP datasets)")
+
+# Generate heatmap: chr. mark intensity of all ChIP datasets vs. barcodes
+pheatmap(as.matrix(mapping_mean), annotation_col = LAD_integration, 
+         annotation_row = chromatin.mark_type, 
+         annotation_colors = annotation_colors, 
+         main = "RSTP2#5: chromatin mark intensity 
+         per barcode (all ChIP datasets)")
+
+# The following two heatmaps represent in color the status of integration in a chromatin domain, since for some chromatin marks multiple datasets (up to 3) were used, the state calling can be 0.333, 0.5, or 0.666 instead of 0 or 1
+# Each chromatin mark is annotated with either repressive or active
+
+# Generate heatmap: ChIP integration calling for only essential datasets vs. barcode
+pheatmap(as.matrix(mapping_integration_essent), annotation_row = chromatin.mark_type3, 
+         annotation_colors = annotation_colors_2, color = brewer.pal(5, "PuBu"),
+         main = "RSTP2#5: chromatin integration state 
+         per barcode (essential ChIP datasets)")
+
+# Generate heatmap: ChIP integration calling for all datasets vs. barcode
+pheatmap(as.matrix(mapping_integration), annotation_row = chromatin.mark_type3, 
+         annotation_colors = annotation_colors_2, color = brewer.pal(5, "PuBu"),
+         main = "RSTP2#5: chromatin integration state 
+         per barcode (all ChIP datasets)")
+
+
 ```
 
 # Conclusions
-```{r}
-```
+
+The heatmaps reveal many valuable information about the integrations of clone 5. 
+In this case 18 out of 20 integrations were mapped and annotated (we were not able to map 2 barcodes). 
+
+What can we conclude from these plots?
+
+"RSTP2#5: chromatin mark intensity per barcode (essential ChIP datasets)":
+- LAD barcodes cluster together, but still have some intra-group variability
+- The H3K27me3 integration state calling doesn't always overlap with high ChIP mean values (why?)
+- There seems to be a high variability between barcodes (we have pure LADs (e.g. CATCC...), repressed barcodes (e.g. GAGC...), rather boring barcodes (no marks, e.g. GCGCA...), and very active barcodes(e.g. TATG...))
+- possible barcode clustering (from left to right): barcode 1-2 = very active, barcode 3-6: active, barcode 7-10: slightly repressed, barcode 11-14: slightly repressed 2, barcode 15-18: LADs
+- active marks tend to cluster together
+
+"RSTP2#5: chromatin mark intensity per barcode (all ChIP datasets)":
+- again, LADs cluster together
+- LMNB1, H3K9me2, EZH2 and H3K122ac are very different from other marks
+- possible barcode clustering (from left to right): 1-3: mainly active, 4: repressed, 5-6: active, 7-10: LADs, 11: active, 12-15: boring/slightly repressed, 16-18: repressed
+
+"RSTP2#5: chromatin integration state per barcode (essential ChIP datasets)":
+- active/repressive marks tend to cluster together
+- possible barcode clustering (from left to right): 1-5: LADs, 6-10: repressed, 11-18: active
+
+"RSTP2#5: chromatin integration state per barcode (all ChIP datasets)":
+- active/repressive marks tend to cluster together
+- possible barcode clustering (from left to right): 1-3: repressed, 4-8: active, 9-10: slightly repressed, 11-15: LADs, 16-18: slightly active
+
+
+
 
 ## Exporting potential data. 
 ```{r}
