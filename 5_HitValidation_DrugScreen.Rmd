@@ -69,7 +69,7 @@ SetFileName <- function(filename, initials) {
 
 ## Data import
 ```{r Data Import}
-setwd("~/mydata/EpiScreen/epigenetic-screening-on-trip-clone/Data/")
+setwd("/DATA/usr/m.trauernicht/EpiScreen/epigenetic-screening-on-trip-clone/Data")
 
 # Import data from preprocessing script
 indel.data <- get(load("mt20190204_indel.data"))
@@ -77,13 +77,13 @@ t.outlier.df <- get(load("mt20190204_t.outlier.df"))
 chi.outlier.df <- get(load("mt20190204_chi.outlier.df"))
 
 # Load ChIP data
-setwd("~/mydata/Mapping_Clone5_9/nearest_domains-1000-0.9")
+setwd("/DATA/usr/m.trauernicht/Mapping_Clone5_9/nearest_domains-1000-0.9")
 file.list <- list.files(pattern = '*.txt')
 ChIP.list <- lapply(file.list, read.table, header = TRUE)
 ChIP.df <- as.data.frame(ChIP.list)
 
 # Load Lmnb1 data
-setwd("~/mydata/Mapping_Clone5_9")
+setwd("/DATA/usr/m.trauernicht/Mapping_Clone5_9")
 lmn.df <- get(load("rs20190116_RSTP2.2000.Chromatin.RData"))
 
 # Load clone 5 barcode data
