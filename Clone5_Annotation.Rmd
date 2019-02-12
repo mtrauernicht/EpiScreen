@@ -145,7 +145,6 @@ mapping_mean$H2AFZ <- rowMeans(mapping_mean[,c("H2AFZ","H2AFZ.1")])
 mapping_mean$EZH2 <- rowMeans(mapping_mean[,c("EZH2","EZH2.1")])
 mapping_mean$H4K5acK8ac <- rowMeans(mapping_mean[,c("H4K5acK8ac","H4K5acK8ac.1")])
 mapping_mean$H3K122ac <- rowMeans(mapping_mean[,c("H3K122ac","H3K122ac.1")])
-mapping_mean$H3K122ac <- rowMeans(mapping_mean[,c("H3K122ac","H3K122ac.1")])
 mapping_mean <- select(mapping_mean, -ends_with(".1"), -ends_with(".2"), -ends_with(".3"), -ends_with(".4"))
 
 # Change df format to normalize mean values
@@ -163,19 +162,10 @@ mapping_mean_long[grep("EZH2|K562|K9me|K79me3|K27me|macroH2A|BMI1|CBX2|119ub|
                           MEL18|RING|PCGF|MEL|RCOR|LMNB", mapping_mean_long$variable),]$type <- "Repressive"
 ```
 
-## Create heatmaps
+## Create heatmaps: mapping_mean
 ```{r}
-## mapping_mean dataset
-# Set Barcode column as rownames and remove Barcode column
-row.names(mapping_mean) <- mapping_mean$variable
-mapping_mean <- mapping_mean[,-1]
-
-# Generate heatmap
-pheatmap(as.matrix(mapping_mean)) 
-
 ## mapping_mean_essent dataset
-mapping_mean_essent <- mapping_mean[c("LMNB1","EZH2","H3K79me2","H3K9me3","H3K9me2","H3K122ac","H3K27ac","H3K4me1","H3K27me3","H3K36me3","POL2"),]
-
+mapping_mean_essent <- mapping_mean[grep("LMNB1|EZH2|H3K79me2|H3K9me3|H3K9me2|H3K122ac|H3K27ac|H3K4me1|H3K27me3|H3K36me3|POL2", mapping_mean$variable),]
 
 # Annotate chr. marks
 chromatin.mark_type1 <- mapping_mean_long[,c(-1,-3)]
@@ -209,11 +199,71 @@ annotation_colors = list(
   H3K27me3_integration = c(Yes="#66CC00", No="#CCCCCC"),
   chromatin.mark_type = c(Active="#66CC00", Repressive="#CCCCCC"))
 
+# Set Barcode column as rownames and remove Barcode column
+row.names(mapping_mean_essent) <- mapping_mean_essent$variable
+mapping_mean_essent <- mapping_mean_essent[,-1]
+
 # Generate heatmap
 pheatmap(as.matrix(mapping_mean_essent), annotation_col = LAD_integration, 
-         annotation_row = chromatin.mark_type, annotation_colors = annotation_colors, legend_labels = "log2(")
+         annotation_row = chromatin.mark_type, 
+         annotation_colors = annotation_colors, main = "RSTP2#5: chromatin mark intensity per barcode")
 
 
+
+## mapping_mean dataset
+# Set Barcode column as rownames and remove Barcode column
+row.names(mapping_mean) <- mapping_mean$variable
+mapping_mean <- mapping_mean[,-1]
+
+# Generate heatmap
+pheatmap(as.matrix(mapping_mean), annotation_col = LAD_integration, 
+         annotation_row = chromatin.mark_type, 
+         annotation_colors = annotation_colors, main = "RSTP2#5: chromatin mark intensity per barcode")
+
+
+
+```
+
+
+## Create heatmaps: mapping_integration
+```{r}
+# Average repetitive ChIP datasets & remove duplets
+mapping_integration$H3K79me2 <- rowMeans(mapping_integration[,c("H3K79me2","H3K79me2.1")])
+mapping_integration$H3K9me3 <- rowMeans(mapping_integration[,c("H3K9me3","H3K9me3.1","H3K9me3.2")])
+mapping_integration$H3K9me2 <- rowMeans(mapping_integration[,c("H3K9me2","H3K9me2.1")])
+mapping_integration$H3K27ac <- rowMeans(mapping_integration[,c("H3K27ac","H3K27ac.1","H3K27ac.2")])
+mapping_integration$H3K27me3 <- rowMeans(mapping_integration[,c("H3K27me3","H3K27me3.1","H3K27me3.2")])
+mapping_integration$H3K36me3 <- rowMeans(mapping_integration[,c("H3K36me3","H3K36me3.1","H3K36me3.2")])
+mapping_integration$H3K4me1 <- rowMeans(mapping_integration[,c("H3K4me1","H3K4me1.1","H3K4me1.2")])
+mapping_integration$PU1 <- rowMeans(mapping_integration[,c("PU1","PU1.1")])
+mapping_integration$POL2 <- rowMeans(mapping_integration[,c("POL2","POL2.1")])
+mapping_integration <- select(mapping_integration, -ends_with(".1"), -ends_with(".2"), -ends_with(".3"), -ends_with(".4"))
+
+## Only essentials
+mapping_integration_essent <- mapping_integration[,c("LMNB1","EZH2","H3K79me2","H3K9me3","H3K9me2","H3K122ac","H3K27ac","H3K4me1","H3K27me3","H3K36me3","POL2")]
+
+# Preprocess dataset for heatmap
+mapping_integration$LAD_state[is.na(mapping_integration$LAD_state)] <- 0
+row.names(mapping_integration) <- mapping_integration$barcode
+mapping_integration <- mapping_integration[,-1]
+
+# Annotation color
+chromatin.mark_type2 <- chromatin.mark_type
+chromatin.mark_type2 <- mapping_mean_long[,c(-1,-3)]
+chromatin.mark_type2 <- chromatin.mark_type2[!duplicated(chromatin.mark_type2), ]
+chromatin.mark_type2$variable <- as.character(chromatin.mark_type2$variable)
+chromatin.mark_type2[chromatin.mark_type2$variable == "LMNB1",]$variable <- "LAD_state"
+chromatin.mark_type3 <- chromatin.mark_type2[,2]
+chromatin.mark_type2 <- chromatin.mark_type2[,-2]
+chromatin.mark_type2 <- as.data.frame(chromatin.mark_type2)
+chromatin.mark_type3 <- as.data.frame(chromatin.mark_type3)
+row.names(chromatin.mark_type3) <- chromatin.mark_type2$chromatin.mark_type2
+annotation_colors_2 = list(
+  chromatin.mark_type3 = c(Active="#66CC00", Repressive="#CCCCCC"))
+
+# Generate heatmap
+pheatmap(as.matrix(mapping_integration), annotation_col = chromatin.mark_type3, 
+         annotation_colors = annotation_colors_2, main = "RSTP2#5: chromatin integration state per barcode")
 
 
 
