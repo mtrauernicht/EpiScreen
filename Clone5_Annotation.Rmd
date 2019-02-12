@@ -225,6 +225,10 @@ pheatmap(as.matrix(mapping_mean), annotation_col = LAD_integration,
 ```
 
 
+
+
+
+
 ## Create heatmaps: mapping_integration
 ```{r}
 # Average repetitive ChIP datasets & remove duplets
@@ -239,13 +243,12 @@ mapping_integration$PU1 <- rowMeans(mapping_integration[,c("PU1","PU1.1")])
 mapping_integration$POL2 <- rowMeans(mapping_integration[,c("POL2","POL2.1")])
 mapping_integration <- select(mapping_integration, -ends_with(".1"), -ends_with(".2"), -ends_with(".3"), -ends_with(".4"))
 
-## Only essentials
-mapping_integration_essent <- mapping_integration[,c("LMNB1","EZH2","H3K79me2","H3K9me3","H3K9me2","H3K122ac","H3K27ac","H3K4me1","H3K27me3","H3K36me3","POL2")]
+# Turn around cols and rows
+mapping_integration_long <- melt(mapping_integration)
+mapping_integration <- dcast(mapping_integration_long, variable ~ barcode, value.var = "value")
 
-# Preprocess dataset for heatmap
-mapping_integration$LAD_state[is.na(mapping_integration$LAD_state)] <- 0
-row.names(mapping_integration) <- mapping_integration$barcode
-mapping_integration <- mapping_integration[,-1]
+## Only essentials
+mapping_integration_essent <- mapping_integration[grep("LMNB1|EZH2|H3K79me2|H3K9me3|H3K9me2|H3K122ac|H3K27ac|H3K4me1|H3K27me3|H3K36me3|POL2", mapping_integration$variable),]
 
 # Annotation color
 chromatin.mark_type2 <- chromatin.mark_type
@@ -261,8 +264,25 @@ row.names(chromatin.mark_type3) <- chromatin.mark_type2$chromatin.mark_type2
 annotation_colors_2 = list(
   chromatin.mark_type3 = c(Active="#66CC00", Repressive="#CCCCCC"))
 
+# Preprocess dataset for heatmap
+mapping_integration_essent[is.na(mapping_integration_essent)] <- 0
+row.names(mapping_integration_essent) <- mapping_integration_essent$variable
+mapping_integration_essent <- mapping_integration_essent[,-1]
+
 # Generate heatmap
-pheatmap(as.matrix(mapping_integration), annotation_col = chromatin.mark_type3, 
+pheatmap(as.matrix(mapping_integration_essent), annotation_row = chromatin.mark_type3, 
+         annotation_colors = annotation_colors_2, main = "RSTP2#5: chromatin integration state per barcode")
+
+
+
+# Preprocess dataset for heatmap
+mapping_integration[is.na(mapping_integration)] <- 0
+row.names(mapping_integration) <- mapping_integration$variable
+mapping_integration <- mapping_integration[,-1]
+
+
+# Generate heatmap
+pheatmap(as.matrix(mapping_integration), annotation_row = chromatin.mark_type3, 
          annotation_colors = annotation_colors_2, main = "RSTP2#5: chromatin integration state per barcode")
 
 
