@@ -71,7 +71,7 @@ file.list <- list.files(pattern = '*.txt')
 ChIP.list <- lapply(file.list, read.table, header = TRUE)
 mapping_integration <- as.data.frame(ChIP.list)
 
-setwd("/DATA/usr/m.trauernicht/Mapping_Clone5_9/means")
+setwd("/DATA/usr/m.trauernicht/Mapping_Clone5_9/means/")
 file.list_mean <- list.files(pattern = '*.txt')
 mapping.list_mean <- lapply(file.list_mean, read.table, header = TRUE)
 mapping_mean <- as.data.frame(mapping.list_mean)
@@ -82,6 +82,12 @@ lmn.df <- get(load("rs20190116_RSTP2.2000.Chromatin.RData"))
 
 # Load clone 5 barcode data
 clone5.bc <- read.delim("mt20190204_clone5_barcodes.txt")
+
+# Alternative LMNB1 data
+setwd("/DATA/usr/c.leemans/projects/chip_ruben/")
+lmnb.df <- read.delim("cl20181025_mean_dam_10kb.txt")
+
+
 ```
 
 # Analysis
@@ -92,7 +98,18 @@ clone5.bc <- read.delim("mt20190204_clone5_barcodes.txt")
 mapping_integration <- select(mapping_integration, ends_with("e"), contains("Distance"))
 
 # Rename variables 
-names(mapping_integration)[2:38] <- gsub(".*_.*_(.*?)_.*.txt", "\\1", file.list)
+names(mapping_integration)[2:38] <- gsub(".*_(.*?_.*?_.*?).txt", "\\1", file.list)
+
+mapping_integration <- mapping_integration[,c("Barcode", "Bernstein2011_H2AFZ_ENCSR000APC", 
+                       "Schmidl2015_H3K27me3_chipmentation", "Schmidl2015_H3K27ac_chipmentation",
+                       "Schmidl2015_H3K4me1_chipmentation", "Schmidl2015_H3K36me3_chipmentation",
+                       "Salzberg2017_H3K9me3_ab8898", "Salzberg2017_H3K9me2_ab1220",
+                       "Pradeepa2016_H3K122ac_ab33309", "Fu2013_H3K79me2_GSM865283",
+                       "Minoda2018_H4K5acK8ac_GSE113635", "vdBoom2016_H2AK119ub_GSM1319308",
+                       "Snyder2016_POL2_ENCSR388QZF")]
+
+# Rename variables 
+colnames(mapping_integration) <- gsub(".*_(.*?)_.*", "\\1", colnames(mapping_integration))
 
 # Process lmn dataset
 lmn.df.mean <- lmn.df[,c(1,101)]
@@ -118,18 +135,34 @@ mapping_integration$barcode <- gsub(".B","",mapping_integration$barcode)
 # Remove not needed data
 mapping_mean <- select(mapping_mean, ends_with("id"), starts_with("mean"))
 
+
 # Rename variables 
-names(mapping_mean)[2:47] <- gsub(".*_.*_(.*?)_.*.txt", "\\1", file.list)
+names(mapping_mean)[2:47] <- gsub(".*_(.*?_.*?_.*?).txt", "\\1", file.list)
+
+mapping_mean <- mapping_mean[,c("transcript_id", "Bernstein2011_H2AFZ_ENCSR000APC", 
+                       "Schmidl2015_H3K27me3_chipmentation", "Schmidl2015_H3K27ac_chipmentation",
+                       "Schmidl2015_H3K4me1_chipmentation", "Schmidl2015_H3K36me3_chipmentation",
+                       "Salzberg2017_H3K9me3_ab8898", "Salzberg2017_H3K9me2_ab1220",
+                       "Pradeepa2016_H3K122ac_ab33309", "Fu2013_H3K79me2_GSM865283",
+                       "Minoda2018_H4K5acK8ac_GSE113635", "vdBoom2016_H2AK119ub_GSM1319308",
+                       "Snyder2016_POL2_ENCSR388QZF")]
+
+# Rename variables 
+colnames(mapping_mean) <- gsub(".*_(.*?)_.*", "\\1", colnames(mapping_mean))
+
+
 
 # Process mapping_mean dataset
-lmn.df <- lmn.df[,c(1,100)]
-lmn.df <- lmn.df[!duplicated(lmn.df), ]
-lmn.df <- merge(lmn.df, clone5.bc)
+# Load alternative lmnb1 df
+setnames(lmnb.df, old = "name", new = "barcode")
+lmnb.df <- merge(lmnb.df, clone5.bc)
+lmnb.df <- lmnb.df[,-3]
 setnames(mapping_mean, old = "transcript_id", new = "barcode")
 mapping_mean <- merge(mapping_mean, clone5.bc)
 
 # Combine the two chr. state dfs
-mapping_mean <- merge(lmn.df, mapping_mean, all = TRUE)
+mapping_mean <- merge(lmnb.df, mapping_mean, all = TRUE)
+setnames(mapping_mean, old = "mean", new = "LMNB1")
 
 # Remove .B from barcode
 mapping_mean$barcode <- gsub(".B","",mapping_mean$barcode)
@@ -137,39 +170,6 @@ mapping_mean$barcode <- gsub(".B","",mapping_mean$barcode)
 
 ## Normalization mean values
 ```{r}
-# I am pretty sure that H3K27me3 dataset is not H3K27me3 but actually H3K27ac (since it overlaps with the other H3K27ac datasets, but not at all with the other H3K27me3 datasets)
-setnames(mapping_mean, old = "H3K27me3", new = "H3K27ac.3")
-
-# Average repetitive ChIP datasets & remove duplets
-mapping_mean$H3K79me2 <- 
-  rowMeans(mapping_mean[,c("H3K79me2","H3K79me2.1","H3K79me2.2","H3K79me2.3")])
-mapping_mean$H3K9me3 <- 
-  rowMeans(mapping_mean[,c("H3K9me3","H3K9me3.1","H3K9me3.2","H3K9me3.3","H3K9me3.4")])
-mapping_mean$H3K9me2 <- 
-  rowMeans(mapping_mean[,c("H3K9me2","H3K9me2.1","H3K9me2.2")])
-mapping_mean$H3K27ac <- 
-  rowMeans(mapping_mean[,c("H3K27ac","H3K27ac.1","H3K27ac.2","H3K27ac.3")])
-mapping_mean$H3K27me3 <- 
-  rowMeans(mapping_mean[,c("H3K27me3.1","H3K27me3.2")])
-mapping_mean$H3K36me3 <- 
-  rowMeans(mapping_mean[,c("H3K36me3","H3K36me3.1","H3K36me3.2")])
-mapping_mean$H3K4me1 <- 
-  rowMeans(mapping_mean[,c("H3K4me1","H3K4me1.1","H3K4me1.2")])
-mapping_mean$PU1 <- 
-  rowMeans(mapping_mean[,c("PU1","PU1.1")])
-mapping_mean$POL2 <- 
-  rowMeans(mapping_mean[,c("POL2","POL2.1")])
-mapping_mean$H2AFZ <- 
-  rowMeans(mapping_mean[,c("H2AFZ","H2AFZ.1")])
-mapping_mean$EZH2 <- 
-  rowMeans(mapping_mean[,c("EZH2","EZH2.1")])
-mapping_mean$H4K5acK8ac <- 
-  rowMeans(mapping_mean[,c("H4K5acK8ac","H4K5acK8ac.1")])
-mapping_mean$H3K122ac <- 
-  rowMeans(mapping_mean[,c("H3K122ac","H3K122ac.1")])
-mapping_mean <- 
-  select(mapping_mean, -ends_with(".1"), -ends_with(".2"), -ends_with(".3"), -ends_with(".4"))
-
 # Change df format to normalize mean values
 mapping_mean_long <- melt(mapping_mean)
 mapping_mean_long$value[is.na(mapping_mean_long$value)] <- 0
@@ -190,11 +190,6 @@ mapping_mean_long[grep("EZH2|K562|K9me|K79me3|K27me|macroH2A|BMI1|CBX2|119ub|
 
 ## Create code for heatmaps: mapping_mean dataset
 ```{r}
-## mapping_mean_essent dataset
-mapping_mean_essent <- 
-  mapping_mean[grep("LMNB1|EZH2|H3K79me2|H3K9me3|H3K9me2|H3K122ac|H3K27ac|H3K4me1|H3K27me3|H3K36me3|POL2", 
-                    mapping_mean$variable),]
-
 # Annotate chr. marks: here I create a df to annotate which chromatin marks are active/repressive, 
 # this is being used in the heatmap later
 chromatin.mark_type1 <- mapping_mean_long[,c(-1,-3)]
@@ -224,9 +219,12 @@ LAD_integration$H3K27me3_integration <- H3K27me3_integration$H3K27me3_integratio
 
 # Change colors of annotations
 annotation_colors = list(
-  LAD_integration = c(Yes="#66CC00", No="#CCCCCC"),
-  H3K27me3_integration = c(Yes="#66CC00", No="#CCCCCC"),
-  chromatin.mark_type = c(Active="#66CC00", Repressive="#CCCCCC"))
+  LAD_integration = c(Yes="#669966", No="grey90"),
+  H3K27me3_integration = c(Yes="#669966", No="grey90"),
+  chromatin.mark_type = c(Active="#669966", Repressive="grey90"))
+
+
+
 
 # Set Barcode column as rownames and remove Barcode column
 row.names(mapping_mean_essent) <- mapping_mean_essent$variable
@@ -247,37 +245,10 @@ mapping_mean <- mapping_mean[,-1]
 
 ## Create code for heatmaps: mapping_integration dataset
 ```{r}
-# Average repetitive ChIP datasets & remove duplets
-mapping_integration$H3K79me2 <- 
-  rowMeans(mapping_integration[,c("H3K79me2","H3K79me2.1")])
-mapping_integration$H3K9me3 <- 
-  rowMeans(mapping_integration[,c("H3K9me3","H3K9me3.1","H3K9me3.2")])
-mapping_integration$H3K9me2 <- 
-  rowMeans(mapping_integration[,c("H3K9me2","H3K9me2.1")])
-mapping_integration$H3K27ac <- 
-  rowMeans(mapping_integration[,c("H3K27ac","H3K27ac.1","H3K27ac.2")])
-mapping_integration$H3K27me3 <- 
-  rowMeans(mapping_integration[,c("H3K27me3","H3K27me3.1","H3K27me3.2")])
-mapping_integration$H3K36me3 <- 
-  rowMeans(mapping_integration[,c("H3K36me3","H3K36me3.1","H3K36me3.2")])
-mapping_integration$H3K4me1 <- 
-  rowMeans(mapping_integration[,c("H3K4me1","H3K4me1.1","H3K4me1.2")])
-mapping_integration$PU1 <- 
-  rowMeans(mapping_integration[,c("PU1","PU1.1")])
-mapping_integration$POL2 <- 
-  rowMeans(mapping_integration[,c("POL2","POL2.1")])
-mapping_integration <- 
-  select(mapping_integration, -ends_with(".1"), -ends_with(".2"), -ends_with(".3"), -ends_with(".4"))
-
 # Turn around cols and rows
 mapping_integration_long <- melt(mapping_integration)
 mapping_integration <- 
   dcast(mapping_integration_long, variable ~ barcode, value.var = "value")
-
-## Only essentials
-mapping_integration_essent <- 
-  mapping_integration[grep("LAD_state|EZH2|H3K79me2|H3K9me3|H3K9me2|H3K122ac|H3K27ac|H3K4me1|H3K27me3|H3K36me3|POL2",
-                           mapping_integration$variable),]
 
 # Annotation color
 chromatin.mark_type2 <- chromatin.mark_type
@@ -295,15 +266,9 @@ chromatin.mark_type3 <- as.data.frame(chromatin.mark_type3)
 row.names(chromatin.mark_type3) <- 
   chromatin.mark_type2$chromatin.mark_type2
 annotation_colors_2 = list(
-  chromatin.mark_type3 = c(Active="#66CC00", Repressive="#CCCCCC"))
-
-# Preprocess dataset for heatmap
-mapping_integration_essent[is.na(mapping_integration_essent)] <- 0
-row.names(mapping_integration_essent) <- mapping_integration_essent$variable
-mapping_integration_essent <- mapping_integration_essent[,-1]
+  chromatin.mark_type3 = c(Active="chocolate1", Repressive="grey82"))
 
 
-## The same for df with all ChIP datasets
 # Preprocess dataset for heatmap
 mapping_integration[is.na(mapping_integration)] <- 0
 row.names(mapping_integration) <- mapping_integration$variable
@@ -327,13 +292,19 @@ Next, heatmaps can be visualized, using either the dataframe containing only ess
 # Additionally, LAD & H3K27me3 integration calling states are represented -
 # per barcode (meaning: do these barcodes reside in a LAD/H3K27me3 domain?)
 
+breaksList <- seq(-1.7,1.5,.001)
+
 # Generate heatmap: chr. mark intensity of only essential ChIP datasets vs. barcodes
-pheatmap(as.matrix(mapping_mean_essent), annotation_col = LAD_integration, 
+pheatmap(as.matrix(mapping_mean), annotation_col = LAD_integration, 
          annotation_row = chromatin.mark_type, 
          annotation_colors = annotation_colors,
+         color = colorRampPalette(rev(brewer.pal(n = 7, name = "RdGy")))(length(breaksList)),
+         breaks = breaksList,
          annotation_legend = F,
          main = "RSTP2#5: chromatin mark intensity 
          per barcode (essential ChIP datasets)")
+
+superheat(as.matrix(mapping_mean),bottom.label.text.angle = 90, yt = cor(mapping_mean)[,"TCTTTTGAGGAGCTGA"])
 ```
 
 ## Conclusions from this heatmap:
@@ -343,20 +314,6 @@ pheatmap(as.matrix(mapping_mean_essent), annotation_col = LAD_integration,
 boring barcodes (no marks, e.g. GCGCA...), and very active barcodes(e.g. TATG...))
 - possible barcode clustering (from left to right): barcode 1-2 = very active, barcode 3-6: active, barcode 7-10: slightly repressed, barcode 11-14: slightly repressed 2, barcode 15-18: LADs
 - active marks tend to cluster together
-
-```{r fig.height = 10, fig.width = 20}
-# Generate heatmap: chr. mark intensity of all ChIP datasets vs. barcodes
-pheatmap(as.matrix(mapping_mean), annotation_col = LAD_integration, 
-         annotation_row = chromatin.mark_type, 
-         annotation_colors = annotation_colors, 
-         annotation_legend = F,
-         legend_labels = "Hoi",
-         main = "RSTP2#5: chromatin mark intensity 
-         per barcode (all ChIP datasets)", fontsize = 16)
-```
-
-## Conclusions from this heatmap:
-- again, LADs cluster together
 - LMNB1, H3K9me2, EZH2 and H3K122ac are very different from other marks
 - possible barcode clustering (from left to right): 1-3: mainly active, 4: repressed, 5-6: active, 7-10: LADs, 11: active, 12-15: boring/slightly repressed, 16-18: repressed
 
@@ -367,19 +324,11 @@ pheatmap(as.matrix(mapping_mean), annotation_col = LAD_integration,
 
 # Each chromatin mark is annotated with either repressive or active
 
-# Generate heatmap: ChIP integration calling for only essential datasets vs. barcode
-pheatmap(as.matrix(mapping_integration_essent), annotation_row = chromatin.mark_type3, 
-         annotation_colors = annotation_colors_2, color = brewer.pal(5, "PuBu"),
-         annotation_legend = F, fontsize = 20,
-         main = "RSTP2#5: chromatin integration state 
-         per barcode (essential ChIP datasets)")
-
 # Generate heatmap: ChIP integration calling for all datasets vs. barcode
 pheatmap(as.matrix(mapping_integration), annotation_row = chromatin.mark_type3, 
          annotation_colors = annotation_colors_2, color = brewer.pal(5, "PuBu"),
          annotation_legend = F,
-         main = "RSTP2#5: chromatin integration state 
-         per barcode (all ChIP datasets)", fontsize = 16)
+         main = "RSTP2#5: chromatin integration state per barcode")
 ```
 
 ## Conclusions from these heatmaps:
@@ -416,6 +365,9 @@ save(mapping_integration, file = filename)
 
 filename <- SetFileName("_mapping_integration_long", "mt")
 save(mapping_integration_long, file = filename)
+
+filename <- SetFileName("_mapping_mean_long", "mt")
+save(mapping_mean_long, file = filename)
 
 ```
 
