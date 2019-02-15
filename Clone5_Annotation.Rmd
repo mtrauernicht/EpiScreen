@@ -71,9 +71,9 @@ file.list <- list.files(pattern = '*.txt')
 ChIP.list <- lapply(file.list, read.table, header = TRUE)
 mapping_integration <- as.data.frame(ChIP.list)
 
-setwd("/DATA/usr/m.trauernicht/Mapping_Clone5_9/means/")
+setwd("/DATA/projects/DSBrepair/data/pipeline_20181208/means/")
 file.list_mean <- list.files(pattern = '*.txt')
-mapping.list_mean <- lapply(file.list_mean, read.table, header = TRUE)
+mapping.list_mean <- lapply(file.list_mean, read.table, stringsAsFactors = F, header = TRUE)
 mapping_mean <- as.data.frame(mapping.list_mean)
 
 # Load Lmnb1 data
@@ -137,7 +137,7 @@ mapping_mean <- select(mapping_mean, ends_with("id"), starts_with("mean"))
 
 
 # Rename variables 
-names(mapping_mean)[2:47] <- gsub(".*_(.*?_.*?_.*?).txt", "\\1", file.list)
+names(mapping_mean)[2:47] <- gsub(".*_(.*?_.*?_.*?).txt", "\\1", file.list_mean)
 
 mapping_mean <- mapping_mean[,c("transcript_id", "Bernstein2011_H2AFZ_ENCSR000APC", 
                        "Schmidl2015_H3K27me3_chipmentation", "Schmidl2015_H3K27ac_chipmentation",
@@ -292,15 +292,15 @@ Next, heatmaps can be visualized, using either the dataframe containing only ess
 # Additionally, LAD & H3K27me3 integration calling states are represented -
 # per barcode (meaning: do these barcodes reside in a LAD/H3K27me3 domain?)
 
-breaksList <- seq(-1.7,1.5,.001)
+breaksList <- seq(-1.2,1,.001)
 
 # Generate heatmap: chr. mark intensity of only essential ChIP datasets vs. barcodes
-pheatmap(as.matrix(mapping_mean), annotation_col = LAD_integration, 
+x <- pheatmap(as.matrix(mapping_mean), annotation_col = LAD_integration, 
          annotation_row = chromatin.mark_type, 
          annotation_colors = annotation_colors,
          color = colorRampPalette(rev(brewer.pal(n = 7, name = "RdGy")))(length(breaksList)),
          breaks = breaksList,
-         annotation_legend = F,
+         annotation_legend = T,
          main = "RSTP2#5: chromatin mark intensity 
          per barcode (essential ChIP datasets)")
 
