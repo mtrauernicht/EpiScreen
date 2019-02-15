@@ -76,11 +76,11 @@ SetFileName <- function(filename, initials) {
 ```{r Data Import}
 # Import data from 5_HitValidation_DrugScreen.Rmd
 setwd("/DATA/usr/m.trauernicht/EpiScreen/epigenetic-screening-on-trip-clone/Data")
-mapping_mean <- get(load("mt20190212_mapping_mean"))
-mapping_integration <- get(load("mt20190212_mapping_integration"))
-indel.data <- get(load("mt20190204_indel.data"))
-mapping_integration_long <- get(load("mt20190212_mapping_integration_long"))
-mapping_mean_long <- get(load("mt20190214_mapping_mean_long"))
+mapping_mean <- get(load("mt20190215_mapping_mean"))
+mapping_integration <- get(load("mt20190215_mapping_integration"))
+indel.data <- get(load("mt20190215_indel.data"))
+mapping_integration_long <- get(load("mt20190215_mapping_integration_long"))
+mapping_mean_long <- get(load("mt20190215_mapping_mean_long"))
 ```
 
 
@@ -143,9 +143,9 @@ indel.data.low$mean.statistic.bc.drug <-
 ## Dataframe preprocessing t-statistic heatmap of barcode vs. drug
 ```{r}
 # Remove columns
-indel.data.high.drug.st <- indel.data.high[,c(1,6,42)]
-indel.data.med.drug.st <- indel.data.med[,c(1,6,42)]
-indel.data.low.drug.st <- indel.data.low[,c(1,6,42)]
+indel.data.high.drug.st <- indel.data.high[,c(1,6,38)]
+indel.data.med.drug.st <- indel.data.med[,c(1,6,38)]
+indel.data.low.drug.st <- indel.data.low[,c(1,6,38)]
 indel.data.high.drug.st <- indel.data.high.drug.st[!duplicated(indel.data.high.drug.st), ]
 indel.data.med.drug.st <- indel.data.med.drug.st[!duplicated(indel.data.med.drug.st), ]
 indel.data.low.drug.st <- indel.data.low.drug.st[!duplicated(indel.data.low.drug.st), ]
@@ -163,9 +163,9 @@ indel.data.high.drug.st <-
 ## Dataframe preprocessing t-statistic heatmap of barcode vs. target
 ```{r}
 # Remove columns
-indel.data.high.target.st <- indel.data.high[,c(1,7,41)]
-indel.data.med.target.st <- indel.data.med[,c(1,7,41)]
-indel.data.low.target.st <- indel.data.low[,c(1,7,41)]
+indel.data.high.target.st <- indel.data.high[,c(1,7,37)]
+indel.data.med.target.st <- indel.data.med[,c(1,7,37)]
+indel.data.low.target.st <- indel.data.low[,c(1,7,37)]
 indel.data.high.target.st <- indel.data.high.target.st[!duplicated(indel.data.high.target.st), ]
 indel.data.med.target.st <- indel.data.med.target.st[!duplicated(indel.data.med.target.st), ]
 indel.data.low.target.st <- indel.data.low.target.st[!duplicated(indel.data.low.target.st), ]
@@ -182,9 +182,9 @@ indel.data.high.target.st <-
 ## Dataframe preprocessing logratio heatmap of barcode vs. drug
 ```{r}
 # Remove columns
-indel.data.high.drug <- indel.data.high[,c(1,6,39)]
-indel.data.med.drug <- indel.data.med[,c(1,6,39)]
-indel.data.low.drug <- indel.data.low[,c(1,6,39)]
+indel.data.high.drug <- indel.data.high[,c(1,6,35)]
+indel.data.med.drug <- indel.data.med[,c(1,6,35)]
+indel.data.low.drug <- indel.data.low[,c(1,6,35)]
 indel.data.high.drug <- 
   indel.data.high.drug[!duplicated(indel.data.high.drug), ]
 indel.data.med.drug <- 
@@ -208,9 +208,9 @@ indel.data.high.drug <-
 ```{r}
 ## Heatmap for each barcode vs each target
 # Remove columns
-indel.data.high.target <- indel.data.high[,c(1,7,40)]
-indel.data.med.target <- indel.data.med[,c(1,7,40)]
-indel.data.low.target <- indel.data.low[,c(1,7,40)]
+indel.data.high.target <- indel.data.high[,c(1,7,36)]
+indel.data.med.target <- indel.data.med[,c(1,7,36)]
+indel.data.low.target <- indel.data.low[,c(1,7,36)]
 indel.data.high.target <- 
   indel.data.high.target[!duplicated(indel.data.high.target), ]
 indel.data.med.target <- 
@@ -259,9 +259,6 @@ indel.data.med.target.st <- indel.data.med.target.st[,c(-1)]
 
 row.names(indel.data.low.target.st) <- indel.data.low.target.st$Target
 indel.data.low.target.st <- indel.data.low.target.st[,c(-1)]
-
-# Make color scale for t-statistic
-breaksList3 <- seq(-26,24,4)
 ```
 
 ## Generate heatmap for logratio barcode vs. target group
@@ -303,31 +300,23 @@ indel.data.low.target <- indel.data.low.target[,c(-1)]
 
 
 # Annotate barcodes
-annotate.bc <- 
-  mapping_integration_long[grep("LAD_state|H3K27me3|H3K4me1|H3K27ac", 
-                                             mapping_integration_long$variable),]
-annotate.bc2 <-
-  mapping_mean_long[grep("H3K27me3",mapping_mean_long$variable),]
+annotate.bc <-
+  mapping_mean_long[grep("H3K27me3|LMNB1|H3K4me1|H3K27ac",mapping_mean_long$variable),]
 
-annotate.bc <- dcast(annotate.bc, barcode ~ variable, value.var = "value")
-annotate.bc2 <- dcast(annotate.bc2, barcode ~ variable, value.var = "mean")
-annotate.bc[is.na(annotate.bc)] <- 0
-setnames(annotate.bc2, old = "H3K27me3", new = "H3K27me3_mean")
-annotate.bc <- merge(annotate.bc, annotate.bc2)
+annotate.bc <- dcast(annotate.bc, barcode ~ variable, value.var = "mean")
+annotate.bc[,2:5] <- 2^(annotate.bc[,2:5])
 row.names(annotate.bc) <- annotate.bc$barcode
 annotate.bc <- annotate.bc[,-1]
 
 # Change colors of annotations
 annotation_colors = list(
-  LAD_state = brewer.pal(5, "PuBu"),
-  H3K27me3 = brewer.pal(5, "PuBu"),
-  H3K27me3_mean = brewer.pal(9, "PuBu"),
-  H3K4me1 = brewer.pal(5, "PuBu"),
-  H3K27ac = brewer.pal(5, "PuBu"))
+  LMNB1 = colorRampPalette(brewer.pal(n = 7, name = "PuBu"))(100),
+  H3K27me3 = colorRampPalette(brewer.pal(n = 7, name = "PuBu"))(100),
+  H3K4me1 = colorRampPalette(brewer.pal(n = 7, name = "PuBu"))(100),
+  H3K27ac = colorRampPalette(brewer.pal(n = 7, name = "PuBu"))(100))
 
 
-# Keeping the scale in the pheatmap function
-breaksList <- seq(-2.2,2,0.1)
+
 ```
 
 
@@ -351,10 +340,10 @@ data2 <- indel.data.high.drug2[-grep("(activator)|Negative control|MRN|DNA-PK",i
 row.names(indel.data.high.drug) <- indel.data.high.drug$barcode
 indel.data.high.drug <- indel.data.high.drug[,c(-1)]
 
-row.names(indel.data.med.drug) <- indel.data.med.drug$Drug
+row.names(indel.data.med.drug) <- indel.data.med.drug$barcode
 indel.data.med.drug <- indel.data.med.drug[,c(-1)]
 
-row.names(indel.data.low.drug) <- indel.data.low.drug$Drug
+row.names(indel.data.low.drug) <- indel.data.low.drug$barcode
 indel.data.low.drug <- indel.data.low.drug[,c(-1)]
 
 
@@ -367,14 +356,6 @@ target2 <- target
 target <- target[,c(-1,-3)]
 target <- as.data.frame(target)
 row.names(target) <- target2$Drug
-
-
-# Keeping the scale in the pheatmap function
-breaksList2 <- seq(-0.5,0.5,0.01)
-
-
-
-
 ```
 
 I want to create heatmaps for each drug within the 17 different target groups. This will give more information about the effect of individual drugs (and maybe clustering within groups -> subgroups because of different targets etc.).
@@ -498,6 +479,9 @@ Next step is to import the chromatin data to generate a correlation matrix betwe
 # Results
 ## t-statistic pheatmap: barcode vs. target group
 ```{r}
+# Make color scale for t-statistic
+breaksList3 <- seq(-26,24,4)
+
 # t-statistic pheatmap: barcode vs. target group - 10uM with DNA-PKi
 pheatmap(as.matrix(indel.data.high.target.st), annotation_col = annotate.bc, fontsize_row = 6, 
          annotation_colors = annotation_colors, 
@@ -535,6 +519,9 @@ pheatmap(as.matrix(indel.data.low.target.st[-2,]), annotation_col = annotate.bc,
 \newpage
 ## logratio heatmap of target group vs. barcode
 ```{r}
+# Keeping the scale in the pheatmap function
+breaksList <- seq(-2.2,2,0.1)
+
 # pheatmap function: logratio heatmap of target group vs. barcode - 10uM drugs added 
 pheatmap(as.matrix(indel.data.high.target), annotation_col = annotate.bc, fontsize_row = 6, 
          annotation_colors = annotation_colors, 
@@ -543,27 +530,6 @@ pheatmap(as.matrix(indel.data.high.target), annotation_col = annotate.bc, fontsi
          main = "log2(+1/-7 indel ratio), 
          10uM of drugs added")
 
-# pheatmap function: logratio heatmap of target group vs. barcode - 1uM drugs added 
-pheatmap(as.matrix(indel.data.med.target), annotation_col = annotate.bc, fontsize_row = 6,
-         color = colorRampPalette(rev(brewer.pal(n = 7, name = "RdGy")))(length(breaksList)), 
-         breaks = breaksList, annotation_legend = F,cellheight = 6,
-         annotation_colors = annotation_colors, main = "log2(+1/-7 indel ratio) - 
-         1uM of drugs added")
-
-# pheatmap function: logratio heatmap of target group vs. barcode - 100nM drugs added
-pheatmap(as.matrix(indel.data.low.target), annotation_col = annotate.bc, fontsize_row = 6,
-         color = colorRampPalette(rev(brewer.pal(n = 7, name = "RdGy")))(length(breaksList)), 
-         breaks = breaksList, annotation_legend = F,cellheight = 6,
-         annotation_colors = annotation_colors, main = "log2(+1/-7 indel ratio) - 
-         100nM of drugs added")
-```
-
-## Conclusion from these heatmaps:
-- DNA-PKi has by far the biggest effect, no other drug category can reach out to a change of that magnitude
-- We need to look at the heatmaps without DNA-PKi to catch more details
-\newpage
-## logratio heatmap of target group vs. barcode - no DNA-PKi
-```{r}
 # pheatmap function: logratio heatmap of target group vs. barcode - 10uM drugs added - no DNA-PKi
 pheatmap(as.matrix(indel.data.high.target[-2,]), annotation_col = annotate.bc, fontsize_row = 10,
          color = colorRampPalette(rev(brewer.pal(n = 7, name = "RdGy")))(length(breaksList)), 
@@ -584,9 +550,12 @@ pheatmap(as.matrix(indel.data.low.target[-2,]), annotation_col = annotate.bc, fo
          breaks = breaksList, annotation_legend = F,cellheight = 10,
          annotation_colors = annotation_colors, main = "log2(+1/-7 indel ratio) - 
          100nM of drugs added - no DNA-PKi")
+
 ```
 
-## Conclusions from these heatmaps:
+## Conclusion from these heatmaps:
+- DNA-PKi has by far the biggest effect, no other drug category can reach out to a change of that magnitude
+- We need to look at the heatmaps without DNA-PKi to catch more details
 - Aurora kinase inhibitors and DNMT inhibitors seem to consistently elevate +1/-7 indel ratios, even more drastically than Mirin
 - Some barcodes seem more susceptible to DNMT and aurora kinase inhibitors (some overlay with H3K27me3)
 - Many drug categories do not seem to change indel patterns (HDAC activator, HIF, HAT, Other, Sirtuin)
@@ -598,8 +567,12 @@ pheatmap(as.matrix(indel.data.low.target[-2,]), annotation_col = annotate.bc, fo
 \newpage
 ## logratio heatmap of each individual drug vs. barcode
 ```{r}
+
+# Keeping the scale in the pheatmap function
+breaksList2 <- seq(-1.7,1.5,0.01)
+
 # pheatmap function: logratio heatmap of each individual drug vs. barcode - 10uM drugs added
-pheatmap(as.matrix(indel.data.high.drug), fontsize_col = 5, fontsize_row = 5, annotation_col = target, cellheight = 8,
+pheatmap(as.matrix(indel.data.high.drug), fontsize_col = 7, fontsize_row = 7, annotation_col = target, cellheight = 8,
          annotation_row = annotate.bc,
          color = colorRampPalette(rev(brewer.pal(n = 7, name = "RdGy")))(length(breaksList2)),
          breaks = breaksList2, annotation_legend = F,
@@ -613,10 +586,13 @@ pheatmap(as.matrix(indel.data.high.drug), fontsize_col = 5, fontsize_row = 5, an
 
 ## logratio heatmap of each individual drug vs. barcode (plot for each inidividual target group)
 ```{r}
+breaksList4 <- seq(-3.7,3.5,0.01)
+
 for (i in unique(data2$Target)) {
   data <- data2[data2$Target == i,]
   p <- pheatmap(as.matrix(data[,1:18]), annotation_col = annotate.bc, 
-         color = colorRampPalette(rev(brewer.pal(n = 7, name = "RdGy")))(100), annotation_legend = F,
+         color = colorRampPalette(brewer.pal(n = 7, name = "Reds"))(100), 
+         annotation_legend = F, cluster_cols = x$tree_col,
          annotation_colors = annotation_colors, main = print(i))
   print(p)
 }
