@@ -208,7 +208,7 @@ setnames(indel.data, old = "rn", new = "barcode")
 indel.data <- indel.data[indel.data$barcode != "ACCCCTAAAGGCGCTG",]
 
 # We want to exclude reads from cells that have reduced viability (set cut-off at 50% reduced viability)
-indel.data <- indel.data[indel.data$viability > 50000,]
+indel.data <- indel.data[indel.data$viability > 45000,]
 
 # Also, we want to exclude remaining barcodes with very low reads
 indel.data <- indel.data[indel.data$read.count1.7 > 30,]
