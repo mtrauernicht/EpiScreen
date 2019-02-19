@@ -1,0 +1,132 @@
+---
+title: "Clone 5 mapping"
+author: "Max Trauernicht"
+date: "`r format(Sys.time(), '%Y-%m-%d')`"
+output: 
+  html_document:
+    theme: journal #cerulean
+    highlight: monochrome
+    toc: true
+    toc_float: true
+    code_folding: show
+  editor_options:
+    chunk_output_type: console
+---
+
+# knitr document van Steensel lab
+
+# RSTP2 clone 5 mapping using tagmentation data
+
+# Introduction
+
+## Description of Data
+How to make a good rendering table: 
+```{r table1, echo=FALSE, message=FALSE, warnings=FALSE, results='asis'}
+tabl <- "
+| column1	|	column2	|	column3	|	
+|----|----|----|
+|1	|	2	|	3	|	
+|a	|	b	|	c	|	
+"
+cat(tabl) # output the table in a format good for HTML/PDF/docx conversion
+```
+
+# Data processing
+## Path, Libraries, Parameters and Useful Functions
+```{r setup}
+knitr::opts_chunk$set(echo = TRUE)
+StartTime <-Sys.time()
+
+# 8-digit Date tag:
+Date <- substr(gsub("-","",Sys.time()),1,8) 
+# libraries:
+```
+
+### Custom functions
+Functions used thoughout this script.
+```{r}
+SetFileName <- function(filename, initials) {
+  # Set filename with extension and initials to make filename with date integrated.
+  filename <- substitute(filename)
+  initials <- substitute(initials)
+  filename <- paste0(initials, Date, filename)
+  filename
+}
+
+
+roundUp <- function(x,to=5000)
+{
+  to*(x%/%to + as.logical(x%%to))
+}
+
+```
+
+
+## Data import
+```{r}
+setwd("/DATA/usr/r.schep/projects/tagmap_ruben/")
+header <- c(1:20)
+tag.df.raw <- read.delim("rs20190218_Clone5_Rev.txt", header = F)
+
+setwd("/DATA/usr/m.trauernicht/Mapping_Clone5_9/")
+clone5.mapping <- read.table("mt20181026_RSTP2_clone5.bed")
+
+
+```
+
+# Analysis
+## Pre-processing
+```{r}
+# Select important columns
+tag.df.raw <- tag.df.raw[,c(3:10)]
+
+# Remove NAs
+tag.df.raw <- na.omit(tag.df.raw)
+
+# Choose quality cutoff
+# tag.df.raw <- tag.df.raw[tag.df.raw$V5 >= 40,]
+
+# Remove low read counts
+tag.df.raw <- tag.df.raw[tag.df.raw$V4 %in% names(which(table(tag.df.raw$V4) > 30)), ]
+
+# Put close locations together by rounding
+tag.df.raw$V4 <- roundUp(tag.df.raw$V4)
+
+# Reduce df length by only selecting unique locations
+tag.df <- tag.df.raw[!duplicated(tag.df.raw$V4), ]
+
+# Import mapping df and round the same way
+clone5.mapping <- clone5.mapping[,c(-3,-5)]
+clone5.mapping$V2 <- roundUp(clone5.mapping$V2)
+
+# Create dfs that only contain unmatched locations of both dfs
+tag.df.unmatched <- tag.df[! tag.df$V4 %in% clone5.mapping$V2,]
+clone5.mapping.unmatched <- clone5.mapping[! clone5.mapping$V2 %in% tag.df$V4,]
+```
+
+
+
+## Visualisation
+```{r}
+```
+
+# Results
+```{r}
+```
+
+# Conclusions
+```{r}
+```
+
+## Exporting potential data. 
+```{r}
+```
+
+# Session Info
+```{r}
+paste("Run time: ",format(Sys.time()-StartTime))
+getwd()
+date()
+sessionInfo()
+```
+
