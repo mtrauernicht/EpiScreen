@@ -309,7 +309,7 @@ row.names(annotate.bc) <- annotate.bc$barcode
 annotate.bc <- annotate.bc[,-1]
 
 # Change colors of annotations
-annotation_colors = list(
+annotation_colors_scr = list(
   LMNB1 = colorRampPalette(brewer.pal(n = 7, name = "PuBu"))(100),
   H3K27me3 = colorRampPalette(brewer.pal(n = 7, name = "PuBu"))(100),
   H3K4me1 = colorRampPalette(brewer.pal(n = 7, name = "PuBu"))(100),
@@ -484,7 +484,7 @@ breaksList3 <- seq(-26,24,4)
 
 # t-statistic pheatmap: barcode vs. target group - 10uM with DNA-PKi
 pheatmap(as.matrix(indel.data.high.target.st), annotation_col = annotate.bc, fontsize_row = 6, 
-         annotation_colors = annotation_colors, 
+         annotation_colors = annotation_colors_scr, 
          color = colorRampPalette(rev(brewer.pal(n = 7, name = "PRGn")))(length(breaksList3)), 
          breaks = breaksList3, annotation_legend = F, cellheight = 6,
          main = "log2(+1/-7 indel ratio), 
@@ -492,7 +492,7 @@ pheatmap(as.matrix(indel.data.high.target.st), annotation_col = annotate.bc, fon
 
 # t-statistic pheatmap: barcode vs. target group - 10uM without DNA-PKi
 pheatmap(as.matrix(indel.data.high.target.st[-2,]), annotation_col = annotate.bc, fontsize_row = 6, 
-         annotation_colors = annotation_colors, 
+         annotation_colors = annotation_colors_scr, 
          color = colorRampPalette(rev(brewer.pal(n = 7, name = "PRGn")))(length(breaksList3)), 
          breaks = breaksList3, annotation_legend = F,cellheight = 6,
          main = "log2(+1/-7 indel ratio), 
@@ -500,7 +500,7 @@ pheatmap(as.matrix(indel.data.high.target.st[-2,]), annotation_col = annotate.bc
 
 # t-statistic pheatmap: barcode vs. target group - 1uM without DNA-PKi
 pheatmap(as.matrix(indel.data.med.target.st[-2,]), annotation_col = annotate.bc, fontsize_row = 6, 
-         annotation_colors = annotation_colors, 
+         annotation_colors = annotation_colors_scr, 
          color = colorRampPalette(rev(brewer.pal(n = 7, name = "PRGn")))(length(breaksList3)), 
          breaks = breaksList3, annotation_legend = F,cellheight = 6,
          main = "log2(+1/-7 indel ratio), 
@@ -508,7 +508,7 @@ pheatmap(as.matrix(indel.data.med.target.st[-2,]), annotation_col = annotate.bc,
 
 # t-statistic pheatmap: barcode vs. target group - 100nM without DNA-PKi
 pheatmap(as.matrix(indel.data.low.target.st[-2,]), annotation_col = annotate.bc, fontsize_row = 6, 
-         annotation_colors = annotation_colors, 
+         annotation_colors = annotation_colors_scr, 
          color = colorRampPalette(rev(brewer.pal(n = 7, name = "PRGn")))(length(breaksList3)), 
          breaks = breaksList3, annotation_legend = F,cellheight = 6,
          main = "log2(+1/-7 indel ratio), 
@@ -524,7 +524,7 @@ breaksList <- seq(-2.2,2,0.1)
 
 # pheatmap function: logratio heatmap of target group vs. barcode - 10uM drugs added 
 pheatmap(as.matrix(indel.data.high.target), annotation_col = annotate.bc, fontsize_row = 6, 
-         annotation_colors = annotation_colors, 
+         annotation_colors = annotation_colors_scr, 
          color = colorRampPalette(rev(brewer.pal(n = 7, name = "RdGy")))(length(breaksList)), 
          breaks = breaksList, annotation_legend = F,cellheight = 6,
          main = "log2(+1/-7 indel ratio), 
@@ -534,21 +534,21 @@ pheatmap(as.matrix(indel.data.high.target), annotation_col = annotate.bc, fontsi
 pheatmap(as.matrix(indel.data.high.target[-2,]), annotation_col = annotate.bc, fontsize_row = 10,
          color = colorRampPalette(rev(brewer.pal(n = 7, name = "RdGy")))(length(breaksList)), 
          breaks = breaksList, annotation_legend = F,cellheight = 10,
-         annotation_colors = annotation_colors, main = "log2(+1/-7 indel ratio) -
+         annotation_colors = annotation_colors_sr, main = "log2(+1/-7 indel ratio) -
          10uM of drugs added - no DNA-PKi")
 
 # pheatmap function: logratio heatmap of target group vs. barcode - 1uM drugs added - no DNA-PKi
 pheatmap(as.matrix(indel.data.med.target[-2,]), annotation_col = annotate.bc, fontsize_row = 10,
          color = colorRampPalette(rev(brewer.pal(n = 7, name = "RdGy")))(length(breaksList)),
          breaks = breaksList, annotation_legend = F,cellheight = 10,
-         annotation_colors = annotation_colors, main = "log2(+1/-7 indel ratio) - 
+         annotation_colors = annotation_colors_scr, main = "log2(+1/-7 indel ratio) - 
          1uM of drugs added - no DNA-PKi")
 
 # pheatmap function: logratio heatmap of target group vs. barcode - 100nM drugs added - no DNA-PKi
 pheatmap(as.matrix(indel.data.low.target[-2,]), annotation_col = annotate.bc, fontsize_row = 10,
          color = colorRampPalette(rev(brewer.pal(n = 7, name = "RdGy")))(length(breaksList)),
          breaks = breaksList, annotation_legend = F,cellheight = 10,
-         annotation_colors = annotation_colors, main = "log2(+1/-7 indel ratio) - 
+         annotation_colors = annotation_colors_scr, main = "log2(+1/-7 indel ratio) - 
          100nM of drugs added - no DNA-PKi")
 
 ```
@@ -576,7 +576,7 @@ pheatmap(as.matrix(indel.data.high.drug), fontsize_col = 7, fontsize_row = 7, an
          annotation_row = annotate.bc,
          color = colorRampPalette(rev(brewer.pal(n = 7, name = "RdGy")))(length(breaksList2)),
          breaks = breaksList2, annotation_legend = F,
-         annotation_colors = annotation_colors, , legend = F, main = "log2(+1/-7 indel ratio) - 10uM of drugs added")
+         annotation_colors = annotation_colors_scr, , legend = F, main = "log2(+1/-7 indel ratio) - 10uM of drugs added")
 
 
 
@@ -586,14 +586,19 @@ pheatmap(as.matrix(indel.data.high.drug), fontsize_col = 7, fontsize_row = 7, an
 
 ## logratio heatmap of each individual drug vs. barcode (plot for each inidividual target group)
 ```{r}
-breaksList4 <- seq(-3.7,3.5,0.01)
+breaksList4 <- seq(0,3.5,0.01)
+
+neworder <- c(6,11,4,5,13,7,1,8,9,14,10,15,3,12,2,16)
+
+x2$tree_col[["order"]] <- neworder
+
 
 for (i in unique(data2$Target)) {
   data <- data2[data2$Target == i,]
   p <- pheatmap(as.matrix(data[,1:18]), annotation_col = annotate.bc, 
          color = colorRampPalette(brewer.pal(n = 7, name = "Reds"))(100), 
          annotation_legend = F, cluster_cols = x$tree_col,
-         annotation_colors = annotation_colors, main = print(i))
+         annotation_colors = annotation_colors_scr, main = print(i))
   print(p)
 }
 ```
