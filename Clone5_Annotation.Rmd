@@ -48,6 +48,8 @@ library(data.table)
 library(devtools)
 library(RColorBrewer)
 library(pheatmap)
+library(rtracklayer)
+library(GenomicRanges)
 ```
 
 ### Custom functions
@@ -71,26 +73,58 @@ file.list <- list.files(pattern = '*.txt')
 ChIP.list <- lapply(file.list, read.table, header = TRUE)
 mapping_integration <- as.data.frame(ChIP.list)
 
-setwd("/DATA/projects/DSBrepair/data/pipeline_20181208/means/")
+setwd("/DATA/projects/DSBrepair/data/cl20190220_chip_clone5/means/")
 file.list_mean <- list.files(pattern = '*.txt')
 mapping.list_mean <- lapply(file.list_mean, read.table, stringsAsFactors = F, header = TRUE)
 mapping_mean <- as.data.frame(mapping.list_mean)
 
-# Load Lmnb1 data
-setwd("/DATA/usr/m.trauernicht/Mapping_Clone5_9")
-lmn.df <- get(load("rs20190116_RSTP2.2000.Chromatin.RData"))
-
 # Load clone 5 barcode data
+setwd("/DATA/usr/m.trauernicht/Mapping_Clone5_9")
 clone5.bc <- read.delim("mt20190204_clone5_barcodes.txt")
+clone5_lmnb1 <- read.table("mt20190218_RSTP2_clone5.bed")
 
-# Alternative LMNB1 data
-setwd("/DATA/usr/c.leemans/projects/chip_ruben/")
-lmnb.df <- read.delim("cl20181025_mean_dam_10kb.txt")
+# Import LAD calling from Tom
+LAD.HMM.gr <- import.bed("/home/t.v.schaik/mydata/proj/3D_nucleus/results/ts180110_4DN_DataProcessing/results/HMM/bin-5kb/K562_LMNB1-5kb-combined_HMM.txt.gz")
+
+# K562 Lamina
+setwd("/home/t.v.schaik/mydata/proj/3D_nucleus/results/ts180110_4DN_DataProcessing/results/normalized/bin-5kb/")
+DamID.bins.norm.5kb <- import.bedGraph("K562_LMNB1-5kb-combined.norm.txt.gz")
+colnames(mcols(DamID.bins.norm.5kb)) <- "Lamina"
 
 
 ```
 
 # Analysis
+
+## Import and compute LMNB1 data
+```{r}
+# Rename columns of bed file
+names(clone5_lmnb1) <- c("seqnames","start","end","barcode","ori")
+
+# Increase width of integration window
+clone5_lmnb1$end <- clone5_lmnb1$start + 1000
+
+# Make genomic ranges
+clone5_lmb1.1 <- makeGRangesFromDataFrame(clone5_lmnb1, start.field = "start", end.field = "end", keep.extra.columns = T)
+clone5_lmb1.1 <- narrow(clone5_lmb1.1,start=500, end=-500) ##why
+
+# Compute DamID scores for LmnB1
+ovl <- findOverlaps(clone5_lmb1.1, DamID.bins.norm.5kb)
+mcols(clone5_lmb1.1)$K562.lamina <- mcols(DamID.bins.norm.5kb)$Lamina [subjectHits(ovl)]
+
+# LAD calling from Tom
+ovl <- findOverlaps(clone5_lmb1.1, LAD.HMM.gr)
+
+# overlaps
+mcols(clone5_lmb1.1)$LAD_state <- "NA"
+mcols(clone5_lmb1.1)$LAD_state[queryHits(ovl)] <- mcols(LAD.HMM.gr)$name[subjectHits(ovl)]
+
+# Back to dataframe
+clone5_lmnb1.dt <- GenomicRanges::as.data.frame(clone5_lmb1.1)
+clone5_lmnb1.dt <- clone5_lmnb1.dt[,c(6,8,9)]
+```
+
+
 
 ## Pre-processing mapping_integration df
 ```{r}
@@ -111,15 +145,13 @@ mapping_integration <- mapping_integration[,c("Barcode", "Bernstein2011_H2AFZ_EN
 # Rename variables 
 colnames(mapping_integration) <- gsub(".*_(.*?)_.*", "\\1", colnames(mapping_integration))
 
-# Process lmn dataset
-lmn.df.mean <- lmn.df[,c(1,101)]
-lmn.df.mean <- lmn.df.mean[!duplicated(lmn.df.mean), ]
-lmn.df.mean <- merge(lmn.df.mean, clone5.bc)
+# Only select clone 5 data
 setnames(mapping_integration, old = "Barcode", new = "barcode")
 mapping_integration <- merge(mapping_integration, clone5.bc)
 
 # Combine the two chr. state dfs
-mapping_integration <- merge(lmn.df.mean, mapping_integration, all = TRUE)
+clone5_lmnb1.dt_state <- clone5_lmnb1.dt[,c(1,3)]
+mapping_integration <- merge(clone5_lmnb1.dt_state, mapping_integration, all = TRUE)
 
 # Change from distance to integration: yes (1) or no (0)
 mapping_integration[,3:ncol(mapping_integration)] <- 
@@ -135,9 +167,8 @@ mapping_integration$barcode <- gsub(".B","",mapping_integration$barcode)
 # Remove not needed data
 mapping_mean <- select(mapping_mean, ends_with("id"), starts_with("mean"))
 
-
 # Rename variables 
-names(mapping_mean)[2:47] <- gsub(".*_(.*?_.*?_.*?).txt", "\\1", file.list_mean)
+names(mapping_mean)[2:ncol(mapping_mean)] <- gsub(".*_(.*?_.*?_.*?).txt", "\\1", file.list_mean)
 
 mapping_mean <- mapping_mean[,c("transcript_id", "Bernstein2011_H2AFZ_ENCSR000APC", 
                        "Schmidl2015_H3K27me3_chipmentation", "Schmidl2015_H3K27ac_chipmentation",
@@ -150,23 +181,19 @@ mapping_mean <- mapping_mean[,c("transcript_id", "Bernstein2011_H2AFZ_ENCSR000AP
 # Rename variables 
 colnames(mapping_mean) <- gsub(".*_(.*?)_.*", "\\1", colnames(mapping_mean))
 
-
-
-# Process mapping_mean dataset
-# Load alternative lmnb1 df
-setnames(lmnb.df, old = "name", new = "barcode")
-lmnb.df <- merge(lmnb.df, clone5.bc)
-lmnb.df <- lmnb.df[,-3]
+# Rename variable
 setnames(mapping_mean, old = "transcript_id", new = "barcode")
-mapping_mean <- merge(mapping_mean, clone5.bc)
 
-# Combine the two chr. state dfs
-mapping_mean <- merge(lmnb.df, mapping_mean, all = TRUE)
-setnames(mapping_mean, old = "mean", new = "LMNB1")
 
-# Remove .B from barcode
-mapping_mean$barcode <- gsub(".B","",mapping_mean$barcode)
+# Add lmnb1 data to df
+clone5_lmnb1.dt_mean <- clone5_lmnb1.dt[,c(1,2)]
+clone5_lmnb1.dt_mean$barcode <- gsub(".B","",clone5_lmnb1.dt_mean$barcode)
+mapping_mean <- merge(clone5_lmnb1.dt_mean, mapping_mean, all = TRUE)
+setnames(mapping_mean, old = "K562.lamina", new = "LMNB1")
+
 ```
+
+
 
 ## Normalization mean values
 ```{r}
@@ -223,23 +250,10 @@ annotation_colors = list(
   H3K27me3_integration = c(Yes="#669966", No="grey90"),
   chromatin.mark_type = c(Active="#669966", Repressive="grey90"))
 
-
-
-
-# Set Barcode column as rownames and remove Barcode column
-row.names(mapping_mean_essent) <- mapping_mean_essent$variable
-mapping_mean_essent <- mapping_mean_essent[,-1]
-
-
 ## mapping_mean dataset
 # Set Barcode column as rownames and remove Barcode column
 row.names(mapping_mean) <- mapping_mean$variable
 mapping_mean <- mapping_mean[,-1]
-
-
-
-
-
 ```
 
 
@@ -292,10 +306,23 @@ Next, heatmaps can be visualized, using either the dataframe containing only ess
 # Additionally, LAD & H3K27me3 integration calling states are represented -
 # per barcode (meaning: do these barcodes reside in a LAD/H3K27me3 domain?)
 
-breaksList <- seq(-1.2,1,.001)
+breaksList <- c(seq(min(as.matrix(mapping_mean)), 0, 
+                   length.out=ceiling(100/2) + 1), 
+              seq(max(as.matrix(mapping_mean))/100, 
+                  max(as.matrix(mapping_mean)), length.out=floor(100/2)))
 
 # Generate heatmap: chr. mark intensity of only essential ChIP datasets vs. barcodes
-x <- pheatmap(as.matrix(mapping_mean), annotation_col = LAD_integration, 
+pheatmap(as.matrix(mapping_mean), annotation_col = LAD_integration, 
+         annotation_row = chromatin.mark_type, 
+         annotation_colors = annotation_colors,
+         color = colorRampPalette(rev(brewer.pal(n = 7, name = "RdGy")))(100),
+         breaks = breaksList,
+         annotation_legend = T,
+         main = "RSTP2#5: chromatin mark intensity 
+         per barcode (essential ChIP datasets)")
+
+# Save heatmap for further use (exclude barcodes that were discarded in episcreen analysis)
+x <- pheatmap(as.matrix(mapping_mean[,c(-1,-11)]), annotation_col = LAD_integration, 
          annotation_row = chromatin.mark_type, 
          annotation_colors = annotation_colors,
          color = colorRampPalette(rev(brewer.pal(n = 7, name = "RdGy")))(length(breaksList)),
@@ -304,7 +331,9 @@ x <- pheatmap(as.matrix(mapping_mean), annotation_col = LAD_integration,
          main = "RSTP2#5: chromatin mark intensity 
          per barcode (essential ChIP datasets)")
 
-superheat(as.matrix(mapping_mean),bottom.label.text.angle = 90, yt = cor(mapping_mean)[,"TCTTTTGAGGAGCTGA"])
+
+
+# superheat(as.matrix(mapping_mean),bottom.label.text.angle = 90, yt = cor(mapping_mean)[,"TCTTTTGAGGAGCTGA"])
 ```
 
 ## Conclusions from this heatmap:
@@ -369,6 +398,8 @@ save(mapping_integration_long, file = filename)
 filename <- SetFileName("_mapping_mean_long", "mt")
 save(mapping_mean_long, file = filename)
 
+filename <- SetFileName("_chip_dendogram", "mt")
+save(x, file = filename)
 ```
 
 # Session Info
