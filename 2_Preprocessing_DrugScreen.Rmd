@@ -440,6 +440,8 @@ setwd("/DATA/usr/m.trauernicht/EpiScreen/epigenetic-screening-on-trip-clone/Data
 # The mutations list that can be loaded for the indel spectra plots.
 filename <- SetFileName("_RSTP2_2000_indels.df", "mt")
 save(RSTP2_2000_indels.df, file = filename)
+filename <- SetFileName("_mutations.list", "mt")
+save(mutations.list, file = filename)
 ```
 
 ### Conclusions 
