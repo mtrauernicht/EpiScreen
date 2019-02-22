@@ -97,9 +97,9 @@ ReadsPerBarcode <- function(mutations) {
   df
 }
 
-#RemoveLargeDeletions <- function(x, lowerindels = as.character(c(-120:-11, 3:20))) {
-#  x <- x[ , -which(names(x) %in% lowerindels)]
-#}
+RemoveLargeDeletions <- function(x, lowerindels = as.character(c(-120:-11, 3:20))) {
+ x <- x[ , -which(names(x) %in% lowerindels)]
+}
 
 SumLargeIndels <- function(x, maxshift = 10, maxinsert = 5) {
   min <- as.numeric(names(x)[1])
@@ -415,9 +415,12 @@ The files can be found in the /mutation folder of the trip results.
 # Set directory to the mutation output folder of the CRISPR-TRIP snakemake script
 setwd("/DATA/projects/DSBrepair/data/R/")
 load("rs20181206_All.IndelFreqData.RData")
-#file.list <- list.files(pattern = "*_All.IndelFreqData.RData")
-#RData <- sort(file.list, decreasing = TRUE)[1] #take the most recent.
-#load(RData)
+file.list <- list.files(pattern = "*_All.IndelFreqData.RData")
+RData <- sort(file.list, decreasing = TRUE)[1] #take the most recent.
+load(RData)
+
+setwd("/DATA/usr/m.trauernicht/EpiScreen/epigenetic-screening-on-trip-clone/Data/")
+mutations.list <- get(load("mt20190222_mutations.list"))
 ```
 
 ### Some data pre-processing
@@ -440,22 +443,11 @@ of reads per barcode.
 
 ```{r}
 # Make the sums of the reads per barcode
-barcodesum <- lapply(all.norm.mutations.df.list, ReadsPerBarcode)
-
-# I want to cut off the mutations below -60, these are very rare and not really needed
-# for the plotting of the data.
-
-# We start by giving the range we want to remove.
-###lowerindels <- as.character(c(-120:-30, 4:20))
-
-# Apply the RemoveLargeDeletions function on all the dataframes in the list.
-###all.norm.mutations.df.list <- lapply(all.norm.mutations.df.list, RemoveLargeDeletions)
+barcodesum <- lapply(mutations.list, ReadsPerBarcode)
 
 # Let's keep the total mutations list also.
-all.norm.mutations.df.list.large <- all.norm.mutations.df.list
-all.norm.mutations.df.list <- lapply(all.norm.mutations.df.list, SumLargeIndels, maxshift = 15)
-
-
+mutations.list.large <- mutations.list
+mutations.list <- lapply(mutations.list, SumLargeIndels, maxshift = 15)
 ```
 
 Conclusion : We now have a dataframes with somewhat reduced (max -15 deletion) indels.
@@ -471,53 +463,46 @@ each sample. We can then plot these in a simple way, a seperate PDF can also be 
 # dataframe. This works as wel, because the other plots also rely on dataframe lists.
 
 # Apply the sum of the columns over all the dataframes in the list.
-sum.list <- lapply(all.norm.mutations.df.list, OverallIndels)
-large.sum.list <- lapply(all.norm.mutations.df.list.large, OverallIndels) ##what is the difference
+sum.list <- lapply(mutations.list, OverallIndels)
 
 # We can plot all these
 ###OverallIndelPlot(sum.list)
-OverallIndelPlot(all.norm.mutations.df.list)
+OverallIndelPlot(mutations.list)
 
 # To create a PDF of these figures, for the small mutations.
-setwd("/DATA/projects/DSBrepair/results/")
-filename <- SetFileName("_Overall_IndelSpectra.pdf", "rs")
+setwd("/DATA/usr/m.trauernicht/EpiScreen/epigenetic-screening-on-trip-clone/Results/")
+filename <- SetFileName("_Overall_IndelSpectra.pdf", "mt")
 pdf(filename, width = 11, height = 8)
-OverallIndelPlot(all.norm.mutations.df.list)
-dev.off()
-
-# Same for large mutations
-filename <- SetFileName("_Overall_IndelSpectra_large_mutations.pdf", "rs")
-pdf(filename, width = 11, height = 8)
-OverallIndelPlot(all.norm.mutations.df.list.large)
+OverallIndelPlot(mutations.list)
 dev.off()
 ```
 
 
 
 
-### Plotting the indel spectrum for each barcode in one specifig sample.
+### Plotting the indel spectrum for one specific well.
 We want to be able to have a quick look at how all the barcodes look in one sample.
 moreover, we want to see how they vary (i.e. in what extent the location creates
 variation)
 
 ```{r samples, echo=FALSE}
-# Preview of a few barodes in a sample.
-names(all.norm.mutations.df.list)
+# Preview of a few wells in a sample.
+names(mutations.list)
 # Name the sample:
-plot_sample <- c("indel_sum_AB_LBR2_64h")
+plot_sample <- c("1um_rep1_plate1_F4_064")
 ####### Function that creates the PDF ######
 # Generate file name with date and sample
-if (plot_sample %in% names(all.norm.mutations.df.list)) {
+if (plot_sample %in% names(mutations.list)) {
   # Date is called at the beginning of the script.
-  filename <- paste("rs", Date, "Overall_IndelSpectra" , plot_sample, ".pdf", sep = "_")
+  filename <- paste("mt", Date, "Overall_IndelSpectra" , plot_sample, ".pdf", sep = "_")
   filename <- gsub("-", "", filename)
   filename <- gsub("_[.]", ".", filename)
   ### Run PDF
-  setwd("/DATA/projects/DSBrepair/results/")
+  setwd("/DATA/usr/m.trauernicht/EpiScreen/epigenetic-screening-on-trip-clone/Results/")
   pdf(filename, width = 11, height = 8)
-  ### make the plos
+  ### make the plots
   #SampleIndelSpectra(plot_sample)
-  SampleIndelSpectra(j=all.norm.mutations.df.list[[plot_sample]], name=plot_sample, barcodes.no = 200)
+  SampleIndelSpectra(j=mutations.list[[plot_sample]], name=plot_sample, barcodes.no = 19)
 
   dev.off()
 } else {
@@ -526,58 +511,50 @@ if (plot_sample %in% names(all.norm.mutations.df.list)) {
 ```
 
 
-## Plotting the indel sprectra for one integration in all the samples.
-Here we plot one barcode in all the samples that it was found.
+## Plotting the indel sprectra for one barcode in all the samples.
 Again this can also be saved as a PDF.
 
 ```{r barcodes}
-setwd("/DATA/projects/DSBrepair/results/")
+setwd("/DATA/usr/m.trauernicht/EpiScreen/epigenetic-screening-on-trip-clone/Results/")
 # This script produces histograms of the indels of a specific barcode in all the samples.
 # Preview :
-##BarcodeIndelSpectrum("TATGGCTGTCGGGTAG.B")
-#BarcodeIndelSpectrum(indellist = all.norm.mutations.df.list, i="CCGGGGACGTATGCAC.B")
+# #BarcodeIndelSpectrum("ACTGTCGAGTTGTCCG)
+# BarcodeIndelSpectrum(indellist = mutations.list, i="ACTGTCGAGTTGTCCG")
 
 # To make a PDF of these plots
-filename <- SetFileName("CCCACCCAGCCCACGT_A_LBR2.pdf", "rs")
+filename <- SetFileName("_ACTGTCGAGTTGTCCG.pdf", "mt")
 pdf(filename, width = 11, height = 8)
-#BarcodeIndelSpectrum("TATGGCTGTCGGGTAG.B")
-BarcodeIndelSpectrum(indellist = all.norm.mutations.df.list, i="CCCACCCAGCCCACGT.A")
+#BarcodeIndelSpectrum("ACTGTCGAGTTGTCCG")
+BarcodeIndelSpectrum(indellist = mutations.list, i="ACTGTCGAGTTGTCCG")
 dev.off()
 ```
 
 
 # Group experiments
 ```{r sample names}
-samples_names <- unique(names(all.norm.mutations.df.list))
-LBR2_samples <- grep("LBR2_-|LBR2_DMSO$|LBR2_ODNOT_DMSO|LBR2_t64$|LBR2_DMSO_t64$|LBR2_siNT", samples_names, value=TRUE)
+samples_names <- unique(names(mutations.list))
 
-LBR2.A_samples <- grep("LBR2_-|LBR2_DMSO$|LBR2_ODNOT_DMSO|LBR2_t64$|LBR2_DMSO_t64$|LBR2_siNT", grep("_A_", samples_names, value=TRUE), value=TRUE)
-LBR2.B_samples <- grep("LBR2_-|LBR2_DMSO$|LBR2_ODNOT_DMSO|LBR2_t64$|LBR2_DMSO_t64$|LBR2_siNT", grep("_B_", samples_names, value=TRUE), value=TRUE)
+DMSO_samples <- grep("_B1_|_B12_|_F1_|_F12_", samples_names, value=TRUE)
 
-LBR2_NU7441_samples <- grep("LBR2_NU7441$|LBR2_ODNOT_NU7441|LBR2_NU7441_t64$", samples_names, value=TRUE)
+Mirin_samples <- grep("_C1_|_C12_|_G1_|_G12_", samples_names, value=TRUE)
 
+DNAPK_samples <- grep("_D1_|_D12_|_H1_|_H12_", samples_names,  value=TRUE)
 
-LBR2_ODN3_samples <- grep("LBR2_ssODN3_DMSO_t64$|LBR2_ODN3_DMSO$", samples_names, value=TRUE)
-LBR2_ODN3_NU7441_samples <- grep("LBR2_ssODN3_NU7441_t64$|LBR2_ODN3_NU7441$", samples_names, value=TRUE)
-
-LBR1_samples <- grep("LBR1_-|LBR1_DMSO$|LBR1_ODNOT_DMSO|LBR1_t64$|LBR1_DMSO_t64$|LBR1_siNT", samples_names, value=TRUE)
-
-
-
+All_samples <- grep("", samples_names,  value=TRUE)
 ```
 
 ## Beeswarm plots of all the integrations in one. 
 ```{r plotting}
 ### Beeswarm of all the indel for all barcodes of multiple experiments
-mutations.regular.list <- all.norm.mutations.df.list[LBR2_samples]
-names(mutations.regular.list)
-dat <- do.call(rbind, setNames(mutations.regular.list, NULL)) # This is a big data.frame with all data 
-repl <- length(mutations.regular.list)
+mutations.list.dmso <- mutations.list[DMSO_samples]
+names(mutations.list.dmso)
+dat <- do.call(rbind, setNames(mutations.list.dmso, NULL)) # This is a big data.frame with all data 
+repl <- length(mutations.list.dmso)
 
 # make rowname row 1
 dat <- tibble::rownames_to_column(dat, "barcode")
 
-# This creates a dataframe with different numbers after each barcodes we do not want that.
+# This creates a dataframe with different numbers after each barcodes, we do not want that.
 dat$barcode <- gsub('[0-9]+', '', dat$barcode)
 head(dat)
 reads.mut.barcode <- dat %>%
@@ -585,7 +562,7 @@ reads.mut.barcode <- dat %>%
   summarise_all(funs(sum))
 
 # Test the new data frame with the sums of the barcodes 
-reads.mut.barcode[reads.mut.barcode$barcode=="AAAAGGTTATCTCGGT.A", -1] == colSums(dat[dat$barcode=="AAAAGGTTATCTCGGT.A", -1])
+reads.mut.barcode[reads.mut.barcode$barcode=="ACTGTCGAGTTGTCCG", -1] == colSums(dat[dat$barcode=="ACTGTCGAGTTGTCCG", -1])
 
 #counts of each barcode in the various replicates
 reads.mut.barcode_counts <- dat %>%
@@ -599,23 +576,17 @@ reads.mut.barcode.freq <- melt(reads.mut.barcode.freq, id = "barcode")
 # Plot it in a beeswarm plot
 ggplot(reads.mut.barcode.freq, aes(variable, value)) + geom_quasirandom() + theme_bw() + ylim(0, 100)
 
-Freq.LBR2_samples <- FrequencyReadsMut(all.norm.mutations.df.list, LBR2_samples)
-BeeswarmIndelSpectrum(Freq.LBR2_samples)
+Freq.DMSO_samples <- FrequencyReadsMut(mutations.list, DMSO_samples)
+BeeswarmIndelSpectrum(Freq.DMSO_samples)
 
-Freq.LBR2.NU7441_samples <- FrequencyReadsMut(all.norm.mutations.df.list, LBR2_NU7441_samples)
-BeeswarmIndelSpectrum(Freq.LBR2.NU7441_samples)
+Freq.Mirin_samples <- FrequencyReadsMut(mutations.list, Mirin_samples)
+BeeswarmIndelSpectrum(Freq.Mirin_samples)
 
-Freq.LBR2_ODN3_samples <- FrequencyReadsMut(all.norm.mutations.df.list, LBR2_ODN3_samples)
-BeeswarmIndelSpectrum(Freq.LBR2_ODN3_samples)
+Freq.DNAPK_samples <- FrequencyReadsMut(mutations.list, DNAPK_samples)
+BeeswarmIndelSpectrum(Freq.DNAPK_samples)
 
-Freq.LBR2_ODN3_NU7441_samples <- FrequencyReadsMut(all.norm.mutations.df.list, LBR2_ODN3_NU7441_samples)
-BeeswarmIndelSpectrum(Freq.LBR2_ODN3_NU7441_samples)
-dim(Freq.LBR2_ODN3_NU7441_samples)
-
-Freq.LBR1_samples <- FrequencyReadsMut(all.norm.mutations.df.list, LBR1_samples)
-BeeswarmIndelSpectrum(Freq.LBR1_samples)
-
-
+Freq.All_samples <- FrequencyReadsMut(mutations.list, All_samples)
+BeeswarmIndelSpectrum(Freq.All_samples)
 ```
   
 ### Conclusions 
