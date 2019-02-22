@@ -18,27 +18,12 @@ knitr document van Steensel lab
 # Preprocessing of the indel data
 # Introduction
 
-In this script I want to prepocess the datafiles into several working dataframes. 
-
-I want one data frame in which I have the number of mutations, per sample, per barcode per indel size.
-This one will be used for plotting indel patterns, calculating ratios later on and such.
-
-I want one dataframe that contains the ratios of each barcode in each sample. These ratios will be : 
-This could be a long dataframe, with the following variables: Barcode, sample, ratios ...  
+In this script I want to prepocess the raw data from the epigenetic screening into one dataframe containing all information: +1/-7 ratio, efficiency, etc. This should all be integrated with the drug and the drug target group corresponding to the well. 
+This will be used for plotting indel patterns, calculating ratios later on and such.
 
 * Efficiency (All mutations / Total or (Total - WT sequences) / Total)  
 * +1 / -7  
-* Deletions / Total  
-* Insertions / Total  
-* +1 / (-7 + -14 + -22)  
-* Barcode effiency vs Overall efficiency  
 
-In this dataframe I would also like to have the means of the samples (here I will ignore the inhibitor treated ones)  
-
-* Mean ratio  
-* Total reads  
-* Mean reads  
-* Median reads  
 
 ## Description of Data
 
@@ -321,16 +306,8 @@ df.list <- Filter(Negate(function(x) is.null(unlist(x))), df.list)
 
 
 ### Some data pre-processing
-Set everything in a datafram that contains the barcodes, indel ratios, and efficiencies.
+Set everything in a dataframe that contains the barcodes, indel ratios, and efficiencies.
 ```{r indeldataframe}
-# To be able to setup the functions in a general way. This means in cases where we have A
-# and B samples. 
-# A <- grep("_A_",  names(df.list))
-# B <- grep("_B_",  names(df.list))
-# # Rename the barcodes
-# df.list <- RenameBarcodes(df.list, pool = A)
-# df.list <- RenameBarcodes(df.list, pool = B)
-
 # Total reads per barcode
 total.reads.list <- mclapply(df.list, Read_Counts, mc.cores = 10)
 
@@ -342,59 +319,54 @@ point.mut.list <- mclapply(df.list, Point_Mut_Counts, mc.cores = 10)
 indel.list <- mclapply(df.list, IndelsOnly, mc.cores = 10)
 
 mutations.list <- lapply(indel.list, MutationsToDataframe)
+
 # We need to get the total reads in each sample, here I'll get the sum of all the columns and rows from each dataframe.
 total.reads.mutations.list <- mclapply(indel.list, Read_Counts, mc.cores = 10)
 ```
 
 Next we will work on a long dataframe that will include all the ratios (deletions, insertions, +1/-7 etc) for each barcode in each sample.
 
-I found out that some barcodes overlap in A and B but do not have the same integration sites (this has a very low chance). It would be a pitty to trash them, and I do not want to merge them as they are integrated in differente locations. I will name all the barcodes in A sample to "barcode".A and in B to "barcode".B. For this I will use the n.samples to pick out only A and only B data.
-
- 
 # Analysis
 ## Not clear counts in the mutation data
 ```{r not_clear}
 # I need to change the list into a data frame, and pull out the names of the samples, transform the data frame (this returns a matrix) and rechange it into a data frame. 
-total.reads.df <- ldply(total.reads.list, data.frame)
-point.mut.df <- ldply(point.mut.list, data.frame)
-not.clear.df <- ldply(not.clear.list, data.frame)
+# total.reads.df <- ldply(total.reads.list, data.frame)
+# point.mut.df <- ldply(point.mut.list, data.frame)
+# not.clear.df <- ldply(not.clear.list, data.frame)
+# 
+# # Merge them all together
+# non.indels.df <- list(total.reads.df, point.mut.df, not.clear.df) %>% 
+#   join_all(., by = c(".id", "barcode"),  match = "first")  %>%
+#   mutate_all(funs(replace(., is.na(.), 0)))
+# 
+# # Calculate the fraction of not clear
+# non.indels.df$nc_fraction <- non.indels.df$not_clear/non.indels.df$sum*100
+# non.indels.df$pm_fraction <- non.indels.df$point_mut/non.indels.df$sum*100
+# 
+# # What is the mean not clear fraction in our samples? 
+# nc_pm_fraction.df <- non.indels.df %>% 
+#   group_by(.id) %>% 
+#   summarise(mean_nc = mean(nc_fraction),
+#             median_nc = median(nc_fraction),
+#             max_nc = max(nc_fraction),
+#             mean_pm = mean(pm_fraction),
+#             median_pm = median(pm_fraction),
+#             max_pm = max(pm_fraction)) %>% 
+#   melt(., id.vars = ".id")
+# 
+# nc_pm_fraction.df$type <- gsub(".*_", "", nc_pm_fraction.df$variable)
+# nc_pm_fraction.df$plasmid <- gsub("indel_.*?_.*?_(.*?)_.*", "\\1", nc_pm_fraction.df$.id)
+# 
+# ggplot(nc_pm_fraction.df, aes(.id , value, fill = variable)) + 
+#   geom_bar(position = "dodge", stat = "identity") + 
+#   facet_grid(type ~ ., scales = "free")
+# 
+# 
+# # The total means and medians of all the samples: 
+# nc_pm_fraction.df %>% group_by(variable) %>% summarise(mean = mean(value), median = median(value), max = max(value), min = min(value))
 
-# Merge them all together
-non.indels.df <- list(total.reads.df, point.mut.df, not.clear.df) %>% 
-  join_all(., by = c(".id", "barcode"),  match = "first")  %>%
-  mutate_all(funs(replace(., is.na(.), 0)))
-
-# Calculate the fraction of not clear
-non.indels.df$nc_fraction <- non.indels.df$not_clear/non.indels.df$sum*100
-non.indels.df$pm_fraction <- non.indels.df$point_mut/non.indels.df$sum*100
-
-# What is the mean not clear fraction in our samples? 
-nc_pm_fraction.df <- non.indels.df %>% 
-  group_by(.id) %>% 
-  summarise(mean_nc = mean(nc_fraction),
-            median_nc = median(nc_fraction),
-            max_nc = max(nc_fraction),
-            mean_pm = mean(pm_fraction),
-            median_pm = median(pm_fraction),
-            max_pm = max(pm_fraction)) %>% 
-  melt(., id.vars = ".id")
-
-nc_pm_fraction.df$type <- gsub(".*_", "", nc_pm_fraction.df$variable)
-nc_pm_fraction.df$plasmid <- gsub("indel_.*?_.*?_(.*?)_.*", "\\1", nc_pm_fraction.df$.id)
-
-ggplot(nc_pm_fraction.df, aes(.id , value, fill = variable)) + 
-  geom_bar(position = "dodge", stat = "identity") + 
-  facet_grid(type ~ ., scales = "free")
-
-
-# The total means and medians of all the samples: 
-nc_pm_fraction.df %>% group_by(variable) %>% summarise(mean = mean(value), median = median(value), max = max(value), min = min(value))
-
-```
-  
-```{r}
-# What are the top non clear barcodes?
-non.indels.df[order(non.indels.df$nc_fraction, decreasing = T)[1:30],]
+# # What are the top non clear barcodes?
+# non.indels.df[order(non.indels.df$nc_fraction, decreasing = T)[1:30],]
 
 ```
 
@@ -404,179 +376,26 @@ Discard this barcode for all further analysis?
 Quick look at the amount of point mutations per sample. 
 
 ```{r}
-ggplot(nc_pm_fraction.df[nc_pm_fraction.df$type=="pm", ], aes(.id , value, fill = variable)) + 
-  geom_bar(position = "dodge", stat = "identity") + 
-  facet_grid(. ~ plasmid, scales = "free")
-
-# make a small dataframe with the mean amount of point mutations.
-mean_pm <- nc_pm_fraction.df[nc_pm_fraction.df$variable=="mean_pm", ]
-# What are the experiments with the most point mutations?
-mean_pm[order(mean_pm$value, decreasing = T)[1:20],]
-
-# Are there any barcodes that pop up specifically?
-non.indels.df[order(non.indels.df$pm_fraction, decreasing = T)[1:20],]
-```
-
-Again the same barcode pops up.
-
-We can remove the barcode in case we want to get rid of it.
-
-```{r}
-# mutations.list <- lapply(mutations.list, 
-#                          RemoveBarcodeFromList_RN , 
-#                          barcode = c("ACCCCTAAAGGCGCTG"))
-# mutations.list <- lapply(mutations.list, 
-#                          RemoveBarcodeFromList_RN , 
-#                          barcode = c("ACCCCTAAAGGCGCTG"))
+# ggplot(nc_pm_fraction.df[nc_pm_fraction.df$type=="pm", ], aes(.id , value, fill = variable)) + 
+#   geom_bar(position = "dodge", stat = "identity") + 
+#   facet_grid(. ~ plasmid, scales = "free")
 # 
-# total.reads.mutations.list <- lapply(total.reads.mutations.list, 
-#                                      RemoveBarcodeFromList_barcode, 
-#                                      barcode = c("ACCCCTAAAGGCGCTG"))
-# total.reads.mutations.list <- lapply(total.reads.mutations.list, 
-#                                      RemoveBarcodeFromList_barcode, 
-#                                      barcode = c("ACCCCTAAAGGCGCTG"))
-# dim(total.reads.mutations.list$`indel_9_B_LBR2_-`)
+# # make a small dataframe with the mean amount of point mutations.
+# mean_pm <- nc_pm_fraction.df[nc_pm_fraction.df$variable=="mean_pm", ]
+# # What are the experiments with the most point mutations?
+# mean_pm[order(mean_pm$value, decreasing = T)[1:20],]
+# 
+# # Are there any barcodes that pop up specifically?
+# non.indels.df[order(non.indels.df$pm_fraction, decreasing = T)[1:20],]
 ```
 
 
 ```{r}
-# Let's make the sums of different sample groups
-# norm.mutations.list <- lapply(mutations.list, function(df) {
-#   df <- df/sum(df)
-#   df
-# })
-
-# transform rownames to 1 column in all the samples
-# norm.mutations.dt.list <- copy(norm.mutations.list)
-# norm.mutations.dt.list <- lapply(norm.mutations.dt.list, setDT, keep.rownames = TRUE)
+# Put the lists into one df
 mutations.dt.list <- copy(mutations.list)
 mutations.dt.list <- lapply(mutations.dt.list, setDT, keep.rownames = TRUE)
-
-# Make the sample lists: 
-##### Rep 1,2,3 #####
-# Select the samples (in a ugly way but it works..)
-samples.names <- names(mutations.dt.list)
-rep1.10um.samples <- samples.names[-grep("rep2|rep3|1um|100nm", samples.names)]
-rep1.1um.samples <- samples.names[-grep("rep2|rep3|10um|100nm", samples.names)]
-rep1.100nm.samples <- samples.names[-grep("rep1|rep3|10um|1um", samples.names)]
-rep2.10um.samples <- samples.names[-grep("rep1|rep3|1um|100nm", samples.names)]
-rep2.1um.samples <- samples.names[-grep("rep1|rep3|10um|100nm", samples.names)]
-rep2.100nm.samples <- samples.names[-grep("rep1|rep3|10um|1um", samples.names)]
-rep3.10um.samples <- samples.names[-grep("rep1|rep2|1um|100nm", samples.names)]
-rep3.1um.samples <- samples.names[-grep("rep1|rep2|10um|100nm", samples.names)]
-rep3.100nm.samples <- samples.names[-grep("rep1|rep2|10um|1um", samples.names)]
-
-
-# take the samples - bind rows - remove NA's - group by barcode - sum the same barcodes - tib to DT
-alles.tib <- mutations.dt.list %>% 
-  bind_rows() %>% NAToZero() %>% group_by(rn) %>% summarise_all(.funs = sum) %>% as.data.table()
-
-rep1.10um.tib <- mutations.dt.list[rep1.10um.samples] %>% 
-  bind_rows() %>% NAToZero() %>% group_by(rn) %>% summarise_all(.funs = sum) %>% as.data.table()
-
-rep1.1um.tib <- mutations.dt.list[rep1.1um.samples] %>% 
-  bind_rows() %>% NAToZero() %>% group_by(rn) %>% summarise_all(.funs = sum) %>% as.data.table()
-
-rep1.100nm.tib <- mutations.dt.list[rep1.100nm.samples] %>% 
-  bind_rows() %>% NAToZero() %>% group_by(rn) %>% summarise_all(.funs = sum) %>% as.data.table()
-
-rep2.10um.tib <- mutations.dt.list[rep2.10um.samples] %>% 
-  bind_rows() %>% NAToZero() %>% group_by(rn) %>% summarise_all(.funs = sum) %>% as.data.table()
-
-rep2.1um.tib <- mutations.dt.list[rep2.1um.samples] %>% 
-  bind_rows() %>% NAToZero() %>% group_by(rn) %>% summarise_all(.funs = sum) %>% as.data.table()
-
-rep2.100nm.tib <- mutations.dt.list[rep2.100nm.samples] %>% 
-  bind_rows() %>% NAToZero() %>% group_by(rn) %>% summarise_all(.funs = sum) %>% as.data.table()
-
-rep3.10um.tib <- mutations.dt.list[rep3.10um.samples] %>% 
-  bind_rows() %>% NAToZero() %>% group_by(rn) %>% summarise_all(.funs = sum) %>% as.data.table()
-
-rep3.1um.tib <- mutations.dt.list[rep3.1um.samples] %>% 
-  bind_rows() %>% NAToZero() %>% group_by(rn) %>% summarise_all(.funs = sum) %>% as.data.table()
-
-rep3.100nm.tib <- mutations.dt.list[rep3.100nm.samples] %>% 
-  bind_rows() %>% NAToZero() %>% group_by(rn) %>% summarise_all(.funs = sum) %>% as.data.table()
-
-
-#### Controls: PAO, DMSO, Mirin, DNA-PKi ####
-# Select the samples (in a ugly way but it works..)
-samples.names <- names(mutations.dt.list)
-PAO.samples <- samples.names[grep("A1_|A12_", samples.names)]
-DMSO.samples <- samples.names[grep("B1_|B12_", samples.names)]
-Mirin.samples <- samples.names[grep("C1_|C12_", samples.names)]
-DNA.PKi.samples <- samples.names[grep("D1_|D12_", samples.names)]
-
-# take the samples - bind rows - remove NA's - group by barcode - sum the same barcodes - tib to DT
-PAO.tib <- mutations.dt.list[PAO.samples] %>% 
-  bind_rows() %>% NAToZero() %>% group_by(rn) %>% summarise_all(.funs = sum) %>% as.data.table()
-
-DMSO.tib <- mutations.dt.list[DMSO.samples] %>% 
-  bind_rows() %>% NAToZero() %>% group_by(rn) %>% summarise_all(.funs = sum) %>% as.data.table()
-
-DMSO.reads <- total.reads.mutations.list[DMSO.samples] %>% 
-  bind_rows() %>% group_by(barcode) %>% summarise_all(.funs = sum) %>% as.data.table()
-dim(DMSO.reads)
-
-Mirin.tib <- mutations.dt.list[Mirin.samples] %>% 
-  bind_rows() %>% NAToZero() %>% group_by(rn) %>% summarise_all(.funs = sum) %>% as.data.table()
-
-DNA.PKi.tib <- mutations.dt.list[DNA.PKi.samples] %>% 
-  bind_rows() %>% NAToZero() %>% group_by(rn) %>% summarise_all(.funs = sum) %>% as.data.table()
-
-
-
-
-control.indel.list <- list(PAO.tib,
-                          DMSO.tib,
-                          Mirin.tib,
-                          DNA.PKi.tib)
-
-names(control.indel.list) <- c("indel_PAO",
-                              "indel_DMSO",
-                              "indel_Mirin", 
-                              "indel_DNA.PKi")
-
-control.reads.list <- list(PAO.reads,
-                          DMSO.reads,
-                          Mirin.reads,
-                          DNA.PKi.reads)
-
-names(control.reads.list) <- c("indel_PAO",
-                              "indel_DMSO",
-                              "indel_Mirin", 
-                              "indel_DNA.PKi")
-
-control.mutations.dt.list <- c(control.indel.list, mutations.dt.list)
-
-control.reads.dt.list <- c(control.reads.list, total.reads.mutations.list)
-
-# control.mutations.df.list <- lapply(control.mutations.dt.list, function(x) {
-#   x <- as.data.frame(x)
-#   x <- x[ , mixedsort(colnames(x))]
-#   rownames(x) <- x[, "rn"]
-#   x$rn <- NULL
-#   x
-# })
-
-# ### STILL WORKING ON THIS -- how to multiply each row by the same row in the other list.
-# control.mutations.df.list <- mapply(function(x, y) {
-#   df <- x*y$sum
-#   df}, x = all.mutations.df.list, 
-#   y = all.norm.reads.dt.list) 
-
-```
-
-
-```{r}
-reads.df <- ldply(total.reads.mutations.list, data.frame)
 indels.df <- ldply(mutations.dt.list, data.frame)
-# ? summarise(control.reads.df)
-# Merge them all together
-
-
 ```
-
 
 # Indel proportions data frame. 
  
@@ -603,141 +422,29 @@ RSTP2_2000_indels.df$read.count <- rowSums(RSTP2_2000_indels.df[,c(7:118)])
 RSTP2_2000_indels.df$read.count1.7 <- rowSums(RSTP2_2000_indels.df[,c(47,55)])
 RSTP2_2000_indels.df$all.indels <- rowSums(RSTP2_2000_indels.df[,c(7:53,56:118)])
 RSTP2_2000_indels.df$overall.ratio <- RSTP2_2000_indels.df[,"X0"] / (RSTP2_2000_indels.df[,"X0"] + RSTP2_2000_indels.df[,"all.indels"])
+
 # Calculate the efficiency
 RSTP2_2000_indels.df$efficiency <- (1 - RSTP2_2000_indels.df[,"overall.ratio"])
 
 
 
-
-
-
-
-
-
-
-
 # Let's plot the distribution of the amount of reads per barcode
-p <- ggplot(RSTP2_2000_indels.df, aes(log10(sum)))
+p <- ggplot(RSTP2_2000_indels.df, aes(read.count))
 p + geom_density()
-
-# We can repeat all this for the efficiencies. 
-# Fist make one dataframe for all the effiencies, deletions and insertions
-efficiency.df <- lapply(mutations.dt.list, CalculateEfficiencies) %>% 
-  ldply(., data.frame)
-
-deletions.df <- lapply(all.norm.mutations.df.list, CalculateDeletions) %>% 
-  ldply(., data.frame)
-
-insertions.df <- lapply(all.norm.mutations.df.list, CalculateInsertions) %>% 
-  ldply(., data.frame)
-
-# Calculate the proportion of some set indels
-plus2.ratio.mutations.df <- lapply(all.norm.mutations.df.list, indel = 2, CalculateRatio) %>% 
-  ldply(., data.frame)
-
-plus1.ratio.mutations.df <- lapply(all.norm.mutations.df.list, indel = 1, CalculateRatio) %>%
-  ldply(., data.frame)
-
-min7.ratio.mutations.df <- lapply(all.norm.mutations.df.list, indel = -7, CalculateRatio) %>% 
-  ldply(., data.frame)
-
-min14.ratio.mutations.df <- lapply(all.norm.mutations.df.list, indel = -14, CalculateRatio) %>%
-  ldply(., data.frame)
-
-min22.ratio.mutations.df <- lapply(all.norm.mutations.df.list, indel = -22, CalculateRatio) %>%
-  ldply(., data.frame)
-
-# List all the data frames 
-indel.ratios.list <- list(RSTP2_2000_mutations.df,
-                          efficiency.df, 
-                          insertions.df, 
-                          deletions.df, 
-                          plus2.ratio.mutations.df, 
-                          plus1.ratio.mutations.df, 
-                          min7.ratio.mutations.df, 
-                          min14.ratio.mutations.df,
-                          min22.ratio.mutations.df)
-
-indel.ratios.df <- join_all(indel.ratios.list, 
-                         by = c(".id", "barcode"),
-                         match = "first")
-
-dim(indel.ratios.df)
-###
-plus1.per.mutations.df <- lapply(all.norm.mutations.df.list, indel = 1, CalculatePercentage) %>% 
-  ldply(., data.frame)
-
-plus2.per.mutations.df <- lapply(all.norm.mutations.df.list, indel = 2, CalculatePercentage) %>%
-  ldply(., data.frame)
-
-min7.per.mutations.df <- lapply(all.norm.mutations.df.list, indel = -7, CalculatePercentage) %>%
-  ldply(., data.frame)
-
-###
-
-plus1.min7.ratio.mutations.df <- lapply(all.norm.mutations.df.list, 
-                                        indel1 = 1, 
-                                        indel2 = -7, 
-                                        CalculateRatio_internal) %>% 
-  ldply(., data.frame)
-
-plus1.plus2.ratio.mutations.df <- lapply(all.norm.mutations.df.list, 
-                                         indel1 = 1, 
-                                         indel2 = 2, 
-                                         CalculateRatio_internal) %>% 
-  ldply(., data.frame)
-
-plus2.min7.ratio.mutations.df <- lapply(all.norm.mutations.df.list, 
-                                        indel1 = 2, 
-                                        indel2 = -7, 
-                                        CalculateRatio_internal) %>% 
-  ldply(., data.frame)
-
-# Merge these with the large dataframe
-indel.ratios.list <- list(indel.ratios.df,
-                          plus2.per.mutations.df,
-                          plus1.per.mutations.df,
-                          min7.per.mutations.df,
-                          plus1.min7.ratio.mutations.df,
-                          plus1.plus2.ratio.mutations.df,
-                          plus2.min7.ratio.mutations.df)
-
-indel.ratios.df <- join_all(indel.ratios.list, 
-                         by = c(".id", "barcode"),
-                         match = "first")
-
-
-# Rename the first column to sample
-colnames(indel.ratios.df)[1] <- "sample"
-
-head(indel.ratios.df)
-
-# For the following operations it's better to work with a data table
-tib_indel_ratios <- as_tibble(indel.ratios.df)
-dim(tib_indel_ratios)
-
-# Export it for the efficiency analysis. To test potential normalisation. 
-setwd("/DATA/projects/DSBrepair/data/R/")
-
-# The ratios data for the efficiency analysis
-filename <- SetFileName("_total_indel_data.RData", "rs")
-save(tib_indel_ratios, file = filename)
 ```
 
 ## Processed data export
 The files will be saved in the processed data folder.
 ```{r export}
-setwd("/DATA/usr/m.trauernicht/EpiScreen/epigenetic-screening-on-trip-clone")
+setwd("/DATA/usr/m.trauernicht/EpiScreen/epigenetic-screening-on-trip-clone/Data")
 # The mutations list that can be loaded for the indel spectra plots.
 filename <- SetFileName("_RSTP2_2000_indels.df", "mt")
 save(RSTP2_2000_indels.df, file = filename)
-
-# The ratios data that can be loaded for the chromatin analysis.
-filename <- SetFileName("_All.and.mean.Ratios.RData", "rs")
-save(tib_indel_ratios, file = filename)
 ```
+
 ### Conclusions 
-I'm happy with the output I've generated. I should still work on checking what the best amount of reads is that I need for correct correlations etc.
+Looks all fine! Now, we can generate indel plots and look in detail at the ratios.
+
 ### Session Info
 ```{r session_info}
 sessionInfo()
