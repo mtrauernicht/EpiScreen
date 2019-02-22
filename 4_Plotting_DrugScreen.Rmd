@@ -3,14 +3,14 @@ title: "Plotting of the epigenetic screening results"
 author: "Max Trauernicht"
 date: "`r format(Sys.time(), '%Y-%m-%d')`"
 output:
-  pdf_document:
-    toc: yes
   html_document:
     code_folding: show
     highlight: monochrome
     theme: journal
     toc: yes
     toc_float: yes
+  pdf_document:
+    toc: yes
   editor_options:
     chunk_output_type: console
 ---
@@ -47,6 +47,7 @@ library(outliers)
 library(ggplot2)
 library(ggbeeswarm)
 library(data.table)
+library(ggrepel)
 ```
 
 ### Custom functions
@@ -185,7 +186,7 @@ StatSmoothFunc <- ggproto("StatSmooth", Stat,
 setwd("/DATA/usr/m.trauernicht/EpiScreen/epigenetic-screening-on-trip-clone/Data")
 
 # Import data from preprocessing script
-RSTP2_2000_indels.df <- get(load("mt20190125RSTP2_2000_indels.df"))
+RSTP2_2000_indels.df <- get(load("mt20190222_RSTP2_2000_indels.df"))
 indel.data <- RSTP2_2000_indels.df[,c(1:6,47,54,55,119:124,127)]
 
 # Import viability data and the mean +1/-7 ratio from previous experiments
@@ -358,8 +359,11 @@ chi.outlier.df <- chi.outlier.df[-grep("DNA-PK", chi.outlier.df$Target),]
 
 ```
 
+
+\newpage
+# Results
 ## Visualization: checking quality of data
-```{r visualization quality data}
+```{r Quality check data, out.width= "80%", fig.align= "center", echo = FALSE, warning = FALSE}
 ## Make some density plots to get a feeling for the data
 # Density plot logratio of the controls
 ggplot(data = indel.data[indel.data$Drug == c("DMSO","DNA-PKi","Mirin"),], aes(x = logratio.platenorm, fill = Target)) + geom_density() + xlab("logratio") + labs(title = "logratio density of the controls")
@@ -380,76 +384,76 @@ ggplot(data = indel.data,
 # Density plot logratio per target
 ggplot(data = indel.data, 
        aes(x = logratio.platenorm, fill = Target)) + geom_density()+
-  xlab("logratio") + facet_wrap(~ Target, nrow = 4)
+  xlab("logratio") + facet_wrap(~ Target, nrow = 4)+ 
+  labs(title = "logratio density per target")
 
 # Density plot logratio per barcode
 ggplot(data = indel.data, 
        aes(x = logratio.platenorm, fill = Target)) + geom_density()+
-  xlab("logratio") + facet_wrap(~ barcode, nrow = 6, scales = "free")
+  xlab("logratio") + facet_wrap(~ barcode, nrow = 6, scales = "free")+ 
+  labs(title = "logratio density per barcode")
 
 # Density plot logratio in the three chromatin states
 ggplot(data = indel.data, 
        aes(x = logratio, fill = Target)) + geom_density()+
-  xlab("logratio") + facet_wrap(~ chr.state, nrow = 3)
+  xlab("logratio") + facet_wrap(~ chr.state, nrow = 3)+ 
+  labs(title = "logratio density per barcode group")
 
 # Density plot efficiency
 ggplot(data = indel.data, aes(x = efficiency, fill = Target)) + geom_density() +
-xlab("efficiency")
+xlab("efficiency")+ labs(title = "efficiency density")
 
 # Density plot efficiency per target
 ggplot(data = indel.data, 
        aes(x = efficiency.platenorm, fill = Target)) + geom_density()+
-  xlab("efficiency: normalized over plate") + facet_grid(rows = vars(Target))
+  xlab("efficiency: normalized over plate") + facet_grid(rows = vars(Target))+ 
+  labs(title = "efficiency density per target group")
 
 # Density plot efficiency per barcode
 ggplot(data = indel.data, 
        aes(x = efficiency.platenorm, fill = Target)) + geom_density()+
-  xlab("efficiency: normalized over plate") + facet_wrap(~ Target, nrow = 4)
+  xlab("efficiency: normalized over plate") + facet_wrap(~ Target, nrow = 4)+ 
+  labs(title = "efficiency density per barcode")
 
 # Integral of density plot
 ggplot(data = indel.data, 
        aes(x = efficiency.platenorm)) +
-  xlab("efficiency: normalized over plate") + stat_ecdf(aes(colour = Target))
+  xlab("efficiency: normalized over plate") + stat_ecdf(aes(colour = Target))+ 
+  labs(title = "integral of efficiency density")
 
 # Density plot normalized efficiency of the controls
 ggplot(data = indel.data[indel.data$Drug == c("DMSO","DNA-PKi","Mirin"),], 
        aes(x = efficiency.platenorm, fill = Target)) + geom_density() +
-  xlab("efficiency: normalized over plate")
+  xlab("efficiency: normalized over plate")+ 
+  labs(title = "normalized efficiency density of controls")
 
 # Density plots t-distribution, only Mirin & DNA-PKi
 ggplot(data = indel.data[indel.data$Drug == c("DMSO","DNA-PKi","Mirin"),], aes(x = statistic, fill = Target)) + geom_density() +
-geom_vline(data=indel.data, aes(xintercept=4),linetype="dashed", size=1) + geom_vline(data=indel.data, aes(xintercept=-4),linetype="dashed", size=1)+ xlab("t-statistic")
+geom_vline(data=indel.data, aes(xintercept=4),linetype="dashed", size=1) + geom_vline(data=indel.data, aes(xintercept=-4),linetype="dashed", size=1)+ xlab("t-statistic")+ labs(title = "t-statistic density of controls")
 
 # Density plots t-distribution
 ggplot(data = indel.data, aes(x = statistic, fill = Target)) + geom_density() +
-geom_vline(data=indel.data, aes(xintercept=4),linetype="dashed", size=1) + geom_vline(data=indel.data, aes(xintercept=-4),linetype="dashed", size=1)+ xlab("t-statistic")
+geom_vline(data=indel.data, aes(xintercept=4),linetype="dashed", size=1) + geom_vline(data=indel.data, aes(xintercept=-4),linetype="dashed", size=1)+ xlab("t-statistic")+ labs(title = "t-statistic density")
 
 # Density plot t-statistic + facet_wrap
- ggplot(data = indel.data, aes(x = statistic, fill = Target)) + geom_density() +
-+     geom_vline(data=indel.data, aes(xintercept=4),linetype="dashed", size=1) + geom_vline(data=indel.data, aes(xintercept=-4),linetype="dashed", size=1)+ xlab("t-statistic") + facet_wrap(~Target, nrow = 4, scales = "free")
+ ggplot(data = indel.data, aes(x = statistic, fill = Target)) + geom_density() + geom_vline(data=indel.data, aes(xintercept=4),linetype="dashed", size=1) + geom_vline(data=indel.data, aes(xintercept=-4),linetype="dashed", size=1)+ xlab("t-statistic") + facet_wrap(~Target, nrow = 4, scales = "free")+ labs(title = "t-statistic density per target group")
 
 # Total amount of drugs per target group
 ggplot(indel.data, aes(x = reorder(Target,Target, function(x)-length(x)))) +
   geom_bar()+
   theme(axis.text.x = element_text(angle = 90, hjust = 1.0, vjust = 0))+ 
-  ylab("amount outliers") + xlab("target group")
-
-# Total amount of drugs per target group in outlier df
-ggplot(t.outlier.df, aes(x = reorder(Target,Target, function(x)-length(x)))) +
-  geom_bar()+
-  theme(axis.text.x = element_text(angle = 90, hjust = 1.0, vjust = 0))+ 
-  ylab("amount outliers") + xlab("target group")
+  ylab("datapoints") + xlab("target group")+ labs(title = "datapoints per target group")
 
 # Relative amount of drugs in outlier df
 ggplot(NULL,aes(x = reorder(Target,Target,function(x)-length(x)))) + 
       geom_bar(aes(fill="amount non-outliers"), data = indel.data, alpha = 0.5)+
   geom_bar(aes(fill="amount outlier"), data = t.outlier.df, alpha = 0.5)+
   theme(axis.text.x = element_text(angle = 90, hjust = 1.0, vjust = 0))+ 
-  ylab("count") + xlab("target group") + labs(title = "outlier vs. non-outlier distribution per drug category", fill = "groups")
+  ylab("datapoints") + xlab("target group") + labs(title = "outlier vs. non-outlier distribution per drug category", fill = "groups")
 
 
 # Density plot of reads.count using only PAO data -> these are the input reads
-ggplot(data = all.indel.data[all.indel.data$Drug == c("PAO","DMSO"),], aes(x = read.count, fill = Drug, group = Drug)) + geom_density() + facet_wrap(~rn, nrow = 6)
+ggplot(data = all.indel.data[all.indel.data$Drug == c("PAO","DMSO"),], aes(x = read.count, fill = Drug, group = Drug)) + geom_density() + facet_wrap(~rn, nrow = 6)+ labs(title = "read count before cutting (PAO) and after cutting (DMSO)")
 
 # Density plot per target group, comparing effect on opposite chromatin states
 ggplot(data = indel.data[indel.data$chr.state == c("open","closed"),], aes(x = statistic, fill = chr.state)) + 
@@ -463,87 +467,54 @@ ggplot(data = indel.data[indel.data$chr.state == c("open","closed"),], aes(x = s
 
 
 
-
-## Visualizaton: 
-```{r visualization}
-# Make a beeswarm plot with alternative colors for outliers based on chi square scores
-ggplot(data = indel.data) +
-  geom_quasirandom(mapping = 
-                     aes(x = barcode, y = logratio.mean, 
-                         colour = ifelse(abs(statistic) < 4,
-                                         "non-outlier","outlier"))) +
-  theme(axis.text.x = element_text(angle = 90, hjust = 1.0, vjust = 0)) + 
-  ylab("log2(+1/-7 ratio)") + xlab("Barcode") + labs(title = "Outlier plot", colour = "Outlier based on t-statistic value > 4") + scale_color_manual(values=c("#999999", "#E69F00"))
-
-# Boxplot of efficiencies 
-ggplot(data = indel.data) +
-  geom_boxplot(mapping = aes(x = barcode, y = efficiency)) +
-  theme(axis.text.x = element_text(angle = 90, hjust = 1.0, vjust = 0)) 
-
-# Boxplot of efficiencies normalized
-ggplot(data = indel.data) +
-  geom_boxplot(mapping = aes(x = barcode, y = efficiency.platenorm)) +
-  theme(axis.text.x = element_text(angle = 90, hjust = 1.0, vjust = 0)) 
-
-# Beeswarm plot of efficiencies
-ggplot(data = indel.data) +
-  geom_quasirandom(mapping = 
-                     aes(x = barcode, y = efficiency.mean, 
-                         colour = ifelse(abs(statistic) < 4,
-                                         "non-outlier","outlier"))) +
-  theme(axis.text.x = element_text(angle = 90, hjust = 1.0, vjust = 0)) + 
-  ylab("efficiency") + xlab("barcode") + labs(title = "Efficiency plot, outliers (based on logratio) in yellow", colour = "Logratio outlier based on t-statistic value > 4") + scale_color_manual(values=c("#999999", "#E69F00"))
-
-# ggplot specifying group of drugs
-ggplot(data = indel.data) +
-  geom_quasirandom(mapping = aes(x = barcode, y = logratio.mean, colour = Target)) +
-  theme(axis.text.x = element_text(angle = 90, hjust = 1.0, vjust = 0))+ 
-  ylab("log2(+1/-7 ratio)") + xlab("Barcode") 
-
-# Make a loop of plots, plotting the ratio per drug target group together with DMSO
-for (i in unique(indel.data$Target)) {
-  data <- indel.data[indel.data$Target == c(i,"Negative control"), ]
-  p <- ggplot(data = data) +
-    geom_quasirandom(mapping = aes(x = barcode, y = logratio.mean, colour = Target)) +
-    theme(axis.text.x = element_text(angle = 90, hjust = 1.0, vjust = 0))+ 
-    ylab("log2(+1/-7 ratio)") + xlab("Barcode") + labs(fill="titel")
-  print(p)
-}
-
-# Same for efficiency
-for (i in unique(indel.data$Target)) {
-  data <- indel.data[indel.data$Target == c(i,"Negative control"), ]
-  p <- ggplot(data = data) +
-    geom_quasirandom(mapping = aes(x = logratio.platenorm, y = efficiency.platenorm, colour = Target, size = chr.state)) +
-    ylab("cutting efficiency") + xlab("log2(+1/-7 ratio)") + labs(fill="titel")
-  print(p)
-}
-```
-
-
-## Visualization: correlation plots
-```{r}
+\newpage
+## Visualization: correlation plots for quality check
+```{r correlation plots, out.width= "80%", fig.align= "center", echo = FALSE, warning = FALSE}
 # Correlation mean efficiency vs mean ratio
-indel.data$mean.logratio.target = 
-  ave(indel.data$logratio.platenorm, indel.data$Target, FUN = function(x) mean(x))
-indel.data$mean.efficiency.target = 
-  ave(indel.data$efficiency.platenorm, indel.data$Target, FUN = function(x) mean(x))
-ggplot(data = indel.data[indel.data$Drug != "DNA-PKi",], aes(x=mean.logratio.target, y=mean.efficiency.target)) +
-    geom_point(mapping = aes(colour = Target)) + geom_smooth(method = lm) + 
-  stat_smooth_func(geom="text",method="lm",hjust=0,vjust=10,parse=TRUE)+
-  labs(title="Correlation efficiency vs. logratio")
+indel.data$mean.logratio.drug = 
+  ave(indel.data$logratio.platenorm, indel.data$Drug, indel.data$conc, FUN = function(x) mean(x))
+indel.data$mean.efficiency.drug = 
+  ave(indel.data$efficiency.platenorm, indel.data$Drug, indel.data$conc, FUN = function(x) mean(x))
 
+
+for (i in unique(indel.data$conc)) {
+  data <- indel.data[indel.data$conc == i,]
+p <- ggplot(data = data, aes(x=mean.efficiency.drug, y=mean.logratio.drug, label = Drug, color = Target)) +
+    geom_point(size = 0.001) + 
+  labs(title = paste("correlation logratio vs. efficiency, concentration:",i)) +
+  geom_text(aes(label = ifelse(abs(mean.logratio.drug)>0.5, as.character(Drug),'')), 
+            hjust=0,vjust=0, angle = 45, size = 3, family = "symbol")
+print(p)
+}
+
+
+  
 # Correlation plot mean viability vs. mean efficiency
-indel.data$mean.viability.target = 
-  ave(indel.data$viability, indel.data$Target, FUN = function(x) mean(x))
-ggplot(data = indel.data, aes(x=mean.viability.target, y=mean.efficiency.target)) +
-  geom_point(mapping = aes(colour = Target)) + geom_smooth(method = lm) + 
-  stat_smooth_func(geom="text",method="lm",hjust=0,parse=TRUE)
+indel.data$mean.viability.drug = 
+  ave(indel.data$viability, indel.data$Drug, indel.data$conc, FUN = function(x) mean(x))
+
+for (i in unique(indel.data$conc)) {
+  data <- indel.data[indel.data$conc == i,]
+p <- ggplot(data = data, aes(x=mean.viability.drug, y=mean.efficiency.drug, label = Drug, color = Target)) +
+    geom_point(size = 0.001) + 
+  labs(title = paste("correlation efficiency vs. viability, concentration:",i)) +
+  geom_text(aes(label = ifelse(abs(mean.efficiency.drug)>0.05, as.character(Drug),'')), 
+            hjust=0,vjust=0, angle = 45, size = 3, family = "symbol")
+print(p)
+}
+
 
 # Correlation plot mean viability vs. mean ratio
-ggplot(data = indel.data, aes(x=mean.viability.target, y=mean.logratio.target)) +
-  geom_point() + geom_smooth(method = lm) + 
-  stat_smooth_func(geom="text",method="lm",hjust=0,parse=TRUE)
+for (i in unique(indel.data$conc)) {
+  data <- indel.data[indel.data$conc == i,]
+p <- ggplot(data = data, aes(x=mean.viability.drug, y=mean.logratio.drug, label = Drug, color = Target)) +
+    geom_point(size = 0.001) + 
+  labs(title = paste("correlation logratio vs. viability, concentration:",i)) +
+  geom_text(aes(label = ifelse(abs(mean.logratio.drug)>0.5, as.character(Drug),'')), 
+            hjust=0,vjust=0, angle = 45, size = 3, family = "symbol")
+print(p)
+}
+
 
 # Correlation old (predicted) +1/-7 ratio vs. +1/-7 ratio of this experiment 
 indel.data$mean.ratio.bc <- ave(indel.data$ratio, indel.data$barcode, FUN = function(x) mean(x))
@@ -555,46 +526,142 @@ ggplot(data = indel.data[indel.data$Target == "Negative control",], aes(x=log2(m
 
 # Correlation plots of the replicates
 indel.data.rep1 <- indel.data[grep("rep1", indel.data$condition),]
-indel.data.rep1 <- indel.data.rep1[,c(1,23)]
+indel.data.rep1 <- indel.data.rep1[,c(1,5,14,23)]
 indel.data.rep2 <- indel.data[grep("rep2", indel.data$condition),]
-indel.data.rep2 <- indel.data.rep2[,c(1,23)]
+indel.data.rep2 <- indel.data.rep2[,c(1,5,14,23)]
 indel.data.rep3 <- indel.data[grep("rep3", indel.data$condition),]
-indel.data.rep3 <- indel.data.rep3[,c(1,23)]
+indel.data.rep3 <- indel.data.rep3[,c(1,5,14,23)]
 setnames(indel.data.rep1, old = "logratio.platenorm", new = "rep1")
 setnames(indel.data.rep2, old = "logratio.platenorm", new = "rep2")
 setnames(indel.data.rep3, old = "logratio.platenorm", new = "rep3")
-indel.data.rep <- merge(indel.data.rep1, indel.data.rep2)
+indel.data.rep <- merge(indel.data.rep1, indel.data.rep2, all = T)
+indel.data.rep <- merge(indel.data.rep, indel.data.rep3, all = T)
 
-
-ggplot(data = indel.data, aes(x=logratio, y=rep2_logratio)) +
+ggplot(data = indel.data.rep, aes(x=rep1, y=rep2)) +
   geom_point() + geom_smooth(method = lm) + stat_smooth_func(geom="text",method="lm",hjust=0,parse=TRUE) 
 
 # Correlation rep1 vs rep3
-ggplot(data = indel.data, aes(x=logratio, y=rep3_logratio)) +
+ggplot(data = indel.data.rep, aes(x=rep1, y=rep3)) +
   geom_point() + geom_smooth(method = lm) + stat_smooth_func(geom="text",method="lm",hjust=0,parse=TRUE) 
 
 # Correlation rep2 vs rep3 per group
-ggplot(data = indel.data, aes(x=rep2_logratio, y=rep3_logratio)) +
+ggplot(data = indel.data.rep, aes(x=rep2, y=rep3)) +
   geom_point() + geom_smooth(method = lm) + stat_smooth_func(geom="text",method="lm",hjust=0,parse=TRUE)
 
 # Correlation matrix plot
-correlation.plot.rep <- indel.data[,c(22,28,29)]
+correlation.plot.rep <- indel.data.rep[,c(4,5,6)]
 pairs(correlation.plot.rep)
-
-# Correlation plot plate 1uM_plate1
-correlation.plot.weird.plate <- indel.data[grep("1um_.*_plate1",indel.data$condition),]
-correlation.plot.weird.plate <- correlation.plot.weird.plate[,c(22,28,29)]
-pairs(correlation.plot.weird.plate)
-```
-We can see that there is a very high correlation between all 3 replicates, even when you look at the plates which have shifted amounts of reads (some wells have very low amount of reads and others have very high amounts of reads), meaning that we can use the data of all 3 replicates.
-# Results
-```{r}
-
 ```
 
-# Conclusions
-```{r}
+### Conclusion correlation plots
+We can see that there is a very high correlation between all 3 replicates, meaning that we can use the data of all 3 replicates.
+
+
+\newpage
+## Visualizaton: Spotting outliers
+```{r visualization spotting outliers, out.width= "80%", fig.align= "center", echo = FALSE, warning = FALSE}
+# Make a beeswarm plot with alternative colors for outliers based on chi square scores
+ggplot(data = indel.data) +
+  geom_quasirandom(mapping = 
+                     aes(x = barcode, y = logratio.mean, 
+                         colour = ifelse(abs(statistic) < 4,
+                                         "non-outlier","outlier"))) +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1.0, vjust = 0)) + 
+  ylab("log2(+1/-7 ratio)") + xlab("Barcode") + 
+  labs(title = "Outlier plot", colour = "Outlier based on t-statistic value > 4") + scale_color_manual(values=c("#999999", "#E69F00"))
+
+# Boxplot of efficiencies 
+ggplot(data = indel.data) +
+  geom_boxplot(mapping = aes(x = barcode, y = efficiency)) +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1.0, vjust = 0)) + 
+  labs(title = "Efficiency distribution per barcode") 
+
+# Boxplot of efficiencies normalized
+ggplot(data = indel.data) +
+  geom_boxplot(mapping = aes(x = barcode, y = efficiency.platenorm)) +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1.0, vjust = 0)) + 
+  labs(title = "Efficiency distribution per barcode after normalization") 
+
+# Beeswarm plot of efficiencies
+ggplot(data = indel.data) +
+  geom_quasirandom(mapping = 
+                     aes(x = barcode, y = efficiency.mean, 
+                         colour = ifelse(abs(statistic) < 4,
+                                         "non-outlier","outlier"))) +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1.0, vjust = 0)) + 
+  ylab("efficiency") + xlab("barcode") + labs(title = "Efficiency plot, outliers (based on logratio) in yellow", colour = "Logratio outlier based on t-statistic value > 4") + scale_color_manual(values=c("#999999", "#E69F00"))
+
+
+# Make a loop of plots, plotting the ratio per drug target group together with DMSO
+for (i in unique(indel.data$Target)) {
+  data <- indel.data[indel.data$Target == c(i,"Negative control"), ]
+  p <- ggplot(data = data) +
+    geom_quasirandom(mapping = aes(x = barcode, y = logratio.platenorm, colour = Target)) +
+    theme(axis.text.x = element_text(angle = 90, hjust = 1.0, vjust = 0))+ 
+    ylab("log2(+1/-7 ratio)") + xlab("Barcode")+ labs(title= paste("logratio of",i, "compared to DMSO"))
+  print(p)
+}
+
+# Visualize drug outliers per concentration
+logratio.outlier <- indel.data[abs(indel.data$logratio.platenorm) > 1 | indel.data$Drug == "DMSO",]
+logratio.outlier.low <- logratio.outlier[logratio.outlier$conc == "100nm",]
+logratio.outlier.med <- logratio.outlier[logratio.outlier$conc == "1um",]
+logratio.outlier.high <- logratio.outlier[logratio.outlier$conc == "10um",]
+
+
+for (i in unique(logratio.outlier.low$Drug)) {
+  data <- logratio.outlier.low[logratio.outlier.low$Drug == c(i,"DMSO"), ]
+  p <- ggplot(data = data) +
+    geom_quasirandom(mapping = aes(x = barcode, y = logratio.platenorm, colour = Drug)) +
+    theme(axis.text.x = element_text(angle = 90, hjust = 1.0, vjust = 0))+ 
+    ylab("log2(+1/-7 ratio)") + xlab("Barcode")+ labs(title= paste("logratio of",i, "compared to DMSO, 100nm"))
+  print(p)
+}
+
+for (i in unique(logratio.outlier.med$Drug)) {
+  data <- logratio.outlier.med[logratio.outlier.med$Drug == c(i,"DMSO"), ]
+  p <- ggplot(data = data) +
+    geom_quasirandom(mapping = aes(x = barcode, y = logratio.platenorm, colour = Drug)) +
+    theme(axis.text.x = element_text(angle = 90, hjust = 1.0, vjust = 0))+ 
+    ylab("log2(+1/-7 ratio)") + xlab("Barcode")+ labs(title= paste("logratio of",i, "compared to DMSO, 1uM"))
+  print(p)
+}
+
+for (i in unique(logratio.outlier.high$Drug)) {
+  data <- logratio.outlier.high[logratio.outlier.high$Drug == c(i,"DMSO"), ]
+  p <- ggplot(data = data) +
+    geom_quasirandom(mapping = aes(x = barcode, y = logratio.platenorm, colour = Drug)) +
+    theme(axis.text.x = element_text(angle = 90, hjust = 1.0, vjust = 0))+ 
+    ylab("log2(+1/-7 ratio)") + xlab("Barcode")+ labs(title= paste("logratio of",i, "compared to DMSO, 10uM"))
+  print(p)
+}
+
+
+# Any barcodes more frequently low/high ratios? - Generate barplot
+low <- as.data.frame(table(logratio.outlier.low[-grep("DNA-PKi", logratio.outlier.low$Drug),]$barcode))
+low$Freq <- ave(low$Freq, FUN = function(x) x/max(x))
+med <- as.data.frame(table(logratio.outlier.med[-grep("DNA-PKi", logratio.outlier.med$Drug),]$barcode))
+med$Freq <- ave(med$Freq, FUN = function(x) x/max(x))
+high <- as.data.frame(table(logratio.outlier.high[-grep("DNA-PKi", logratio.outlier.high$Drug),]$barcode)) 
+high$Freq <- ave(high$Freq, FUN = function(x) x/max(x))
+setnames(low, old = "Freq", new = "low")
+setnames(high, old = "Freq", new = "high")
+setnames(med, old = "Freq", new = "med")
+freq <- merge(low, med)
+freq <- merge(freq, high)
+freq <- melt(freq)
+
+ggplot(freq, aes(Var1, value, fill = variable)) +
+  geom_bar(stat="identity", position="dodge")+
+  theme(axis.text.x = element_text(angle = 90, hjust = 1.0, vjust = 0))+ 
+  ylab("outlier datapoints") + xlab("barcode")+ labs(title = "relative amount of outlier datapoints per barcode")
+
 ```
+
+## Conclusion
+The data looks very nice, we can already spot the first outliers. Now we need to generate more sophisticated plots and integrate chromatin data to select hits.
+
+
 
 ## Exporting potential data. 
 ```{r export}
