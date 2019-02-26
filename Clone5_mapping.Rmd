@@ -18,6 +18,8 @@ output:
 # RSTP2 clone 5 mapping using tagmentation data
 
 # Introduction
+In this script, tagmentation mapping data is processed and analyzed by comparing it to iPCR mapping data. This way, I want to filter out the yet unknown 2 barcode locations of RSTP2#5.
+
 
 ## Description of Data
 How to make a good rendering table: 
