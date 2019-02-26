@@ -20,7 +20,7 @@ output:
 # TRIP Clone annotation
 
 # Introduction
-In this document, ChIP data from the location of the barcodes in RSTP2#5 will be imported in order to be able to characterize and annotate each barcode. In this way, we can identify which barcodes are in a rather active chromatin environment, but also barcodes that are in repressed environments. This will help us to understand the results we might get in future experiments (e.g. the epigenetic screening).
+In this document, ChIP data from the location of the barcodes in RSTP2#5 will be imported in order to be able to characterize and annotate each barcode. In this way, we can identify which barcodes are in a rather active chromatin environment or barcodes that are in repressed environments. This will help us to understand the results we might get in future experiments (e.g. the epigenetic screening).
 
 ## Description of Data
 How to make a good rendering table: 
@@ -328,8 +328,7 @@ x <- pheatmap(as.matrix(mapping_mean[,c(-1,-11)]), annotation_col = LAD_integrat
          color = colorRampPalette(rev(brewer.pal(n = 7, name = "RdGy")))(length(breaksList)),
          breaks = breaksList,
          annotation_legend = T,
-         main = "RSTP2#5: chromatin mark intensity 
-         per barcode (essential ChIP datasets)")
+         main = "RSTP2#5: chromatin mark intensity per barcode")
 
 
 
