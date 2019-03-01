@@ -310,9 +310,9 @@ indel.data.low.target <- indel.data.low.target[,c(-1)]
 
 # Annotate barcodes
 annotate.bc <-
-  mapping_mean_long[grep("H3K27me3|LMNB1|H3K4me1|H3K27ac",mapping_mean_long$variable),]
+  mapping_mean_long[grep("H3K27me3|LMNB1|H3K36me3|H3K27ac|POL2",mapping_mean_long$variable),]
 annotate.bc <- dcast(annotate.bc, barcode ~ variable, value.var = "mean")
-annotate.bc[,2:5] <- 2^(annotate.bc[,2:5])
+# annotate.bc[,2:5] <- 2^(annotate.bc[,2:5])
 ratio.bc <- indel.data[,c(1,15)]
 setnames(ratio.bc, old = "ratio", new = "mean_ratio")
 ratio.bc$mean_ratio <- ave(ratio.bc$mean_ratio, ratio.bc$barcode, FUN= function(x) mean(x))
@@ -320,14 +320,6 @@ ratio.bc <- ratio.bc[!duplicated(ratio.bc), ]
 annotate.bc <- merge(annotate.bc, ratio.bc, all = T)
 row.names(annotate.bc) <- annotate.bc$barcode
 annotate.bc <- annotate.bc[,-1]
-
-# Change colors of annotations
-annotation_colors_scr = list(
-  LMNB1 = colorRampPalette(brewer.pal(n = 7, name = "PuBu"))(100),
-  H3K27me3 = colorRampPalette(brewer.pal(n = 7, name = "PuBu"))(100),
-  H3K4me1 = colorRampPalette(brewer.pal(n = 7, name = "Reds"))(100),
-  H3K27ac = colorRampPalette(brewer.pal(n = 7, name = "Reds"))(100),
-  mean_ratio = colorRampPalette(brewer.pal(n = 7, name = "Greys"))(100))
 ```
 
 
@@ -433,6 +425,25 @@ target2 <- target
 target <- target[,c(-1,-3)]
 target <- as.data.frame(target)
 row.names(target) <- target2$Drug
+
+
+
+cool = rainbow(50, start=rgb2hsv(col2rgb("#F5867D"))[1], end=rgb2hsv(col2rgb("#D8B34D"))[1])
+warm = rainbow(50, start=rgb2hsv(col2rgb("#74904D"))[1], end=rgb2hsv(col2rgb("#1A7243"))[1])
+cols = c(rev(cool), rev(warm))
+mypalette <- colorRampPalette(cols)(255)
+
+
+# Change colors of annotations
+annotation_colors_scr = list(
+  LMNB1 = colorRampPalette(brewer.pal(n = 7, name = "PRGn"))(100),
+  H3K27me3 = colorRampPalette(brewer.pal(n = 7, name = "PRGn"))(100),
+  H3K36me3 = colorRampPalette(brewer.pal(n = 7, name = "PRGn"))(100),
+  POL2 = colorRampPalette(brewer.pal(n = 7, name = "PRGn"))(100),
+  H3K27ac = colorRampPalette(brewer.pal(n = 7, name = "PRGn"))(100),
+  mean_ratio = colorRampPalette(brewer.pal(n = 7, name = "PRGn"))(100),
+  target = c("Sirtuin" = '#e6194b', "HDAC" = '#3cb44b', "PARP" = '#ffe119', "Negative control" = '#4363d8', "Epigenetic Reader Domain" = '#f58231', "MRN" = '#911eb4', "DNMT" = '#46f0f0', "HMT" = '#f032e6', "Aurora Kinase" = '#bcf60c', "JAK" = '#fabebe', "Histone demethylase" = '#008080', "HAT" = '#e6beff', "DNA-PK" = '#9a6324', "HIF" = '#fffac8', "PIM" = '#800000'))
+
 ```
 
 I want to create heatmaps for each drug within the 17 different target groups. This will give more information about the effect of individual drugs (and maybe clustering within groups -> subgroups because of different targets etc.).
@@ -444,6 +455,7 @@ I want to create heatmaps for each drug within the 17 different target groups. T
 ## logratio heatmap of each individual drug vs. barcode
 ```{r out.width= "100%", fig.align= "center", echo=FALSE}
 
+## Every drug
 # Keeping the scale in the pheatmap function
 myBreaks5 <- c(seq(min(as.matrix(indel.data.high.drug)), 0, 
                    length.out=ceiling(100/2) + 1), 
@@ -460,20 +472,23 @@ pheatmap(as.matrix(indel.data.high.drug),
          main = "log2(+1/-7 indel ratio) change - 10uM of drugs added")
 
 
-
+## Only drugs that change ratio
 # Keeping the scale in the pheatmap function
 myBreaks6 <- c(seq(min(as.matrix(indel.data.high.drug.ess)), 0, 
                    length.out=ceiling(100/2) + 1), 
               seq(max(as.matrix(indel.data.high.drug.ess))/100, 
-                  max(as.matrix(indel.data.high.drug.ess)), length.out=floor(100/2)))
+                  max(as.matrix(indel.data.high.drug.ess))/2, length.out=floor(100/2)))
 
-# pheatmap function: without DNA-PKi: logratio heatmap of each individual drug vs. barcode - 10uM drugs added - include only drugs that achieve 2-fold change
+# pheatmap function: without DNA-PKi: logratio heatmap of eac a certain fold change
 indel.data.high.drug.ess <- indel.data.high.drug[,-42]
-indel.data.high.drug.ess <- indel.data.high.drug.ess[, colSums(indel.data.high.drug.ess > 0.5) > 1 | colSums(indel.data.high.drug.ess < -0.5) >1] 
+indel.data.high.drug.ess <- 
+  indel.data.high.drug.ess[, 
+                           colSums(indel.data.high.drug.ess > 1) >= 1 | 
+                             colSums(indel.data.high.drug.ess < -0.5) >= 1] 
 
 pheatmap(as.matrix(indel.data.high.drug.ess),
-         annotation_col = target, 
-         annotation_row = annotate.bc,
+         annotation_col = target, border_color = "grey60",
+         annotation_row = annotate.bc, annotation_legend = F,
          color = colorRampPalette(rev(brewer.pal(n = 7, name = "RdBu")))(100),
          breaks = myBreaks6, cluster_rows = chip_dendogram$tree_col,
          annotation_colors = annotation_colors_scr, 
@@ -485,19 +500,22 @@ pheatmap(as.matrix(indel.data.high.drug.ess),
 myBreaks7 <- c(seq(min(as.matrix(indel.data.med.drug.ess)), 0, 
                    length.out=ceiling(100/2) + 1), 
               seq(max(as.matrix(indel.data.med.drug.ess))/100, 
-                  max(as.matrix(indel.data.med.drug.ess)), length.out=floor(100/2)))
+                  max(as.matrix(indel.data.med.drug.ess))/2, length.out=floor(100/2)))
 
 
-# pheatmap function: without DNA-PKi: logratio heatmap of each individual drug vs. barcode - 1uM drugs added- include only drugs that achieve 2-fold change
+# pheatmap function: without DNA-PKi: logratio heatmap of each individual drug vs. barcode - 1uM drugs added- include only drugs that achieve a certain fold change
 indel.data.med.drug.ess <- indel.data.med.drug[,-44]
-indel.data.med.drug.ess <- indel.data.med.drug.ess[, colSums(indel.data.med.drug.ess > 0.5) > 1 | colSums(indel.data.med.drug.ess < -0.5) >1] 
+indel.data.med.drug.ess <- 
+  indel.data.med.drug.ess[, 
+                          colSums(indel.data.med.drug.ess > 1) >= 1 |
+                            colSums(indel.data.med.drug.ess < -0.5) >= 1] 
 
 pheatmap(as.matrix(indel.data.med.drug.ess), 
          annotation_col = target,
          annotation_row = annotate.bc,
          color = colorRampPalette(rev(brewer.pal(n = 7, name = "RdBu")))(100),
          breaks = myBreaks7, cluster_rows = chip_dendogram$tree_col,
-         annotation_colors = annotation_colors_scr, 
+         annotation_colors = annotation_colors_scr, annotation_legend = F,
          main = "log2(+1/-7 indel ratio) change - 1uM of drugs added")
 
 
@@ -505,18 +523,21 @@ pheatmap(as.matrix(indel.data.med.drug.ess),
 myBreaks8 <- c(seq(min(as.matrix(indel.data.low.drug.ess)), 0, 
                    length.out=ceiling(100/2) + 1), 
               seq(max(as.matrix(indel.data.low.drug.ess))/100, 
-                  max(as.matrix(indel.data.low.drug.ess)), length.out=floor(100/2)))
+                  max(as.matrix(indel.data.low.drug.ess))/2, length.out=floor(100/2)))
 
-# pheatmap function: without DNA-PKi: logratio heatmap of each individual drug vs. barcode - 100nM drugs added - include only drugs that achieve 2-fold change
+# pheatmap function: without DNA-PKi: logratio heatmap of each individual drug vs. barcode - 100nM drugs added - include only drugs that achieve a certain fold change
 indel.data.low.drug.ess <- indel.data.low.drug[,-48]
-indel.data.low.drug.ess <- indel.data.low.drug.ess[, colSums(indel.data.low.drug.ess > 0.5) > 1 | colSums(indel.data.low.drug.ess < -0.5) >1]
+indel.data.low.drug.ess <- 
+  indel.data.low.drug.ess[, 
+                          colSums(indel.data.low.drug.ess > 0.75) >= 1 |
+                            colSums(indel.data.low.drug.ess < -0.5) >= 1]
 
 pheatmap(as.matrix(indel.data.low.drug.ess), 
          annotation_col = target, 
          annotation_row = annotate.bc,
          color = colorRampPalette(rev(brewer.pal(n = 7, name = "RdBu")))(100),
          breaks = myBreaks8, cluster_rows = chip_dendogram$tree_col,
-         annotation_colors = annotation_colors_scr, 
+         annotation_colors = annotation_colors_scr, annotation_legend = F,
          main = "log2(+1/-7 indel ratio) change - 100nM of drugs added")
 
 
@@ -537,63 +558,72 @@ pheatmap(as.matrix(indel.data.high.eff[,-42]), fontsize_col = 8, fontsize_row = 
          main = "log2(efficiency) change - 10uM of drugs added")
 
 # Keeping the scale in the pheatmap function
-myBreaks8.51 <- c(seq(min(as.matrix(indel.data.high.eff.ess)), 0, 
+myBreaks8.51 <- c(seq(min(as.matrix(indel.data.high.eff.ess))/1.5, 0, 
                    length.out=ceiling(100/2) + 1), 
               seq(max(as.matrix(indel.data.high.eff.ess))/100, 
-                  max(as.matrix(indel.data.high.eff.ess)), length.out=floor(100/2)))
+                  max(as.matrix(indel.data.high.eff.ess))/1.5, length.out=floor(100/2)))
 
 # Efficiency change heatmap - 10 uM
 indel.data.high.eff.ess <- indel.data.high.eff[,-42]
-indel.data.high.eff.ess <- indel.data.high.eff.ess[, colSums(indel.data.high.eff.ess > 0.2) > 1 | colSums(indel.data.high.eff.ess < -0.1) >1]
+indel.data.high.eff.ess <- 
+  indel.data.high.eff.ess[, 
+                          colSums(indel.data.high.eff.ess > 0.1) >= 1 |
+                            colSums(indel.data.high.eff.ess < -0.2) >= 1]
 
 pheatmap(as.matrix(indel.data.high.eff.ess),
-         annotation_col = target, 
+         annotation_col = target,   
          annotation_row = annotate.bc,
          color = colorRampPalette(rev(brewer.pal(n = 7, name = "RdBu")))(100),
          breaks = myBreaks8.51, cluster_rows = chip_dendogram$tree_col,
-         annotation_colors = annotation_colors_scr, 
-         main = "log2(efficiency) change - 10uM of drugs added")
+         annotation_colors = annotation_colors_scr, annotation_legend = F,
+         main = "efficiency change - 10uM of drugs added")
 
 
 
 
 
 # Keeping the scale in the pheatmap function
-myBreaks9.5 <- c(seq(min(as.matrix(indel.data.med.eff.ess)), 0, 
+myBreaks9.5 <- c(seq(min(as.matrix(indel.data.med.eff.ess))/1.5, 0, 
                    length.out=ceiling(100/2) + 1), 
               seq(max(as.matrix(indel.data.med.eff.ess))/100, 
-                  max(as.matrix(indel.data.med.eff.ess)), length.out=floor(100/2)))
+                  max(as.matrix(indel.data.med.eff.ess))/1.5, length.out=floor(100/2)))
 
 # Efficiency change heatmap - 1 uM
 indel.data.med.eff.ess <- indel.data.med.eff[,-44]
-indel.data.med.eff.ess <- indel.data.med.eff.ess[, colSums(indel.data.med.eff.ess > 0.2) > 1 | colSums(indel.data.med.eff.ess < -0.1) >1]
+indel.data.med.eff.ess <- 
+  indel.data.med.eff.ess[, 
+                         colSums(indel.data.med.eff.ess > 0.1) >= 1 | 
+                           colSums(indel.data.med.eff.ess < -0.15) >= 1]
 
 pheatmap(as.matrix(indel.data.med.eff.ess), 
          annotation_col = target, 
-         annotation_row = annotate.bc,
+         annotation_row = annotate.bc,annotation_legend = F,
          color = colorRampPalette(rev(brewer.pal(n = 7, name = "RdBu")))(100),
          breaks = myBreaks9.5, cluster_rows = chip_dendogram$tree_col,
          annotation_colors = annotation_colors_scr, 
-         main = "log2(efficiency) change - 1uM of drugs added")
+         main = "efficiency change - 1uM of drugs added")
 
 
 # Keeping the scale in the pheatmap function
-myBreaks10.5 <- c(seq(min(as.matrix(indel.data.low.eff.ess)), 0, 
+myBreaks10.5 <- c(seq(min(as.matrix(indel.data.low.eff.ess))/1.5, 0, 
                    length.out=ceiling(100/2) + 1), 
               seq(max(as.matrix(indel.data.low.eff.ess))/100, 
-                  max(as.matrix(indel.data.low.eff.ess)), length.out=floor(100/2)))
+                  max(as.matrix(indel.data.low.eff.ess))/1.5, length.out=floor(100/2)))
 
 # Efficiency change heatmap - 100 nM
 indel.data.low.eff.ess <- indel.data.low.eff[,-48]
-indel.data.low.eff.ess <- indel.data.low.eff.ess[, colSums(indel.data.low.eff.ess > 0.2) > 1 | colSums(indel.data.low.eff.ess < -0.1) >1]
+indel.data.low.eff.ess <- 
+  indel.data.low.eff.ess[, 
+                         colSums(indel.data.low.eff.ess > 0.1) >= 1 |
+                           colSums(indel.data.low.eff.ess < -0.15) >= 1]
 
 pheatmap(as.matrix(indel.data.low.eff.ess), 
          annotation_col = target,
-         annotation_row = annotate.bc,
+         annotation_row = annotate.bc, annotation_legend = F,
          color = colorRampPalette(rev(brewer.pal(n = 7, name = "RdBu")))(100),
          breaks = myBreaks10.5, cluster_rows = chip_dendogram$tree_col,
          annotation_colors = annotation_colors_scr, 
-         main = "log2(efficiency) change - 100nM of drugs added")
+         main = "efficiency change - 100nM of drugs added")
 ```
 
 \newpage
