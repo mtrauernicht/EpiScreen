@@ -654,7 +654,7 @@ freq <- melt(freq)
 ggplot(freq, aes(Var1, value, fill = variable)) +
   geom_bar(stat="identity", position="dodge")+
   theme(axis.text.x = element_text(angle = 90, hjust = 1.0, vjust = 0))+ 
-  ylab("outlier datapoints") + xlab("barcode")+ labs(title = "relative amount of outlier datapoints per barcode")
+  ylab("outlier datapoints") + xlab("barcode")+ labs(title = "relative amount of datapoints of abs(logratio-change) > 1 per barcode")
 
 ```
 
