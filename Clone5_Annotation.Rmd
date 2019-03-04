@@ -129,7 +129,7 @@ clone5_lmnb1.dt <- clone5_lmnb1.dt[,c(6,8,9)]
 ## Pre-processing mapping_integration df
 ```{r}
 # Remove not needed data
-mapping_integration <- select(mapping_integration, ends_with("e"), contains("Distance"))
+mapping_integration <- dplyr::select(mapping_integration, ends_with("e"), contains("Distance"))
 
 # Rename variables 
 names(mapping_integration)[2:38] <- gsub(".*_(.*?_.*?_.*?).txt", "\\1", file.list)
@@ -165,7 +165,7 @@ mapping_integration$barcode <- gsub(".B","",mapping_integration$barcode)
 ## Pre-processing mapping_mean df
 ```{r}
 # Remove not needed data
-mapping_mean <- select(mapping_mean, ends_with("id"), starts_with("mean"))
+mapping_mean <- dplyr::select(mapping_mean, ends_with("id"), starts_with("mean"))
 
 # Rename variables 
 names(mapping_mean)[2:ncol(mapping_mean)] <- gsub(".*_(.*?_.*?_.*?).txt", "\\1", file.list_mean)
@@ -315,22 +315,29 @@ breaksList <- c(seq(min(as.matrix(mapping_mean)), 0,
 pheatmap(as.matrix(mapping_mean), annotation_col = LAD_integration, 
          annotation_row = chromatin.mark_type, 
          annotation_colors = annotation_colors,
-         color = colorRampPalette(rev(brewer.pal(n = 7, name = "RdGy")))(100),
+         color = colorRampPalette(rev(brewer.pal(n = 7, name = "RdBu")))(100),
          breaks = breaksList,
          annotation_legend = T,
          main = "RSTP2#5: chromatin mark intensity 
          per barcode (essential ChIP datasets)")
 
 # Save heatmap for further use (exclude barcodes that were discarded in episcreen analysis)
+setwd("/DATA/usr/m.trauernicht/EpiScreen/epigenetic-screening-on-trip-clone/Results/")
+tiff("clone5.tiff", units="in", width=8, height=5, res=300)
+pheatmap(as.matrix(mapping_mean[,c(-1,-11)]), annotation_col = LAD_integration, 
+         annotation_row = chromatin.mark_type, 
+         annotation_colors = annotation_colors,
+         color = colorRampPalette(rev(brewer.pal(n = 7, name = "RdBu")))(100),
+         breaks = breaksList,
+         main = "RSTP2#5: chromatin mark intensity per barcode")
+dev.off()
+
 x <- pheatmap(as.matrix(mapping_mean[,c(-1,-11)]), annotation_col = LAD_integration, 
          annotation_row = chromatin.mark_type, 
          annotation_colors = annotation_colors,
-         color = colorRampPalette(rev(brewer.pal(n = 7, name = "RdGy")))(length(breaksList)),
+         color = colorRampPalette(rev(brewer.pal(n = 7, name = "RdBu")))(100),
          breaks = breaksList,
-         annotation_legend = T,
          main = "RSTP2#5: chromatin mark intensity per barcode")
-
-
 
 # superheat(as.matrix(mapping_mean),bottom.label.text.angle = 90, yt = cor(mapping_mean)[,"TCTTTTGAGGAGCTGA"])
 ```
@@ -375,10 +382,6 @@ pheatmap(as.matrix(mapping_integration), annotation_row = chromatin.mark_type3,
 The heatmaps reveal many valuable information about the integrations of clone 5. 
 We can now use this information to look at how individual barcodes responded in the drug screening.
 We can also try to cluster barcodes based on the above heatmaps and use these clusters in the analysis of the epigenetic drug screening.
-
-
-
-
 
 
 
