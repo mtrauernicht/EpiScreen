@@ -76,12 +76,12 @@ SetFileName <- function(filename, initials) {
 ```{r Data Import}
 # Import data from 5_HitValidation_DrugScreen.Rmd
 setwd("/DATA/usr/m.trauernicht/EpiScreen/epigenetic-screening-on-trip-clone/Data")
-mapping_mean <- get(load("mt20190225_mapping_mean"))
-mapping_integration <- get(load("mt20190225_mapping_integration"))
-indel.data <- get(load("mt20190222_indel.data"))
-mapping_integration_long <- get(load("mt20190225_mapping_integration_long"))
-mapping_mean_long <- get(load("mt20190225_mapping_mean_long"))
-chip_dendogram <- get(load("mt20190225_chip_dendogram"))
+mapping_mean <- get(load("mt20190305_mapping_mean"))
+mapping_integration <- get(load("mt20190305_mapping_integration"))
+indel.data <- get(load("mt20190305_indel.data"))
+mapping_integration_long <- get(load("mt20190305_mapping_integration_long"))
+mapping_mean_long <- get(load("mt20190305_mapping_mean_long"))
+chip_dendogram <- get(load("mt20190305_chip_dendogram"))
 ```
 
 
@@ -436,12 +436,12 @@ mypalette <- colorRampPalette(cols)(255)
 
 # Change colors of annotations
 annotation_colors_scr = list(
-  LMNB1 = colorRampPalette(brewer.pal(n = 7, name = "PRGn"))(100),
-  H3K27me3 = colorRampPalette(brewer.pal(n = 7, name = "PRGn"))(100),
-  H3K36me3 = colorRampPalette(brewer.pal(n = 7, name = "PRGn"))(100),
-  POL2 = colorRampPalette(brewer.pal(n = 7, name = "PRGn"))(100),
-  H3K27ac = colorRampPalette(brewer.pal(n = 7, name = "PRGn"))(100),
-  mean_ratio = colorRampPalette(brewer.pal(n = 7, name = "PRGn"))(100),
+  LMNB1 = colorRampPalette(rev(brewer.pal(n = 7, name = "RdBu")))(100),
+  H3K27me3 = colorRampPalette(rev(brewer.pal(n = 7, name = "RdBu")))(100),
+  H3K36me3 = colorRampPalette(rev(brewer.pal(n = 7, name = "RdBu")))(100),
+  POL2 = colorRampPalette(rev(brewer.pal(n = 7, name = "RdBu")))(100),
+  H3K27ac = colorRampPalette(rev(brewer.pal(n = 7, name = "RdBu")))(100),
+  mean_ratio = colorRampPalette(rev(brewer.pal(n = 7, name = "RdBu")))(100),
   target = c("Sirtuin" = '#e6194b', "HDAC" = '#3cb44b', "PARP" = '#ffe119', "Negative control" = '#4363d8', "Epigenetic Reader Domain" = '#f58231', "MRN" = '#911eb4', "DNMT" = '#46f0f0', "HMT" = '#f032e6', "Aurora Kinase" = '#bcf60c', "JAK" = '#fabebe', "Histone demethylase" = '#008080', "HAT" = '#e6beff', "DNA-PK" = '#9a6324', "HIF" = '#fffac8', "PIM" = '#800000'))
 
 ```
@@ -753,16 +753,18 @@ pheatmap(as.matrix(indel.data.high.drug.st), fontsize_col = 8, fontsize_row = 5,
 
 ## Heatmap efficiency/logratio overlay
 ```{r}
-indel.data.high$logratio.platenorm.rel <- ave(indel.data.high$logratio.platenorm, FUN = function (x) x/max(x))
-indel.data.high$efficiency.platenorm.rel <- ave(indel.data.high$efficiency.platenorm, FUN = function(x) x/max(x))
+indel.data.high$logratio.platenorm.rel <- ave(indel.data.high$logratio.platenorm, FUN = function (x) 2^x)
+indel.data.high$logratio.platenorm.rel <- ave(indel.data.high$logratio.platenorm.rel, FUN = function (x) x/max(x))
+indel.data.high$efficiency.platenorm.rel <- ave(indel.data.high$efficiency.platenorm, FUN = function(x) 2^x)
+indel.data.high$efficiency.platenorm.rel <- ave(indel.data.high$efficiency.platenorm.rel, FUN = function(x) x/max(x))
 indel.data.high$overlay <- abs(indel.data.high$logratio.platenorm.rel - indel.data.high$efficiency.platenorm.rel)
-
+indel.data.high$overlay.drug <- ave(indel.data.high$overlay, indel.data.high$Drug, indel.data.high$barcode, FUN = function(x) mean(x))
 
 
 indel.data.overlay.high <- indel.data.high[,c(1,6,47)]
 indel.data.overlay.high <- 
   indel.data.overlay.high[!duplicated(indel.data.overlay.high), ]
-indel.data.overlay.high <- dcast(indel.data.overlay.high, Drug ~ barcode, value.var = "overlay")
+indel.data.overlay.high <- dcast(indel.data.overlay.high, barcode ~ Drug, value.var = "overlay.drug")
 rownames(indel.data.overlay.high) <- indel.data.overlay.high[,1]
 indel.data.overlay.high <- indel.data.overlay.high[,-1]
 
@@ -771,12 +773,13 @@ myBreaks12.5 <- c(seq(min(as.matrix(indel.data.overlay.high)), 0,
               seq(max(as.matrix(indel.data.overlay.high))/100, 
                   max(as.matrix(indel.data.overlay.high)), length.out=floor(100/2)))
 
-# pheatmap function: t-statistic heatmap of each individual drug vs. barcode - 10uM drugs added
-pheatmap(as.matrix(indel.data.overlay.high), fontsize_col = 8, fontsize_row = 8, cellheight = 8,
-         annotation_row = annotate.bc,
-         color = colorRampPalette(rev(brewer.pal(n = 7, name = "RdGy")))(100),
-         breaks = myBreaks12.5,
-         annotation_colors = annotation_colors_scr, main = "log2(+1/-7 indel ratio) - 10uM of drugs added")
+# pheatmap 
+indel.data.overlay.high <- 
+  indel.data.overlay.high[, 
+                         colSums(indel.data.overlay.high > 0.875) >= 1 | colSums(indel.data.overlay.high < 0.6) >= 1]
+
+
+pheatmap(as.matrix(indel.data.overlay.high))
 ```
 
 
@@ -797,113 +800,25 @@ Next step is to import the chromatin data to generate a correlation matrix betwe
 # Import chromatin data
 mapping_mean_chip <- tibble::rownames_to_column(mapping_mean, "barcode")
 chip_data <- melt(mapping_mean_chip)
-
+chip_data <- dcast(chip_data, variable ~ barcode, value.var = "value")
+setnames(chip_data, old = "variable", new = "barcode")
 
 # Process indel data
-indel.data.chip <- indel.data[,c(1,3,6,23)]
-setnames(chip_data, old = "variable", new = "barcode")
-chip_data <- merge(indel.data.chip, mapping_mean, all = TRUE)
-# 
-# # Make df more sexy
-# indel.data <- indel.data[,c(-2,-5,-8:-14,-16,-17,-22,-25,-32:-38)]
-# indel.data <- indel.data[-grep("ACCCCTAAAGGCGCTG", indel.data$barcode),]
-```
+indel.data.chip <- indel.data.high[,c(1,6,39)]
+indel.data.chip <- indel.data.chip[!duplicated(indel.data.chip),]
+indel.data.chip <- dcast(indel.data.chip, barcode ~ Drug, value.var = "mean.logratio.bc.drug")
+chip_data <- merge(indel.data.chip, chip_data, all = TRUE)
+chip_data <- chip_data[chip_data$barcode != c("ACCCCTAAAGGCGCTG", "CTCTTAATCGCTGCC"), ]
+row.names(chip_data) <- chip_data$barcode
+chip_data <- chip_data[,-1]
 
+# Calculate correlations
+cor_chip_indel <- cor(chip_data)
+cor_chip_indel <- melt(cor_chip_indel)
 
-
-
-## The same for t.outlier.df
-```{r}
-# # Import chromatin data
-# t.outlier.df <- merge(t.outlier.df, ChIP.df, all = TRUE)
-# 
-# # Make df more sexy
-# t.outlier.df <- t.outlier.df[-grep("ACCCCTAAAGGCGCTG", t.outlier.df$barcode),]
-# t.outlier.df <- t.outlier.df[-grep("CTCTTAATCGCTGCC", t.outlier.df$barcode),]
-# 
-# 
-# # Check which drugs inhibit all barcodes
-# for (i in unique(t.outlier.df$Drug)) {
-#     print(i)
-#     print(length(unique(t.outlier.df$barcode[t.outlier.df$Drug == i])))
-#   }
-# 
-# # Make pan-inhibitor drug df and selective inhibitor df
-# pan.inhibitor.df <- t.outlier.df[grep("GSK J4 HCl|AZD1480|AZ 960|MLN8054|AMG-900|BMN 673|Mirin|CYT387|DNA-PKi", t.outlier.df$Drug),]
-# sel.inhibitor.df <- t.outlier.df[-grep("GSK J4 HCl|AZD1480|AZ 960|MLN8054|AMG-900|BMN 673|Mirin|CYT387|DNA-PKi", t.outlier.df$Drug),]
-# sel.inhibitor.df <- sel.inhibitor.df[abs(sel.inhibitor.df$statistic) > 10,]
-# 
-# sel.inhibitor.df <- sel.inhibitor.df[-grep("Aurora Kinase", sel.inhibitor.df$Target),]
-# sel.inhibitor.df <- sel.inhibitor.df[,c(1,2,6,7,23,27)]
-# 
-# indel.data$mean.logratio.drug.bc <- ave(indel.data$logratio.platenorm, indel.data$Drug, indel.data$barcode, FUN = function(x) mean(x))
-# 
-# # Make a nice plot to see effect of selective drugs
-# for (i in unique(indel.data$Drug)) {
-#   if( i %in% sel.inhibitor.df$Drug) {
-#   data <- indel.data[indel.data$Drug == c(i,"DMSO"), ]
-#   p <- ggplot(data = data) +
-#     geom_point(mapping = aes(x = barcode, y = mean.logratio.drug.bc, colour = Drug))+
-#     geom_point(data = filter(data, statistic > 10), size = 10, colour ="red")+
-#     theme(axis.text.x = element_text(angle = 90, hjust = 1.0, vjust = 0))+ 
-#     ylab("log2(+1/-7 ratio)") + xlab("Barcode") + labs(fill="titel")
-#   print(p)
-#   }
-# }
-# 
-# colours = c("DMSO" = "#999999", i = "#FF9966")
-# 
-# 
-# 
-# 
-# 
-# 
-# t.outlier.df <- t.outlier.df[,c(-2,-5,-8:-14,-16,-17,-22,-25)]
-# 
-# 
-# # Compute mean of logratio per barcode and drug
-# t.outlier.df$mean.logratio.bc.drug <- ave(t.outlier.df$logratio.platenorm, 
-# t.outlier.df$barcode, t.outlier.df$Drug, FUN = function(x) mean(x))
-# 
-# # Rename barcode column
-# t.outlier.df$barcode<- with(t.outlier.df, paste0(barcode, Drug, collapse = "_"))
-# 
-# # Split up per concentration
-# t.outlier.df.high <- t.outlier.df[grep("10um", t.outlier.df$condition),]
-# t.outlier.df.med <- t.outlier.df[grep("1um", t.outlier.df$condition),]
-# t.outlier.df.low <- t.outlier.df[grep("100nm", t.outlier.df$condition),]
-# 
-# # Remove columns
-# t.outlier.df.high <- t.outlier.df.high[,c(1,19:56)]
-# t.outlier.df.med <- t.outlier.df.med[,c(1,19:56)]
-# t.outlier.df.low <- t.outlier.df.low[,c(1,19:56)]
-# 
-# logratio <- t.outlier.df[,c(1,57)]
-# 
-# t.outlier.df.high <- t.outlier.df.high[!duplicated(t.outlier.df.high), ]
-# t.outlier.df.med <- t.outlier.df.med[!duplicated(t.outlier.df.med), ]
-# t.outlier.df.low <- t.outlier.df.low[!duplicated(t.outlier.df.low), ]
-# 
-# 
-# 
-# t.outlier.df.high.drug <- melt(t.outlier.df.high)
-# t.outlier.df.high.drug <- merge(t.outlier.df.high.drug, logratio)
-# 
-# 
-# 
-# for (i in t.outlier.df.high$Drug) {
-#     p <- count_if(1, t.outlier.df.high$LAD_state[t.outlier.df.high$Drug == i])
-#     print(i)
-#     print(length(i))
-#     print(p)
-#   }
-
-```
-
-## Bind version
-```{r}
-# ChIP.df <- melt(ChIP.df)
-# t.outlier.df2 <- merge(ChIP.df, t.outlier.df, all=TRUE)
+# Visualize
+ggplot(data = cor_chip_indel, aes(x=Var1, y=Var2, fill=value)) + 
+  geom_tile()
 
 ```
 
