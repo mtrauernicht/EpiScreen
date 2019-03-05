@@ -101,13 +101,16 @@ Read_Counts <- function(x) {
 
 MutationsToDataframe <- function(mutations) {
   # This function does
-  tmp <- data.table::dcast(mutations, value.var = "V1", formula = V2 ~ V4, fun = sum)
-  n <- colnames(tmp)
-  names(tmp) <- n
-  rownames(tmp) <- tmp$"V2"
-  tmp <- tmp[, -1]
+  tmp <- dcast(mutations, formula = V2 ~ V4, value.var = "V1", fun = sum)
   tmp
 }
+
+RownamesList <- function(list) {
+  rownames(list) <- list$"V2"
+  list
+}
+  # n <- colnames(tmp)
+  # names(tmp) <- n
 
 IndelsOnly <- function(x) {
   #This function removes the "not_clear and "point_mut" from the indels.
@@ -266,13 +269,11 @@ CalculateDeletions <- function(deletions) {
 Data import from mapping, files were generated on 21.01.2019.
 ```{r import}
 # Set directory to the mutation output folder of the CRISPR-TRIP snakemake script
-setwd("/DATA/projects/DSBrepair/data/5280_DrugScreen/processed/mutation_counts")
+setwd("/DATA/projects/DSBrepair/data/5280_DrugScreen/processed_190305/indelPCR_counts/")
 
 # Import files in list and make individual tables
-file.list <- list.files(pattern='*[.]raw_count.table')
-
-# Create a df with all the mutation_count data
-df.list <- mclapply(file.list, read.table, mc.cores = 20, stringsAsFactors = FALSE)
+file.list <- list.files(pattern='*[.]count.table')
+df.list <- lapply(file.list, fread)
 
 # Import RSTP2 clone 5 barcode list (in total 20 barcodes)
 barcodes.list <- c("AGGGCGTAAAATATTT", "TATGGCTGTCGGGTAG", "TGTCCCTTAGTACTTT", "AGAAAATAATATGACG","CGGCCTGAAGGTCAGG","TTGAACGCGGGCTCGG","GCTAACATCACGAATC","GCGCACCCTTTAATTG","ACTGTCGAGTTGTCCG","CCGGGGACGTATGCAC","TCTTTTGAGGAGCTGA","ATATCGTTGCTGGAGA","CATCCACCACACTTCA","ACCCCTAAAGGCGCTG","ATACTATATTTAACGG","CATTTCTGATCAATAA","CTCTTAATCGCTGCC","GAGCGCGTCACCGGGT","GTACCTCTCGATAGTG","TGGCCAATATTTGTCT")
@@ -311,84 +312,14 @@ Set everything in a dataframe that contains the barcodes, indel ratios, and effi
 # Total reads per barcode
 total.reads.list <- mclapply(df.list, Read_Counts, mc.cores = 10)
 
-# Combine the mutations in a list as dataframes for eacht sample.
-not.clear.list<- mclapply(df.list, Not_Clear_Counts, mc.cores = 10)
-point.mut.list <- mclapply(df.list, Point_Mut_Counts, mc.cores = 10)
-
-# Now remove these samples from all the mutations lists before we make the indel dataframes
+# Now remove not clear samples from all the mutations lists before we make the indel dataframes
 indel.list <- mclapply(df.list, IndelsOnly, mc.cores = 10)
 
-mutations.list <- lapply(indel.list, MutationsToDataframe)
-
-# We need to get the total reads in each sample, here I'll get the sum of all the columns and rows from each dataframe.
-total.reads.mutations.list <- mclapply(indel.list, Read_Counts, mc.cores = 10)
+# Transform to long format
+mutations.list <- mclapply(indel.list, MutationsToDataframe, mc.cores = 10)
 ```
-
-Next we will work on a long dataframe that will include all the ratios (deletions, insertions, +1/-7 etc) for each barcode in each sample.
 
 # Analysis
-## Not clear counts in the mutation data
-```{r not_clear}
-# I need to change the list into a data frame, and pull out the names of the samples, transform the data frame (this returns a matrix) and rechange it into a data frame. 
-# total.reads.df <- ldply(total.reads.list, data.frame)
-# point.mut.df <- ldply(point.mut.list, data.frame)
-# not.clear.df <- ldply(not.clear.list, data.frame)
-# 
-# # Merge them all together
-# non.indels.df <- list(total.reads.df, point.mut.df, not.clear.df) %>% 
-#   join_all(., by = c(".id", "barcode"),  match = "first")  %>%
-#   mutate_all(funs(replace(., is.na(.), 0)))
-# 
-# # Calculate the fraction of not clear
-# non.indels.df$nc_fraction <- non.indels.df$not_clear/non.indels.df$sum*100
-# non.indels.df$pm_fraction <- non.indels.df$point_mut/non.indels.df$sum*100
-# 
-# # What is the mean not clear fraction in our samples? 
-# nc_pm_fraction.df <- non.indels.df %>% 
-#   group_by(.id) %>% 
-#   summarise(mean_nc = mean(nc_fraction),
-#             median_nc = median(nc_fraction),
-#             max_nc = max(nc_fraction),
-#             mean_pm = mean(pm_fraction),
-#             median_pm = median(pm_fraction),
-#             max_pm = max(pm_fraction)) %>% 
-#   melt(., id.vars = ".id")
-# 
-# nc_pm_fraction.df$type <- gsub(".*_", "", nc_pm_fraction.df$variable)
-# nc_pm_fraction.df$plasmid <- gsub("indel_.*?_.*?_(.*?)_.*", "\\1", nc_pm_fraction.df$.id)
-# 
-# ggplot(nc_pm_fraction.df, aes(.id , value, fill = variable)) + 
-#   geom_bar(position = "dodge", stat = "identity") + 
-#   facet_grid(type ~ ., scales = "free")
-# 
-# 
-# # The total means and medians of all the samples: 
-# nc_pm_fraction.df %>% group_by(variable) %>% summarise(mean = mean(value), median = median(value), max = max(value), min = min(value))
-
-# # What are the top non clear barcodes?
-# non.indels.df[order(non.indels.df$nc_fraction, decreasing = T)[1:30],]
-
-```
-
-It seems that most of the not clear reads (and also the fewest reads) come from one specific barcode: ACCCCTAAAGGCGCTG
-Discard this barcode for all further analysis?
-
-Quick look at the amount of point mutations per sample. 
-
-```{r}
-# ggplot(nc_pm_fraction.df[nc_pm_fraction.df$type=="pm", ], aes(.id , value, fill = variable)) + 
-#   geom_bar(position = "dodge", stat = "identity") + 
-#   facet_grid(. ~ plasmid, scales = "free")
-# 
-# # make a small dataframe with the mean amount of point mutations.
-# mean_pm <- nc_pm_fraction.df[nc_pm_fraction.df$variable=="mean_pm", ]
-# # What are the experiments with the most point mutations?
-# mean_pm[order(mean_pm$value, decreasing = T)[1:20],]
-# 
-# # Are there any barcodes that pop up specifically?
-# non.indels.df[order(non.indels.df$pm_fraction, decreasing = T)[1:20],]
-```
-
 
 ```{r}
 # Put the lists into one df
@@ -402,13 +333,15 @@ indels.df <- ldply(mutations.dt.list, data.frame)
 ```{r calculate_ratios}
 RSTP2_2000_indels.df <- indels.df
 # Assing condition and plasmid tranfection from the sample names to a column.
+RSTP2_2000_indels.df$.id <- gsub("(.*?).count.table", "\\1", 
+                                            RSTP2_2000_indels.df$.id)
 RSTP2_2000_indels.df$rep <- gsub(".*m_rep(.*?)_.*", "\\1", 
                                             RSTP2_2000_indels.df$.id)
 RSTP2_2000_indels.df$plate <- gsub(".*_plate(.*?)_.*", "\\1", 
                                            RSTP2_2000_indels.df$.id)
 RSTP2_2000_indels.df$conc <- gsub("_rep.*", "\\1", 
                                          RSTP2_2000_indels.df$.id)
-RSTP2_2000_indels.df$Number <- gsub(".*_plate.*_.*(.*?)","\\1", RSTP2_2000_indels.df$.id)
+RSTP2_2000_indels.df$Number <- gsub(".*plate.*_(.*?_.*?)","\\1", RSTP2_2000_indels.df$.id)
 
 # Import the drugs and match with the df
 RSTP2_2000_indels.df <- merge(drugs.list, RSTP2_2000_indels.df)
@@ -418,9 +351,9 @@ RSTP2_2000_indels.df$ratio <- RSTP2_2000_indels.df$X1 / RSTP2_2000_indels.df$X.7
 
 # Calculate the overall indel ratio
 RSTP2_2000_indels.df <- mutate_all(RSTP2_2000_indels.df, funs(replace(., is.na(.), 0)))
-RSTP2_2000_indels.df$read.count <- rowSums(RSTP2_2000_indels.df[,c(7:118)])
-RSTP2_2000_indels.df$read.count1.7 <- rowSums(RSTP2_2000_indels.df[,c(47,55)])
-RSTP2_2000_indels.df$all.indels <- rowSums(RSTP2_2000_indels.df[,c(7:53,56:118)])
+RSTP2_2000_indels.df$read.count <- rowSums(RSTP2_2000_indels.df[,c(7:119)])
+RSTP2_2000_indels.df$read.count1.7 <- rowSums(RSTP2_2000_indels.df[,c(48,56)])
+RSTP2_2000_indels.df$all.indels <- rowSums(RSTP2_2000_indels.df[,c(7:54,56:119)])
 RSTP2_2000_indels.df$overall.ratio <- RSTP2_2000_indels.df[,"X0"] / (RSTP2_2000_indels.df[,"X0"] + RSTP2_2000_indels.df[,"all.indels"])
 
 # Calculate the efficiency
