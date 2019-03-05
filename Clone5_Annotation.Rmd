@@ -324,7 +324,7 @@ pheatmap(as.matrix(mapping_mean), annotation_col = LAD_integration,
 # Save heatmap for further use (exclude barcodes that were discarded in episcreen analysis)
 setwd("/DATA/usr/m.trauernicht/EpiScreen/epigenetic-screening-on-trip-clone/Results/")
 tiff("clone5.tiff", units="in", width=8, height=5, res=300)
-pheatmap(as.matrix(mapping_mean[,c(-1,-11)]), annotation_col = LAD_integration, 
+pheatmap(as.matrix(mapping_mean[,-1]), annotation_col = LAD_integration, 
          annotation_row = chromatin.mark_type, 
          annotation_colors = annotation_colors,
          color = colorRampPalette(rev(brewer.pal(n = 7, name = "RdBu")))(100),
@@ -332,12 +332,22 @@ pheatmap(as.matrix(mapping_mean[,c(-1,-11)]), annotation_col = LAD_integration,
          main = "RSTP2#5: chromatin mark intensity per barcode")
 dev.off()
 
-x <- pheatmap(as.matrix(mapping_mean[,c(-1,-11)]), annotation_col = LAD_integration, 
+x <- pheatmap(as.matrix(mapping_mean[,-1]), annotation_col = LAD_integration, 
          annotation_row = chromatin.mark_type, 
          annotation_colors = annotation_colors,
          color = colorRampPalette(rev(brewer.pal(n = 7, name = "RdBu")))(100),
          breaks = breaksList,
          main = "RSTP2#5: chromatin mark intensity per barcode")
+
+mapping_mean_reduced <- mapping_mean[c(1,3:4,6,13),]
+
+pheatmap(as.matrix(mapping_mean_reduced[,-1]), annotation_col = LAD_integration, 
+         annotation_row = chromatin.mark_type, 
+         annotation_colors = annotation_colors,
+         color = colorRampPalette(rev(brewer.pal(n = 7, name = "RdBu")))(100),
+         breaks = breaksList,
+         main = "RSTP2#5: chromatin mark intensity per barcode")
+
 
 # superheat(as.matrix(mapping_mean),bottom.label.text.angle = 90, yt = cor(mapping_mean)[,"TCTTTTGAGGAGCTGA"])
 ```
