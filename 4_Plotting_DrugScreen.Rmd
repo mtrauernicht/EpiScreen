@@ -186,8 +186,8 @@ StatSmoothFunc <- ggproto("StatSmooth", Stat,
 setwd("/DATA/usr/m.trauernicht/EpiScreen/epigenetic-screening-on-trip-clone/Data")
 
 # Import data from preprocessing script
-RSTP2_2000_indels.df <- get(load("mt20190222_RSTP2_2000_indels.df"))
-indel.data <- RSTP2_2000_indels.df[,c(1:6,47,54,55,119:124,127)]
+RSTP2_2000_indels.df <- get(load("mt20190305_RSTP2_2000_indels.df"))
+indel.data <- RSTP2_2000_indels.df[,c(1:6,48,55,56,120:125,128)]
 
 # Import viability data and the mean +1/-7 ratio from previous experiments
 viability.data <- read.delim("mt20190124_viabilityData")
@@ -198,8 +198,9 @@ mean.ratio.data <- read.delim("mt20190124_meanratiosperbarcode")
 ```{r pre-processing}
 # Add viability data to indel.data
 indel.data <- merge(viability.data, indel.data) 
-indel.data <- merge(mean.ratio.data, indel.data)
-all.indel.data <- merge(mean.ratio.data, indel.data)
+setnames(indel.data, old = "V2", new = "rn")
+indel.data <- merge(mean.ratio.data, indel.data, all = T)
+all.indel.data <- indel.data
 
 
 setnames(indel.data, old = ".id", new = "condition")
