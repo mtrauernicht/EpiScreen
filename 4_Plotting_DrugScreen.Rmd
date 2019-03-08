@@ -207,7 +207,8 @@ setnames(indel.data, old = ".id", new = "condition")
 setnames(indel.data, old = "rn", new = "barcode")
 
 # Remove weird barcode?
-indel.data <- indel.data[indel.data$barcode != "ACCCCTAAAGGCGCTG",]
+indel.data <- indel.data[indel.data$barcode != "ACCCCTAAAGGCGCTG" &
+                           indel.data$barcode != "CTCTTAATCGCTGCC",]
 
 # We want to exclude reads from cells that have reduced viability (set cut-off at 50% reduced viability)
 indel.data <- indel.data[indel.data$viability > 45000,]
@@ -454,7 +455,7 @@ ggplot(NULL,aes(x = reorder(Target,Target,function(x)-length(x)))) +
 
 
 # Density plot of reads.count using only PAO data -> these are the input reads
-ggplot(data = all.indel.data[all.indel.data$Drug == c("PAO","DMSO"),], aes(x = read.count, fill = Drug, group = Drug)) + geom_density() + facet_wrap(~rn, nrow = 6)+ labs(title = "read count before cutting (PAO) and after cutting (DMSO)")
+ggplot(data = all.indel.data[all.indel.data$Drug == c("PAO","DMSO"),], aes(x = read.count, fill = Drug, group = Drug)) + geom_density() + facet_wrap(~barcode, nrow = 6)+ labs(title = "read count before cutting (PAO) and after cutting (DMSO)")
 
 # Density plot per target group, comparing effect on opposite chromatin states
 ggplot(data = indel.data[indel.data$chr.state == c("open","closed"),], aes(x = statistic, fill = chr.state)) + 
