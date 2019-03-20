@@ -564,8 +564,8 @@ pheatmap(as.matrix(indel.data.high.eff[,-42]), fontsize_col = 8, fontsize_row = 
 indel.data.high.eff.ess <- indel.data.high.eff[,-42]
 indel.data.high.eff.ess <- 
   indel.data.high.eff.ess[, 
-                          colSums(indel.data.high.eff.ess > 0.1) >= 1 |
-                            colSums(indel.data.high.eff.ess < -0.2) >= 1]
+                          colSums(indel.data.high.eff.ess > 0.0666) >= 1 |
+                            colSums(indel.data.high.eff.ess < -0.1333) >= 1]
 
 myBreaks8.51 <- c(seq(min(as.matrix(indel.data.high.eff.ess))/1.5, 0, 
                    length.out=ceiling(100/2) + 1), 
@@ -585,8 +585,8 @@ pheatmap(as.matrix(indel.data.high.eff.ess),
 indel.data.med.eff.ess <- indel.data.med.eff[,-44]
 indel.data.med.eff.ess <- 
   indel.data.med.eff.ess[, 
-                         colSums(indel.data.med.eff.ess > 0.1) >= 1 | 
-                           colSums(indel.data.med.eff.ess < -0.15) >= 1]
+                         colSums(indel.data.med.eff.ess > 0.0666) >= 1 | 
+                           colSums(indel.data.med.eff.ess < -0.1333) >= 1]
 
 myBreaks9.5 <- c(seq(min(as.matrix(indel.data.med.eff.ess))/1.5, 0, 
                    length.out=ceiling(100/2) + 1), 
@@ -606,8 +606,8 @@ pheatmap(as.matrix(indel.data.med.eff.ess),
 indel.data.low.eff.ess <- indel.data.low.eff[,-48]
 indel.data.low.eff.ess <- 
   indel.data.low.eff.ess[, 
-                         colSums(indel.data.low.eff.ess > 0.1) >= 1 |
-                           colSums(indel.data.low.eff.ess < -0.15) >= 1]
+                         colSums(indel.data.low.eff.ess > 0.0666) >= 1 |
+                           colSums(indel.data.low.eff.ess < -0.1333) >= 1]
 
 myBreaks10.5 <- c(seq(min(as.matrix(indel.data.low.eff.ess))/1.5, 0, 
                    length.out=ceiling(100/2) + 1), 
@@ -716,7 +716,7 @@ p <- pheatmap(data,
          annotation_row = type,
          color = colorRampPalette(rev(brewer.pal(n = 7, name = "RdBu")))(100),
          annotation_colors = annotation_colors_scr, annotation_legend = F,
-         main = paste(i,"correlation heatmap: ChiP data vs. logratio change per drug"))
+         main = paste(i,"correlation heatmap: ChiP data vs. efficiency change per drug"))
 print(p)
 }
 
