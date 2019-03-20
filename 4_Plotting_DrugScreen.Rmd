@@ -48,6 +48,7 @@ library(ggplot2)
 library(ggbeeswarm)
 library(data.table)
 library(ggrepel)
+library(GGally)
 ```
 
 ### Custom functions
@@ -552,7 +553,24 @@ ggplot(data = indel.data.rep, aes(x=rep2, y=rep3)) +
 
 # Correlation matrix plot
 correlation.plot.rep <- indel.data.rep[,c(4,5,6)]
-pairs(correlation.plot.rep)
+correlation.plot.rep <- na.omit(correlation.plot.rep)
+boundaries <- seq(from = 0.9, by = 0.01, length.out = 4)
+plt <- ggpairs(correlation.plot.rep,
+               upper = list(continuous = corColor),
+               lower = list(continuous = function(data, mapping, ...) {
+                   ggally_points(data = data[n, ], mapping = mapping, alpha = 0.1, size = 0.5) +
+                   geom_abline(slope = 1, lty = "dashed", col = "red") +
+                   theme_bw()}),
+               diag = list(continuous = function(data, mapping, ...) {
+                   ggally_densityDiag(data = data, mapping = mapping, alpha = 0.3, fill = "red") +
+                   theme_bw()})) +
+  ggtitle("corraltaion of the three replicates") +
+  xlab("logratio") +
+  ylab("logratio") 
+  # theme_bw()
+
+print(plt)
+
 ```
 
 ### Conclusion correlation plots
