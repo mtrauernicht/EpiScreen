@@ -372,7 +372,9 @@ chi.outlier.df <- chi.outlier.df[-grep("DNA-PK", chi.outlier.df$Target),]
 ggplot(data = indel.data[indel.data$Drug == c("DMSO","DNA-PKi","Mirin"),], aes(x = logratio.platenorm, fill = Target)) + geom_density() + xlab("logratio") + labs(title = "logratio density of the controls")
 
 # Density plot logratio 
-ggplot(data = indel.data, aes(x = logratio.platenorm, fill = Target)) + geom_density() + xlab("logratio")+ labs(title = "logratio density of all targets")
+ggplot(data = indel.data, aes(x = logratio.platenorm, fill = Target)) + 
+  geom_density() + xlab("logratio")+ labs(title = "logratio density of all targets") +
+  theme(legend.text=element_text(size=18))
 
 # Integral of logratio density plot per target group
 ggplot(data = indel.data, 
@@ -444,14 +446,14 @@ geom_vline(data=indel.data, aes(xintercept=4),linetype="dashed", size=1) + geom_
 # Total amount of drugs per target group
 ggplot(indel.data, aes(x = reorder(Target,Target, function(x)-length(x)))) +
   geom_bar()+
-  theme(axis.text.x = element_text(angle = 90, hjust = 1.0, vjust = 0))+ 
+  theme(axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1, size = 12))+ 
   ylab("datapoints") + xlab("target group")+ labs(title = "datapoints per target group")
 
 # Relative amount of drugs in outlier df
 ggplot(NULL,aes(x = reorder(Target,Target,function(x)-length(x)))) + 
       geom_bar(aes(fill="amount non-outliers"), data = indel.data, alpha = 0.5)+
   geom_bar(aes(fill="amount outlier"), data = t.outlier.df, alpha = 0.5)+
-  theme(axis.text.x = element_text(angle = 90, hjust = 1.0, vjust = 0))+ 
+  theme(axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1, size = 12))+ 
   ylab("datapoints") + xlab("target group") + labs(title = "outlier vs. non-outlier distribution per drug category", fill = "groups")
 
 
@@ -554,7 +556,7 @@ ggplot(data = indel.data.rep, aes(x=rep2, y=rep3)) +
 # Correlation matrix plot
 correlation.plot.rep <- indel.data.rep[,c(4,5,6)]
 correlation.plot.rep <- na.omit(correlation.plot.rep)
-boundaries <- seq(from = 0.9, by = 0.01, length.out = 4)
+boundaries <- seq(from = 0.8, by = 0.01, length.out = 4)
 plt <- ggpairs(correlation.plot.rep,
                upper = list(continuous = corColor),
                lower = list(continuous = function(data, mapping, ...) {
@@ -564,7 +566,8 @@ plt <- ggpairs(correlation.plot.rep,
                diag = list(continuous = function(data, mapping, ...) {
                    ggally_densityDiag(data = data, mapping = mapping, alpha = 0.3, fill = "red") +
                    theme_bw()})) +
-  ggtitle("corraltaion of the three replicates") +
+  ggtitle("correlation of the three replicates") +
+  theme(text = element_text(size = 20))+
   xlab("logratio") +
   ylab("logratio") 
   # theme_bw()
