@@ -58,6 +58,7 @@ library(gridExtra)
 library(RColorBrewer)
 library(Pigengene)
 library(tidyr)
+library(VennDiagram)
 ```
 
 ### Custom functions
@@ -79,7 +80,7 @@ SetFileName <- function(filename, initials) {
 setwd("/DATA/usr/m.trauernicht/EpiScreen/epigenetic-screening-on-trip-clone/Data")
 mapping_mean <- get(load("mt20190308_mapping_mean"))
 mapping_integration <- get(load("mt20190308_mapping_integration"))
-indel.data <- get(load("mt20190308_indel.data"))
+indel.data <- get(load("mt20190320_indel.data"))
 mapping_integration_long <- get(load("mt20190308_mapping_integration_long"))
 mapping_mean_long <- get(load("mt20190308_mapping_mean_long"))
 chip_dendogram <- get(load("mt20190308_chip_dendogram"))
@@ -482,9 +483,7 @@ pheatmap(as.matrix(indel.data.high.drug),
 # pheatmap function: without DNA-PKi: logratio heatmap of eac a certain fold change
 indel.data.high.drug.ess <- indel.data.high.drug[,-42]
 indel.data.high.drug.ess <- 
-  indel.data.high.drug.ess[, 
-                           colSums(indel.data.high.drug.ess > 1) >= 1 | 
-                             colSums(indel.data.high.drug.ess < -0.5) >= 1] 
+  indel.data.high.drug.ess[, colSums(indel.data.high.drug.ess > 1.25) >= 1 | colSums(indel.data.high.drug.ess < -0.5) >= 1] 
 # Keeping the scale in the pheatmap function
 myBreaks6 <- c(seq(min(as.matrix(indel.data.high.drug.ess)), 0, 
                    length.out=ceiling(100/2) + 1), 
@@ -624,8 +623,56 @@ pheatmap(as.matrix(indel.data.low.eff.ess),
 ```
 
 \newpage
-## Heatmap efficiency/logratio overlay
+## Efficiency/logratio overlay
 ```{r visualization overlay efficiency logratio, out.width= "100%", fig.align= "center", echo=FALSE}
+# Draw venn diagram to see overlaps between efficiency and logratio outliers
+## Calculate the intersections
+colnames.logr.high <- colnames((indel.data.high.drug.ess))
+colnames.eff.high <- colnames((indel.data.high.eff.ess))
+x <- intersect(colnames.logr.high, colnames.eff.high)
+
+colnames.logr.med <- colnames((indel.data.med.drug.ess))
+colnames.eff.med <- colnames((indel.data.med.eff.ess))
+y <- intersect(colnames.logr.med, colnames.eff.med)
+
+colnames.logr.low <- colnames((indel.data.low.drug.ess))
+colnames.eff.low <- colnames((indel.data.low.eff.ess))
+z <- intersect(colnames.logr.low, colnames.eff.low)
+
+
+# Draw the diagrams
+## High
+draw.pairwise.venn(length(colnames.logr.high), 
+                   length(colnames.eff.high), 
+                   length(x),
+                   category = c("Drugs with altered logratio", "Drugs with alterd efficiency"), 
+                   fill = c("blue", "red"), cat.pos = c(2,2))
+
+## Med
+draw.pairwise.venn(length(colnames.logr.med), 
+                   length(colnames.eff.med), 
+                   length(y),
+                   category = c("Drugs with altered logratio", "Drugs with alterd efficiency"), 
+                   fill = c("blue", "red"), cat.pos = c(2,2))
+
+## Low
+draw.pairwise.venn(length(colnames.logr.low), 
+                   length(colnames.eff.low), 
+                   length(z),
+                   category = c("Drugs with altered logratio", "Drugs with alterd efficiency"), 
+                   fill = c("blue", "red"), cat.pos = c(2,2))
+
+
+```
+
+
+
+
+
+
+\newpage
+## Heatmap efficiency/logratio overlay computation
+```{r computation overlay efficiency logratio, out.width= "100%", fig.align= "center", echo=FALSE}
 indel.data.high$logratio.platenorm.rel <- ave(indel.data.high$logratio.platenorm, FUN = function (x) 2^x)
 indel.data.high$logratio.platenorm.rel <- ave(indel.data.high$logratio.platenorm.rel, FUN = function (x) x/max(x))
 indel.data.high$efficiency.platenorm.rel <- ave(indel.data.high$efficiency.platenorm, FUN = function(x) 2^x)
@@ -677,25 +724,59 @@ chip_data <- dcast(chip_data, variable ~ barcode, value.var = "value")
 setnames(chip_data, old = "variable", new = "barcode")
 chip_data <- chip_data[chip_data$barcode != 
                          "ACCCCTAAAGGCGCTG" & chip_data$barcode != "CTCTTAATCGCTGCC", ]
-chip_data <- merge(chip_data, ratio.bc)
+## In case I want to include the mean.ratio
+# chip_data <- merge(chip_data, ratio.bc) 
 row.names(chip_data) <- chip_data$barcode
 chip_data <- chip_data[,-1]
 
 # Calculate correlations
-cor_chip_indel.high <- cor(chip_data,indel.data.high.drug.ess)
-cor_chip_indel.med <- cor(chip_data,indel.data.med.drug.ess)
-cor_chip_indel.low <- cor(chip_data,indel.data.low.drug.ess)
+cor_chip_indel.high <- cor(chip_data,indel.data.high.drug)
+cor_chip_indel.med <- cor(chip_data,indel.data.med.drug)
+cor_chip_indel.low <- cor(chip_data,indel.data.low.drug)
 
 # Calculate correlations for efficiency data
-cor_chip_indel.high.eff <- cor(chip_data,indel.data.high.eff.ess)
-cor_chip_indel.med.eff <- cor(chip_data,indel.data.med.eff.ess)
-cor_chip_indel.low.eff <- cor(chip_data,indel.data.low.eff.ess)
+cor_chip_indel.high.eff <- cor(chip_data,indel.data.high.eff)
+cor_chip_indel.med.eff <- cor(chip_data,indel.data.med.eff)
+cor_chip_indel.low.eff <- cor(chip_data,indel.data.low.eff)
+
+# Take only drugs that have correlation of absolute > 0.5 with at least one ChIP dataset
+cor_chip_indel.high <- 
+  cor_chip_indel.high[, 
+                      colSums(cor_chip_indel.high > 0.666) >= 1 | 
+                        colSums(cor_chip_indel.high < -0.666) >= 1]
+
+cor_chip_indel.med <- 
+  cor_chip_indel.med[, 
+                      colSums(cor_chip_indel.med > 0.666) >= 1 | 
+                        colSums(cor_chip_indel.med < -0.666) >= 1]
+
+cor_chip_indel.low <- 
+  cor_chip_indel.low[, 
+                      colSums(cor_chip_indel.low > 0.666) >= 1 | 
+                        colSums(cor_chip_indel.low < -0.666) >= 1]
+
+cor_chip_indel.high.eff <- 
+  cor_chip_indel.high.eff[, 
+                      colSums(cor_chip_indel.high.eff > 0.666) >= 1 | 
+                        colSums(cor_chip_indel.high.eff < -0.666) >= 1]
+
+cor_chip_indel.med.eff <- 
+  cor_chip_indel.med.eff[, 
+                      colSums(cor_chip_indel.med.eff > 0.666) >= 1 | 
+                        colSums(cor_chip_indel.med.eff < -0.666) >= 1]
+
+cor_chip_indel.low.eff <- 
+  cor_chip_indel.low.eff[, 
+                      colSums(cor_chip_indel.low.eff > 0.666) >= 1 | 
+                        colSums(cor_chip_indel.low.eff < -0.666) >= 1]
 
 # plotting the correlations
 cor.pheatmap <- 
   list(cor_chip_indel.high, cor_chip_indel.med, cor_chip_indel.low)
 cor.pheatmap.eff <- 
   list(cor_chip_indel.high.eff, cor_chip_indel.med.eff, cor_chip_indel.low.eff)
+
+
 
 for(i in 1:(length(cor.pheatmap))) {
   data <- cor.pheatmap[[i]]
@@ -707,7 +788,6 @@ p <- pheatmap(data,
          main = paste(i,"correlation heatmap: ChiP data vs. logratio change per drug"))
 print(p)
 }
-
 
 for(i in 1:(length(cor.pheatmap.eff))) {
   data <- cor.pheatmap.eff[[i]]
