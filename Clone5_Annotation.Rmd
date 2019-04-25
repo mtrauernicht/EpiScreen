@@ -66,7 +66,7 @@ SetFileName <- function(filename, initials) {
 
 
 ## Data import
-```{r}
+```{r out.width= "80%", fig.align= "center", echo = FALSE, warning = FALSE}
 # Load ChIP data
 setwd("/DATA/usr/m.trauernicht/Mapping_Clone5_9/nearest_domains-1000-0.9")
 file.list <- list.files(pattern = '*.txt')
@@ -97,7 +97,7 @@ colnames(mcols(DamID.bins.norm.5kb)) <- "Lamina"
 # Analysis
 
 ## Import and compute LMNB1 data
-```{r}
+```{r out.width= "80%", fig.align= "center", echo = FALSE, warning = FALSE}
 # Rename columns of bed file
 names(clone5_lmnb1) <- c("seqnames","start","end","barcode","ori")
 
@@ -127,7 +127,7 @@ clone5_lmnb1.dt <- clone5_lmnb1.dt[,c(6,8,9)]
 
 
 ## Pre-processing mapping_integration df
-```{r}
+```{r out.width= "80%", fig.align= "center", echo = FALSE, warning = FALSE}
 # Remove not needed data
 mapping_integration <- dplyr::select(mapping_integration, ends_with("e"), contains("Distance"))
 
@@ -165,12 +165,12 @@ mapping_integration$barcode <- gsub(".B","",mapping_integration$barcode)
 ## Pre-processing mapping_mean df
 ```{r}
 # Remove not needed data
-mapping_mean <- dplyr::select(mapping_mean, ends_with("id"), starts_with("mean"))
+mapping_mean_all <- dplyr::select(mapping_mean, ends_with("id"), starts_with("mean"))
 
 # Rename variables 
-names(mapping_mean)[2:ncol(mapping_mean)] <- gsub(".*_(.*?_.*?_.*?).txt", "\\1", file.list_mean)
+names(mapping_mean_all)[2:ncol(mapping_mean_all)] <- gsub(".*_(.*?_.*?_.*?).txt", "\\1", file.list_mean)
 
-mapping_mean <- mapping_mean[,c("transcript_id", "Bernstein2011_H2AFZ_ENCSR000APC", 
+mapping_mean <- mapping_mean_all[,c("transcript_id", "Bernstein2011_H2AFZ_ENCSR000APC", 
                        "Schmidl2015_H3K27me3_chipmentation", "Schmidl2015_H3K27ac_chipmentation",
                        "Schmidl2015_H3K4me1_chipmentation", "Schmidl2015_H3K36me3_chipmentation",
                        "Salzberg2017_H3K9me3_ab8898", "Salzberg2017_H3K9me2_ab1220",
@@ -180,23 +180,25 @@ mapping_mean <- mapping_mean[,c("transcript_id", "Bernstein2011_H2AFZ_ENCSR000AP
 
 # Rename variables 
 colnames(mapping_mean) <- gsub(".*_(.*?)_.*", "\\1", colnames(mapping_mean))
+colnames(mapping_mean_all) <- gsub(".*_(.*?)_.*", "\\1", colnames(mapping_mean_all))
 
 # Rename variable
 setnames(mapping_mean, old = "transcript_id", new = "barcode")
-
+setnames(mapping_mean_all, old = "transcript_id", new = "barcode")
 
 # Add lmnb1 data to df
 clone5_lmnb1.dt_mean <- clone5_lmnb1.dt[,c(1,2)]
 clone5_lmnb1.dt_mean$barcode <- gsub(".B","",clone5_lmnb1.dt_mean$barcode)
 mapping_mean <- merge(clone5_lmnb1.dt_mean, mapping_mean, all = TRUE)
 setnames(mapping_mean, old = "K562.lamina", new = "LMNB1")
-
+mapping_mean_all <- merge(clone5_lmnb1.dt_mean, mapping_mean_all, all = TRUE)
+setnames(mapping_mean_all, old = "K562.lamina", new = "LMNB1")
 ```
 
 
 
 ## Normalization mean values
-```{r}
+```{r out.width= "80%", fig.align= "center", echo = FALSE, warning = FALSE}
 # Change df format to normalize mean values
 mapping_mean_long <- melt(mapping_mean)
 mapping_mean_long$value[is.na(mapping_mean_long$value)] <- 0
@@ -208,6 +210,18 @@ mapping_mean_long$mean <-
 mapping_mean_long <- mapping_mean_long[,c(-3,-4)]
 mapping_mean <- dcast(mapping_mean_long, variable ~ barcode, value.var = "mean")
 
+# The same for all ChIP datasets
+mapping_mean_long_all <- melt(mapping_mean_all)
+mapping_mean_long_all$value[is.na(mapping_mean_long_all$value)] <- 0
+mapping_mean_long_all$log <- mapping_mean_long_all$value
+mapping_mean_long_all$log[mapping_mean_long_all$variable != "LMNB1"] <- 
+  ave(mapping_mean_long_all$value[mapping_mean_long_all$variable != "LMNB1"], FUN = function(x) log2(x))
+mapping_mean_long_all$mean <- 
+  ave(mapping_mean_long_all$log, mapping_mean_long_all$variable, FUN = function(x) x/max(x))
+mapping_mean_long_all <- mapping_mean_long_all[,c(-3,-4)]
+mapping_mean_all <- dcast(mapping_mean_long_all, variable ~ barcode, value.var = "mean")
+
+
 # Add type of chr. mark (repressive or active)
 mapping_mean_long$type <- "Active"
 mapping_mean_long[grep("EZH2|K562|K9me|K79me3|K27me|macroH2A|BMI1|CBX2|119ub|
@@ -216,7 +230,7 @@ mapping_mean_long[grep("EZH2|K562|K9me|K79me3|K27me|macroH2A|BMI1|CBX2|119ub|
 ```
 
 ## Create code for heatmaps: mapping_mean dataset
-```{r}
+```{r out.width= "80%", fig.align= "center", echo = FALSE, warning = FALSE}
 # Annotate chr. marks: here I create a df to annotate which chromatin marks are active/repressive, 
 # this is being used in the heatmap later
 chromatin.mark_type1 <- mapping_mean_long[,c(-1,-3)]
@@ -258,7 +272,7 @@ mapping_mean <- mapping_mean[,-1]
 
 
 ## Create code for heatmaps: mapping_integration dataset
-```{r}
+```{r out.width= "80%", fig.align= "center", echo = FALSE, warning = FALSE}
 # Turn around cols and rows
 mapping_integration_long <- melt(mapping_integration)
 mapping_integration <- 
@@ -295,7 +309,7 @@ Next, heatmaps can be visualized, using either the dataframe containing only ess
 
 \newpage
 # Results
-```{r}
+```{r out.width= "80%", fig.align= "center", echo = FALSE, warning = FALSE}
 ## Generate the heatmaps
 
 # The following two heatmaps represent in color the intensity -
@@ -312,14 +326,13 @@ breaksList <- c(seq(min(as.matrix(mapping_mean)), 0,
                   max(as.matrix(mapping_mean)), length.out=floor(100/2)))
 
 # Generate heatmap: chr. mark intensity of only essential ChIP datasets vs. barcodes
-pheatmap(as.matrix(mapping_mean), annotation_col = LAD_integration, 
+pheatmap(as.matrix(mapping_mean), 
          annotation_row = chromatin.mark_type, 
          annotation_colors = annotation_colors,
          color = colorRampPalette(rev(brewer.pal(n = 7, name = "RdBu")))(100),
          breaks = breaksList,
          annotation_legend = T,
-         main = "RSTP2#5: chromatin mark intensity 
-         per barcode (essential ChIP datasets)")
+         main = "RSTP2#5: chromatin mark intensity per barcode")
 
 # Save heatmap for further use (exclude barcodes that were discarded in episcreen analysis)
 setwd("/DATA/usr/m.trauernicht/EpiScreen/epigenetic-screening-on-trip-clone/Results/")
@@ -332,7 +345,7 @@ pheatmap(as.matrix(mapping_mean[,c(-1,-11)]), annotation_col = LAD_integration,
          main = "RSTP2#5: chromatin mark intensity per barcode")
 dev.off()
 
-x <- pheatmap(as.matrix(mapping_mean[,c(-1,-11)]), annotation_col = LAD_integration, 
+x <- pheatmap(as.matrix(mapping_mean[,c(-1,-11)]),
          annotation_row = chromatin.mark_type, 
          annotation_colors = annotation_colors,
          color = colorRampPalette(rev(brewer.pal(n = 7, name = "RdBu")))(100),
@@ -362,19 +375,6 @@ boring barcodes (no marks, e.g. GCGCA...), and very active barcodes(e.g. TATG...
 - LMNB1, H3K9me2, EZH2 and H3K122ac are very different from other marks
 - possible barcode clustering (from left to right): 1-3: mainly active, 4: repressed, 5-6: active, 7-10: LADs, 11: active, 12-15: boring/slightly repressed, 16-18: repressed
 
-```{r fig.height = 10, fig.width = 20}
-# The following two heatmaps represent in color the status of integration -
-# in a chromatin domain, since for some chromatin marks multiple datasets -
-# (up to 3) were used, the state calling can be 0.333, 0.5, or 0.666 instead of 0 or 1
-
-# Each chromatin mark is annotated with either repressive or active
-
-# Generate heatmap: ChIP integration calling for all datasets vs. barcode
-pheatmap(as.matrix(mapping_integration), annotation_row = chromatin.mark_type3, 
-         annotation_colors = annotation_colors_2, color = brewer.pal(5, "PuBu"),
-         annotation_legend = F,
-         main = "RSTP2#5: chromatin integration state per barcode")
-```
 
 ## Conclusions from these heatmaps:
 - active/repressive marks tend to cluster together
@@ -412,6 +412,9 @@ save(mapping_mean_long, file = filename)
 
 filename <- SetFileName("_chip_dendogram", "mt")
 save(x, file = filename)
+
+filename <- SetFileName("_mapping_mean_all", "mt")
+save(mapping_mean_all, file = filename)
 ```
 
 # Session Info
