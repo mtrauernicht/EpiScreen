@@ -494,7 +494,7 @@ names(mutations.list)
 View(drugs.list)
 
 # Name the sample:
-plot_sample <- c("100nm_rep1_plate2_H10_190")
+plot_sample <- c("1um_rep2_plate1_D9_045")
 ####### Function that creates the PDF ######
 # Generate file name with date and sample
 if (plot_sample %in% names(mutations.list)) {
