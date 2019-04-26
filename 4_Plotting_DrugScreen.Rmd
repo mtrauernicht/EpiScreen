@@ -534,7 +534,9 @@ indel.data$mean.efficiency.drug =
 
 for (i in unique(indel.data$conc)) {
   data <- indel.data[indel.data$conc == i,]
-p <- gghighlight_point(data = data, aes(x=mean.efficiency.drug, y=mean.logratio.drug, label = Drug, color = Target), abs(mean.logratio.drug) > 0.5) +
+p <- ggplot(data = data, aes(x=mean.efficiency.drug, y=mean.logratio.drug)) +
+  geom_point(size = 0.001) + 
+  gghighlight(abs(mean.logratio.drug) > 0.5, label_key = Drug) + 
   labs(title = paste("correlation logratio vs. efficiency, concentration:",i)) 
 print(p)
 }
@@ -543,14 +545,12 @@ print(p)
 # Correlation plot mean viability vs. mean efficiency
 indel.data$mean.viability.drug = 
   ave(indel.data$viability, indel.data$Drug, indel.data$conc, FUN = function(x) mean(x))
+indel.data$Drug <- as.character(indel.data$Drug)
 
 for (i in unique(indel.data$conc)) {
   data <- indel.data[indel.data$conc == i,]
-p <- ggplot(data = data, aes(x=mean.viability.drug, y=mean.efficiency.drug, label = Drug, color = Target)) +
-    geom_point(size = 0.001) + 
+p <- gghighlight_point(data = data, aes(x=mean.viability.drug, y=mean.efficiency.drug), abs(mean.efficiency.drug) > 0.05, label_key = Drug) +
   labs(title = paste("correlation efficiency vs. viability, concentration:",i)) +
-  geom_text(aes(label = ifelse(abs(mean.efficiency.drug)>0.05, as.character(Drug),'')), 
-            hjust=0,vjust=0, angle = 45, size = 3, family = "symbol")
 print(p)
 }
 
