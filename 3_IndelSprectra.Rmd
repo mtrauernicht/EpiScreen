@@ -185,8 +185,8 @@ OverallIndelPlot <- function(indellist) {
     range <- c(-b_del:b_ins)
   
     COL <- "black"
-    COL[!as.numeric(names(y))==0] <- "#1874CD"
-    COL[as.numeric(names(y))==0] <- "#98F5FF"
+    COL[as.numeric(names(y))==-7] <- "#1874CD"
+    COL[as.numeric(names(y))==1] <- "#98F5FF"
   
     if(length(range)>1){
        bp <- barplot(as.numeric(indel.summary), 
@@ -255,8 +255,13 @@ SampleIndelSpectra <- function(j, name="sample", barcodes.no=nrow(j)) {
   range <- c(-b_del:b_ins)
   
   COL <- "black"
-  COL[!as.numeric(names(y))==0] <- "#1874CD"
-  COL[as.numeric(names(y))==0] <- "#98F5FF"
+  COL[!as.numeric(names(y))==0] <- "black"
+  COL[as.numeric(names(y))==0] <- "#808184"
+  COL[as.numeric(names(y))==-7] <- "#3D4FA1"
+  COL[as.numeric(names(y))==1] <- "#EE3F2A"
+
+
+  
   
   if(length(range)>1){
     bp <- barplot(as.numeric(indel.summary), 
@@ -494,7 +499,7 @@ names(mutations.list)
 View(drugs.list)
 
 # Name the sample:
-plot_sample <- c("1um_rep2_plate1_D9_045")
+plot_sample <- c("100nm_rep3_plate2_E6_150")
 ####### Function that creates the PDF ######
 # Generate file name with date and sample
 if (plot_sample %in% names(mutations.list)) {
