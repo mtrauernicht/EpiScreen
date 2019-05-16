@@ -75,6 +75,7 @@ library(ggbeeswarm)
 library(data.table)
 library(magrittr)
 library(dplyr)
+library(tibble)
 ```
 
 ### Custom functions
@@ -184,9 +185,11 @@ OverallIndelPlot <- function(indellist) {
     b_ins <- abs(max(as.numeric(shiftrange)))
     range <- c(-b_del:b_ins)
   
-    COL <- "black"
-    COL[as.numeric(names(y))==-7] <- "#1874CD"
-    COL[as.numeric(names(y))==1] <- "#98F5FF"
+  COL <- "black"
+  COL[!as.numeric(names(y))==0] <- "black"
+  COL[as.numeric(names(y))==0] <- "#808184"
+  COL[as.numeric(names(y))==-7] <- "#3D4FA1"
+  COL[as.numeric(names(y))==1] <- "#EE3F2A"
   
     if(length(range)>1){
        bp <- barplot(as.numeric(indel.summary), 
@@ -408,6 +411,12 @@ BeeswarmIndelSpectrum <- function(readfrequency){
    # Plot it in a beeswarm plot
   ggplot(readfrequency$reads.mut.barcode.freq, aes(variable, value)) + geom_quasirandom() + theme_bw() + ylim(0, 100)
 }
+
+BarcodesToRownames <- function(x) {
+  tmp <- x %>% remove_rownames %>% column_to_rownames(var="V2")
+  tmp
+}
+
 ```
 
 ### Data import
@@ -425,7 +434,7 @@ RData <- sort(file.list, decreasing = TRUE)[1] #take the most recent.
 load(RData)
 
 setwd("/DATA/usr/m.trauernicht/EpiScreen/epigenetic-screening-on-trip-clone/Data/")
-mutations.list <- get(load("mt20190222_mutations.list"))
+mutations.list <- get(load("mt20190510_mutations.list"))
 drugs.list <- read.delim("mt20190326_DrugNames.txt")
 ```
 
@@ -449,6 +458,7 @@ of reads per barcode.
 
 ```{r}
 # Make the sums of the reads per barcode
+mutations.list <- lapply(mutations.list, BarcodesToRownames)
 barcodesum <- lapply(mutations.list, ReadsPerBarcode)
 
 # Let's keep the total mutations list also.
@@ -499,7 +509,7 @@ names(mutations.list)
 View(drugs.list)
 
 # Name the sample:
-plot_sample <- c("100nm_rep3_plate2_E6_150")
+plot_sample <- c("1um_rep2_plate2_B1_109.count.table")
 ####### Function that creates the PDF ######
 # Generate file name with date and sample
 if (plot_sample %in% names(mutations.list)) {
