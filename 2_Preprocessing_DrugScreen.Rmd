@@ -359,6 +359,9 @@ RSTP2_2000_indels.df$overall.ratio <- RSTP2_2000_indels.df[,"X0"] / (RSTP2_2000_
 # Calculate the efficiency
 RSTP2_2000_indels.df$efficiency <- (1 - RSTP2_2000_indels.df[,"overall.ratio"])
 
+decitabine.rep3 <- RSTP2_2000_indels.df[RSTP2_2000_indels.df$Drug == "Decitabine" & RSTP2_2000_indels.df$rep == "3",]
+decitabine <- RSTP2_2000_indels.df[RSTP2_2000_indels.df$Drug == "Decitabine",]
+decitabine2 <- decitabine[,c(-6:-100)]
 
 
 # Let's plot the distribution of the amount of reads per barcode
