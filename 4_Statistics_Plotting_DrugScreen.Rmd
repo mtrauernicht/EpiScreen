@@ -1126,11 +1126,60 @@ ggplot(decitabine.dmso, aes(x = reorder(integration,order),
   geom_hline(yintercept = 1, linetype = "dashed", alpha = 0.5)+
   theme_classic2()
 
-  
+# HDACs (efficiency and logratio)
+hdac.dmso <- indel.data[indel.data$Drug == "Vorinostat (SAHA, MK0683)"|
+                          indel.data$Drug == "Givinostat (ITF2357)"|
+                          indel.data$Drug == "PCI-24781 (Abexinostat)"|
+                          indel.data$Drug == "AR-42"|
+                          indel.data$Drug == "Scriptaid ",]
+hdac.dmso <- hdac.dmso[hdac.dmso$conc == "1um",]
 
-    # theme(axis.text.x = element_text(angle = 90, hjust = 1.0, vjust = 0))+ 
+hdac.dmso$logratio.platenorm <- ave(hdac.dmso$logratio.platenorm, 
+                                    hdac.dmso$barcode, hdac.dmso$Drug,
+                                    FUN = function(x) mean(x))
+hdac.dmso$efficiency.platenorm <- ave(hdac.dmso$efficiency.platenorm, 
+                                    hdac.dmso$barcode, hdac.dmso$Drug,
+                                    FUN = function(x) mean(x))
 
 
+hdac.dmso <- hdac.dmso[,c(6,25,26,35,36)]
+hdac.dmso <- unique(hdac.dmso)
+hdac.dmso$mean <- ave(hdac.dmso$logratio.platenorm, hdac.dmso$integration,
+                      FUN = function(x) mean(x))
+hdac.dmso$mean2 <- ave(hdac.dmso$efficiency.platenorm, hdac.dmso$integration,
+                      FUN = function(x) mean(x))
+
+ggplot(hdac.dmso, aes(colour = Drug, group = Drug, fill = Drug)) +
+  geom_bar(stat="identity", aes(x =  reorder(integration,order),
+                                y = mean)) +
+    geom_quasirandom(aes(x = reorder(integration,order), 
+                            y = logratio.platenorm)) + 
+  scale_colour_brewer(palette = "Set2")+
+  coord_flip()+
+  theme(axis.title.y = element_blank())+
+    ylab("Change log2(+1/-7 ratio)")+
+  theme(text = element_text(size = 14))+
+  geom_hline(yintercept = 1, linetype = "dashed", alpha = 0.5)+
+  scale_y_continuous(limits = c(-0.5,2))+
+  theme_classic2()
+
+ggplot(hdac.dmso, aes(colour = Drug, group = Drug, fill = Drug)) +
+  geom_bar(stat="identity", aes(x =  reorder(integration,order),
+                                y = mean2)) +
+    geom_quasirandom(aes(x = reorder(integration,order), 
+                            y = efficiency.platenorm)) + 
+  scale_colour_brewer(palette = "Set2")+
+  coord_flip()+
+  theme(axis.title.y = element_blank())+
+    ylab("Change log2(+1/-7 ratio)")+
+  theme(text = element_text(size = 14))+
+  scale_y_continuous(limits = c(-0.1,0.3))+
+  theme_classic2()
+
+# Statistical significance? Is integration 17 different?
+anova <- aov(logratio.platenorm ~ integration, data = hdac.dmso)
+summary.aov(anova)
+tukey <- TukeyHSD(anova)
 ```
 
 ## Conclusion
