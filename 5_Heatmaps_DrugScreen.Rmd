@@ -1109,7 +1109,7 @@ print(p)
 }
 
 # Boxplot
-mean.ratio <- indel.data[indel.data$Drug == "GSK J4 HCl" & indel.data$conc == "10um",]
+mean.ratio <- indel.data[indel.data$Drug == "CTPB" & indel.data$conc == "10um",]
 mean.ratio <- mean.ratio[,c(1,25)]
 mean.ratio$logratio.platenorm <- ave(mean.ratio$logratio.platenorm, mean.ratio$barcode, FUN = function(x) mean(x))
 mean.ratio <- unique(mean.ratio)
@@ -1126,10 +1126,22 @@ mean.ratio2 <- cbind(mean.ratio, clusters)
 ggplot(mean.ratio2, aes(x=cluster, y=logratio.platenorm, fill = cluster))+
   geom_boxplot()+
   scale_fill_brewer(palette = "Pastel2")+
-  scale_y_continuous(breaks=c(-0.5,0,0.5))
+  scale_y_continuous(breaks=c(-0.5,0,0.5))+ theme_classic2()
   
+## Statistical analysis: are the groups significantly different?
+mean.ratio <- indel.data[indel.data$Drug == "AT9283" & indel.data$conc == "1um",]
+mean.ratio <- mean.ratio[,c(1,12,25)]
+mean.ratio$logratio.platenorm <- ave(mean.ratio$logratio.platenorm, mean.ratio$rep, mean.ratio$barcode, FUN = function(x) mean(x))
+mean.ratio <- unique(mean.ratio)
+clusters2 <- tibble::rownames_to_column(as.data.frame(clusters), "barcode")
+mean.ratio <- merge(mean.ratio, clusters2)
+t.test(mean.ratio$logratio.platenorm[mean.ratio$cluster == "Active_G.B."],
+                                     mean.ratio$logratio.platenorm[mean.ratio$cluster == "Active_P.E."])$p.value
 
 
+anova <- aov(logratio.platenorm ~ cluster, data = mean.ratio)
+summary.aov(anova)
+tukey <- TukeyHSD(anova)
 ```
 
 
@@ -1154,7 +1166,7 @@ pheatmap(cor_hdac,
 ## Correlation plots individual drugs
 ```{r}
 ## In case I want to include the mean.ratio
-mean.ratio <- indel.data[indel.data$Drug == "3-Deazaneplanocin A (DZNeP)" & indel.data$conc == "1um",]
+mean.ratio <- indel.data[indel.data$Drug == "MC-1293" & indel.data$conc == "1um",]
 mean.ratio <- mean.ratio[,c(1,25)]
 mean.ratio$logratio.platenorm <- ave(mean.ratio$logratio.platenorm, mean.ratio$barcode, FUN = function(x) mean(x))
 mean.ratio <- unique(mean.ratio)
@@ -1165,8 +1177,8 @@ mean.ratio2 <- mean.ratio
 mean.ratio2 <- mean.ratio2 %>% 
   remove_rownames %>% column_to_rownames(var="Var2")
 
-# chip_data <- chip_data %>% 
-#   remove_rownames %>% column_to_rownames(var="rowname")
+ chip_data <- chip_data %>% 
+   remove_rownames %>% column_to_rownames(var="rowname")
 
 cor_ratio <- cor(mean.ratio2, chip_data)
 cor_ratio <- as.data.frame(cor_ratio)
@@ -1185,12 +1197,17 @@ Correlation")+
 # Scatterplot
 mean.ratio <- tibble::rownames_to_column(as.data.frame(mean.ratio2))
 chip_data <- tibble::rownames_to_column(as.data.frame(chip_data))
-hdac1.data <- chip_data[,c(1,3)]
+hdac1.data <- chip_data[,c(1,11)]
 hdac.1.data <- cbind(hdac1.data, mean.ratio2)
 
-ggplot(hdac.1.data, aes(x=H3K27me3, y=logratio.platenorm))+
+ggplot(hdac.1.data, aes(x=HDAC1, y=logratio.platenorm))+
   geom_point()+
-  geom_smooth(method = lm) 
+  geom_smooth(method = lm) +
+  theme_classic2()
+
+# Statistical significance?
+x <- cor.test(hdac.1.data$HDAC1, hdac.1.data$logratio.platenorm)
+
 ```
 
 
