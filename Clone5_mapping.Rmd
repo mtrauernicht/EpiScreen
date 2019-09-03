@@ -70,7 +70,7 @@ setwd("/DATA/usr/r.schep/projects/tagmap_ruben/")
 header <- c(1:20)
 tag.df.raw <- read.delim("rs20190218_Clone5_Rev.txt", header = F)
 
-setwd("/DATA/usr/m.trauernicht/Mapping_Clone5_9/")
+setwd("/DATA/usr/m.trauernicht/projects/EpiScreen/Mapping_Clone5_9/")
 clone5.mapping <- read.table("mt20190218_RSTP2_clone5.bed")
 
 
