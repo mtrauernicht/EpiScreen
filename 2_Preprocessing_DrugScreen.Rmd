@@ -279,7 +279,7 @@ df.list <- lapply(file.list, fread)
 barcodes.list <- c("AGGGCGTAAAATATTT", "TATGGCTGTCGGGTAG", "TGTCCCTTAGTACTTT", "AGAAAATAATATGACG","CGGCCTGAAGGTCAGG","TTGAACGCGGGCTCGG","GCTAACATCACGAATC","GCGCACCCTTTAATTG","ACTGTCGAGTTGTCCG","CCGGGGACGTATGCAC","TCTTTTGAGGAGCTGA","ATATCGTTGCTGGAGA","CATCCACCACACTTCA","ACCCCTAAAGGCGCTG","ATACTATATTTAACGG","CATTTCTGATCAATAA","CTCTTAATCGCTGCC","GAGCGCGTCACCGGGT","GTACCTCTCGATAGTG","TGGCCAATATTTGTCT")
 
 # Import drug list 
-setwd("/DATA/usr/m.trauernicht/EpiScreen/epigenetic-screening-on-trip-clone/Data/")
+setwd("/DATA/usr/m.trauernicht/projects/EpiScreen/epigenetic-screening-on-trip-clone/Data/")
 drugs.list <- read.delim("mt20190123_EpigeneticDrugList.txt")
 
 # rename the lists
@@ -372,7 +372,7 @@ p + geom_density()
 ## Processed data export
 The files will be saved in the processed data folder.
 ```{r export}
-setwd("/DATA/usr/m.trauernicht/EpiScreen/epigenetic-screening-on-trip-clone/Data")
+setwd("/DATA/usr/m.trauernicht/projects/EpiScreen/epigenetic-screening-on-trip-clone/Data")
 # The mutations list that can be loaded for the indel spectra plots.
 filename <- SetFileName("_RSTP2_2000_indels.df", "mt")
 save(RSTP2_2000_indels.df, file = filename)
