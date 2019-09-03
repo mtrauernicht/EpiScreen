@@ -83,7 +83,7 @@ SetFileName <- function(filename, initials) {
 # Import data from 5_HitValidation_DrugScreen.Rmd
 setwd("/DATA/usr/m.trauernicht/EpiScreen/epigenetic-screening-on-trip-clone/Data")
 mapping_mean <- get(load("mt20190510_mapping_mean"))
-indel.data <- get(load("mt20190510_indel.data"))
+indel.data <- get(load("mt20190502_indel.data"))
 mapping_mean_long <- get(load("mt20190510_mapping_mean_long"))
 chip_dendogram <- get(load("mt20190510_chip_dendogram"))
 mapping_mean_all <- get(load("mt20190329_mapping_mean_all"))
@@ -278,14 +278,14 @@ indel.data.high.drug <-
 ## Prepare t-statistic heatmaps of barcode vs. drug
 ```{r}
 # Create matrix and use heatmap function
-row.names(indel.data.high.drug.st) <- indel.data.high.drug.st$barcode
-indel.data.high.drug.st <- indel.data.high.drug.st[,c(-1)]
+indel.data.high.drug.st <- indel.data.high.drug.st %>% 
+  remove_rownames %>% column_to_rownames(var="barcode")
 
-row.names(indel.data.med.drug.st) <- indel.data.med.drug.st$barcode
-indel.data.med.drug.st <- indel.data.med.drug.st[,c(-1)]
+indel.data.med.drug.st <- indel.data.med.drug.st %>% 
+  remove_rownames %>% column_to_rownames(var="barcode")
 
-row.names(indel.data.low.drug.st) <- indel.data.low.drug.st$barcode
-indel.data.low.drug.st <- indel.data.low.drug.st[,c(-1)]
+indel.data.low.drug.st <- indel.data.low.drug.st %>% 
+  remove_rownames %>% column_to_rownames(var="barcode")
 
 ```
 
@@ -293,16 +293,16 @@ indel.data.low.drug.st <- indel.data.low.drug.st[,c(-1)]
 ```{r}
 # Create matrix and use heatmap function
 indel.data.high.count <- na.omit(indel.data.high.count)
-row.names(indel.data.high.count) <- indel.data.high.count$barcode
-indel.data.high.count <- indel.data.high.count[,c(-1)]
+indel.data.high.count <- indel.data.high.count %>% 
+  remove_rownames %>% column_to_rownames(var="barcode")
 
 indel.data.med.count <- na.omit(indel.data.med.count)
-row.names(indel.data.med.count) <- indel.data.med.count$barcode
-indel.data.med.count <- indel.data.med.count[,c(-1)]
+indel.data.med.count <- indel.data.med.count %>% 
+  remove_rownames %>% column_to_rownames(var="barcode")
 
 indel.data.low.count <- na.omit(indel.data.low.count)
-row.names(indel.data.low.count) <- indel.data.low.count$barcode
-indel.data.low.count <- indel.data.low.count[,c(-1)]
+indel.data.low.count <- indel.data.low.count %>% 
+  remove_rownames %>% column_to_rownames(var="barcode")
 
 ```
 
@@ -310,71 +310,71 @@ indel.data.low.count <- indel.data.low.count[,c(-1)]
 
 ## Generating heatmaps per barcode
 ```{r}
-# Loop for each target: high concentration
+# Add target to logratio df: high concentration
 target.high <- indel.data.high[,c(6,7)]
 target.high <- target.high[!duplicated(target.high), ]
 indel.data.high.drug2 <- melt(indel.data.high.drug)
 indel.data.high.drug2 <- dcast(indel.data.high.drug2, variable ~ barcode, value.var = "value")
 setnames(target.high, old = "Drug", new = "variable")
 indel.data.high.drug2 <- merge(indel.data.high.drug2, target.high)
-row.names(indel.data.high.drug2) <- indel.data.high.drug2$variable
-indel.data.high.drug2 <- indel.data.high.drug2[,-1]
+indel.data.high.drug2 <- indel.data.high.drug2 %>% 
+  remove_rownames %>% column_to_rownames(var="variable")
 data2 <- indel.data.high.drug2[-grep("Negative control|MRN|DNA-PK",indel.data.high.drug2$Target),]
 
-# Loop for each target: med concentration
+# Add target to logratio df: med concentration
 target.med <- indel.data.med[,c(6,7)]
 target.med <- target.med[!duplicated(target.med), ]
 indel.data.med.drug2 <- melt(indel.data.med.drug)
 indel.data.med.drug2 <- dcast(indel.data.med.drug2, variable ~ barcode, value.var = "value")
 setnames(target.med, old = "Drug", new = "variable")
 indel.data.med.drug2 <- merge(indel.data.med.drug2, target.med)
-row.names(indel.data.med.drug2) <- indel.data.med.drug2$variable
-indel.data.med.drug2 <- indel.data.med.drug2[,-1]
+indel.data.med.drug2 <- indel.data.med.drug2 %>% 
+  remove_rownames %>% column_to_rownames(var="variable")
 data3 <- indel.data.med.drug2[-grep("Negative control|MRN|DNA-PK",indel.data.med.drug2$Target),]
 
-# Loop for each target: low concentration
+# Add target to logratio df: low concentration
 target.low <- indel.data.low[,c(6,7)]
 target.low <- target.low[!duplicated(target.low), ]
 indel.data.low.drug2 <- melt(indel.data.low.drug)
 indel.data.low.drug2 <- dcast(indel.data.low.drug2, variable ~ barcode, value.var = "value")
 setnames(target.low, old = "Drug", new = "variable")
 indel.data.low.drug2 <- merge(indel.data.low.drug2, target.low)
-row.names(indel.data.low.drug2) <- indel.data.low.drug2$variable
-indel.data.low.drug2 <- indel.data.low.drug2[,-1]
+indel.data.low.drug2 <- indel.data.low.drug2 %>% 
+  remove_rownames %>% column_to_rownames(var="variable")
 data4 <- indel.data.low.drug2[-grep("Negative control|MRN|DNA-PK",indel.data.low.drug2$Target),]
 
 
-# Loop for each target: high concentration
+# Add target to efficiency df: high concentration
 target.high.eff <- indel.data.high[,c(6,7)]
 target.high.eff <- target.high.eff[!duplicated(target.high.eff), ]
 indel.data.high.drug2 <- melt(indel.data.high.eff)
 indel.data.high.drug2 <- dcast(indel.data.high.drug2, variable ~ barcode, value.var = "value")
 setnames(target.high.eff, old = "Drug", new = "variable")
 indel.data.high.drug2 <- merge(indel.data.high.drug2, target.high.eff)
-row.names(indel.data.high.drug2) <- indel.data.high.drug2$variable
-indel.data.high.drug2 <- indel.data.high.drug2[,-1]
+indel.data.high.drug2 <- indel.data.high.drug2 %>% 
+  remove_rownames %>% column_to_rownames(var="variable")
 data5 <- indel.data.high.drug2[-grep("Negative control|MRN|DNA-PK",indel.data.high.drug2$Target),]
 
-# Loop for each target: med concentration
+# Add target to efficiency df: med concentration
 target.med.eff <- indel.data.med[,c(6,7)]
 target.med.eff <- target.med.eff[!duplicated(target.med.eff), ]
 indel.data.med.drug2 <- melt(indel.data.med.eff)
 indel.data.med.drug2 <- dcast(indel.data.med.drug2, variable ~ barcode, value.var = "value")
 setnames(target.med.eff, old = "Drug", new = "variable")
 indel.data.med.drug2 <- merge(indel.data.med.drug2, target.med.eff)
-row.names(indel.data.med.drug2) <- indel.data.med.drug2$variable
-indel.data.med.drug2 <- indel.data.med.drug2[,-1]
+indel.data.med.drug2 <- indel.data.med.drug2 %>% 
+  remove_rownames %>% column_to_rownames(var="variable")
 data6 <- indel.data.med.drug2[-grep("Negative control|MRN|DNA-PK",indel.data.med.drug2$Target),]
 
-# Loop for each target: high concentration
+# Add target to efficiency df: low concentration
 target.low.eff <- indel.data.low[,c(6,7)]
 target.low.eff <- target.low.eff[!duplicated(target.low.eff), ]
 indel.data.low.drug2 <- melt(indel.data.low.eff)
 indel.data.low.drug2 <- dcast(indel.data.low.drug2, variable ~ barcode, value.var = "value")
 setnames(target.low.eff, old = "Drug", new = "variable")
 indel.data.low.drug2 <- merge(indel.data.low.drug2, target.low.eff)
-row.names(indel.data.low.drug2) <- indel.data.low.drug2$variable
-indel.data.low.drug2 <- indel.data.low.drug2[,-1]
+indel.data.low.drug2 <- indel.data.low.drug2 %>% 
+  remove_rownames %>% column_to_rownames(var="variable")
 data7 <- indel.data.low.drug2[-grep("Negative control|MRN|DNA-PK",indel.data.low.drug2$Target),]
 
 
@@ -382,23 +382,23 @@ data7 <- indel.data.low.drug2[-grep("Negative control|MRN|DNA-PK",indel.data.low
 
 
 # Heatmap per barcode
-row.names(indel.data.high.drug) <- indel.data.high.drug$barcode
-indel.data.high.drug <- indel.data.high.drug[,c(-1)]
+indel.data.high.drug <- indel.data.high.drug %>% 
+  remove_rownames %>% column_to_rownames(var="barcode")
 
-row.names(indel.data.med.drug) <- indel.data.med.drug$barcode
-indel.data.med.drug <- indel.data.med.drug[,c(-1)]
+indel.data.med.drug <- indel.data.med.drug %>% 
+  remove_rownames %>% column_to_rownames(var="barcode")
 
-row.names(indel.data.low.drug) <- indel.data.low.drug$barcode
-indel.data.low.drug <- indel.data.low.drug[,c(-1)]
+indel.data.low.drug <- indel.data.low.drug %>% 
+  remove_rownames %>% column_to_rownames(var="barcode")
 
-rownames(indel.data.high.eff) <- indel.data.high.eff$barcode
-indel.data.high.eff <- indel.data.high.eff[,-1]
+indel.data.high.eff <- indel.data.high.eff %>% 
+  remove_rownames %>% column_to_rownames(var="barcode")
 
-rownames(indel.data.med.eff) <- indel.data.med.eff$barcode
-indel.data.med.eff <- indel.data.med.eff[,-1]
+indel.data.med.eff <- indel.data.med.eff %>% 
+  remove_rownames %>% column_to_rownames(var="barcode")
 
-rownames(indel.data.low.eff) <- indel.data.low.eff$barcode
-indel.data.low.eff <- indel.data.low.eff[,-1]
+indel.data.low.eff <- indel.data.low.eff %>% 
+  remove_rownames %>% column_to_rownames(var="barcode")
 ```
 
 
@@ -757,11 +757,14 @@ pheatmap(as.matrix(indel.data.low.count.ess),
 ## Heatmap only HDACs
 ```{r}
 # Only select HDAC data, 1 uM concentration
+# data2 = logratio_high, data3 = logratio_med, data4 = logratio_low, 
+# data5 = efficiency_high, data6 = efficiency_med, data7 = efficiency_low
 hdac.logratio <- data7[data7$Target=="HDAC",]
 hdac.logratio <- hdac.logratio[,-19]
 hdac.logratio <- t(hdac.logratio)
 
 # Generate pheatmap
+# Use myBreaks5 for efficiency heatmap, myBreaks1 for logratio heatmap
 pheatmap(as.matrix(hdac.logratio), 
          annotation_col = target, 
          annotation_row = barcode.annotation,annotation_legend = F,
@@ -857,10 +860,11 @@ Next step is to import the chromatin data to generate a correlation matrix betwe
 ```{r correlation chip logratio, out.width= "100%", fig.align= "center", echo=FALSE}
 # Import chromatin data
 mapping_mean_chip <- mapping_mean
+mapping_mean_chip <- tibble::rownames_to_column(as.data.frame(mapping_mean_chip), "ChIP")
 chip_data <- melt(mapping_mean_chip, variable.name="barcode", value.name="mean")
-chip_data <- dcast(chip_data, Var2 ~ Var1, value.var = "mean")
-chip_data <- chip_data[chip_data$Var2 != 
-                         "ACCCCTAAAGGCGCTG" & chip_data$Var2 != "CTCTTAATCGCTGCC", ]
+chip_data <- dcast(chip_data, barcode ~ ChIP, value.var = "mean")
+chip_data <- chip_data[chip_data$barcode != 
+                         "ACCCCTAAAGGCGCTG" & chip_data$barcode != "CTCTTAATCGCTGCC", ]
 chip_data2 <- chip_data
 
 ## In case I want to include the mean.ratio
@@ -868,7 +872,6 @@ mean.ratio <- indel.data[indel.data$Drug == "DMSO",]
 mean.ratio <- mean.ratio[,c(1,15)]
 mean.ratio$ratio <- ave(mean.ratio$ratio, mean.ratio$barcode, FUN = function(x) mean(x))
 mean.ratio <- unique(mean.ratio)
-setnames(mean.ratio, "barcode", "Var2")
 chip_data <- merge(chip_data, mean.ratio)
 
 
@@ -878,18 +881,17 @@ delay.data$fold_dif.mean <- ave(delay.data$fold_difference, delay.data$barcode, 
 delay.data <- delay.data[,c(1,7)]
 delay.data <- delay.data[!duplicated(delay.data),]
 delay.data <- delay.data[c(-1,-11),]
-setnames(delay.data, "barcode", "Var2")
 chip_data <- merge(chip_data, delay.data)
 
 chip_data <- chip_data %>% 
-  remove_rownames %>% column_to_rownames(var="Var2")
+  remove_rownames %>% column_to_rownames(var="barcode")
 
 ## Ratio is influenced by which ChIP datasets?
 mean.ratio2 <- mean.ratio
 mean.ratio2 <- mean.ratio2 %>% 
-  remove_rownames %>% column_to_rownames(var="Var2")
+  remove_rownames %>% column_to_rownames(var="barcode")
 chip_data2 <- chip_data2 %>% 
-  remove_rownames %>% column_to_rownames(var="Var2")
+  remove_rownames %>% column_to_rownames(var="barcode")
 
 cor_ratio <- cor(mean.ratio2, chip_data2)
 chip_data3 <- chip_data2[,14,drop = F]
@@ -1166,19 +1168,19 @@ pheatmap(cor_hdac,
 ## Correlation plots individual drugs
 ```{r}
 ## In case I want to include the mean.ratio
-mean.ratio <- indel.data[indel.data$Drug == "MC-1293" & indel.data$conc == "1um",]
+mean.ratio <- indel.data[indel.data$Drug == "Decitabine",]
 mean.ratio <- mean.ratio[,c(1,25)]
 mean.ratio$logratio.platenorm <- ave(mean.ratio$logratio.platenorm, mean.ratio$barcode, FUN = function(x) mean(x))
 mean.ratio <- unique(mean.ratio)
-setnames(mean.ratio, "barcode", "Var2")
+
 
 ## Ratio is influenced by which ChIP datasets?
 mean.ratio2 <- mean.ratio
 mean.ratio2 <- mean.ratio2 %>% 
-  remove_rownames %>% column_to_rownames(var="Var2")
+  remove_rownames %>% column_to_rownames(var="barcode")
 
- chip_data <- chip_data %>% 
-   remove_rownames %>% column_to_rownames(var="rowname")
+ #chip_data <- chip_data %>% 
+  # remove_rownames %>% column_to_rownames(var="rowname")
 
 cor_ratio <- cor(mean.ratio2, chip_data)
 cor_ratio <- as.data.frame(cor_ratio)
@@ -1197,16 +1199,16 @@ Correlation")+
 # Scatterplot
 mean.ratio <- tibble::rownames_to_column(as.data.frame(mean.ratio2))
 chip_data <- tibble::rownames_to_column(as.data.frame(chip_data))
-hdac1.data <- chip_data[,c(1,11)]
+hdac1.data <- chip_data[,c(1,17)]
 hdac.1.data <- cbind(hdac1.data, mean.ratio2)
 
-ggplot(hdac.1.data, aes(x=HDAC1, y=logratio.platenorm))+
+ggplot(hdac.1.data, aes(x=WGBS, y=logratio.platenorm))+
   geom_point()+
   geom_smooth(method = lm) +
   theme_classic2()
 
 # Statistical significance?
-x <- cor.test(hdac.1.data$HDAC1, hdac.1.data$logratio.platenorm)
+x <- cor.test(hdac.1.data$WGBS, hdac.1.data$logratio.platenorm)
 
 ```
 
