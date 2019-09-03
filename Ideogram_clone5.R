@@ -9,7 +9,7 @@ chromsizes<-read.table("/home/r.schep/mydata/data/genomes/GRCh38/hg38_chromsizes
 chromsizes
 names(chromsizes)<-c("chr_r","pos_r")
 
-granges.clone5 <- read.csv2("/DATA/usr/m.trauernicht/Mapping_Clone5_9/mt20190509_clone5_genomicranges.csv")
+granges.clone5 <- read.csv2("/DATA/usr/m.trauernicht/projects/EpiScreen/Mapping_Clone5_9/mt20190509_clone5_genomicranges.csv")
 setnames(granges.clone5, "start", "start_pos")
 setnames(granges.clone5, "seqnames", "seqname")
 
