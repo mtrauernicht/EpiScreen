@@ -433,7 +433,7 @@ file.list <- list.files(pattern = "*_All.IndelFreqData.RData")
 RData <- sort(file.list, decreasing = TRUE)[1] #take the most recent.
 load(RData)
 
-setwd("/DATA/usr/m.trauernicht/EpiScreen/epigenetic-screening-on-trip-clone/Data/")
+setwd("/DATA/usr/m.trauernicht/projects/EpiScreen/epigenetic-screening-on-trip-clone/Data/")
 mutations.list <- get(load("mt20190510_mutations.list"))
 drugs.list <- read.delim("mt20190326_DrugNames.txt")
 ```
@@ -486,7 +486,7 @@ sum.list <- lapply(mutations.list, OverallIndels)
 OverallIndelPlot(mutations.list)
 
 # To create a PDF of these figures, for the small mutations.
-setwd("/DATA/usr/m.trauernicht/EpiScreen/epigenetic-screening-on-trip-clone/Results/")
+setwd("/DATA/usr/m.trauernicht/projects/EpiScreen/epigenetic-screening-on-trip-clone/Results/")
 filename <- SetFileName("_Overall_IndelSpectra.pdf", "mt")
 pdf(filename, width = 11, height = 8)
 OverallIndelPlot(mutations.list)
@@ -518,7 +518,7 @@ if (plot_sample %in% names(mutations.list)) {
   filename <- gsub("-", "", filename)
   filename <- gsub("_[.]", ".", filename)
   ### Run PDF
-  setwd("/DATA/usr/m.trauernicht/EpiScreen/epigenetic-screening-on-trip-clone/Results/")
+  setwd("/DATA/usr/m.trauernicht/projects/EpiScreen/epigenetic-screening-on-trip-clone/Results/")
   pdf(filename, width = 11, height = 8)
   ### make the plots
   #SampleIndelSpectra(plot_sample)
@@ -538,7 +538,7 @@ if (plot_sample %in% names(mutations.list)) {
 Again this can also be saved as a PDF.
 
 ```{r barcodes}
-setwd("/DATA/usr/m.trauernicht/EpiScreen/epigenetic-screening-on-trip-clone/Results/")
+setwd("/DATA/usr/m.trauernicht/projects/EpiScreen/epigenetic-screening-on-trip-clone/Results/")
 # This script produces histograms of the indels of a specific barcode in all the samples.
 # Preview :
 # #BarcodeIndelSpectrum("ACTGTCGAGTTGTCCG)
