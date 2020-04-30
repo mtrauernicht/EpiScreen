@@ -259,26 +259,9 @@ for (i in 1:18) {
 }
 ```
 
-## Mapping QC  
-
-Here we will have a look at the mapping quality and some conflicts.
-These conflicts can be of different nature:
-- mismatch in the barcode
-- multiple alignments
-- barcode present in both pools
- 
-### Diplicated integrations (mismatch in the barcode)  
-
-
-#### Manual curation
-
-Are there duplicated start positions. Basically the same integration but with a different barcode (due to sequencing/PCR errors)?  
-  
-## Data output pour the next scripts
-We need bedfiles of 1kb surrounding the integration sites for all the barcodes. The mapped barcodes from read 2 (A.2 and B.2)
-```{r}
-
-```
+# Conclusion
+- In general, the data looks very good
+- Some plates have wells with 0 reads - other wells take over the reads in this plate - we have to investigate further whether this can be a problem.
 
 # Session Info  
 ```{r}
