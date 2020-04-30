@@ -81,7 +81,7 @@ SetFileName <- function(filename, initials) {
 ## Data import
 ```{r Data Import}
 # Import data from 5_HitValidation_DrugScreen.Rmd
-setwd("/DATA/usr/m.trauernicht/projects/EpiScreen/epigenetic-screening-on-trip-clone/Data")
+setwd("/DATA/usr/m.trauernicht/projects/EpiScreen/data/files_scripts/")
 mapping_mean <- get(load("mt20190510_mapping_mean"))
 indel.data <- get(load("mt20190502_indel.data"))
 mapping_mean_long <- get(load("mt20190510_mapping_mean_long"))
