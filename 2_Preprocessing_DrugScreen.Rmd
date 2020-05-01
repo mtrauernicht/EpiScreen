@@ -328,26 +328,23 @@ mutations.dt.list <- lapply(mutations.dt.list, setDT, keep.rownames = TRUE)
 indels.df <- ldply(mutations.dt.list, data.frame)
 ```
 
-# Indel proportions data frame. 
- 
+# Add identifiers and compute indel ratios
 ```{r calculate_ratios}
 RSTP2_2000_indels.df <- indels.df
-# Assing condition and plasmid tranfection from the sample names to a column.
-RSTP2_2000_indels.df$.id <- gsub("(.*?).count.table", "\\1", 
-                                            RSTP2_2000_indels.df$.id)
-RSTP2_2000_indels.df$rep <- gsub(".*m_rep(.*?)_.*", "\\1", 
-                                            RSTP2_2000_indels.df$.id)
-RSTP2_2000_indels.df$plate <- gsub(".*_plate(.*?)_.*", "\\1", 
-                                           RSTP2_2000_indels.df$.id)
-RSTP2_2000_indels.df$conc <- gsub("_rep.*", "\\1", 
-                                         RSTP2_2000_indels.df$.id)
-RSTP2_2000_indels.df$Number <- gsub(".*plate.*_(.*?_.*?)","\\1", RSTP2_2000_indels.df$.id)
+# Assigning identifiers to df
+RSTP2_2000_indels.df <- RSTP2_2000_indels.df %>% 
+  mutate(.id = gsub("(.*?).count.table", "\\1", RSTP2_2000_indels.df$.id),
+         rep = gsub(".*m_rep(.*?)_.*", "\\1", RSTP2_2000_indels.df$.id),
+         plate = gsub(".*_plate(.*?)_.*", "\\1", RSTP2_2000_indels.df$.id),
+         conc = gsub("_rep.*", "\\1", RSTP2_2000_indels.df$.id),
+         Number = gsub(".*plate.*_(.*?_.*?).count.table","\\1", RSTP2_2000_indels.df$.id))
 
 # Import the drugs and match with the df
 RSTP2_2000_indels.df <- merge(drugs.list, RSTP2_2000_indels.df)
 
-# Calculate the +1/-7 ratio
-RSTP2_2000_indels.df$ratio <- RSTP2_2000_indels.df$X1 / RSTP2_2000_indels.df$X.7
+# Calculate +1/-7 ratios
+RSTP2_2000_indels.df <- RSTP2_2000_indels.df %>%
+  mutate(ratio = X1 / X.7)
 
 # Calculate the overall indel ratio
 RSTP2_2000_indels.df <- mutate_all(RSTP2_2000_indels.df, funs(replace(., is.na(.), 0)))
@@ -359,14 +356,16 @@ RSTP2_2000_indels.df$overall.ratio <- RSTP2_2000_indels.df[,"X0"] / (RSTP2_2000_
 # Calculate the efficiency
 RSTP2_2000_indels.df$efficiency <- (1 - RSTP2_2000_indels.df[,"overall.ratio"])
 
-decitabine.rep3 <- RSTP2_2000_indels.df[RSTP2_2000_indels.df$Drug == "Decitabine" & RSTP2_2000_indels.df$rep == "3",]
-decitabine <- RSTP2_2000_indels.df[RSTP2_2000_indels.df$Drug == "Decitabine",]
-decitabine2 <- decitabine[,c(-6:-100)]
+# Calculate the MMEJ ratio
+RSTP2_2000_indels.df <- RSTP2_2000_indels.df %>%
+  mutate(MMEJ_fraction = X.7 / all.indels,
+         NHEJ_fraction = X1 / all.indels,
+         MMEJ_score = MMEJ_fraction / (MMEJ_fraction + NHEJ_fraction))
 
 
 # Let's plot the distribution of the amount of reads per barcode
 p <- ggplot(RSTP2_2000_indels.df, aes(read.count))
-p + geom_density()
+p + geom_density() + theme_bw() + labs(title = "overall read distribution")
 ```
 
 ## Processed data export
