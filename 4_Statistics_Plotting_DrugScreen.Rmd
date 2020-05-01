@@ -35,7 +35,7 @@ cat(tabl) # output the table in a format good for HTML/PDF/docx conversion
 
 # Data processing
 ## Path, Libraries, Parameters and Useful Functions
-```{r setup}
+```{r setup, echo = FALSE, warning = FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 StartTime <-Sys.time()
 
@@ -58,7 +58,7 @@ library(ggpubr)
 
 ### Custom functions
 Functions used thoughout this script.
-```{r}
+```{r load_functions, echo = FALSE, warning = FALSE}
 
 p.adjust <- function(p, method = p.adjust.methods, n = length(p))
 {
@@ -297,7 +297,7 @@ corColor <- function(data, mapping, color = I("black"), sizeRange = c(1, 3), ...
 
 
 ## Data import
-```{r data import}
+```{r data import, echo = FALSE, warning = FALSE}
 setwd("/DATA/usr/m.trauernicht/projects/EpiScreen/data/files_scripts")
 
 # Import data from preprocessing script
@@ -312,7 +312,7 @@ viability <- read.csv2("EpiscreenAllPlates.csv")
 mean.ratio.data <- read.delim("mt20190124_meanratiosperbarcode")
 ```
 ## Visualize viability data
-```{r}
+```{r viability_overview, echo = FALSE, warning = FALSE}
 viability.df <- melt(viability)
 viability.df$value <- ave(viability.df$value, viability.df$variable, FUN = function(x) x/max(x))
 
@@ -327,34 +327,35 @@ print(p)
 
 
 
-## Data pre-processing
-```{r pre-processing}
+## Data pre-processing - clean up dataframe and add important specifiers
+```{r pre-processing, echo = FALSE, warning = FALSE}
 # Add viability data to indel.data
 indel.data <- merge(viability.data, indel.data) 
 setnames(indel.data, old = "V2", new = "rn")
+
+# Add previously estimated +1/-7 ratio data for correlation check-ups
 indel.data <- merge(mean.ratio.data, indel.data, all = T)
 all.indel.data <- indel.data
 
-
+# Rename columns
 setnames(indel.data, old = ".id", new = "condition")
 setnames(indel.data, old = "rn", new = "barcode")
 
-# Remove weird barcode?
+# Remove barcodes with abnormal counts from analysis
 indel.data <- indel.data[indel.data$barcode != "ACCCCTAAAGGCGCTG" &
                            indel.data$barcode != "CTCTTAATCGCTGCC",]
 
 
-# Also, we want to exclude remaining barcodes with very low reads
-indel.data <- indel.data[indel.data$read.count1.7 > 30,]
-
+# Set a threshold on minimun +1 and -7 read counts to exclude noisy data
 low.indel.count <- indel.data[indel.data$read.count1.7 < 30,]
 low.indel.count <- low.indel.count[low.indel.count$X0 > 100,]
 low.indel.count <- low.indel.count[!low.indel.count$Drug %in% "PAO",]
 
+indel.data <- indel.data[indel.data$read.count1.7 > 30,]
+
 # Remove 0, NAs, Infs
 indel.data <- indel.data[is.finite(indel.data$ratio),]
 indel.data <- indel.data[indel.data$ratio != 0,]
-
 
 # Add plate specifier
 indel.data$plate.nr <- "1"
@@ -383,117 +384,26 @@ indel.data$logratio <- ave(indel.data$ratio, FUN = function(x) log2(x))
 # Compute relative viability
 indel.data$viability <- ave(indel.data$viability, indel.data$plate.nr, FUN = function(x) x/max(x))
 
-# We want to exclude reads from cells that have reduced viability (set cut-off at 50% reduced viability)
+# We want to exclude reads from cells that have reduced viability (set cut-off at 45% reduced viability)
 indel.data <- indel.data[indel.data$viability > 0.45,]
 
-# Exclude data completely (remove the remaining datapoint) if 2 out of 3 replicates were already excluded untill now
+
+## Add some more classifiers
 indel.data$classifier <- gsub("_rep[0-9]", "\\1", indel.data$condition)
 indel.data$uniqueID <- paste(indel.data$barcode, indel.data$classifier)
-# indel.data <- indel.data[indel.data$uniqueID %in% names(which(table(indel.data$uniqueID) > 1)), ]
+
+# Optional: Exclude data completely (remove the remaining datapoint) if 2 out of 3 replicates were already excluded untill now
+## indel.data <- indel.data[indel.data$uniqueID %in% names(which(table(indel.data$uniqueID) > 1)), ]
 ```
-
-## Plotting indel spectra for certain drugs
-```{r plotting indel spectra, out.width= "80%", fig.align= "center", echo = FALSE, warning = FALSE}
-# indel.data.plot <- indel.data.all[indel.data.all$V2 == "GAGCGCGTCACCGGGT" & 
-#                                     indel.data.all$Drug == "GSK J4 HCl" | 
-#                                     indel.data.all$V2 == "GAGCGCGTCACCGGGT" & 
-#                                     indel.data.all$Drug == "DMSO",]
-# indel.data.plot.dmso <- indel.data.plot[indel.data.plot$Drug == "DMSO" & indel.data.plot$Number == "B1_013",]
-# indel.data.plot.dmso2 <- indel.data.plot[indel.data.plot$Drug == "DMSO" & indel.data.plot$Number == "B1_109" & indel.data.plot$rep == "2" & indel.data.plot$conc == "1um",]
-# indel.data.plot.dmso <- rbind(indel.data.plot.dmso, indel.data.plot.dmso2)
-# indel.data.plot.gsk <- indel.data.plot[indel.data.plot$Drug == "GSK J4 HCl",]
-# indel.data.plot <- rbind(indel.data.plot.dmso, indel.data.plot.gsk)
-# indel.data.plot <- indel.data.plot[,c(2,16,18,19)]
-# indel.data.plot$ratio <- log2(indel.data.plot$ratio)
-# indel.data.plot$Drug <- as.character(indel.data.plot$Drug)
-# indel.data.plot$Drug <- as.factor(indel.data.plot$Drug)
-# 
-# # Difference calculation
-# for (i in unique(indel.data.plot$conc)) {
-# indel.data.plot$diff[indel.data.plot$conc == i] <- 
-#   indel.data.plot$ratio[indel.data.plot$conc == i & indel.data.plot$Drug == "GSK J4 HCl"] - 
-#   indel.data.plot$ratio[indel.data.plot$conc == i & indel.data.plot$Drug == "DMSO"]
-# }
-# 
-# indel.data.plot$mean.ratio <- ave(indel.data.plot$ratio, indel.data.plot$Drug, indel.data.plot$conc, FUN = function(x) mean(x))
-# indel.data.plot$mean.diff <- ave(indel.data.plot$diff, indel.data.plot$Drug, indel.data.plot$conc, FUN = function(x) mean(x))
-# indel.data.plot$SD.ratio <- ave(indel.data.plot$ratio, indel.data.plot$Drug, indel.data.plot$conc, FUN = function(x) sd(x))
-# indel.data.plot$SD.diff <- ave(indel.data.plot$diff, indel.data.plot$Drug, indel.data.plot$conc, FUN = function(x) sd(x))
-# 
-# indel.data.plot$conc <- factor(indel.data.plot$conc, levels=c("100nm", "1um", "10um"))
-# 
-# # Plotting 
-# p <- ggplot(indel.data.plot[indel.data.plot$Drug == "DMSO",]) + 
-#   geom_errorbar(aes(x = conc, ymin = mean.ratio-SD.ratio, 
-#                     ymax = mean.ratio+SD.ratio), width = 0.2)+
-#   geom_point(aes(x=conc, y=ratio, color=rep)) +
-#   scale_color_brewer(palette = "Set2")+
-#   coord_cartesian(ylim = c(0, 6)) + 
-#   theme_classic2()
-# 
-# p1 <- p  + geom_bar(data = indel.data.plot[indel.data.plot$Drug == "DMSO",],
-#                                            stat= "identity", 
-#                                            aes(x=conc, y=mean.ratio/3))
-# p1
-# 
-# ggplot(indel.data.plot[indel.data.plot$Drug == "GSK J4 HCl",], aes(x=conc, y=ratio))+
-#   geom_bar(indel.data.plot[indel.data.plot$Drug == "GSK J4 HCl",],
-#            stat= "identity", aes(x=conc, y=mean.ratio/3)) +
-#   geom_errorbar(aes(x = conc, ymin = mean.ratio-SD.ratio, ymax = mean.ratio+SD.ratio), width = 0.2)+
-#   geom_point(aes(x=conc, y=ratio, color=rep)) +
-#   scale_color_brewer(palette = "Set2")+
-#   coord_cartesian(ylim = c(0, 6)) + 
-#   theme_classic2()
-# 
-# ggplot(indel.data.plot[indel.data.plot$Drug == "GSK J4 HCl",], aes(x=conc, y=diff))+
-#   geom_bar(indel.data.plot[indel.data.plot$Drug == "GSK J4 HCl",],
-#            stat= "identity", aes(x=conc, y=mean.diff/3)) +
-#   geom_errorbar(aes(x = conc, ymin = mean.diff-SD.diff, ymax = mean.diff+SD.diff), width = 0.2)+
-#   geom_point(aes(x=conc, y=diff, color=rep)) +
-#   scale_color_brewer(palette = "Set2")+
-#   coord_cartesian(ylim = c(0, 4)) + 
-#   theme_classic2()
-```
-
-
 
 
 
 # Analysis
 
-## Compute relative barcode counts
-```{r}
-# Plate normalization: substract dmso bc counts from each drug per plate
-for (i in 1:18) {
-  for (j in unique(indel.data$barcode)) {
-  dmso.mean <- 
-    mean(indel.data$read.count[indel.data$Drug == 
-                        "DMSO" & indel.data$plate.nr == 
-                        i & indel.data$barcode == j])
-  indel.data$rel.counts[indel.data$plate.nr == i & indel.data$barcode == j] <- 
-    indel.data$read.count[indel.data$plate.nr == i & indel.data$barcode == j] /
-    dmso.mean
-  }
-}
-
-
-# Check which drugs alter barcode count
-indel.data$mean.count <- ave(indel.data$rel.counts, indel.data$Drug, indel.data$barcode, FUN = function(x) mean(x))
-indel.data.bc.count <- indel.data[indel.data$mean.count >  1.5 | indel.data$mean.count < 0.666,]
-
-ggplot(indel.data.bc.count, aes(colour = barcode, y = mean.count, x = reorder(Drug, Drug, function(x) -length(x)))) + 
-    geom_point() +
-    theme(axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1, size = 12)) + 
-    ylab("datapoints") + xlab("target group") + labs(title = "datapoints drugs with altered bc counts")
-
-```
-
-
-
 ## Data analysis
-```{r data analysis}
+```{r data analysis, echo = FALSE, warning = FALSE}
 ## Normalize the data
-# Plate normalization: substract log(DMSO.mean) for each drug per plate
+# Plate normalization: substract log2(DMSO.mean)ratio from log2(drug)ratio per plate
 for (i in 1:18) {
   for (j in unique(indel.data$barcode)) {
   dmso.mean <- mean(indel.data$logratio[indel.data$Drug == 
@@ -517,157 +427,147 @@ for (i in 1:18) {
   }
 }
 
-## Perform t-tests
+## Perform t-tests - save in different file
 
 # t-test for target groups
-indel.data2 <- indel.data[indel.data$Target == "Aurora Kinase" |
+indel.data.aurora <- indel.data[indel.data$Target == "Aurora Kinase" |
                             indel.data$Drug == "DMSO" &
                             indel.data$conc == "1um",]
-indel.data2$logratio.drug <- ave(indel.data2$logratio.platenorm, 
-                                 indel.data2$Target,
-                                 indel.data2$rep,
+indel.data.aurora$logratio.drug <- ave(indel.data.aurora$logratio.platenorm, 
+                                 indel.data.aurora$Target,
+                                 indel.data.aurora$rep,
                                  FUN = function(x) mean(x))
-indel.data2 <- indel.data2[,c(7,12,27)]
-indel.data2 <- unique(indel.data2)
-indel.data2$mean <- ave(indel.data2$logratio.drug, indel.data2$Target, FUN = function(x) mean(x))
-indel.data2$sd <- ave(indel.data2$logratio.drug, indel.data2$Target, FUN = function(x) sd(x))
+indel.data.aurora <- indel.data.aurora %>% select(Target, rep, logratio.drug) %>% unique()
+indel.data.aurora$mean <- ave(indel.data.aurora$logratio.drug, indel.data.aurora$Target, FUN = function(x) mean(x))
+indel.data.aurora$sd <- ave(indel.data.aurora$logratio.drug, indel.data.aurora$Target, FUN = function(x) sd(x))
 
-for (i in unique(indel.data2$Target)) {
-    x <- indel.data2[indel.data2$Target == "Negative Control",]
-    y <- indel.data2[indel.data2$Target == "Aurora Kinase",]
+for (i in unique(indel.data.aurora$Target)) {
+    x <- indel.data.aurora[indel.data.aurora$Target == "Negative Control",]
+    y <- indel.data.aurora[indel.data.aurora$Target == "Aurora Kinase",]
     
     if (nrow(y)>1) {
-    indel.data2$p.value[indel.data2$Target == i] <- 
+    indel.data.aurora$p.value[indel.data.aurora$Target == i] <- 
       t.test(x$logratio.drug, y$logratio.drug)$p.value
     
-    indel.data2$statistic[indel.data2$Target == i] <- 
+    indel.data.aurora$statistic[indel.data.aurora$Target == i] <- 
       t.test(x$logratio.drug, y$logratio.drug)$statistic
   
-    indel.data2$conf.int1[indel.data2$Target == i] <- 
+    indel.data.aurora$conf.int1[indel.data.aurora$Target == i] <- 
       t.test(x$logratio.drug, y$logratio.drug)$conf.int[1]
   
-    indel.data2$conf.int2[indel.data2$Target == i] <- 
+    indel.data.aurora$conf.int2[indel.data.aurora$Target == i] <- 
       t.test(x$logratio.drug, y$logratio.drug)$conf.int[2]
     }
 }
 
 
-# Adjust p-values for multiple testing
-indel.data2 <- indel.data2[,c(1,4,5,6)]
-indel.data2 <- unique(indel.data2)
+# Select relevant data
+indel.data.aurora <- indel.data.aurora %>% select(Target, mean, sd, p.value) %>% unique()
 
 
 # t-test for controls
-indel.data2 <- indel.data[indel.data$Drug == "DNA-PKi" |
+indel.data.controls <- indel.data[indel.data$Drug == "DNA-PKi" |
                             indel.data$Drug == "DMSO" |
                             indel.data$Drug == "Mirin",]
-indel.data2$logratio.drug <- ave(indel.data2$logratio.platenorm, 
-                                 indel.data2$Drug,
-                                 indel.data2$rep, FUN = function(x) mean(x))
-indel.data2 <- indel.data2[,c(6,12,27)]
-indel.data2 <- unique(indel.data2)
-indel.data2$mean <- ave(indel.data2$logratio.drug, indel.data2$Drug,  FUN = function(x) mean(x))
-indel.data2$sd <- ave(indel.data2$logratio.drug, indel.data2$Drug,  FUN = function(x) sd(x))
+indel.data.controls$logratio.drug <- ave(indel.data.controls$logratio.platenorm, 
+                                 indel.data.controls$Drug,
+                                 indel.data.controls$rep, FUN = function(x) mean(x))
+indel.data.controls <- indel.data.controls %>% select(Drug, rep, logratio.drug) %>% unique()
+indel.data.controls$mean <- ave(indel.data.controls$logratio.drug, indel.data.controls$Drug,  FUN = function(x) mean(x))
+indel.data.controls$sd <- ave(indel.data.controls$logratio.drug, indel.data.controls$Drug,  FUN = function(x) sd(x))
 
-for (i in unique(indel.data2$Drug)) {
-    x <- indel.data2[indel.data2$Drug == "DMSO",]
-    y <- indel.data2[indel.data2$Drug == i,]
+for (i in unique(indel.data.controls$Drug)) {
+    x <- indel.data.controls[indel.data.controls$Drug == "DMSO",]
+    y <- indel.data.controls[indel.data.controls$Drug == i,]
     
     if (nrow(y)>1) {
-    indel.data2$p.value[indel.data2$Drug == i] <- 
+    indel.data.controls$p.value[indel.data.controls$Drug == i] <- 
       t.test(x$logratio.drug, y$logratio.drug)$p.value
     
-    indel.data2$statistic[indel.data2$Drug == i] <- 
+    indel.data.controls$statistic[indel.data.controls$Drug == i] <- 
       t.test(x$logratio.drug, y$logratio.drug)$statistic
   
-    indel.data2$conf.int1[indel.data2$Drug == i] <- 
+    indel.data.controls$conf.int1[indel.data.controls$Drug == i] <- 
       t.test(x$logratio.drug, y$logratio.drug)$conf.int[1]
   
-    indel.data2$conf.int2[indel.data2$Drug == i] <- 
+    indel.data.controls$conf.int2[indel.data.controls$Drug == i] <- 
       t.test(x$logratio.drug, y$logratio.drug)$conf.int[2]
     }
 }
 
 
 # Select relevant data
-indel.data2 <- indel.data2[,c(1,4,5,6)]
-indel.data2 <- unique(indel.data2)
+indel.data.controls <- indel.data.controls %>% select(Drug, mean, sd, p.value) %>% unique()
 
 
 # t-test for individual drugs
-indel.data2 <- indel.data
-indel.data2$logratio.drug <- ave(indel.data2$logratio.platenorm, 
-                                 indel.data2$Drug, indel.data$conc,
-                                 indel.data2$rep, FUN = function(x) mean(x))
-indel.data2 <- indel.data2[,c(6,12,14,27)]
-indel.data2 <- unique(indel.data2)
-indel.data2$mean <- ave(indel.data2$logratio.drug, indel.data2$Drug, indel.data2$conc, FUN = function(x) mean(x))
-indel.data2$sd <- ave(indel.data2$logratio.drug, indel.data2$Drug, indel.data2$conc, FUN = function(x) sd(x))
+indel.data.drugs <- indel.data
+indel.data.drugs$logratio.drug <- ave(indel.data.drugs$logratio.platenorm, 
+                                 indel.data.drugs$Drug, indel.data$conc,
+                                 indel.data.drugs$rep, FUN = function(x) mean(x))
+indel.data.drugs <- indel.data.drugs %>% select(Drug, rep, conc, logratio.drug) %>% unique()
+indel.data.drugs$mean <- ave(indel.data.drugs$logratio.drug, indel.data.drugs$Drug, indel.data.drugs$conc, FUN = function(x) mean(x))
+indel.data.drugs$sd <- ave(indel.data.drugs$logratio.drug, indel.data.drugs$Drug, indel.data.drugs$conc, FUN = function(x) sd(x))
 
-for (j in unique(indel.data2$conc)) {
-for (i in unique(indel.data2$Drug)) {
-    x <- indel.data2[indel.data2$Drug == "DMSO" & indel.data2$conc == j,]
-    y <- indel.data2[indel.data2$Drug == i & indel.data2$conc == j,]
+for (j in unique(indel.data.drugs$conc)) {
+for (i in unique(indel.data.drugs$Drug)) {
+    x <- indel.data.drugs[indel.data.drugs$Drug == "DMSO" & indel.data.drugs$conc == j,]
+    y <- indel.data.drugs[indel.data.drugs$Drug == i & indel.data.drugs$conc == j,]
     
     if (nrow(y)>1) {
-    indel.data2$p.value[indel.data2$Drug == i & indel.data2$conc == j] <- 
+    indel.data.drugs$p.value[indel.data.drugs$Drug == i & indel.data.drugs$conc == j] <- 
       t.test(x$logratio.drug, y$logratio.drug)$p.value
     
-    indel.data2$statistic[indel.data2$Drug == i & indel.data2$conc == j] <- 
+    indel.data.drugs$statistic[indel.data.drugs$Drug == i & indel.data.drugs$conc == j] <- 
       t.test(x$logratio.drug, y$logratio.drug)$statistic
   
-    indel.data2$conf.int1[indel.data2$Drug == i & indel.data2$conc == j] <- 
+    indel.data.drugs$conf.int1[indel.data.drugs$Drug == i & indel.data.drugs$conc == j] <- 
       t.test(x$logratio.drug, y$logratio.drug)$conf.int[1]
   
-    indel.data2$conf.int2[indel.data2$Drug == i & indel.data2$conc == j] <- 
+    indel.data.drugs$conf.int2[indel.data.drugs$Drug == i & indel.data.drugs$conc == j] <- 
       t.test(x$logratio.drug, y$logratio.drug)$conf.int[2]
     }
 }
 }
 
 # Select relevant data
-indel.data2 <- indel.data2[,c(1,3,5,6,7)]
-indel.data2 <- unique(indel.data2)
-
+indel.data.drugs <- indel.data.drugs %>% select(Drug, conc, mean, sd, p.value) %>% unique()
 
 # t-test for each drug, treating integrations as replicates
-indel.data2 <- indel.data
-indel.data2$logratio.drug <- ave(indel.data2$logratio.platenorm, 
-                                 indel.data2$Drug, indel.data$conc,
-                                 indel.data2$rep, indel.data2$barcode,
+indel.data.drugs.int <- indel.data
+indel.data.drugs.int$logratio.drug <- ave(indel.data.drugs.int$logratio.platenorm, 
+                                 indel.data.drugs.int$Drug, indel.data$conc,
+                                 indel.data.drugs.int$rep, indel.data.drugs.int$barcode,
                                  FUN = function(x) mean(x))
-indel.data2 <- indel.data2[,c(6,12,14,21,27)]
-indel.data2 <- unique(indel.data2)
-indel.data2$mean <- ave(indel.data2$logratio.drug, indel.data2$Drug, indel.data2$conc, FUN = function(x) mean(x))
-indel.data2$sd <- ave(indel.data2$logratio.drug, indel.data2$Drug, indel.data2$conc, FUN = function(x) sd(x))
+indel.data.drugs.int <- indel.data.drugs.int %>% select(Drug, rep, conc, classifier, logratio.drug) %>%
+  unique()
+indel.data.drugs.int$mean <- ave(indel.data.drugs.int$logratio.drug, indel.data.drugs.int$Drug, indel.data.drugs.int$conc, FUN = function(x) mean(x))
+indel.data.drugs.int$sd <- ave(indel.data.drugs.int$logratio.drug, indel.data.drugs.int$Drug, indel.data.drugs.int$conc, FUN = function(x) sd(x))
 
-for (j in unique(indel.data2$conc)) {
-for (i in unique(indel.data2$Drug)) {
-    x <- indel.data2[indel.data2$Drug == "DMSO" & indel.data2$conc == j,]
-    y <- indel.data2[indel.data2$Drug == i & indel.data2$conc == j,]
+for (j in unique(indel.data.drugs.int$conc)) {
+for (i in unique(indel.data.drugs.int$Drug)) {
+    x <- indel.data.drugs.int[indel.data.drugs.int$Drug == "DMSO" & indel.data.drugs.int$conc == j,]
+    y <- indel.data.drugs.int[indel.data.drugs.int$Drug == i & indel.data.drugs.int$conc == j,]
     
     if (nrow(y)>1) {
-    indel.data2$p.value[indel.data2$Drug == i & indel.data2$conc == j] <- 
+    indel.data.drugs.int$p.value[indel.data.drugs.int$Drug == i & indel.data.drugs.int$conc == j] <- 
       t.test(x$logratio.drug, y$logratio.drug)$p.value
     
-    indel.data2$statistic[indel.data2$Drug == i & indel.data2$conc == j] <- 
+    indel.data.drugs.int$statistic[indel.data.drugs.int$Drug == i & indel.data.drugs.int$conc == j] <- 
       t.test(x$logratio.drug, y$logratio.drug)$statistic
   
-    indel.data2$conf.int1[indel.data2$Drug == i & indel.data2$conc == j] <- 
+    indel.data.drugs.int$conf.int1[indel.data.drugs.int$Drug == i & indel.data.drugs.int$conc == j] <- 
       t.test(x$logratio.drug, y$logratio.drug)$conf.int[1]
   
-    indel.data2$conf.int2[indel.data2$Drug == i & indel.data2$conc == j] <- 
+    indel.data.drugs.int$conf.int2[indel.data.drugs.int$Drug == i & indel.data.drugs.int$conc == j] <- 
       t.test(x$logratio.drug, y$logratio.drug)$conf.int[2]
     }
 }
 }
 
-# Adjust p-values for multiple testing
-indel.data2$p.value.adjust <- p.adjust(indel.data2$p.value)
-indel.data2 <- indel.data2[,c(1,3,6,7,12)]
-indel.data2 <- unique(indel.data2)
-
-
+# Adjust p-values for multiple testing and select relevant data
+indel.data.drugs.int$p.value.adjust <- p.adjust(indel.data.drugs.int$p.value)
+indel.data.drugs.int <- indel.data.drugs.int %>% select(Drug, conc, mean, sd, p.value) %>% unique()
 
 
 
@@ -727,8 +627,8 @@ indel.data2$logratio.sd <- ave(indel.data$logratio.platenorm,
                                  indel.data$Drug,
                                  indel.data$conc,
                                  FUN = function(x) sd(x))
-indel.data2 <- indel.data2[,c(1,6,14,27,32,33,34)]
-indel.data2 <- unique(indel.data2)
+indel.data2 <- indel.data2 %>% select(barcode, Drug, conc, logratio.platenorm, 
+                                      p.value.adjust, logratio.mean, logratio.sd) %>% unique()
 
 
 # Create outlier df based on t-statistic
@@ -742,8 +642,6 @@ indel.data$logratio.mean <-
 indel.data$efficiency.mean <- 
   ave(indel.data$efficiency.platenorm, 
       indel.data$classifier, indel.data$barcode, FUN = function(x) mean(x))
-
-
 ```
 
 
@@ -756,58 +654,58 @@ indel.data <- merge(indel.data, integrations)
 
 # Density plot logratio of the controls
 ggplot(data = indel.data[indel.data$Drug == c("DMSO","DNA-PKi","Mirin"),], 
-       aes(x = logratio.platenorm, fill = Target)) + 
+       aes(x = logratio.platenorm, fill = Target)) + theme_classic() +
   geom_density() + xlab("logratio") + labs(title = "logratio density of the controls")
 
 # Density plot logratio 
 ggplot(data = indel.data, aes(x = logratio.platenorm, fill = Target)) + 
-  geom_density() + xlab("logratio")+ labs(title = "logratio density of all targets") +
+  geom_density() + xlab("logratio")+ labs(title = "logratio density of all targets") + theme_classic() +
   theme(legend.text=element_text(size=18))
 
 # Integral of logratio density plot per target group
 ggplot(data = indel.data, 
        aes(x = logratio.platenorm)) +
-  xlab("logratio") + ylab("acumulative value")+ stat_ecdf(aes(colour = Target))+ 
+  xlab("logratio") + ylab("acumulative value")+ stat_ecdf(aes(colour = Target))+ theme_classic() +
   labs(title = "accumulative logratio of all targets")
 
 
 # Density plot logratio per target
 ggplot(data = indel.data, 
        aes(x = logratio.platenorm, fill = Target)) + geom_density()+
-  xlab("logratio") + facet_wrap(~ Target, nrow = 4)+ 
+  xlab("logratio") + facet_wrap(~ Target, nrow = 4)+ theme_classic() +
   labs(title = "logratio density per target")
 
 # Density plot logratio per integration
 ggplot(data = indel.data, 
        aes(x = logratio.platenorm, fill = Target)) + geom_density()+
-  xlab("logratio") + facet_wrap(~ integration, nrow = 6, scales = "free")+ 
+  xlab("logratio") + facet_wrap(~ integration, nrow = 6, scales = "free")+ theme_classic() +
   labs(title = "logratio density per integration")
 
 # Density plot efficiency
-ggplot(data = indel.data, aes(x = efficiency, fill = Target)) + geom_density() +
+ggplot(data = indel.data, aes(x = efficiency, fill = Target)) + geom_density() + theme_classic() +
 xlab("efficiency")+ labs(title = "efficiency density")
 
 # Density plot efficiency per target
 ggplot(data = indel.data, 
        aes(x = efficiency.platenorm, fill = Target)) + geom_density()+
-  xlab("efficiency: normalized over plate") + facet_grid(rows = vars(Target))+ 
+  xlab("efficiency: normalized over plate") + facet_grid(rows = vars(Target))+ theme_classic() +
   labs(title = "efficiency density per target group")
 
 # Density plot efficiency per integration
 ggplot(data = indel.data, 
-       aes(x = efficiency.platenorm, fill = Target)) + geom_density()+
+       aes(x = efficiency.platenorm, fill = Target)) + geom_density()+ theme_classic() +
   xlab("efficiency: normalized over plate") + facet_wrap(~ Target, nrow = 4)+ 
   labs(title = "efficiency density per integration")
 
 # Integral of density plot
 ggplot(data = indel.data, 
        aes(x = efficiency.platenorm)) +
-  xlab("efficiency: normalized over plate") + stat_ecdf(aes(colour = Target))+ 
+  xlab("efficiency: normalized over plate") + stat_ecdf(aes(colour = Target))+ theme_classic() +
   labs(title = "integral of efficiency density")
 
 # Density plot normalized efficiency of the controls
 ggplot(data = indel.data[indel.data$Drug == c("DMSO","DNA-PKi","Mirin"),], 
-       aes(x = efficiency.platenorm, fill = Target)) + geom_density() +
+       aes(x = efficiency.platenorm, fill = Target)) + geom_density() + theme_classic() +
   xlab("efficiency: normalized over plate")+ 
   labs(title = "normalized efficiency density of controls")
 
@@ -815,32 +713,32 @@ ggplot(data = indel.data[indel.data$Drug == c("DMSO","DNA-PKi","Mirin"),],
 ggplot(data = indel.data[indel.data$Drug == c("DMSO","DNA-PKi","Mirin"),], 
        aes(x = statistic, fill = Target)) + geom_density() +
 geom_vline(data=indel.data, aes(xintercept=4),linetype="dashed", size=1) + 
-  geom_vline(data=indel.data, aes(xintercept=-4),linetype="dashed", size=1)+ 
+  geom_vline(data=indel.data, aes(xintercept=-4),linetype="dashed", size=1)+ theme_classic() +
   xlab("t-statistic")+ labs(title = "t-statistic density of controls")
 
 # Density plots t-distribution
 ggplot(data = indel.data, aes(x = statistic, fill = Target)) + geom_density() +
 geom_vline(data=indel.data, aes(xintercept=4),linetype="dashed", size=1) + 
-  geom_vline(data=indel.data, aes(xintercept=-4),linetype="dashed", size=1)+ 
+  geom_vline(data=indel.data, aes(xintercept=-4),linetype="dashed", size=1)+ theme_classic() +
   xlab("t-statistic")+ labs(title = "t-statistic density")
 
 # Density plot t-statistic + facet_wrap
  ggplot(data = indel.data, aes(x = statistic, fill = Target)) + geom_density() + 
    geom_vline(data=indel.data, aes(xintercept=4),linetype="dashed", size=1) + 
-   geom_vline(data=indel.data, aes(xintercept=-4),linetype="dashed", size=1)+ 
+   geom_vline(data=indel.data, aes(xintercept=-4),linetype="dashed", size=1)+ theme_classic() +
    xlab("t-statistic") + facet_wrap(~Target, nrow = 4, scales = "free")+ 
    labs(title = "t-statistic density per target group")
 
 # Total amount of drugs per target group
 ggplot(indel.data, aes(x = reorder(Target,Target, function(x)-length(x)))) +
-  geom_bar()+
+  geom_bar()+theme_classic() +
   theme(axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1, size = 12))+ 
   ylab("datapoints") + xlab("target group")+ labs(title = "datapoints per target group")
 
 # Relative amount of drugs in outlier df
 ggplot(NULL,aes(x = reorder(Target,Target,function(x)-length(x)))) + 
       geom_bar(aes(fill="amount non-outliers"), data = indel.data, alpha = 0.5)+
-  geom_bar(aes(fill="amount outlier"), data = t.outlier.df, alpha = 0.5)+
+  geom_bar(aes(fill="amount outlier"), data = t.outlier.df, alpha = 0.5)+theme_classic() +
   theme(axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1, size = 12))+ 
   ylab("datapoints") + xlab("target group") + labs(title = "outlier vs. non-outlier distribution per drug category", fill = "groups")
 
@@ -860,7 +758,7 @@ p <- ggplot(indel.data2, aes(x = reorder(Target,Target,function(x)-length(x)),
       geom_bar(stat="identity") +
     labs(fill = "Log2(+1/-7)ratio Change")+
   scale_fill_brewer(palette = "Set2")+
-  coord_flip()+
+  coord_flip()+ theme_classic() +
   ylab("Amount of Drugs per Category") + theme(axis.title.y = element_blank())+
   theme(text = element_text(size = 14), axis.text.y = element_text(size = 12))+
   facet_wrap(~conc, nrow=1, ncol=3)
@@ -887,24 +785,24 @@ indel.data$mean.logratio.drug =
 indel.data$mean.efficiency.drug = 
   ave(indel.data$efficiency.platenorm, indel.data$Drug, indel.data$conc, FUN = function(x) mean(x))
 
-indel.data2 <- indel.data[,c(6,14,37,38)]
+indel.data2 <- indel.data %>% select(Drug, conc, mean.logratio.drug, mean.efficiency.drug)
 indel.data2 <- unique(indel.data2)
 indel.data2$conc <- factor(indel.data2$conc, levels = c("100nm", "1um", "10um"))
 
 
 ggplot(indel.data2, aes(x = mean.logratio.drug, y = mean.efficiency.drug)) +
   geom_point()+
-  xlab("Log2(+1/-7 ratio) Change") + ylab("Cutting Efficiency Change")+
-  gghighlight(abs(mean.logratio.drug) > 2, label_key = Drug)+
-  theme(text = element_text(size = 14))+
+  xlab("Log2(+1/-7 ratio) Change") + ylab("Cutting Efficiency Change") +
+  gghighlight(abs(mean.logratio.drug) > 2, label_key = Drug) + theme_bw() +
+  theme(text = element_text(size = 14)) +
   facet_wrap(~conc, nrow = 1, ncol = 3)
 
 
 ggplot(indel.data2, aes(x = mean.logratio.drug, y = mean.efficiency.drug)) +
-  geom_point()+
-  xlab("Log2(+1/-7 ratio) Change") + ylab("Cutting Efficiency Change")+
-  gghighlight(abs(mean.efficiency.drug) > 0.05, label_key = Drug)+
-  theme(text = element_text(size = 14))+
+  geom_point() +
+  xlab("Log2(+1/-7 ratio) Change") + ylab("Cutting Efficiency Change") +
+  gghighlight(abs(mean.efficiency.drug) > 0.05, label_key = Drug) + theme_bw() +
+  theme(text = element_text(size = 14)) +
   facet_wrap(~conc, nrow = 1, ncol = 3)
 
 
@@ -913,28 +811,26 @@ indel.data$mean.viability.drug =
   ave(indel.data$viability, indel.data$Drug, indel.data$conc, FUN = function(x) mean(x))
 indel.data$Drug <- as.character(indel.data$Drug)
 
-indel.data2 <- indel.data[,c(6,14,38,39)]
-indel.data2 <- unique(indel.data2)
+indel.data2 <- indel.data %>% select(Drug, conc, mean.viability.drug, mean.efficiency.drug) %>% unique()
 indel.data2$conc <- factor(indel.data2$conc, levels = c("100nm", "1um", "10um"))
 
 ggplot(indel.data2, aes(x = mean.viability.drug, y = mean.efficiency.drug)) +
-  geom_point()+
-  xlab("Viability") + ylab("Cutting Efficiency Change")+
-  gghighlight(abs(mean.efficiency.drug) > 0.1, label_key = Drug)+
-  theme(text = element_text(size = 14))+
+  geom_point() +
+  xlab("Viability") + ylab("Cutting Efficiency Change") +
+  gghighlight(abs(mean.efficiency.drug) > 0.1, label_key = Drug) + theme_bw() +
+  theme(text = element_text(size = 14)) +
   facet_wrap(~conc, nrow = 1, ncol = 3)
 
 
 # Correlation plot mean viability vs. mean ratio
-indel.data2 <- indel.data[,c(6,14,39,37)]
-indel.data2 <- unique(indel.data2)
+indel.data2 <- indel.data %>% select(Drug, conc, mean.logratio.drug, mean.viability.drug) %>% unique()
 indel.data2$conc <- factor(indel.data2$conc, levels = c("100nm", "1um", "10um"))
 
 ggplot(indel.data2, aes(x = mean.logratio.drug, y = mean.viability.drug)) +
-  geom_point()+
-  xlab("Log2(+1/-7 ratio) Change") + ylab("Viability")+
-  gghighlight(abs(mean.logratio.drug) > 1.5, label_key = Drug)+
-  theme(text = element_text(size = 14))+
+  geom_point() +
+  xlab("Log2(+1/-7 ratio) Change") + ylab("Viability") +
+  gghighlight(abs(mean.logratio.drug) > 1.5, label_key = Drug) + theme_bw() +
+  theme(text = element_text(size = 14)) +
   facet_wrap(~conc, nrow = 1, ncol = 3)
 
 
@@ -961,7 +857,7 @@ cor.viability.high <- cor.test(indel.data2.high$mean.logratio.drug, indel.data2.
 # Correlation old (predicted) +1/-7 ratio vs. +1/-7 ratio of this experiment 
 indel.data$mean.ratio.bc <- ave(indel.data$ratio, indel.data$integration, FUN = function(x) mean(x))
 ggplot(data = indel.data[indel.data$Target == "Negative Control",], aes(x=log2(mean.ratio), y=log2(mean.ratio.bc))) +
-  geom_point() + geom_smooth(method = lm) +
+  geom_point() + geom_smooth(method = lm) + theme_classic() +
   stat_smooth_func(geom="text",method="lm",hjust=0,parse=TRUE) +
   scale_x_continuous(breaks=c(2, 4, 6, 8))+ xlab("logratio previous experiments") +
   ylab("logratio this experiment (only DMSO treated data)") + 
@@ -970,11 +866,11 @@ ggplot(data = indel.data[indel.data$Target == "Negative Control",], aes(x=log2(m
 # Correlation plots of the replicates
 indel.data.DNAPK <- indel.data[-grep("DNA-PK", indel.data$Drug),]
 indel.data.rep1 <- indel.data.DNAPK[grep("rep1", indel.data.DNAPK$condition),]
-indel.data.rep1 <- indel.data.rep1[,c(1,5,14,20)]
+indel.data.rep1 <- indel.data.rep1 %>% select(barcode, Number, conc, logratio)
 indel.data.rep2 <- indel.data.DNAPK[grep("rep2", indel.data.DNAPK$condition),]
-indel.data.rep2 <- indel.data.rep2[,c(1,5,14,20)]
+indel.data.rep2 <- indel.data.rep2 %>% select(barcode, Number, conc, logratio)
 indel.data.rep3 <- indel.data.DNAPK[grep("rep3", indel.data.DNAPK$condition),]
-indel.data.rep3 <- indel.data.rep3[,c(1,5,14,20)]
+indel.data.rep3 <- indel.data.rep3 %>% select(barcode, Number, conc, logratio)
 setnames(indel.data.rep1, old = "logratio", new = "rep1")
 setnames(indel.data.rep2, old = "logratio", new = "rep2")
 setnames(indel.data.rep3, old = "logratio", new = "rep3")
@@ -982,8 +878,7 @@ indel.data.rep <- merge(indel.data.rep1, indel.data.rep2, all = T)
 indel.data.rep <- merge(indel.data.rep, indel.data.rep3, all = T)
 
 # Correlation matrix plot
-correlation.plot.rep <- indel.data.rep[,c(4,5,6)]
-correlation.plot.rep <- na.omit(correlation.plot.rep)
+correlation.plot.rep <- indel.data.rep %>% select(rep1, rep2, rep3) %>% na.omit()
 
 n <- sample(1:nrow(indel.data), 5000)
 boundaries <- seq(from = 0.7, by = 0.05, length.out = 4)
@@ -1016,27 +911,27 @@ We can see that there is a very high correlation between all 3 replicates, meani
 # Spot individual drug outliers per concentration
 indel.data2 <- indel.data
 indel.data2$logratio.platenorm <- ave(indel.data2$logratio.platenorm, indel.data2$conc, indel.data2$Drug, FUN = function(x) mean(x))
-indel.data2 <- indel.data2[,c(6,14,25)]
+indel.data2 <- indel.data2 %>% select(Drug, conc, logratio.platenorm)
 indel.data2 <- indel.data2[!duplicated(indel.data2),]
 indel.data2$conc <- factor(indel.data2$conc, levels=c("100nm", "1um", "10um"))
 
-ggplot(indel.data2, aes(x=conc, y=logratio.platenorm))+
+ggplot(indel.data2, aes(x=conc, y=logratio.platenorm)) +
   geom_quasirandom() + 
-  coord_cartesian(ylim = c(-4, 4))+  
-  gghighlight(abs(logratio.platenorm) > 2, label_key = Drug)
+  coord_cartesian(ylim = c(-4, 4)) +  
+  gghighlight(abs(logratio.platenorm) > 2, label_key = Drug) + theme_bw()
   
 # The same but only the range between 1 & 2
-ggplot(indel.data2[abs(indel.data2$logratio.platenorm) < 2,], aes(x=conc, y=logratio.platenorm))+
+ggplot(indel.data2[abs(indel.data2$logratio.platenorm) < 2,], aes(x=conc, y=logratio.platenorm)) +
   geom_quasirandom() + 
-  coord_cartesian(ylim = c(-4, 4))+  
-  gghighlight(abs(logratio.platenorm) > 1, label_key = Drug)
+  coord_cartesian(ylim = c(-4, 4)) +  
+  gghighlight(abs(logratio.platenorm) > 1, label_key = Drug) + theme_bw()
 
 # Spot outliers by plotting DMSO versus drugs
 indel.data2 <- indel.data
 indel.data2$mean.ratio.bc.drug.conc <- ave(indel.data2$efficiency, 
                                            indel.data2$conc, indel.data2$Drug, 
                                            indel.data2$barcode, FUN = function(x) mean(x))
-indel.data2 <- indel.data2[,c(1,6,14,41)]
+indel.data2 <- indel.data2 %>% select(barcode, Drug, conc, mean.ratio.bc.drug.conc)
 indel.data2 <- indel.data2[!duplicated(indel.data2),]
 indel.data2.high <- indel.data2[grep("1um", indel.data2$conc),]
 indel.data2.high <- indel.data2.high[,-3]
@@ -1052,14 +947,14 @@ gghighlight_point(indel.data2.high, aes(x = DMSO, y = `Vorinostat (SAHA, MK0683)
   geom_text(aes(x = 0.4, y = 0.52, label = "+10% efficiency", angle = 35)) +
   scale_x_continuous(limits = c(0.25, 1)) +
   scale_y_continuous(limits = c(0.25, 1)) +
-  labs(title = "Efficiency compared to DMSO for each integration")
+  labs(title = "Efficiency compared to DMSO for each integration") + theme_bw()
 
 # Make a beeswarm plot with alternative colors for outliers based on chi square scores
 ggplot(data = indel.data) +
   geom_quasirandom(mapping = 
                      aes(x = reorder(integration, order), y = logratio.mean, 
                          colour = ifelse(p.value > 0.05,
-                                         "non-outlier","outlier")), alpha = 0.5) +
+                                         "non-outlier","outlier")), alpha = 0.5) + theme_bw() +
   theme(axis.text.x = element_text(angle = 90, hjust = 1.0, vjust = 0)) + 
   ylab("log2(+1/-7 ratio)") + xlab("integration") + 
   labs(title = "Outlier plot", colour = "Outlier based on p value < 0.05") + 
@@ -1067,7 +962,7 @@ ggplot(data = indel.data) +
 
 # Boxplot of efficiencies 
 ggplot(data = indel.data[indel.data$Drug == "DMSO",]) +
-  geom_boxplot(mapping = aes(x = reorder(integration, order), y = efficiency)) +
+  geom_boxplot(mapping = aes(x = reorder(integration, order), y = efficiency)) + theme_bw() +
   theme(axis.text.x = element_text(angle = 90, hjust = 1.0, vjust = 0))+
   ylab("Cutting Efficiency")+
   theme(axis.title.x = element_blank())
@@ -1108,8 +1003,7 @@ indel.data2$logratio <- ave(indel.data2$logratio,
                             indel.data2$integration, 
                             indel.data2$rep, 
                             FUN = function(x) mean(x))
-indel.data2 <- indel.data2[,c(12,20,36,42)]
-indel.data2 <- unique(indel.data2)
+indel.data2 <- indel.data2 %>% select(rep, logratio, int, integration) %>% unique()
 indel.data2$mean <- ave(indel.data2$logratio,
                         indel.data2$int, 
                         indel.data2$rep,
@@ -1129,7 +1023,7 @@ indel.data2$sd.bio <- ave(indel.data2$logratio,
 
 # Boxplot of efficiencies normalized
 ggplot(data = indel.data[indel.data$Drug == "DMSO",]) +
-  geom_boxplot(mapping = aes(x = reorder(integration,order), y = efficiency.platenorm)) +
+  geom_boxplot(mapping = aes(x = reorder(integration,order), y = efficiency.platenorm)) + theme_bw() +
   theme(axis.text.x = element_text(angle = 90, hjust = 1.0, vjust = 0)) + 
   labs(title = "Efficiency distribution per integration after normalization") 
 
@@ -1138,7 +1032,7 @@ ggplot(data = indel.data) +
   geom_quasirandom(mapping = 
                      aes(x = reorder(integration,order), y = efficiency.mean, 
                          colour = ifelse(p.value > 0.05,
-                                         "non-outlier","outlier"))) +
+                                         "non-outlier","outlier"))) + theme_bw() +
   theme(axis.text.x = element_text(angle = 90, hjust = 1.0, vjust = 0)) + 
   ylab("efficiency") + xlab("integration") + labs(title = "Efficiency plot, outliers (based on logratio) in yellow", colour = "Logratio outlier based on p value < 0.05") + scale_color_manual(values=c("#999999", "#E69F00"))
 
@@ -1147,7 +1041,7 @@ ggplot(data = indel.data) +
 for (i in unique(indel.data$Target)) {
   data <- indel.data[indel.data$Target == i | indel.data$Target == "Negative Control", ]
   p <- ggplot(data = data) +
-    geom_quasirandom(mapping = aes(x = reorder(integration,order), y = logratio.platenorm, colour = Target), alpha = 0.8, dodge.width = -0.5) +
+    geom_quasirandom(mapping = aes(x = reorder(integration,order), y = logratio.platenorm, colour = Target), alpha = 0.8, dodge.width = -0.5) + theme_bw() +
     theme(axis.text.x = element_text(angle = 90, hjust = 1.0, vjust = 0))+ 
     ylab("log2(+1/-7 ratio)") + xlab("integration")+ labs(title= paste("logratio of",i, "compared to DMSO"))
   print(p)
@@ -1206,8 +1100,9 @@ hdac.dmso$efficiency.platenorm <- ave(hdac.dmso$efficiency.platenorm,
                                     FUN = function(x) mean(x))
 
 
-hdac.dmso <- hdac.dmso[,c(6,25,26,35,36)]
-hdac.dmso <- unique(hdac.dmso)
+hdac.dmso <- hdac.dmso %>% select(Drug, logratio.platenorm, 
+                                                     efficiency.platenorm, order, 
+                                                     integration) %>% unique()
 hdac.dmso$mean <- ave(hdac.dmso$logratio.platenorm, hdac.dmso$integration,
                       FUN = function(x) mean(x))
 hdac.dmso$mean2 <- ave(hdac.dmso$efficiency.platenorm, hdac.dmso$integration,
