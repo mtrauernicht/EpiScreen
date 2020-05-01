@@ -83,7 +83,7 @@ SetFileName <- function(filename, initials) {
 # Import data from 5_HitValidation_DrugScreen.Rmd
 setwd("/DATA/usr/m.trauernicht/projects/EpiScreen/data/files_scripts/")
 mapping_mean <- get(load("mt20190510_mapping_mean"))
-indel.data <- get(load("mt20190502_indel.data"))
+indel.data <- get(load("mt20200501_indel.data"))
 mapping_mean_long <- get(load("mt20190510_mapping_mean_long"))
 chip_dendogram <- get(load("mt20190510_chip_dendogram"))
 mapping_mean_all <- get(load("mt20190329_mapping_mean_all"))
@@ -98,13 +98,13 @@ delay.df <- read.table("cl20190329_minus7_delay.tsv", header = T)
 ```{r input_prep, echo = FALSE, warning = FALSE}
 # Compute mean of logratio per barcode and drug
 indel.data$mean.logratio.bc.drug <- 
-  ave(indel.data$logratio.platenorm, 
+  ave(indel.data$MMEJ_zscore, 
       indel.data$barcode, indel.data$conc, 
       indel.data$Drug, FUN = function(x) mean(x))
 
 # Compute mean of logratio per barcode and target
 indel.data$mean.logratio.bc.target <- 
-  ave(indel.data$logratio.platenorm, 
+  ave(indel.data$MMEJ_zscore, 
       indel.data$barcode, indel.data$conc, 
       indel.data$Target, FUN = function(x) mean(x))
 
@@ -122,7 +122,7 @@ indel.data$mean.statistic.bc.drug <-
 
 # Compute mean of efficiency per barcode and drug
 indel.data$mean.eff.bc.drug <- 
-  ave(indel.data$efficiency.platenorm, 
+  ave(indel.data$efficiency_zscore, 
       indel.data$barcode, indel.data$conc,
       indel.data$Drug, FUN = function(x) mean(x))
 
@@ -254,7 +254,7 @@ Next, I want to create heatmaps to visualize the effect of each individual drug 
 ```{r visualization each drug, out.width= "100%", fig.align= "center", echo=FALSE}
 ## Every drug
 # Keeping the scale in the pheatmap function
-myBreaks1 <- seq(-1.5,1.5,0.03)
+myBreaks1 <- seq(-5,5,0.1)
 
 # pheatmap function: logratio heatmap of each individual drug vs. barcode - 10uM drugs added
 pheatmap(as.matrix(indel.data.high.drug),
@@ -273,10 +273,10 @@ pheatmap(as.matrix(indel.data.high.drug),
 ```{r visualization essential drugs, out.width= "100%", fig.align= "center", echo=FALSE}
 ## Only drugs that change ratio
 # pheatmap function: without DNA-PKi: logratio heatmap of eac a certain fold change
-indel.data.high.drug.ess <- indel.data.high.drug[, colSums(indel.data.high.drug > 1.5) >= 1 |
-                            colSums(indel.data.high.drug < -0.5) >= 1]
+indel.data.high.drug.ess <- indel.data.high.drug[, colSums(indel.data.high.drug > 3) >= 1 |
+                            colSums(indel.data.high.drug < -5) >= 1]
 # Keeping the scale in the pheatmap function
-myBreaks2 <- c(seq(-0.5, 0, length.out=ceiling(100/2) + 1), 
+myBreaks2 <- c(seq(-10, 0, length.out=ceiling(100/2) + 1), 
               seq(9/100, 9/2, length.out=floor(100/2)))
 
 
@@ -296,8 +296,8 @@ pheatmap(as.matrix(indel.data.high.drug.ess),
 
 
 # pheatmap function: without DNA-PKi: logratio heatmap of each individual drug vs. barcode - 1uM drugs added- include only drugs that achieve a certain fold change
-indel.data.med.drug.ess <- indel.data.med.drug[, colSums(indel.data.med.drug > 1) >= 1 |
-                            colSums(indel.data.med.drug < -0.7) >= 1] 
+indel.data.med.drug.ess <- indel.data.med.drug[, colSums(indel.data.med.drug > 3) >= 1 |
+                            colSums(indel.data.med.drug < -3) >= 1] 
 
 myBreaks3 <- c(seq(min(as.matrix(indel.data.med.drug.ess)), 0, 
                    length.out=ceiling(100/2) + 1), 
@@ -321,8 +321,8 @@ pheatmap(as.matrix(indel.data.med.drug.ess),
 
 
 # pheatmap function: without DNA-PKi: logratio heatmap of each individual drug vs. barcode - 100nM drugs added - include only drugs that achieve a certain fold change
-indel.data.low.drug.ess <- indel.data.low.drug[, colSums(indel.data.low.drug > 1) >= 1 |
-                            colSums(indel.data.low.drug < -0.5) >= 1]
+indel.data.low.drug.ess <- indel.data.low.drug[, colSums(indel.data.low.drug > 2) >= 1 |
+                            colSums(indel.data.low.drug < -3) >= 1]
 
 myBreaks4 <- c(seq(min(as.matrix(indel.data.low.drug.ess)), 0, 
                    length.out=ceiling(100/2) + 1), 
@@ -349,7 +349,7 @@ pheatmap(as.matrix(indel.data.low.drug.ess),
 ## Now plot the same for the efficiency
 ```{r visualization efficiency, out.width= "100%", fig.align= "center", echo=FALSE}
 # Efficiency change heatmap - 10 uM
-myBreaks5 <- seq(-0.1, 0.1, 0.002)
+myBreaks5 <- seq(-5, 3, 0.08)
 
 pheatmap(as.matrix(indel.data.high.eff), fontsize_col = 8, fontsize_row = 8, cellheight = 8,
          color = colorRampPalette(rev(brewer.pal(n = 7, name = "RdBu")))(100),
@@ -364,8 +364,8 @@ pheatmap(as.matrix(indel.data.high.eff), fontsize_col = 8, fontsize_row = 8, cel
 
 
 # Efficiency change heatmap - 10 uM - only essentials
-indel.data.high.eff.ess <- indel.data.high.eff[, colSums(indel.data.high.eff > 0.08) >= 1 |
-                            colSums(indel.data.high.eff < -0.2) >= 1]
+indel.data.high.eff.ess <- indel.data.high.eff[, colSums(indel.data.high.eff > 3) >= 1 |
+                            colSums(indel.data.high.eff < -4) >= 1]
 
 myBreaks6 <- c(seq(min(as.matrix(indel.data.high.eff.ess))/1.5, 0, 
                    length.out=ceiling(100/2) + 1), 
@@ -388,8 +388,8 @@ pheatmap(as.matrix(indel.data.high.eff.ess),
 
 
 # Efficiency change heatmap - 1 uM
-indel.data.med.eff.ess <- indel.data.med.eff[, colSums(indel.data.med.eff > 0.0666) >= 1 | 
-                           colSums(indel.data.med.eff < -0.1333) >= 1]
+indel.data.med.eff.ess <- indel.data.med.eff[, colSums(indel.data.med.eff > 3) >= 1 | 
+                           colSums(indel.data.med.eff < -5) >= 1]
 
 myBreaks7 <- c(seq(min(as.matrix(indel.data.med.eff.ess))/1.5, 0, 
                    length.out=ceiling(100/2) + 1), 
@@ -412,8 +412,8 @@ pheatmap(as.matrix(indel.data.med.eff.ess),
 
 
 # Efficiency change heatmap - 100 nM
-indel.data.low.eff.ess <- indel.data.low.eff[, colSums(indel.data.low.eff > 0.0666) >= 1 |
-                           colSums(indel.data.low.eff < -0.1333) >= 1]
+indel.data.low.eff.ess <- indel.data.low.eff[, colSums(indel.data.low.eff > 3) >= 1 |
+                           colSums(indel.data.low.eff < -5) >= 1]
 
 myBreaks8 <- c(seq(min(as.matrix(indel.data.low.eff.ess))/1.5, 0, 
                    length.out=ceiling(100/2) + 1), 
@@ -488,12 +488,12 @@ target.eff.low <- indel.data.low.eff2[-grep("Negative control|MRN|DNA-PK",indel.
 # Choose from the above dfs what you want to display
 
 ## Only select HDACs
-hdac.logratio <- target.eff.high[target.eff.high$Target=="HDAC",] %>% 
+target.plot <- target.eff.med[target.eff.med$Target=="HDAC",] %>% 
   select(-Target) %>% t()
 
 # Generate pheatmap
 # Use myBreaks5 for efficiency heatmap, myBreaks1 for logratio heatmap
-pheatmap(as.matrix(hdac.logratio), 
+pheatmap(as.matrix(target.plot), 
          annotation_col = target, 
          annotation_row = barcode.annotation,annotation_legend = F,
          color = colorRampPalette(rev(brewer.pal(n = 7, name = "RdBu")))(100),
