@@ -38,7 +38,7 @@ cat(tabl) # output the table in a format good for HTML/PDF/docx conversion
 
 # Data processing
 ## Path, Libraries, Parameters and Useful Functions
-```{r setup}
+```{r setup, echo = FALSE, warning = FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 StartTime <-Sys.time()
 
@@ -67,7 +67,7 @@ library(Laurae)
 
 ### Custom functions
 Functions used thoughout this script.
-```{r}
+```{r functions, echo = FALSE, warning = FALSE}
 SetFileName <- function(filename, initials) {
   # Set filename with extension and initials to make filename with date integrated.
   filename <- substitute(filename)
@@ -79,7 +79,7 @@ SetFileName <- function(filename, initials) {
 
 
 ## Data import
-```{r Data Import}
+```{r Data Import, echo = FALSE, warning = FALSE}
 # Import data from 5_HitValidation_DrugScreen.Rmd
 setwd("/DATA/usr/m.trauernicht/projects/EpiScreen/data/files_scripts/")
 mapping_mean <- get(load("mt20190510_mapping_mean"))
@@ -94,349 +94,162 @@ delay.df <- read.table("cl20190329_minus7_delay.tsv", header = T)
 ```
 
 
-## Bring dataframe in suitable format for heatmap function
-```{r generate heatmap}
+## Compute relevant logratios and divide per concentration
+```{r input_prep, echo = FALSE, warning = FALSE}
+# Compute mean of logratio per barcode and drug
+indel.data$mean.logratio.bc.drug <- 
+  ave(indel.data$logratio.platenorm, 
+      indel.data$barcode, indel.data$conc, 
+      indel.data$Drug, FUN = function(x) mean(x))
+
+# Compute mean of logratio per barcode and target
+indel.data$mean.logratio.bc.target <- 
+  ave(indel.data$logratio.platenorm, 
+      indel.data$barcode, indel.data$conc, 
+      indel.data$Target, FUN = function(x) mean(x))
+
+# Compute mean of t-statistic per barcode and target
+indel.data$mean.statistic.bc.target <- 
+  ave(indel.data$statistic, 
+      indel.data$barcode, indel.data$conc, 
+      indel.data$Target, FUN = function(x) mean(x))
+
+# Compute mean of t-statistic per barcode and drug
+indel.data$mean.statistic.bc.drug <- 
+  ave(indel.data$statistic, 
+      indel.data$barcode, indel.data$conc,
+      indel.data$Drug, FUN = function(x) mean(x))
+
+# Compute mean of efficiency per barcode and drug
+indel.data$mean.eff.bc.drug <- 
+  ave(indel.data$efficiency.platenorm, 
+      indel.data$barcode, indel.data$conc,
+      indel.data$Drug, FUN = function(x) mean(x))
+
+
+# Compute mean and sd of barcode counts per barcode and drug
+indel.data$mean.count.bc.drug <- 
+  ave(indel.data$rel.counts, 
+      indel.data$barcode, indel.data$conc,
+      indel.data$Drug, FUN = function(x) mean(x))
+indel.data$sd.count.bc.drug <- 
+  ave(indel.data$rel.counts, 
+      indel.data$barcode, indel.data$conc,
+      indel.data$Drug, FUN = function(x) sd(x))
+
 # Split up per concentration
 indel.data.high <- indel.data[grep("10um", indel.data$condition),]
 indel.data.med <- indel.data[grep("1um", indel.data$condition),]
 indel.data.low <- indel.data[grep("100nm", indel.data$condition),]
-
-# Compute mean of logratio per barcode and drug
-indel.data.high$mean.logratio.bc.drug <- 
-  ave(indel.data.high$logratio.platenorm, 
-      indel.data.high$barcode, indel.data.high$Drug, FUN = function(x) mean(x))
-indel.data.med$mean.logratio.bc.drug <- 
-  ave(indel.data.med$logratio.platenorm, 
-      indel.data.med$barcode, indel.data.med$Drug, FUN = function(x) mean(x))
-indel.data.low$mean.logratio.bc.drug <- 
-  ave(indel.data.low$logratio.platenorm, 
-      indel.data.low$barcode, indel.data.low$Drug, FUN = function(x) mean(x))
-
-# Compute mean of logratio per barcode and target
-indel.data.high$mean.logratio.bc.target <- 
-  ave(indel.data.high$logratio.platenorm, 
-      indel.data.high$barcode, indel.data.high$Target, FUN = function(x) mean(x))
-indel.data.med$mean.logratio.bc.target <- 
-  ave(indel.data.med$logratio.platenorm, 
-      indel.data.med$barcode, indel.data.med$Target, FUN = function(x) mean(x))
-indel.data.low$mean.logratio.bc.target <- 
-  ave(indel.data.low$logratio.platenorm, 
-      indel.data.low$barcode, indel.data.low$Target, FUN = function(x) mean(x))
-
-# Compute mean of t-statistic per barcode and target
-indel.data.high$mean.statistic.bc.target <- 
-  ave(indel.data.high$statistic, 
-      indel.data.high$barcode, indel.data.high$Target, FUN = function(x) mean(x))
-indel.data.med$mean.statistic.bc.target <- 
-  ave(indel.data.med$statistic, 
-      indel.data.med$barcode, indel.data.med$Target, FUN = function(x) mean(x))
-indel.data.low$mean.statistic.bc.target <- 
-  ave(indel.data.low$statistic, 
-      indel.data.low$barcode, indel.data.low$Target, FUN = function(x) mean(x))
-
-# Compute mean of t-statistic per barcode and drug
-indel.data.high$mean.statistic.bc.drug <- 
-  ave(indel.data.high$statistic, 
-      indel.data.high$barcode, indel.data.high$Drug, FUN = function(x) mean(x))
-indel.data.med$mean.statistic.bc.drug <- 
-  ave(indel.data.med$statistic, 
-      indel.data.med$barcode, indel.data.med$Drug, FUN = function(x) mean(x))
-indel.data.low$mean.statistic.bc.drug <- 
-  ave(indel.data.low$statistic, 
-      indel.data.low$barcode, indel.data.low$Drug, FUN = function(x) mean(x))
-
-# Compute mean of efficiency per barcode and drug
-indel.data.high$mean.eff.bc.drug <- 
-  ave(indel.data.high$efficiency.platenorm, 
-      indel.data.high$barcode, indel.data.high$Drug, FUN = function(x) mean(x))
-indel.data.med$mean.eff.bc.drug <- 
-  ave(indel.data.med$efficiency.platenorm, 
-      indel.data.med$barcode, indel.data.med$Drug, FUN = function(x) mean(x))
-indel.data.low$mean.eff.bc.drug <- 
-  ave(indel.data.low$efficiency.platenorm, 
-      indel.data.low$barcode, indel.data.low$Drug, FUN = function(x) mean(x))
-
-
-# Compute mean and sd of barcode counts per barcode and drug
-indel.data.high$mean.count.bc.drug <- 
-  ave(indel.data.high$rel.counts, 
-      indel.data.high$barcode, indel.data.high$Drug, FUN = function(x) mean(x))
-indel.data.high$sd.count.bc.drug <- 
-  ave(indel.data.high$rel.counts, 
-      indel.data.high$barcode, indel.data.high$Drug, FUN = function(x) sd(x))
-indel.data.med$mean.count.bc.drug <- 
-  ave(indel.data.med$rel.counts, 
-      indel.data.med$barcode, indel.data.med$Drug, FUN = function(x) mean(x))
-indel.data.med$sd.count.bc.drug <- 
-  ave(indel.data.med$rel.counts, 
-      indel.data.med$barcode, indel.data.med$Drug, FUN = function(x) sd(x))
-indel.data.low$mean.count.bc.drug <- 
-  ave(indel.data.low$rel.counts, 
-      indel.data.low$barcode, indel.data.low$Drug, FUN = function(x) mean(x))
-indel.data.low$sd.count.bc.drug <- 
-  ave(indel.data.low$rel.counts, 
-      indel.data.low$barcode, indel.data.low$Drug, FUN = function(x) sd(x))
 ```
 
 
 
 
 
-## Dataframe preprocessing efficiency difference
-```{r}
-# Remove columns
-indel.data.high.eff <- indel.data.high[,c(1,6,45)]
-indel.data.high.eff <- indel.data.high.eff[!duplicated(indel.data.high.eff), ]
-indel.data.high.eff <- dcast(indel.data.high.eff, barcode ~ Drug, value.var = "mean.eff.bc.drug")
-
-# Remove columns
-indel.data.med.eff <- indel.data.med[,c(1,6,45)]
-indel.data.med.eff <- indel.data.med.eff[!duplicated(indel.data.med.eff), ]
-indel.data.med.eff <- dcast(indel.data.med.eff, barcode ~ Drug, value.var = "mean.eff.bc.drug")
-
-# Remove columns
-indel.data.low.eff <- indel.data.low[,c(1,6,45)]
-indel.data.low.eff <- indel.data.low.eff[!duplicated(indel.data.low.eff), ]
-indel.data.low.eff <- dcast(indel.data.low.eff, barcode ~ Drug, value.var = "mean.eff.bc.drug")
-```
-
-
-## Dataframe preprocessing relative barcode counts
-```{r}
-# Remove columns
-indel.data.high.count <- indel.data.high[indel.data.high$sd.count.bc.drug < 1,]
-indel.data.high.count <- indel.data.high.count[,c(1,6,46)]
-indel.data.high.count <- indel.data.high.count[!duplicated(indel.data.high.count), ]
-indel.data.high.count <- dcast(indel.data.high.count, barcode ~ Drug, value.var = "mean.count.bc.drug")
-indel.data.high.count <- indel.data.high.count[,-118]
-
-indel.data.med.count <- indel.data.med[indel.data.med$sd.count.bc.drug < 1,]
-indel.data.med.count <- indel.data.med.count[,c(1,6,46)]
-indel.data.med.count <- indel.data.med.count[!duplicated(indel.data.med.count), ]
-indel.data.med.count <- dcast(indel.data.med.count, barcode ~ Drug, value.var = "mean.count.bc.drug")
-indel.data.med.count <- indel.data.med.count[,-146]
-
-
-indel.data.low.count <- indel.data.low[indel.data.low$sd.count.bc.drug < 1,]
-indel.data.low.count <- indel.data.low.count[,c(1,6,46)]
-indel.data.low.count <- indel.data.low.count[!duplicated(indel.data.low.count), ]
-indel.data.low.count <- dcast(indel.data.low.count, barcode ~ Drug, value.var = "mean.count.bc.drug")
-indel.data.low.count <- indel.data.low.count[,-158]
-
-
-```
-
-
-
-## Dataframe preprocessing t-statistic heatmap of barcode vs. drug
-```{r}
-# Remove columns
-indel.data.high.drug.st <- indel.data.high[,c(1,6,44)]
-indel.data.med.drug.st <- indel.data.med[,c(1,6,44)]
-indel.data.low.drug.st <- indel.data.low[,c(1,6,44)]
-indel.data.high.drug.st <- indel.data.high.drug.st[!duplicated(indel.data.high.drug.st), ]
-indel.data.med.drug.st <- indel.data.med.drug.st[!duplicated(indel.data.med.drug.st), ]
-indel.data.low.drug.st <- indel.data.low.drug.st[!duplicated(indel.data.low.drug.st), ]
-
-# Transform to wide format for visualization purposes
-indel.data.low.drug.st <- 
-  dcast(indel.data.low.drug.st, barcode ~ Drug, value.var="mean.statistic.bc.drug")
-indel.data.med.drug.st <- 
-  dcast(indel.data.med.drug.st, barcode ~ Drug, value.var="mean.statistic.bc.drug")
-indel.data.high.drug.st <- 
-  dcast(indel.data.high.drug.st, barcode ~ Drug, value.var="mean.statistic.bc.drug")
-```
-
-
-
-## Dataframe preprocessing logratio heatmap of barcode vs. drug
-```{r}
-# Remove columns
-indel.data.high.drug <- indel.data.high[,c(1,6,41)]
-indel.data.med.drug <- indel.data.med[,c(1,6,41)]
-indel.data.low.drug <- indel.data.low[,c(1,6,41)]
-indel.data.high.drug <- 
-  indel.data.high.drug[!duplicated(indel.data.high.drug), ]
-indel.data.med.drug <- 
-  indel.data.med.drug[!duplicated(indel.data.med.drug), ]
-indel.data.low.drug <- 
-  indel.data.low.drug[!duplicated(indel.data.low.drug), ]
-
-# Transform to wide format for visualization purposes
-indel.data.low.drug <- 
-  dcast(indel.data.low.drug, 
-        barcode ~ Drug, value.var="mean.logratio.bc.drug")
-indel.data.med.drug <- 
-  dcast(indel.data.med.drug, 
-        barcode ~ Drug, value.var="mean.logratio.bc.drug")
-indel.data.high.drug <- 
-  dcast(indel.data.high.drug, 
-        barcode ~ Drug, value.var="mean.logratio.bc.drug")
-```
-
-
-## Prepare t-statistic heatmaps of barcode vs. drug
-```{r}
-# Create matrix and use heatmap function
-indel.data.high.drug.st <- indel.data.high.drug.st %>% 
+## Bring dataframe to heatmap plotting format
+```{r transform_1, echo = FALSE, warning = FALSE}
+# Select columns and transform to wide format - efficiency heatmap
+## High conc
+indel.data.high.eff <- indel.data.high %>% select(barcode, Drug, mean.eff.bc.drug) %>% 
+  unique() %>% dcast(barcode ~ Drug, value.var = "mean.eff.bc.drug") %>% 
   remove_rownames %>% column_to_rownames(var="barcode")
 
-indel.data.med.drug.st <- indel.data.med.drug.st %>% 
+## Med conc
+indel.data.med.eff <- indel.data.med %>% select(barcode, Drug, mean.eff.bc.drug) %>% 
+  unique() %>% dcast(barcode ~ Drug, value.var = "mean.eff.bc.drug") %>% 
   remove_rownames %>% column_to_rownames(var="barcode")
 
-indel.data.low.drug.st <- indel.data.low.drug.st %>% 
+## Low conc
+indel.data.low.eff <- indel.data.low %>% select(barcode, Drug, mean.eff.bc.drug) %>% 
+  unique() %>% dcast(barcode ~ Drug, value.var = "mean.eff.bc.drug") %>% 
+  remove_rownames %>% column_to_rownames(var="barcode")
+
+
+
+# Select columns and transform to wide format - barcode counts
+## High conc
+indel.data.high.count <- indel.data.high[indel.data.high$sd.count.bc.drug < 1,] %>%
+  select(barcode, Drug, mean.count.bc.drug) %>% unique() %>% 
+  dcast(barcode ~ Drug, value.var = "mean.count.bc.drug") %>% filter_all(any_vars(!is.na(.))) %>% 
+  remove_rownames %>% column_to_rownames(var="barcode")
+
+# indel.data.high.count <- indel.data.high.count[,-118]
+
+## Med conc
+indel.data.med.count <- indel.data.med[indel.data.med$sd.count.bc.drug < 1,] %>%
+  select(barcode, Drug, mean.count.bc.drug) %>% unique() %>% 
+  dcast(barcode ~ Drug, value.var = "mean.count.bc.drug") %>% 
+  remove_rownames %>% column_to_rownames(var="barcode")
+
+# indel.data.med.count <- indel.data.med.count[,-146]
+
+## Low conc
+indel.data.low.count <- indel.data.low[indel.data.low$sd.count.bc.drug < 1,] %>%
+  select(barcode, Drug, mean.count.bc.drug) %>% unique() %>% 
+  dcast(barcode ~ Drug, value.var = "mean.count.bc.drug") %>% 
+  remove_rownames %>% column_to_rownames(var="barcode")
+
+# indel.data.low.count <- indel.data.low.count[,-158]
+
+
+
+# Same as above, but using t-statistic data
+indel.data.high.drug.st <- indel.data.high %>% select(barcode, Drug, mean.statistic.bc.drug) %>%
+  unique() %>% dcast(barcode ~ Drug, value.var="mean.statistic.bc.drug") %>% 
+  remove_rownames %>% column_to_rownames(var="barcode")
+
+indel.data.med.drug.st <- indel.data.med %>% select(barcode, Drug, mean.statistic.bc.drug) %>%
+  unique() %>% dcast(barcode ~ Drug, value.var="mean.statistic.bc.drug") %>% 
+  remove_rownames %>% column_to_rownames(var="barcode")
+
+indel.data.low.drug.st <- indel.data.low %>% select(barcode, Drug, mean.statistic.bc.drug) %>%
+  unique() %>% dcast(barcode ~ Drug, value.var="mean.statistic.bc.drug") %>% 
+  remove_rownames %>% column_to_rownames(var="barcode")
+
+
+
+# Same as above, but using logratio data for each barcode vs each drug
+indel.data.high.drug <- indel.data.high %>% select(barcode, Drug, mean.logratio.bc.drug) %>%
+  unique() %>% dcast(barcode ~ Drug, value.var="mean.logratio.bc.drug") %>% 
+  remove_rownames %>% column_to_rownames(var="barcode")
+
+indel.data.med.drug <- indel.data.med %>% select(barcode, Drug, mean.logratio.bc.drug) %>%
+  unique() %>% dcast(barcode ~ Drug, value.var="mean.logratio.bc.drug") %>% 
+  remove_rownames %>% column_to_rownames(var="barcode")
+
+indel.data.low.drug <- indel.data.low %>% select(barcode, Drug, mean.logratio.bc.drug) %>%
+  unique() %>% dcast(barcode ~ Drug, value.var="mean.logratio.bc.drug") %>% 
   remove_rownames %>% column_to_rownames(var="barcode")
 
 ```
 
-## Prepare counts heatmaps of barcode vs. drug
-```{r}
-# Create matrix and use heatmap function
-indel.data.high.count <- na.omit(indel.data.high.count)
-indel.data.high.count <- indel.data.high.count %>% 
-  remove_rownames %>% column_to_rownames(var="barcode")
-
-indel.data.med.count <- na.omit(indel.data.med.count)
-indel.data.med.count <- indel.data.med.count %>% 
-  remove_rownames %>% column_to_rownames(var="barcode")
-
-indel.data.low.count <- na.omit(indel.data.low.count)
-indel.data.low.count <- indel.data.low.count %>% 
-  remove_rownames %>% column_to_rownames(var="barcode")
-
-```
-
-
-
-## Generating heatmaps per barcode
-```{r}
-# Add target to logratio df: high concentration
-target.high <- indel.data.high[,c(6,7)]
-target.high <- target.high[!duplicated(target.high), ]
-indel.data.high.drug2 <- melt(indel.data.high.drug)
-indel.data.high.drug2 <- dcast(indel.data.high.drug2, variable ~ barcode, value.var = "value")
-setnames(target.high, old = "Drug", new = "variable")
-indel.data.high.drug2 <- merge(indel.data.high.drug2, target.high)
-indel.data.high.drug2 <- indel.data.high.drug2 %>% 
-  remove_rownames %>% column_to_rownames(var="variable")
-data2 <- indel.data.high.drug2[-grep("Negative control|MRN|DNA-PK",indel.data.high.drug2$Target),]
-
-# Add target to logratio df: med concentration
-target.med <- indel.data.med[,c(6,7)]
-target.med <- target.med[!duplicated(target.med), ]
-indel.data.med.drug2 <- melt(indel.data.med.drug)
-indel.data.med.drug2 <- dcast(indel.data.med.drug2, variable ~ barcode, value.var = "value")
-setnames(target.med, old = "Drug", new = "variable")
-indel.data.med.drug2 <- merge(indel.data.med.drug2, target.med)
-indel.data.med.drug2 <- indel.data.med.drug2 %>% 
-  remove_rownames %>% column_to_rownames(var="variable")
-data3 <- indel.data.med.drug2[-grep("Negative control|MRN|DNA-PK",indel.data.med.drug2$Target),]
-
-# Add target to logratio df: low concentration
-target.low <- indel.data.low[,c(6,7)]
-target.low <- target.low[!duplicated(target.low), ]
-indel.data.low.drug2 <- melt(indel.data.low.drug)
-indel.data.low.drug2 <- dcast(indel.data.low.drug2, variable ~ barcode, value.var = "value")
-setnames(target.low, old = "Drug", new = "variable")
-indel.data.low.drug2 <- merge(indel.data.low.drug2, target.low)
-indel.data.low.drug2 <- indel.data.low.drug2 %>% 
-  remove_rownames %>% column_to_rownames(var="variable")
-data4 <- indel.data.low.drug2[-grep("Negative control|MRN|DNA-PK",indel.data.low.drug2$Target),]
-
-
-# Add target to efficiency df: high concentration
-target.high.eff <- indel.data.high[,c(6,7)]
-target.high.eff <- target.high.eff[!duplicated(target.high.eff), ]
-indel.data.high.drug2 <- melt(indel.data.high.eff)
-indel.data.high.drug2 <- dcast(indel.data.high.drug2, variable ~ barcode, value.var = "value")
-setnames(target.high.eff, old = "Drug", new = "variable")
-indel.data.high.drug2 <- merge(indel.data.high.drug2, target.high.eff)
-indel.data.high.drug2 <- indel.data.high.drug2 %>% 
-  remove_rownames %>% column_to_rownames(var="variable")
-data5 <- indel.data.high.drug2[-grep("Negative control|MRN|DNA-PK",indel.data.high.drug2$Target),]
-
-# Add target to efficiency df: med concentration
-target.med.eff <- indel.data.med[,c(6,7)]
-target.med.eff <- target.med.eff[!duplicated(target.med.eff), ]
-indel.data.med.drug2 <- melt(indel.data.med.eff)
-indel.data.med.drug2 <- dcast(indel.data.med.drug2, variable ~ barcode, value.var = "value")
-setnames(target.med.eff, old = "Drug", new = "variable")
-indel.data.med.drug2 <- merge(indel.data.med.drug2, target.med.eff)
-indel.data.med.drug2 <- indel.data.med.drug2 %>% 
-  remove_rownames %>% column_to_rownames(var="variable")
-data6 <- indel.data.med.drug2[-grep("Negative control|MRN|DNA-PK",indel.data.med.drug2$Target),]
-
-# Add target to efficiency df: low concentration
-target.low.eff <- indel.data.low[,c(6,7)]
-target.low.eff <- target.low.eff[!duplicated(target.low.eff), ]
-indel.data.low.drug2 <- melt(indel.data.low.eff)
-indel.data.low.drug2 <- dcast(indel.data.low.drug2, variable ~ barcode, value.var = "value")
-setnames(target.low.eff, old = "Drug", new = "variable")
-indel.data.low.drug2 <- merge(indel.data.low.drug2, target.low.eff)
-indel.data.low.drug2 <- indel.data.low.drug2 %>% 
-  remove_rownames %>% column_to_rownames(var="variable")
-data7 <- indel.data.low.drug2[-grep("Negative control|MRN|DNA-PK",indel.data.low.drug2$Target),]
-
-
-
-
-
-# Heatmap per barcode
-indel.data.high.drug <- indel.data.high.drug %>% 
-  remove_rownames %>% column_to_rownames(var="barcode")
-
-indel.data.med.drug <- indel.data.med.drug %>% 
-  remove_rownames %>% column_to_rownames(var="barcode")
-
-indel.data.low.drug <- indel.data.low.drug %>% 
-  remove_rownames %>% column_to_rownames(var="barcode")
-
-indel.data.high.eff <- indel.data.high.eff %>% 
-  remove_rownames %>% column_to_rownames(var="barcode")
-
-indel.data.med.eff <- indel.data.med.eff %>% 
-  remove_rownames %>% column_to_rownames(var="barcode")
-
-indel.data.low.eff <- indel.data.low.eff %>% 
-  remove_rownames %>% column_to_rownames(var="barcode")
-```
 
 
 ## Annotate heatmap columns and rows
 ```{r}
 # Row annotation: annotate drugs with the target group
-target <- indel.data[,c(6,7)]
-target <- target[!duplicated(target),]
-target <- target[target$Target != c("Negative Control", "MRN", "DNA-PK"),]
-target$random <- c(1:156)
-row.names(target) <- target$Drug
-target2 <- target
-target <- target[,c(-1,-3)]
-target <- as.data.frame(target)
-row.names(target) <- target2$Drug
-
+target <- indel.data[indel.data$Target != c("Negative Control", "MRN", "DNA-PK"),] %>% 
+  select(Drug, Target) %>% unique() %>% remove_rownames %>% 
+  column_to_rownames(var="Drug")
 
 # Add type of chr. mark (repressive or active)
-type <- mapping_mean_long[,c(2,4)]
-type <- unique(type)
-type$random <- c(1:17)
-row.names(type) <- type$variable
-type2 <- type
-type <- type[,c(-1,-3)]
-type <- as.data.frame(type)
-row.names(type) <- type2$variable
+type <- mapping_mean_long %>% select(variable, type) %>% unique() %>%
+  remove_rownames %>% column_to_rownames(var="variable")
 
 # Add annotation of barcodes (based on clustering in 0_Clone5_Annotation.Rmd)
-barcode.annotation <- as.data.frame(indel.data.high[,1])
-barcode.annotation <- unique(barcode.annotation)
-barcode.annotation <- barcode.annotation %>% 
-  remove_rownames %>% column_to_rownames(var="indel.data.high[, 1]")
+barcode.annotation <- unique(as.data.frame(indel.data.high$barcode))
+
+## Manually added these tags: check/rewrite this
 barcode.annotation$cluster[c(18,2)] <- "Active Promoter/Enhancer"
 barcode.annotation$cluster[c(12,8)] <- "H3K9me2/3 Domain"
 barcode.annotation$cluster[c(3,14,4,17)] <- "Active Gene Body"
 barcode.annotation$cluster[c(5,13,6,15)] <- "LAD"
 barcode.annotation$cluster[c(7,16)] <- "No Marks Present"
 barcode.annotation$cluster[c(1,10,9,11)] <- "H3K27me3 Domain"
+
+barcode.annotation <- barcode.annotation %>% remove_rownames() %>%
+  column_to_rownames("indel.data.high$barcode")
 
 
 # Change colors of annotations
@@ -463,7 +276,6 @@ ordered_marks2 <- c("DNA-PK","Epigenetic Reader Domain", "HDAC",  "Sirtuin", "HA
                     "HIF", "JAK", "PIM",
                     "Aurora Kinase", "PARP")
 annotation_colors_scr$target <- annotation_colors_scr$target[ordered_marks2]
-
 ```
 
 
