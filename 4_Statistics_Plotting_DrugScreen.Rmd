@@ -302,8 +302,13 @@ setwd("/DATA/usr/m.trauernicht/projects/EpiScreen/data/files_scripts")
 
 # Import data from preprocessing script
 RSTP2_2000_indels.df <- get(load("mt20190501_RSTP2_2000_indels.df"))
-indel.data <- RSTP2_2000_indels.df[,c(1:6,48,55,56,120:125,128)]
-indel.data.all <- RSTP2_2000_indels.df[,c(1:6,48:56,120:125,128)]
+indel.data <- RSTP2_2000_indels.df %>%
+  select(Number, Drug, Target, `IC50..µM.`, `.id`, V2, X.7, X0, X1, rep, 
+         plate, conc, ratio, read.count, efficiency)
+indel.data.all <- RSTP2_2000_indels.df %>% 
+  select(Number, Drug, Target, `IC50..µM.`, `.id`, V2, X.7, X.6, X.5, X.4,
+         X.3, X.2, X.1, X0, X1, rep, plate, conc, ratio, read.count,
+         efficiency)
 integrations <- read.table("barcode_order.txt", header = T)
 
 # Import viability data and the mean +1/-7 ratio from previous experiments
@@ -313,9 +318,9 @@ mean.ratio.data <- read.delim("mt20190124_meanratiosperbarcode")
 ```
 ## Visualize viability data
 ```{r viability_overview, echo = FALSE, warning = FALSE}
-viability.df <- melt(viability)
-viability.df$value <- ave(viability.df$value, viability.df$variable, FUN = function(x) x/max(x))
-
+# Compute relative viability per plate
+viability.df <- melt(viability) %>% 
+  mutate(value = ave(value, variable, FUN = function(x) x/max(x)))
 
 for (i in unique(viability.df$variable)) {
 p <- raw_grid(data = viability.df$value[viability.df$variable == i],
@@ -330,16 +335,13 @@ print(p)
 ## Data pre-processing - clean up dataframe and add important specifiers
 ```{r pre-processing, echo = FALSE, warning = FALSE}
 # Add viability data to indel.data
-indel.data <- merge(viability.data, indel.data) 
-setnames(indel.data, old = "V2", new = "rn")
+indel.data <- merge(viability.data, indel.data) %>% 
+  setnames(old = "V2", new = "rn")
 
-# Add previously estimated +1/-7 ratio data for correlation check-ups
-indel.data <- merge(mean.ratio.data, indel.data, all = T)
+# Add previously estimated +1/-7 ratio data for correlation check-ups, rename columns
+indel.data <- merge(mean.ratio.data, indel.data, all = T) %>%
+  setnames(c(".id", "rn"), c("condition", "barcode"))
 all.indel.data <- indel.data
-
-# Rename columns
-setnames(indel.data, old = ".id", new = "condition")
-setnames(indel.data, old = "rn", new = "barcode")
 
 # Remove barcodes with abnormal counts from analysis
 indel.data <- indel.data[indel.data$barcode != "ACCCCTAAAGGCGCTG" &
