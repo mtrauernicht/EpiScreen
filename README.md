@@ -1,6 +1,8 @@
 # Epigenetic Screening on TRIP Clone
 In this repository all code regarding the epigenetic screening on the K562 CRISPR-Cas9 DSB clone#5 with 18 integrations is uploaded. 
 
+
+## Code is structured in the following script units:
 **Script 0: Clone Annotation**\
 Characterizing the chromatin environment of the 18 integrations of clone#5.
 
