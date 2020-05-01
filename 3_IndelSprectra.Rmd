@@ -481,16 +481,16 @@ each sample. We can then plot these in a simple way, a seperate PDF can also be 
 # Apply the sum of the columns over all the dataframes in the list.
 sum.list <- lapply(mutations.list, OverallIndels)
 
-# We can plot all these
-###OverallIndelPlot(sum.list)
-OverallIndelPlot(mutations.list)
+# # We can plot all these
+# ###OverallIndelPlot(sum.list)
+# OverallIndelPlot(mutations.list)
 
-# To create a PDF of these figures, for the small mutations.
-setwd("/DATA/usr/m.trauernicht/projects/EpiScreen/data/Results/")
-filename <- SetFileName("_Overall_IndelSpectra.pdf", "mt")
-pdf(filename, width = 11, height = 8)
-OverallIndelPlot(mutations.list)
-dev.off()
+# # To create a PDF of these figures, for the small mutations.
+# setwd("/DATA/usr/m.trauernicht/projects/EpiScreen/data/Results/")
+# filename <- SetFileName("_Overall_IndelSpectra.pdf", "mt")
+# pdf(filename, width = 11, height = 8)
+# OverallIndelPlot(mutations.list)
+# dev.off()
 ```
 
 
