@@ -127,16 +127,6 @@ indel.data$mean.eff.bc.drug <-
       indel.data$Drug, FUN = function(x) mean(x))
 
 
-# Compute mean and sd of barcode counts per barcode and drug
-indel.data$mean.count.bc.drug <- 
-  ave(indel.data$rel.counts, 
-      indel.data$barcode, indel.data$conc,
-      indel.data$Drug, FUN = function(x) mean(x))
-indel.data$sd.count.bc.drug <- 
-  ave(indel.data$rel.counts, 
-      indel.data$barcode, indel.data$conc,
-      indel.data$Drug, FUN = function(x) sd(x))
-
 # Split up per concentration
 indel.data.high <- indel.data[grep("10um", indel.data$condition),]
 indel.data.med <- indel.data[grep("1um", indel.data$condition),]
@@ -167,32 +157,6 @@ indel.data.low.eff <- indel.data.low %>% select(barcode, Drug, mean.eff.bc.drug)
 
 
 
-# Select columns and transform to wide format - barcode counts
-## High conc
-indel.data.high.count <- indel.data.high[indel.data.high$sd.count.bc.drug < 1,] %>%
-  select(barcode, Drug, mean.count.bc.drug) %>% unique() %>% 
-  dcast(barcode ~ Drug, value.var = "mean.count.bc.drug") %>% filter_all(any_vars(!is.na(.))) %>% 
-  remove_rownames %>% column_to_rownames(var="barcode")
-
-# indel.data.high.count <- indel.data.high.count[,-118]
-
-## Med conc
-indel.data.med.count <- indel.data.med[indel.data.med$sd.count.bc.drug < 1,] %>%
-  select(barcode, Drug, mean.count.bc.drug) %>% unique() %>% 
-  dcast(barcode ~ Drug, value.var = "mean.count.bc.drug") %>% 
-  remove_rownames %>% column_to_rownames(var="barcode")
-
-# indel.data.med.count <- indel.data.med.count[,-146]
-
-## Low conc
-indel.data.low.count <- indel.data.low[indel.data.low$sd.count.bc.drug < 1,] %>%
-  select(barcode, Drug, mean.count.bc.drug) %>% unique() %>% 
-  dcast(barcode ~ Drug, value.var = "mean.count.bc.drug") %>% 
-  remove_rownames %>% column_to_rownames(var="barcode")
-
-# indel.data.low.count <- indel.data.low.count[,-158]
-
-
 
 # Same as above, but using t-statistic data
 indel.data.high.drug.st <- indel.data.high %>% select(barcode, Drug, mean.statistic.bc.drug) %>%
@@ -206,6 +170,7 @@ indel.data.med.drug.st <- indel.data.med %>% select(barcode, Drug, mean.statisti
 indel.data.low.drug.st <- indel.data.low %>% select(barcode, Drug, mean.statistic.bc.drug) %>%
   unique() %>% dcast(barcode ~ Drug, value.var="mean.statistic.bc.drug") %>% 
   remove_rownames %>% column_to_rownames(var="barcode")
+
 
 
 
@@ -280,14 +245,13 @@ annotation_colors_scr$target <- annotation_colors_scr$target[ordered_marks2]
 
 
 
-Next, I want to create heatmaps to visualize the effect of each individual drug on each of the 18 barcodes.
 
+Next, I want to create heatmaps to visualize the effect of each individual drug on each of the 18 barcodes.
 
 \newpage
 # Results
 ## logratio heatmap of each individual drug vs. barcode
 ```{r visualization each drug, out.width= "100%", fig.align= "center", echo=FALSE}
-
 ## Every drug
 # Keeping the scale in the pheatmap function
 myBreaks1 <- seq(-1.5,1.5,0.03)
@@ -309,17 +273,11 @@ pheatmap(as.matrix(indel.data.high.drug),
 ```{r visualization essential drugs, out.width= "100%", fig.align= "center", echo=FALSE}
 ## Only drugs that change ratio
 # pheatmap function: without DNA-PKi: logratio heatmap of eac a certain fold change
-indel.data.high.drug.ess <- indel.data.high.drug[]
-indel.data.high.drug.ess[is.na(indel.data.high.drug.ess)] <- 0
-indel.data.high.drug.ess <- 
-  indel.data.high.drug.ess[, 
-                          colSums(indel.data.high.drug.ess > 1.5) >= 1 |
-                            colSums(indel.data.high.drug.ess < -0.5) >= 1]
+indel.data.high.drug.ess <- indel.data.high.drug[, colSums(indel.data.high.drug > 1.5) >= 1 |
+                            colSums(indel.data.high.drug < -0.5) >= 1]
 # Keeping the scale in the pheatmap function
-myBreaks2 <- c(seq(-0.5, 0, 
-                   length.out=ceiling(100/2) + 1), 
-              seq(9/100, 
-                  9/2, length.out=floor(100/2)))
+myBreaks2 <- c(seq(-0.5, 0, length.out=ceiling(100/2) + 1), 
+              seq(9/100, 9/2, length.out=floor(100/2)))
 
 
 pheatmap(as.matrix(indel.data.high.drug.ess),
@@ -338,11 +296,8 @@ pheatmap(as.matrix(indel.data.high.drug.ess),
 
 
 # pheatmap function: without DNA-PKi: logratio heatmap of each individual drug vs. barcode - 1uM drugs added- include only drugs that achieve a certain fold change
-indel.data.med.drug.ess <- indel.data.med.drug[]
-indel.data.med.drug.ess <- 
-  indel.data.med.drug.ess[, 
-                          colSums(indel.data.med.drug.ess > 1) >= 1 |
-                            colSums(indel.data.med.drug.ess < -0.7) >= 1] 
+indel.data.med.drug.ess <- indel.data.med.drug[, colSums(indel.data.med.drug > 1) >= 1 |
+                            colSums(indel.data.med.drug < -0.7) >= 1] 
 
 myBreaks3 <- c(seq(min(as.matrix(indel.data.med.drug.ess)), 0, 
                    length.out=ceiling(100/2) + 1), 
@@ -366,11 +321,8 @@ pheatmap(as.matrix(indel.data.med.drug.ess),
 
 
 # pheatmap function: without DNA-PKi: logratio heatmap of each individual drug vs. barcode - 100nM drugs added - include only drugs that achieve a certain fold change
-indel.data.low.drug.ess <- indel.data.low.drug[]
-indel.data.low.drug.ess <- 
-  indel.data.low.drug.ess[, 
-                          colSums(indel.data.low.drug.ess > 1) >= 1 |
-                            colSums(indel.data.low.drug.ess < -0.5) >= 1]
+indel.data.low.drug.ess <- indel.data.low.drug[, colSums(indel.data.low.drug > 1) >= 1 |
+                            colSums(indel.data.low.drug < -0.5) >= 1]
 
 myBreaks4 <- c(seq(min(as.matrix(indel.data.low.drug.ess)), 0, 
                    length.out=ceiling(100/2) + 1), 
@@ -394,12 +346,12 @@ pheatmap(as.matrix(indel.data.low.drug.ess),
 
 ```
 
-
+## Now plot the same for the efficiency
 ```{r visualization efficiency, out.width= "100%", fig.align= "center", echo=FALSE}
 # Efficiency change heatmap - 10 uM
 myBreaks5 <- seq(-0.1, 0.1, 0.002)
 
-pheatmap(as.matrix(indel.data.high.eff[,-36]), fontsize_col = 8, fontsize_row = 8, cellheight = 8,
+pheatmap(as.matrix(indel.data.high.eff), fontsize_col = 8, fontsize_row = 8, cellheight = 8,
          color = colorRampPalette(rev(brewer.pal(n = 7, name = "RdBu")))(100),
          breaks = myBreaks5, cluster_rows = chip_dendogram$tree_col,
          annotation_colors = annotation_colors_scr, 
@@ -412,11 +364,8 @@ pheatmap(as.matrix(indel.data.high.eff[,-36]), fontsize_col = 8, fontsize_row = 
 
 
 # Efficiency change heatmap - 10 uM - only essentials
-indel.data.high.eff.ess <- indel.data.high.eff
-indel.data.high.eff.ess <- 
-  indel.data.high.eff.ess[, 
-                          colSums(indel.data.high.eff.ess > 0.08) >= 1 |
-                            colSums(indel.data.high.eff.ess < -0.2) >= 1]
+indel.data.high.eff.ess <- indel.data.high.eff[, colSums(indel.data.high.eff > 0.08) >= 1 |
+                            colSums(indel.data.high.eff < -0.2) >= 1]
 
 myBreaks6 <- c(seq(min(as.matrix(indel.data.high.eff.ess))/1.5, 0, 
                    length.out=ceiling(100/2) + 1), 
@@ -439,11 +388,8 @@ pheatmap(as.matrix(indel.data.high.eff.ess),
 
 
 # Efficiency change heatmap - 1 uM
-indel.data.med.eff.ess <- indel.data.med.eff
-indel.data.med.eff.ess <- 
-  indel.data.med.eff.ess[, 
-                         colSums(indel.data.med.eff.ess > 0.0666) >= 1 | 
-                           colSums(indel.data.med.eff.ess < -0.1333) >= 1]
+indel.data.med.eff.ess <- indel.data.med.eff[, colSums(indel.data.med.eff > 0.0666) >= 1 | 
+                           colSums(indel.data.med.eff < -0.1333) >= 1]
 
 myBreaks7 <- c(seq(min(as.matrix(indel.data.med.eff.ess))/1.5, 0, 
                    length.out=ceiling(100/2) + 1), 
@@ -466,11 +412,8 @@ pheatmap(as.matrix(indel.data.med.eff.ess),
 
 
 # Efficiency change heatmap - 100 nM
-indel.data.low.eff.ess <- indel.data.low.eff
-indel.data.low.eff.ess <- 
-  indel.data.low.eff.ess[, 
-                         colSums(indel.data.low.eff.ess > 0.0666) >= 1 |
-                           colSums(indel.data.low.eff.ess < -0.1333) >= 1]
+indel.data.low.eff.ess <- indel.data.low.eff[, colSums(indel.data.low.eff > 0.0666) >= 1 |
+                           colSums(indel.data.low.eff < -0.1333) >= 1]
 
 myBreaks8 <- c(seq(min(as.matrix(indel.data.low.eff.ess))/1.5, 0, 
                    length.out=ceiling(100/2) + 1), 
@@ -491,89 +434,62 @@ pheatmap(as.matrix(indel.data.low.eff.ess),
                         "Integration 8","Integration 2"),
          main = "efficiency change - 100nM of drugs added")
 ```
+
+
 \newpage
-## Read count heatmap
-```{r out.width= "100%", fig.align= "center", echo=FALSE}
-## Only drugs that change ratio
-# pheatmap function: count heatmap, selecting only 
-# indel.data.high.count <- na.omit(indel.data.high.count)
-# indel.data.high.count.ess <- 
-#   indel.data.high.count[, 
-#                          colSums(indel.data.high.count > 1.666) >= 1 |
-#                            colSums(indel.data.high.count < 0.666) >= 1]
-# 
-# 
-# 
-# # Keeping the scale in the pheatmap function
-# myBreaks22 <- c(seq(min(as.matrix(indel.data.high.count.ess)), 1, 
-#                 length.out=ceiling(100/2) + 1), 
-#               seq(1.001, max(as.matrix(indel.data.high.count.ess)), 
-#                   length.out=floor(100/2)))
-# 
-# pheatmap(as.matrix(indel.data.high.count.ess),
-#          # annotation_col = target, border_color = "grey60",
-#          # annotation_row = barcode.annotation, annotation_legend = F,
-#          color = colorRampPalette(brewer.pal(n = 7, name = "YlOrRd"))(100),
-#          breaks = myBreaks22, # cluster_rows = chip_dendogram$tree_col,
-#          annotation_colors = annotation_colors_scr, 
-#          main = "barcode count relative to DMSO - 10uM of drugs added")
-# 
-# 
-# # pheatmap function: count heatmap, selecting only 
-# indel.data.med.count <- na.omit(indel.data.med.count)
-# indel.data.med.count.ess <- 
-#   indel.data.med.count[, 
-#                          colSums(indel.data.med.count > 1.666) >= 1 |
-#                            colSums(indel.data.med.count < 0.666) >= 1]
-# 
-# 
-# 
-# # Keeping the scale in the pheatmap function
-# myBreaks23 <- c(seq(min(as.matrix(indel.data.med.count.ess)), 1, 
-#                 length.out=ceiling(100/2) + 1), 
-#               seq(1.001, max(as.matrix(indel.data.med.count.ess)), 
-#                   length.out=floor(100/2)))
-# 
-# pheatmap(as.matrix(indel.data.med.count.ess),
-#          annotation_col = target, border_color = "grey60",
-#          annotation_row = barcode.annotation, annotation_legend = F,
-#          color = colorRampPalette(brewer.pal(n = 7, name = "YlOrRd"))(100),
-#          breaks = myBreaks23, # cluster_rows = chip_dendogram$tree_col,
-#          annotation_colors = annotation_colors_scr, 
-#          main = "barcode count relative to DMSO - 1uM of drugs added")
-# 
-# # pheatmap function: count heatmap, selecting only 
-# indel.data.low.count <- na.omit(indel.data.low.count)
-# indel.data.low.count.ess <- 
-#   indel.data.low.count[, 
-#                          colSums(indel.data.low.count > 1.666) >= 1 |
-#                            colSums(indel.data.low.count < 0.666) >= 1]
-# 
-# 
-# 
-# # Keeping the scale in the pheatmap function
-# myBreaks24 <- c(seq(min(as.matrix(indel.data.low.count.ess)), 1, 
-#                 length.out=ceiling(100/2) + 1), 
-#               seq(1.001, max(as.matrix(indel.data.low.count.ess)), 
-#                   length.out=floor(100/2)))
-# 
-# pheatmap(as.matrix(indel.data.low.count.ess),
-#          annotation_col = target, border_color = "grey60",
-#          annotation_row = barcode.annotation, annotation_legend = F,
-#          color = colorRampPalette(brewer.pal(n = 7, name = "YlOrRd"))(100),
-#          breaks = myBreaks24, # cluster_rows = chip_dendogram$tree_col,
-#          annotation_colors = annotation_colors_scr, 
-#          main = "barcode count relative to DMSO - 100nM of drugs added")
-```
-\newpage
-## Heatmap only HDACs
+## Heatmap for one certain target group
 ```{r}
-# Only select HDAC data, 1 uM concentration
-# data2 = logratio_high, data3 = logratio_med, data4 = logratio_low, 
-# data5 = efficiency_high, data6 = efficiency_med, data7 = efficiency_low
-hdac.logratio <- data7[data7$Target=="HDAC",]
-hdac.logratio <- hdac.logratio[,-19]
-hdac.logratio <- t(hdac.logratio)
+# Annotate heatmaps with drug targets to display only certain drug target groups
+## target.logratio.high
+indel.data.high.drug2 <- rownames_to_column(indel.data.high.drug, "barcode") %>% 
+  melt() %>% dcast(variable ~ barcode, value.var = "value")
+targets <- unique(data.frame(indel.data %>% select(Target, Drug))) %>% 
+  setnames(old = "Drug", new = "variable")
+indel.data.high.drug2 <- merge(indel.data.high.drug2, targets) %>% 
+  remove_rownames %>% column_to_rownames(var="variable")
+target.logratio.high <- indel.data.high.drug2[-grep("Negative control|MRN|DNA-PK",indel.data.high.drug2$Target),]
+
+## target.logratio.med
+indel.data.med.drug2 <- rownames_to_column(indel.data.med.drug, "barcode") %>% 
+  melt() %>% dcast(variable ~ barcode, value.var = "value")
+indel.data.med.drug2 <- merge(indel.data.med.drug2, targets) %>% 
+  remove_rownames %>% column_to_rownames(var="variable")
+target.logratio.med <- indel.data.med.drug2[-grep("Negative control|MRN|DNA-PK",indel.data.med.drug2$Target),]
+
+## target.logratio.low
+indel.data.low.drug2 <- rownames_to_column(indel.data.low.drug, "barcode") %>% 
+  melt() %>% dcast(variable ~ barcode, value.var = "value")
+indel.data.low.drug2 <- merge(indel.data.low.drug2, targets) %>% 
+  remove_rownames %>% column_to_rownames(var="variable")
+target.logratio.low <- indel.data.low.drug2[-grep("Negative control|MRN|DNA-PK",indel.data.low.drug2$Target),]
+
+## target.efficiency.high
+indel.data.high.eff2 <- rownames_to_column(indel.data.high.eff, "barcode") %>% 
+  melt() %>% dcast(variable ~ barcode, value.var = "value")
+indel.data.high.eff2 <- merge(indel.data.high.eff2, targets) %>% 
+  remove_rownames %>% column_to_rownames(var="variable")
+target.eff.high <- indel.data.high.eff2[-grep("Negative control|MRN|DNA-PK",indel.data.high.eff2$Target),]
+
+## target.efficiency.med
+indel.data.med.eff2 <- rownames_to_column(indel.data.med.eff, "barcode") %>% 
+  melt() %>% dcast(variable ~ barcode, value.var = "value")
+indel.data.med.eff2 <- merge(indel.data.med.eff2, targets) %>% 
+  remove_rownames %>% column_to_rownames(var="variable")
+target.eff.med <- indel.data.med.eff2[-grep("Negative control|MRN|DNA-PK",indel.data.med.eff2$Target),]
+
+## target.efficiency.low
+indel.data.low.eff2 <- rownames_to_column(indel.data.low.eff, "barcode") %>% 
+  melt() %>% dcast(variable ~ barcode, value.var = "value")
+indel.data.low.eff2 <- merge(indel.data.low.eff2, targets) %>% 
+  remove_rownames %>% column_to_rownames(var="variable")
+target.eff.low <- indel.data.low.eff2[-grep("Negative control|MRN|DNA-PK",indel.data.low.eff2$Target),]
+
+
+# Choose from the above dfs what you want to display
+
+## Only select HDACs
+hdac.logratio <- target.eff.high[target.eff.high$Target=="HDAC",] %>% 
+  select(-Target) %>% t()
 
 # Generate pheatmap
 # Use myBreaks5 for efficiency heatmap, myBreaks1 for logratio heatmap
@@ -604,11 +520,10 @@ setnames(colnames.logr, "colnames((indel.data.med.drug.ess))", "drug")
 colnames.eff <- as.data.frame(colnames((indel.data.med.eff.ess)))
 setnames(colnames.eff, "colnames((indel.data.med.eff.ess))", "drug")
 
-targets <- target.low[target.low$Target == "HDAC",]
-targets <- targets[,-2]
+hdac <- targets[targets$Target == "HDAC",]
 
-colnames.logr <- unique(colnames.logr[colnames.logr$drug %in% targets,])
-colnames.eff <- unique(colnames.eff[colnames.eff$drug %in% targets,])
+colnames.logr <- unique(colnames.logr[colnames.logr$drug %in% hdac$variable,])
+colnames.eff <- unique(colnames.eff[colnames.eff$drug %in% hdac$variable,])
 
 z <- intersect(colnames.logr, colnames.eff)
 
@@ -618,12 +533,8 @@ z <- intersect(colnames.logr, colnames.eff)
 draw.pairwise.venn(length(colnames.logr), 
                    length(colnames.eff), 
                    length(z),
-                   category = c("Drugs with altered logratio", "Drugs with altered efficiency"), 
+                   category = c("1uM HDACs with altered logratio", "1 uM HDACs with altered efficiency"), 
                    fill = c("blue", "red"), cat.pos = c(2,2))
-
-
-
-
 ```
 
 
@@ -633,76 +544,67 @@ Next step is to import the chromatin data to generate a correlation matrix betwe
 ## Correlation between ChIP data and logratio changes
 ```{r correlation chip logratio, out.width= "100%", fig.align= "center", echo=FALSE}
 # Import chromatin data
-mapping_mean_chip <- mapping_mean
-mapping_mean_chip <- tibble::rownames_to_column(as.data.frame(mapping_mean_chip), "ChIP")
-chip_data <- melt(mapping_mean_chip, variable.name="barcode", value.name="mean")
-chip_data <- dcast(chip_data, barcode ~ ChIP, value.var = "mean")
+mapping_mean_chip <- as.data.frame(mapping_mean) %>% rownames_to_column("ChIP")
+chip_data <- melt(mapping_mean_chip, variable.name="barcode", value.name="mean") %>% 
+  dcast(barcode ~ ChIP, value.var = "mean")
 chip_data <- chip_data[chip_data$barcode != 
                          "ACCCCTAAAGGCGCTG" & chip_data$barcode != "CTCTTAATCGCTGCC", ]
-chip_data2 <- chip_data
+chip_data2 <- chip_data %>% 
+  remove_rownames %>% column_to_rownames(var="barcode")
 
 ## In case I want to include the mean.ratio
-mean.ratio <- indel.data[indel.data$Drug == "DMSO",]
-mean.ratio <- mean.ratio[,c(1,15)]
-mean.ratio$ratio <- ave(mean.ratio$ratio, mean.ratio$barcode, FUN = function(x) mean(x))
-mean.ratio <- unique(mean.ratio)
+mean.ratio <- indel.data[indel.data$Drug == "DMSO",] %>% select(barcode, ratio) %>%
+  mutate(ratio = ave(ratio, barcode, FUN = function(x) mean(x))) %>%
+  unique()
 chip_data <- merge(chip_data, mean.ratio)
 
 
 ## In case I want to include MMEJ delay 
-delay.data <- delay.df[delay.df$clone %in% "5",]
-delay.data$fold_dif.mean <- ave(delay.data$fold_difference, delay.data$barcode, FUN= function(x) mean(x))
-delay.data <- delay.data[,c(1,7)]
-delay.data <- delay.data[!duplicated(delay.data),]
+delay.data <- delay.df[delay.df$clone %in% "5",] %>%
+  mutate(replication_timing = ave(fold_difference, barcode, FUN= function(x) mean(x))) %>%
+  select(barcode, replication_timing) %>% unique()
 delay.data <- delay.data[c(-1,-11),]
-chip_data <- merge(chip_data, delay.data)
-
-chip_data <- chip_data %>% 
+chip_data <- merge(chip_data, delay.data) %>% 
   remove_rownames %>% column_to_rownames(var="barcode")
 
 ## Ratio is influenced by which ChIP datasets?
-mean.ratio2 <- mean.ratio
-mean.ratio2 <- mean.ratio2 %>% 
-  remove_rownames %>% column_to_rownames(var="barcode")
-chip_data2 <- chip_data2 %>% 
-  remove_rownames %>% column_to_rownames(var="barcode")
+mean.ratio2 <- mean.ratio %>% remove_rownames %>% column_to_rownames(var="barcode")
 
-cor_ratio <- cor(mean.ratio2, chip_data2)
-chip_data3 <- chip_data2[,14,drop = F]
-chip_data3 <- cbind(chip_data3, mean.ratio2)
+cor_ratio <- as.data.frame(t(cor(mean.ratio2, chip_data2))) %>% rownames_to_column("ChIP")
+chip_data3 <- chip_data2[,14,drop = F] %>% cbind(chip_data2, mean.ratio2)
 cor_ratio_test <- cor.test(chip_data3$LMNB1, chip_data3$ratio)
-cor_ratio <- as.data.frame(cor_ratio)
-cor_ratio <- t(cor_ratio)
-cor_ratio <- tibble::rownames_to_column(as.data.frame(cor_ratio), "ChIP")
+
 
 ggplot(cor_ratio, aes(x = reorder(ChIP,ratio, function(x) -x), y = ratio, fill=ratio)) +
   geom_bar(stat="identity") +
   xlab("ChIP Dataset") + ylab("Pearson Correlation") +
   scale_fill_gradient2(low = "#D67143", high = "#8EBF7A", 
 name = "Pearson 
-Correlation")+
+Correlation")+ theme_bw() +
    theme(axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1, size = 12))+
-  labs(title = "Correlation Mean Ratio per Barcode vs. Each ChIP Dataset")
+  labs(title = "Correlation Mean Ratio per Barcode vs. Each ChIP Dataset") 
 
 
 ## Scatterplot
 # DNA methylation
-chip_data3 <- tibble::rownames_to_column(as.data.frame(chip_data2))
-dnameth.data <- chip_data3[,c(1,18)]
+dnameth.data <- as.data.frame(chip_data2) %>% rownames_to_column() %>% select(DNAse, WGBS)
 dnameth.data <- cbind(dnameth.data, mean.ratio2)
 
 ggplot(dnameth.data, aes(x=WGBS, y=ratio))+
   geom_point()+
-  geom_smooth(method = lm) 
+  geom_smooth(method = lm) +
+  labs(title = "Correlation indel ratio vs. DNA methylation (WGBS)") +
+  theme_bw()
 
 # LMNB1
-chip_data3 <- tibble::rownames_to_column(as.data.frame(chip_data2))
-lmnb1.data <- chip_data3[,c(1,15)]
+lmnb1.data <- as.data.frame(chip_data2) %>% rownames_to_column() %>% select(LMNB1)
 lmnb1.data <- cbind(lmnb1.data, mean.ratio2)
 
 ggplot(lmnb1.data, aes(x=LMNB1, y=ratio))+
   geom_point()+
-  geom_smooth(method = lm) 
+  geom_smooth(method = lm) +
+  labs(title = "Correlation indel ratio vs. DNA methylation (WGBS)") +
+  theme_bw()
 
 # Calculate correlations
 cor_chip_indel.high <- cor(chip_data,indel.data.high.drug)
@@ -755,13 +657,13 @@ cor.pheatmap.eff <-
 
 for(i in 1:(length(cor.pheatmap))) {
   data <- cor.pheatmap[[i]]
-p <- pheatmap(data, 
+  p <- pheatmap(data, 
          annotation_col = target,
          annotation_row = type,
          color = colorRampPalette(rev(brewer.pal(n = 7, name = "RdBu")))(100),
          annotation_colors = annotation_colors_scr, annotation_legend = F,
          main = paste(i,"correlation heatmap: ChiP data vs. logratio change per drug"))
-print(p)
+  print(p)
 }
 
 for(i in 1:(length(cor.pheatmap.eff))) {
@@ -780,9 +682,9 @@ print(p)
 
 
 ## Cluster-specific effects: now, instead of correlating each chromatin mark against drug-induced change, I try to correlate the drug-induced change against the chromatin clusters
-```{r}
-clusters <- as.data.frame(unique(indel.data$barcode))
-clusters$cluster <- "LAD"
+```{r cluster_correlation, out.width= "100%", fig.align= "center", echo=FALSE}
+# Assign each barcode to a certain cluster
+clusters <- as.data.frame(unique(indel.data$barcode)) %>% mutate(cluster = "LAD")
 clusters$cluster[clusters$`unique(indel.data$barcode)` == "AGAAAATAATATGACG" |
                    clusters$`unique(indel.data$barcode)` == "TTGAACGCGGGCTCGG"] <- "Active_P.E."
 clusters$cluster[clusters$`unique(indel.data$barcode)` == "CCGGGGACGTATGCAC" |
@@ -798,15 +700,12 @@ clusters$cluster[clusters$`unique(indel.data$barcode)` == "ACTGTCGAGTTGTCCG" |
                    clusters$`unique(indel.data$barcode)` == "CGGCCTGAAGGTCAGG"|
                    clusters$`unique(indel.data$barcode)` == "GCGCACCCTTTAATTG"] <- "H3K27"
 
-
-clusters2 <- dcast(clusters, `unique(indel.data$barcode)`~cluster)
-
-clusters2 <- clusters2 %>% 
+# Change data structure to get a binary cluster classfication matrix
+clusters2 <- dcast(clusters, `unique(indel.data$barcode)`~cluster) %>% 
   remove_rownames %>% column_to_rownames(var="unique(indel.data$barcode)")
 
 clusters2[!is.na(clusters2)] <- 1
 clusters2[is.na(clusters2)] <- 0
-
 clusters2$Active_G.B. <- as.numeric(clusters2$Active_G.B.)
 clusters2$Active_P.E. <- as.numeric(clusters2$Active_P.E.)
 clusters2$H3K27 <- as.numeric(clusters2$H3K27)
@@ -814,7 +713,7 @@ clusters2$H3K9 <- as.numeric(clusters2$H3K9)
 clusters2$LAD <- as.numeric(clusters2$LAD)
 clusters2$No <- as.numeric(clusters2$No)
 
-
+# Compute correlations for clusters
 cor.clusters.high <- cor(clusters2, indel.data.high.drug)
 cor.clusters.med <- cor(clusters2, indel.data.med.drug)
 cor.clusters.low <- cor(clusters2, indel.data.low.drug)
@@ -868,7 +767,7 @@ p <- pheatmap(data,
          annotation_col = target,
          annotation_row = type,
          color = colorRampPalette(rev(brewer.pal(n = 7, name = "RdBu")))(100),
-         annotation_colors = annotation_colors_scr, annotation_legend = F,
+         annotation_colors = annotation_colors_scr, annotation_legend = T,
          main = paste(i,"correlation heatmap: ChiP data vs. logratio change per drug"))
 print(p)
 }
@@ -879,18 +778,16 @@ p <- pheatmap(data,
          annotation_col = target,
          annotation_row = type,
          color = colorRampPalette(rev(brewer.pal(n = 7, name = "RdBu")))(100),
-         annotation_colors = annotation_colors_scr, annotation_legend = F,
+         annotation_colors = annotation_colors_scr, annotation_legend = T,
          main = paste(i,"correlation heatmap: ChiP data vs. efficiency change per drug"))
 print(p)
 }
 
 # Boxplot
-mean.ratio <- indel.data[indel.data$Drug == "CTPB" & indel.data$conc == "10um",]
-mean.ratio <- mean.ratio[,c(1,25)]
-mean.ratio$logratio.platenorm <- ave(mean.ratio$logratio.platenorm, mean.ratio$barcode, FUN = function(x) mean(x))
-mean.ratio <- unique(mean.ratio)
-mean.ratio <- mean.ratio %>% 
-  remove_rownames %>% column_to_rownames(var="barcode")
+mean.ratio <- indel.data[indel.data$Drug == "CTPB" & indel.data$conc == "10um",] %>%
+  select(barcode, logratio.platenorm) %>% 
+  mutate(logratio.platenorm = ave(logratio.platenorm, barcode, FUN = function(x) mean(x))) %>% 
+  unique() %>% remove_rownames %>% column_to_rownames(var="barcode")
 
 # Combine dfs
 clusters <- clusters %>% 
@@ -905,11 +802,11 @@ ggplot(mean.ratio2, aes(x=cluster, y=logratio.platenorm, fill = cluster))+
   scale_y_continuous(breaks=c(-0.5,0,0.5))+ theme_classic2()
   
 ## Statistical analysis: are the groups significantly different?
-mean.ratio <- indel.data[indel.data$Drug == "AT9283" & indel.data$conc == "1um",]
-mean.ratio <- mean.ratio[,c(1,12,25)]
-mean.ratio$logratio.platenorm <- ave(mean.ratio$logratio.platenorm, mean.ratio$rep, mean.ratio$barcode, FUN = function(x) mean(x))
-mean.ratio <- unique(mean.ratio)
-clusters2 <- tibble::rownames_to_column(as.data.frame(clusters), "barcode")
+mean.ratio <- indel.data[indel.data$Drug == "AT9283" & indel.data$conc == "1um",] %>%
+  select(barcode, rep, logratio.platenorm) %>%
+  mutate(logratie.platenorm = ave(logratio.platenorm, rep, barcode, FUN = function(x) mean(x))) %>% 
+  unique()
+clusters2 <- rownames_to_column(as.data.frame(clusters), "barcode")
 mean.ratio <- merge(mean.ratio, clusters2)
 t.test(mean.ratio$logratio.platenorm[mean.ratio$cluster == "Active_G.B."],
                                      mean.ratio$logratio.platenorm[mean.ratio$cluster == "Active_P.E."])$p.value
@@ -925,10 +822,9 @@ tukey <- TukeyHSD(anova)
 ## HDAC vs Integration 17
 ```{r HDAC vs Integration 17, out.width= "100%", fig.align= "center", echo=FALSE}
 # select HDAC data
-hdac <- data3[data3$Target == "HDAC",]
-hdac <- hdac[,-19]
-hdac <- hdac[rowSums(hdac > 1) >= 1 | rowSums(hdac < -0.7) >= 1,] 
-hdac <- t(hdac)
+hdac <- target.logratio.med[target.logratio.med$Target == "HDAC",] %>%
+  select(-Target)
+hdac <- hdac[rowSums(hdac > 1) >= 1 | rowSums(hdac < -0.7) >= 1,] %>% t()
 
 # calculate correlations
 cor_hdac <- cor(hdac, chip_data)
@@ -936,44 +832,37 @@ cor_hdac <- cor(hdac, chip_data)
 pheatmap(cor_hdac,
          color = colorRampPalette(rev(brewer.pal(n = 7, name = "RdBu")))(100))
 ```
-
+# H3K27me3 seems to correlate with the logratio change induced by HDACs
 
 
 ## Correlation plots individual drugs
-```{r}
+```{r correlation_individual, out.width= "100%", fig.align= "center", echo=FALSE}
 ## In case I want to include the mean.ratio
-mean.ratio <- indel.data[indel.data$Drug == "Decitabine",]
-mean.ratio <- mean.ratio[,c(1,25)]
-mean.ratio$logratio.platenorm <- ave(mean.ratio$logratio.platenorm, mean.ratio$barcode, FUN = function(x) mean(x))
-mean.ratio <- unique(mean.ratio)
-
+drug <- "Decitabine"
+mean.ratio <- indel.data[indel.data$Drug == drug,] %>%
+  select(barcode, logratio.platenorm) %>%
+  mutate(logratio.platenorm = ave(logratio.platenorm, barcode, FUN = function(x) mean(x))) %>%
+  unique()
 
 ## Ratio is influenced by which ChIP datasets?
-mean.ratio2 <- mean.ratio
-mean.ratio2 <- mean.ratio2 %>% 
+mean.ratio2 <- mean.ratio %>% 
   remove_rownames %>% column_to_rownames(var="barcode")
+cor_ratio <- as.data.frame(t(cor(mean.ratio2, chip_data))) %>% rownames_to_column("ChIP")
 
- # chip_data <- chip_data %>%
- # remove_rownames %>% column_to_rownames(var="rowname")
-
-cor_ratio <- cor(mean.ratio2, chip_data)
-cor_ratio <- as.data.frame(cor_ratio)
-cor_ratio <- t(cor_ratio)
-cor_ratio <- tibble::rownames_to_column(as.data.frame(cor_ratio), "ChIP")
-
-ggplot(cor_ratio, aes(x = reorder(ChIP,logratio.platenorm, function(x) -x), y = logratio.platenorm, fill=logratio.platenorm)) +
+ggplot(cor_ratio, aes(x = reorder(ChIP,logratio.platenorm, function(x) -x), 
+                      y = logratio.platenorm, fill=logratio.platenorm)) +
   geom_bar(stat="identity") +
   xlab("ChIP Dataset") + ylab("Pearson Correlation") +
-  scale_fill_gradient2(low = "#D67143", high = "#8EBF7A", 
-name = "Pearson 
-Correlation")+
-   theme(axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1, size = 12))+
-  labs(title = "Correlation MC-1293 (1 uM) Logratio Change per Barcode vs. Each ChIP Dataset")
+  scale_fill_gradient2(low = "#D67143", high = "#8EBF7A", name = "Pearson Correlation") + 
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1, size = 12)) +
+  labs(title = paste("Correlation ", drug, 
+                     "-induced Logratio Change per Barcode vs. Each ChIP Dataset", sep = ""))
 
 # Scatterplot
-mean.ratio <- tibble::rownames_to_column(as.data.frame(mean.ratio2))
-chip_data <- tibble::rownames_to_column(as.data.frame(chip_data))
-hdac1.data <- chip_data[,c(1,18)]
+mean.ratio <- rownames_to_column(as.data.frame(mean.ratio2))
+chip_data <- rownames_to_column(as.data.frame(chip_data))
+hdac1.data <- chip_data %>% select(DNAse, WGBS)
 hdac.1.data <- cbind(hdac1.data, mean.ratio2)
 
 ggplot(hdac.1.data, aes(x=WGBS, y=logratio.platenorm))+
@@ -983,53 +872,45 @@ ggplot(hdac.1.data, aes(x=WGBS, y=logratio.platenorm))+
 
 # Statistical significance?
 x <- cor.test(hdac.1.data$WGBS, hdac.1.data$logratio.platenorm)
-
 ```
 
 
 
 ## HDAC correlation
-```{r}
+```{r HDAC_correlation, out.width= "100%", fig.align= "center", echo=FALSE}
 ## In case I want to include the mean.ratio
 mean.ratio <- indel.data[indel.data$Drug == "AR-42" | indel.data$Drug == "Vorinostat (SAHA, MK0683)" |
                            indel.data$Drug == "PCI-24781 (Abexinostat)" |
                            indel.data$Drug == "Givinostat (ITF2357)" |
                            indel.data$Drug == "Scriptaid" |
-                           indel.data$Drug == "DMSO" & indel.data$conc == "1um",]
-mean.ratio <- mean.ratio[,c(1,6,25)]
-mean.ratio$logratio.platenorm <- ave(mean.ratio$logratio.platenorm, mean.ratio$Drug, mean.ratio$barcode, FUN = function(x) mean(x))
-mean.ratio <- unique(mean.ratio)
-setnames(mean.ratio, "barcode", "Var2")
+                           indel.data$Drug == "DMSO" & indel.data$conc == "1um",] %>%
+  select(barcode, Drug, logratio.platenorm) %>%
+  mutate(logratio.platenorm = ave(logratio.platenorm, Drug, barcode, FUN = function(x) mean(x))) %>%
+  unique() %>% setnames("barcode", "Var2")
 
 ## Ratio is influenced by which ChIP datasets?
-mean.ratio2 <- mean.ratio
-mean.ratio2 <- dcast(mean.ratio2, Var2 ~ Drug)
-mean.ratio2 <- mean.ratio2 %>% 
+mean.ratio2 <- mean.ratio %>% dcast(Var2 ~ Drug) %>% 
   remove_rownames %>% column_to_rownames(var="Var2")
 mean.ratio2 <- hdac[,colSums(hdac > 1) >= 1 | colSums(hdac < -0.7) >= 1] 
 
-chip_data <- chip_data %>%
-  remove_rownames %>% column_to_rownames(var="rowname")
+chip_data <- chip_data %>% column_to_rownames("rowname")
 
-cor_ratio <- cor(mean.ratio2, chip_data)
-cor_ratio <- as.data.frame(cor_ratio)
-cor_ratio <- t(cor_ratio)
-cor_ratio <- tibble::rownames_to_column(as.data.frame(cor_ratio), "ChIP")
-cor_ratio <- melt(cor_ratio)
+cor_ratio <- as.data.frame(t(cor(mean.ratio2, chip_data))) %>% 
+  rownames_to_column("ChIP") %>% melt()
 
 
-ggplot(cor_ratio, aes(x = reorder(ChIP, value, function(x) -mean(x)), y = value, fill = value)) +
+ggplot(cor_ratio, aes(x = reorder(ChIP, value, function(x) -mean(x)), y = value)) +
   geom_boxplot() +
   geom_jitter(aes(color=variable))+
-  xlab("ChIP Dataset") + ylab("Pearson Correlation") +
+  xlab("ChIP Dataset") + ylab("Pearson Correlation") + theme_bw() +
    theme(axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1, size = 12))+
   labs(title = "Correlation HDACs Logratio Change per Barcode vs. Each ChIP Dataset")
 
 
 # Scatterplot
-chip_data <- tibble::rownames_to_column(as.data.frame(chip_data))
-h3k27.data <- chip_data[,c(1,4)]
-h3k27.data <- cbind(h3k27.data, mean.ratio2)
+mean.ratio <- rownames_to_column(as.data.frame(mean.ratio2))
+h3k27.data <- chip_data %>% select(H3K27me3)
+h3k27.data <- cbind(h3k27.data, mean.ratio)
 h3k27.data <- melt(h3k27.data, id.vars = c("rowname","H3K27me3"))
 
 
@@ -1039,31 +920,29 @@ ggplot(h3k27.data, aes(x=H3K27me3, y=value, color = variable))+
   geom_smooth(method = lm) +
   scale_color_brewer(palette = "Set2")+
   theme_classic2()
-
 ```
 
 \newpage
 ## MC-1293 HDAC1 correlation 
-```{r}
-# mc1293.indel.data <- indel.data.med.drug[,73, drop = F]
-# mc1293.indel.data <- tibble::rownames_to_column(as.data.frame(mc1293.indel.data), "barcode")
-# barcode.order2 <- barcode.order[,-2]
-# mc1293.indel.data <- merge(mc1293.indel.data, barcode.order2)
-# mc1293.indel.data <- mc1293.indel.data[,-1]
-# 
-# chip_data2 <- chip_data[,10, drop = F]
-# chip_data2 <- tibble::rownames_to_column(as.data.frame(chip_data2), "barcode")
-# chip_data2 <- merge(chip_data2, barcode.order2)
-# chip_data2 <- chip_data2[,-1]
-# 
-# 
-# 
-# mc1293.hdac1 <- merge(mc1293.indel.data, chip_data2)
-# mc1293.hdac1 <- melt(mc1293.hdac1)
-# 
-# ggplot(mc1293.hdac1, aes(x = reorder(integration, value), y = value, fill = variable, group = variable))+
-#   geom_bar(stat="identity", position = "dodge")+ 
-#   theme(axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1, size = 12))
+```{r HDAC1_correlation, out.width= "100%", fig.align= "center", echo=FALSE}
+# Plot correlation of MC-1293 vs HDAC1 ChIP
+mc1293.indel.data <- indel.data.med.drug %>% select(`MC-1293`) %>%
+  rownames_to_column("barcode")
+barcode.order2 <- barcode.order %>% select(-order)
+mc1293.indel.data <- merge(mc1293.indel.data, barcode.order2) %>% 
+  select(-barcode)
+
+chip_data <- chip_data %>%
+  rownames_to_column("barcode")
+
+chip_data2 <- chip_data %>% select(barcode, HDAC1) 
+chip_data2 <- merge(chip_data2, barcode.order2) %>% select(-barcode)
+
+mc1293.hdac1 <- merge(mc1293.indel.data, chip_data2) %>% melt()
+
+ggplot(mc1293.hdac1, aes(x = reorder(integration, value), y = value, fill = variable, group = variable))+
+  geom_bar(stat="identity", position = "dodge")+ theme_bw() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1, size = 12))
 ```
 
 
@@ -1071,115 +950,100 @@ ggplot(h3k27.data, aes(x=H3K27me3, y=value, color = variable))+
 ## Drug dose response
 ```{r drug dose responses, out.width= "100%", fig.align= "center", echo=FALSE}
 # Select all drugs that are changed (in either high, med, or low concentration)
-# names.high <- colnames(indel.data.high.drug.ess)
-# names.med <- colnames(indel.data.med.drug.ess)
-# names.low <- colnames(indel.data.low.drug.ess)
-# indel.data.dose <- indel.data[indel.data$Drug %in% names.high |
-#                                 indel.data$Drug %in% names.med |
-#                                 indel.data$Drug %in% names.low, ]
-# 
-# # Plot drug dose response per drug for all barcodes
-# # indel.data.dose$conc <- factor(indel.data.dose$conc, levels=c("100nm", "1um", "10um"))
-# # for (i in c(1:6)){
-# # p<- ggplot(data = indel.data.dose, aes(x = conc, y = logratio.mean, color = barcode)) +
-# #   geom_point(alpha = 0.5) + 
-# #   labs(title = "dose response curve of effective drugs", x = "concentration", y = "log2(+1/-7 ratio) change") +
-# #   stat_summary(fun.y=mean, aes(group=1), geom="line", colour="#993300", alpha = 0.5) +
-# #   stat_summary(fun.y=mean, aes(group=1), geom="point", colour="#993300", size=3, shape=4, alpha = 0.5)+
-# #   facet_wrap_paginate(~Drug, nrow = 4, ncol = 4, page = i)
-# # print(p)
-# # }
-# 
-# # Or directly in one plot
-# ggplot(data = indel.data.dose, aes(x = conc, y = logratio.mean, color = barcode)) +
-#   geom_point(alpha = 0.5) + 
-#   labs(title = "dose response curve of effective drugs", x = "concentration", y = "log2(+1/-7 ratio) change") +
-#   stat_summary(fun.y=mean, aes(group=1), geom="line", colour="#993300", alpha = 0.5) +
-#   stat_summary(fun.y=mean, aes(group=1), geom="point", colour="#993300", size=3, shape=4, alpha = 0.5)+
-#   facet_wrap(~Drug, nrow = 8, ncol = 8)
-# 
-# 
-# 
-# # Look at individual drugs more carefully
-# ## Select drug
-# Drug <- "Resveratrol"
-# for (i in Drug) {
-# p <- ggplot(data = indel.data.dose[indel.data.dose$Drug == Drug,], aes(x = conc, y = logratio.mean, group = barcode, color = barcode)) +
-#   geom_point(alpha = 0.5) + geom_line(alpha = 0.5, linetype = "dashed") +
-#   labs(title = paste("dose response curve of", i), x = "concentration", y = "log2(+1/-7 ratio) change")
-# print(p)
-# }
-# 
-# 
-# # Dose curves for ChIP correlations
-# ## Compute all corralations
-# indel.data.cor <- indel.data[indel.data$Drug %in% names.high |
-#                                 indel.data$Drug %in% names.med |
-#                                 indel.data$Drug %in% names.low, ]
-# indel.data.cor$mean.logratio.bc.drug <- ave(indel.data.cor$logratio.platenorm, 
-#                                             indel.data.cor$barcode, 
-#                                             indel.data.cor$Drug, 
-#                                             FUN = function(x) mean(x))
-# indel.data.cor.high <- indel.data.cor[indel.data.cor$conc %in% "10um",]
-# indel.data.cor.med <- indel.data.cor[indel.data.cor$conc %in% "1um",]
-# indel.data.cor.low <- indel.data.cor[indel.data.cor$conc %in% "100nm",]
-# indel.data.cor.high <- indel.data.cor.high[,c(1,6,41)]
-# indel.data.cor.med <- indel.data.cor.med[,c(1,6,41)]
-# indel.data.cor.low <- indel.data.cor.low[,c(1,6,41)]
-# indel.data.cor.high <- indel.data.cor.high[!duplicated(indel.data.cor.high), ]
-# indel.data.cor.med <- indel.data.cor.med[!duplicated(indel.data.cor.med), ]
-# indel.data.cor.low <- indel.data.cor.low[!duplicated(indel.data.cor.low), ]
-# indel.data.cor.high <- dcast(indel.data.cor.high, barcode ~ Drug, value.var="mean.logratio.bc.drug")
-# indel.data.cor.med <- dcast(indel.data.cor.med, barcode ~ Drug, value.var="mean.logratio.bc.drug")
-# indel.data.cor.low <- dcast(indel.data.cor.low, barcode ~ Drug, value.var="mean.logratio.bc.drug")
-# row.names(indel.data.cor.high) <- indel.data.cor.high$barcode
-# indel.data.cor.high <- indel.data.cor.high[,-1]
-# row.names(indel.data.cor.med) <- indel.data.cor.med$barcode
-# indel.data.cor.med <- indel.data.cor.med[,-1]
-# row.names(indel.data.cor.low) <- indel.data.cor.low$barcode
-# indel.data.cor.low <- indel.data.cor.low[,-1]
-# 
-# # Calculate correlations
-# cor_chip_indel.high <- cor(chip_data,indel.data.cor.high)
-# cor_chip_indel.med <- cor(chip_data,indel.data.cor.med)
-# cor_chip_indel.low <- cor(chip_data,indel.data.cor.low)
-# 
-# ## Convert dfs to long format
-# dose_chip_high <- tibble::rownames_to_column(as.data.frame(cor_chip_indel.high), "ChIP")
-# dose_chip_high <- melt(dose_chip_high, variable.name = "Drug", value.name = "cor")
-# dose_chip_high$conc <- "10um"
-# 
-# dose_chip_med <- tibble::rownames_to_column(as.data.frame(cor_chip_indel.med), "ChIP")
-# dose_chip_med <- melt(dose_chip_med, variable.name = "Drug", value.name = "cor")
-# dose_chip_med$conc <- "1um"
-# 
-# dose_chip_low <- tibble::rownames_to_column(as.data.frame(cor_chip_indel.low), "ChIP")
-# dose_chip_low <- melt(dose_chip_low, variable.name = "Drug", value.name = "cor")
-# dose_chip_low$conc <- "100nm"
-# 
-# ## Combine all dfs to one
-# dose_chip <- rbind(dose_chip_high, dose_chip_med, dose_chip_low)
-# 
-# ## Visualize the dose response of the correlations
-# dose_chip$conc <- factor(dose_chip$conc, levels=c("100nm", "1um", "10um"))
-# ggplot(data = dose_chip, aes(x = conc, y = cor, group = ChIP, color = ChIP)) +
-#   geom_point(alpha = 0.5) + geom_line(alpha = 0.5, linetype = "dashed")+
-#   labs(title = "correlation behavior per concentration", x = "concentration", y = "correlation ChIP vs logratio change") +
-#   facet_wrap(~Drug, nrow = 7, ncol = 7)
-# 
-# # Look at individual drugs more carefully
-# ## Select drug
-# Drug <- "Resveratrol"
-# for (i in Drug) {
-# p <- ggplot(data = dose_chip[dose_chip$Drug == Drug,], aes(x = conc, y = logratio.mean, group = barcode, color = barcode)) +
-#   geom_point(alpha = 0.5) + geom_line(alpha = 0.5, linetype = "dashed") +
-#   labs(title = paste("dose response curve of", i), x = "concentration", y = "log2(+1/-7 ratio) change")
-# print(p)
-# }
+names.high <- colnames(indel.data.high.drug.ess)
+names.med <- colnames(indel.data.med.drug.ess)
+names.low <- colnames(indel.data.low.drug.ess)
+indel.data.dose <- indel.data[indel.data$Drug %in% names.high |
+                                indel.data$Drug %in% names.med |
+                                indel.data$Drug %in% names.low, ]
+
+# Plot drug dose response per drug for all barcodes
+ggplot(data = indel.data.dose, aes(x = conc, y = logratio.mean, color = barcode)) +
+  geom_point(alpha = 0.5) +
+  labs(title = "dose response curve of effective drugs", x = "concentration", y = "log2(+1/-7 ratio) change") +
+  stat_summary(fun.y=mean, aes(group=1), geom="line", colour="#993300", alpha = 0.5) +
+  stat_summary(fun.y=mean, aes(group=1), geom="point", colour="#993300", size=3, shape=4, alpha = 0.5)+
+  facet_wrap(~Drug, nrow = 8, ncol = 8) + theme_bw()
 
 
+# Look at individual drugs more carefully
+## Select drug
+Drug <- "Quercetin"
+for (i in Drug) {
+p <- ggplot(data = indel.data.dose[indel.data.dose$Drug == Drug,], aes(x = conc, y = logratio.mean, group = barcode, color = barcode)) + theme_bw() +
+  geom_point(alpha = 0.5) + geom_line(alpha = 0.5, linetype = "dashed") +
+  labs(title = paste("dose response curve of", i), x = "concentration", y = "log2(+1/-7 ratio) change")
+print(p)
+}
+
+
+# Dose curves for ChIP correlations
+## Compute all corralations
+indel.data.cor <- indel.data[indel.data$Drug %in% names.high |
+                                indel.data$Drug %in% names.med |
+                                indel.data$Drug %in% names.low, ] %>%
+  mutate(mean.logratio.bc.drug = ave(logratio.platenorm, barcode, Drug, conc, FUN = function(x) mean(x))) %>%
+  select(barcode, Drug, mean.logratio.bc.drug, conc) %>% 
+  unique() 
+
+indel.data.cor.high <- indel.data.cor[indel.data.cor$conc %in% "10um",]
+indel.data.cor.med <- indel.data.cor[indel.data.cor$conc %in% "1um",]
+indel.data.cor.low <- indel.data.cor[indel.data.cor$conc %in% "100nm",]
+
+indel.data.cor.high <- indel.data.cor.high %>% 
+  dcast(barcode ~ Drug, value.var="mean.logratio.bc.drug") %>%
+  column_to_rownames("barcode")
+
+indel.data.cor.med <- indel.data.cor.med %>% 
+  dcast(barcode ~ Drug, value.var="mean.logratio.bc.drug") %>%
+  column_to_rownames("barcode")
+
+indel.data.cor.low <- indel.data.cor.low %>% 
+  dcast(barcode ~ Drug, value.var="mean.logratio.bc.drug") %>%
+  column_to_rownames("barcode")
+
+chip_data <- chip_data %>%
+  column_to_rownames("barcode")
+
+# Calculate correlations
+cor_chip_indel.high <- cor(chip_data,indel.data.cor.high)
+cor_chip_indel.med <- cor(chip_data,indel.data.cor.med)
+cor_chip_indel.low <- cor(chip_data,indel.data.cor.low)
+
+## Convert dfs to long format
+dose_chip_high <- rownames_to_column(as.data.frame(cor_chip_indel.high), "ChIP") %>%
+  melt(variable.name = "Drug", value.name = "cor")
+dose_chip_high$conc <- "10um"
+
+dose_chip_med <- rownames_to_column(as.data.frame(cor_chip_indel.med), "ChIP") %>%
+  melt(variable.name = "Drug", value.name = "cor")
+dose_chip_med$conc <- "1um"
+
+dose_chip_low <- rownames_to_column(as.data.frame(cor_chip_indel.low), "ChIP") %>%
+  melt(variable.name = "Drug", value.name = "cor")
+dose_chip_low$conc <- "100nm"
+
+## Combine all dfs to one
+dose_chip <- rbind(dose_chip_high, dose_chip_med, dose_chip_low)
+
+## Visualize the dose response of the correlations
+dose_chip$conc <- factor(dose_chip$conc, levels=c("100nm", "1um", "10um"))
+ggplot(data = dose_chip, aes(x = conc, y = cor, group = ChIP, color = ChIP)) +
+  geom_point(alpha = 0.5) + geom_line(alpha = 0.5, linetype = "dashed")+
+  labs(title = "correlation behavior per concentration", x = "concentration", y = "correlation ChIP vs logratio change") +
+  facet_wrap(~Drug, nrow = 7, ncol = 7) + theme_bw()
+
+# Look at individual drugs more carefully
+## Select drug
+Drug <- "Alisertib (MLN8237)"
+for (i in Drug) {
+p <- ggplot(data = dose_chip[dose_chip$Drug == Drug,], aes(x = conc, y = cor, group = ChIP, color = ChIP)) +
+  geom_point(alpha = 0.5) + geom_line(alpha = 0.5, linetype = "dashed") +
+  labs(title = paste("dose response curve of", i), x = "concentration", y = "log2(+1/-7 ratio) change") +
+  theme_bw()
+print(p)
+}
 ```
-
 
 
 
