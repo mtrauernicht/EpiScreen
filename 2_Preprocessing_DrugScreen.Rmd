@@ -281,7 +281,11 @@ barcodes.list <- c("AGGGCGTAAAATATTT", "TATGGCTGTCGGGTAG", "TGTCCCTTAGTACTTT", "
 # Import drug list 
 setwd("/DATA/usr/m.trauernicht/projects/EpiScreen/data/files_scripts/")
 drugs.list <- read.delim("mt20190123_EpigeneticDrugList.txt")
-
+drugs.list <- drugs.list %>%
+  select(-IC50..µM.) %>%
+  setnames("Number", "well")
+  
+  
 # rename the lists
 names(df.list) <- gsub('(*?)[.]ra.*', '\\1', file.list)
 
@@ -290,7 +294,28 @@ head(names(df.list))
 
 # count the sample number
 n.samples <- length(df.list)
+
+# Import viability data and the mean +1/-7 ratio from previous experiments
+viability.data <- read.delim("mt20190124_viabilityData") %>% setnames(".id", "id")
+viability <- read.csv2("EpiscreenAllPlates.csv")
 ```
+
+
+## Visualize viability data
+```{r viability_overview, echo = FALSE, warning = FALSE}
+# Compute relative viability per plate
+viability.df <- melt(viability) %>% 
+  mutate(value = ave(value, variable, FUN = function(x) x/max(x)))
+
+for (i in unique(viability.df$variable)) {
+p <- raw_grid(data = viability.df$value[viability.df$variable == i],
+       well = viability.df$X[viability.df$variable == i],
+       plate_id = viability.df$variable[viability.df$variable == i])
+print(p)
+}
+```
+
+
 
 ### Select true barcodes and exclude low read counts
 ```{r preprocessing}
@@ -320,7 +345,6 @@ mutations.list <- mclapply(indel.list, MutationsToDataframe, mc.cores = 10)
 ```
 
 # Analysis
-
 ```{r}
 # Put the lists into one df
 mutations.dt.list <- copy(mutations.list)
@@ -333,39 +357,80 @@ indels.df <- ldply(mutations.dt.list, data.frame)
 RSTP2_2000_indels.df <- indels.df
 # Assigning identifiers to df
 RSTP2_2000_indels.df <- RSTP2_2000_indels.df %>% 
-  mutate(.id = gsub("(.*?).count.table", "\\1", RSTP2_2000_indels.df$.id),
-         rep = gsub(".*m_rep(.*?)_.*", "\\1", RSTP2_2000_indels.df$.id),
-         plate = gsub(".*_plate(.*?)_.*", "\\1", RSTP2_2000_indels.df$.id),
-         conc = gsub("_rep.*", "\\1", RSTP2_2000_indels.df$.id),
-         Number = gsub(".*plate.*_(.*?_.*?).count.table","\\1", RSTP2_2000_indels.df$.id))
+  mutate(.id = gsub(".count.table", "\\1", .id),
+         rep = gsub(".*m_rep(.*?)_.*", "R\\1", .id),
+         conc = gsub("_rep.*", "\\1", .id),
+         well = gsub(".*plate.*_(.*?)","\\1", .id))
+
+
+# Add plate specifier
+RSTP2_2000_indels.df$plate <- "P1"
+RSTP2_2000_indels.df[grep("10um_.*_plate2", RSTP2_2000_indels.df$.id),]$plate <- "P2"
+RSTP2_2000_indels.df[grep("1um_.*_plate1", RSTP2_2000_indels.df$.id),]$plate <- "P3"
+RSTP2_2000_indels.df[grep("1um_.*_plate2", RSTP2_2000_indels.df$.id),]$plate <- "P4"
+RSTP2_2000_indels.df[grep("100nm_.*_plate1", RSTP2_2000_indels.df$.id),]$plate <- "P5"
+RSTP2_2000_indels.df[grep("100nm_.*_plate2", RSTP2_2000_indels.df$.id),]$plate <- "P6"
+
+
 
 # Import the drugs and match with the df
-RSTP2_2000_indels.df <- merge(drugs.list, RSTP2_2000_indels.df)
+RSTP2_2000_indels.df <- merge(drugs.list, RSTP2_2000_indels.df) %>%
+  mutate(well = gsub("_[0-9]{3}", "", well))
 
-# Calculate +1/-7 ratios
-RSTP2_2000_indels.df <- RSTP2_2000_indels.df %>%
-  mutate(ratio = X1 / X.7)
-
-# Calculate the overall indel ratio
+# Let's plot the distribution of the amount of reads per drug
 RSTP2_2000_indels.df <- mutate_all(RSTP2_2000_indels.df, funs(replace(., is.na(.), 0)))
-RSTP2_2000_indels.df$read.count <- rowSums(RSTP2_2000_indels.df[,c(7:119)])
-RSTP2_2000_indels.df$read.count1.7 <- rowSums(RSTP2_2000_indels.df[,c(48,56)])
-RSTP2_2000_indels.df$all.indels <- rowSums(RSTP2_2000_indels.df[,c(7:54,56:119)])
-RSTP2_2000_indels.df$overall.ratio <- RSTP2_2000_indels.df[,"X0"] / (RSTP2_2000_indels.df[,"X0"] + RSTP2_2000_indels.df[,"all.indels"])
+RSTP2_2000_indels.df$read.count <- rowSums(RSTP2_2000_indels.df[,c(6:118)])
+RSTP2_2000_indels.df$all.indels <- rowSums(RSTP2_2000_indels.df[,c(6:53,55:118)])
+ggplot(RSTP2_2000_indels.df, aes(read.count)) + geom_density(fill = "#3D9F83") + theme_bw() + 
+  labs(title = "read distribution per drug")
+ggplot(RSTP2_2000_indels.df, aes(read.count)) + geom_density(fill = "#3D9F83") + theme_bw() + 
+  labs(title = "read distribution per drug") + 
+  facet_wrap(~Drug)
 
-# Calculate the efficiency
-RSTP2_2000_indels.df$efficiency <- (1 - RSTP2_2000_indels.df[,"overall.ratio"])
+# Filter out noisy data
+RSTP2_2000_indels.df$read.count1.7 <- rowSums(RSTP2_2000_indels.df[,c(47,55)])
+RSTP2_2000_indels.df <- RSTP2_2000_indels.df[RSTP2_2000_indels.df$read.count1.7 > 30,] %>% 
+  select(-read.count1.7)
 
-# Calculate the MMEJ ratio
+
+# Calculate NHEJ/MMEJ ratios and efficiency
 RSTP2_2000_indels.df <- RSTP2_2000_indels.df %>%
-  mutate(MMEJ_fraction = X.7 / all.indels,
-         NHEJ_fraction = X1 / all.indels,
-         MMEJ_score = MMEJ_fraction / (MMEJ_fraction + NHEJ_fraction))
+  mutate(freqMMEJ = X.7 / all.indels,
+         freqNHEJ = X1 / all.indels,
+         NHEJMMEJratio = freqMMEJ / freqNHEJ,
+         MMEJscore = freqMMEJ / (freqMMEJ + freqNHEJ),
+         NHEJscore = freqNHEJ / (freqNHEJ + freqMMEJ),
+         freqCut = 1 - (X0 / (X0 + all.indels)))
+RSTP2_2000_indels.df <- RSTP2_2000_indels.df %>%
+  select(Drug, Target, well, V2, rep, conc, plate, freqMMEJ, freqNHEJ,
+         NHEJMMEJratio, MMEJscore, NHEJscore, freqCut, .id)
+setnames(RSTP2_2000_indels.df, c("Drug", "Target", "V2", ".id"), c("drug", "target", "barcode", "id"))
 
 
-# Let's plot the distribution of the amount of reads per barcode
-p <- ggplot(RSTP2_2000_indels.df, aes(read.count))
-p + geom_density() + theme_bw() + labs(title = "overall read distribution")
+
+
+# Add viability data to RSTP2_2000_indels.df
+RSTP2_2000_indels.df <- merge(viability.data, RSTP2_2000_indels.df)
+RSTP2_2000_indels.df <- RSTP2_2000_indels.df %>% select(-id)
+
+# Remove barcodes with abnormal counts from analysis
+RSTP2_2000_indels.df <- RSTP2_2000_indels.df[RSTP2_2000_indels.df$barcode != "ACCCCTAAAGGCGCTG" &
+                           RSTP2_2000_indels.df$barcode != "CTCTTAATCGCTGCC",]
+
+
+# We want to exclude reads from cells that have reduced viability (set cut-off at 45% reduced viability)
+RSTP2_2000_indels.df <- RSTP2_2000_indels.df %>% 
+  mutate(viability = ave(viability, plate, FUN = function(x) x/max(x))) # relative viability
+RSTP2_2000_indels.df <- RSTP2_2000_indels.df[RSTP2_2000_indels.df$viability > 0.45,]
+
+# Exclude NA rows
+RSTP2_2000_indels.df <- RSTP2_2000_indels.df[rowSums(is.na(RSTP2_2000_indels.df)) != ncol(RSTP2_2000_indels.df), ]
+
+# Add sample identifier
+RSTP2_2000_indels.df$sample <- "drug"
+RSTP2_2000_indels.df$sample[RSTP2_2000_indels.df$drug == "DMSO"] <- "WT"
+RSTP2_2000_indels.df$sample[RSTP2_2000_indels.df$drug == "DNA-PKi"] <- "DNA-PKi"
+RSTP2_2000_indels.df$sample[RSTP2_2000_indels.df$drug == "Mirin"] <- "Mirin"
 ```
 
 ## Processed data export
