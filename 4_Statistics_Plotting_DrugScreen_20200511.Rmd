@@ -1,0 +1,892 @@
+---
+title: "xv20200429_screen_mmej_sep"
+output: html_document
+---
+
+#Report of the Chromatin DSB screening - This will be the last version. 
+I will start importing data from previous scripts
+A - Data frame with different scores to use as input
+B - Table with clustering data (Needs to be included once Christ finalises his analysis)
+
+I will process data based on MMEJscore first and cuting efficiency later.
+
+```{r setup, include=FALSE}
+library(tidyverse) 
+library(ggbeeswarm)
+library(corrplot)
+library(pheatmap)
+library(viridis)
+library(factoextra)
+library(NbClust)
+library(ggpubr)
+library(ggbiplot)
+library(ggrepel)
+library(readxl)
+library(gridExtra)
+
+```
+## Functions
+```{r}
+#Plot correlations
+replicate.correlation.plot <- function(dt, i, j, k){
+  ggplot(dt, aes_string(x = i, y = j,color = k)) +
+    geom_point(alpha = 0.5) +
+    theme_bw() + 
+    coord_cartesian(expand = F)
+}
+```
+
+## load data
+```{r}
+# Import data from preprocessing script
+setwd("/DATA/usr/m.trauernicht/projects/EpiScreen/data/files_scripts")
+Episcreen_DSB <- get(load("mt20200511_RSTP2_2000_indels.df"))
+integrations <- read.table("barcode_order.txt", header = T)
+
+# Import data needed for Xabiers script
+barcode.group.data <- readRDS(file = "/DATA/projects/DSBrepair/data/R/cl20200423_clones_chip_domains.RDS") %>% filter(barcode %in% unique(Episcreen_DSB$barcode))
+domain.clone5 <- readRDS('/DATA/projects/DSBrepair/data/R/rs20200311_domains_clone5.RDS')
+clusters <- read.csv("/home/x.vergara/XV_P3_ChromDSBScreen/xv20200421_ChromDSBscreen/data/xv20200423_cluster_data.csv") %>% dplyr::select(clusters,name)
+groups <- readRDS("/DATA/projects/DSBrepair/data/R/cl20200423_clones_chip_domains.RDS")
+```
+
+#How data tables looks
+```{r}
+#Plot screen data
+head(EpiscreenDSB)
+```
+
+##Extract wt data: Generate null distributions and calculate mean and sd
+```{r}
+# Filter data for only wt DSBs
+wt.filter <- Episcreen_DSB %>% filter(sample == "WT") %>% dplyr::group_by(rep)
+wt.Episcreen_DSB <- wt.filter %>% dplyr::group_by(barcode,rep) %>% dplyr::summarise(WT.mean = mean(MMEJscore), WT.sd = sd(MMEJscore)) %>% right_join(wt.filter, by = c("barcode","rep")) 
+
+# Plot frequency plot for each barcode
+ggplot(wt.Episcreen_DSB) + geom_density(aes(MMEJscore, fill = rep, color = rep), alpha = 0.3) + facet_wrap(~ barcode) + theme_bw() + ggtitle("WT DSBs - MMEJs score distribution")
+
+#Plot mean & sd of each of the barcodes
+ggplot(wt.Episcreen_DSB) + geom_pointrange(aes(y = reorder(barcode,WT.mean), x = WT.mean, ymin = WT.mean - WT.sd, ymax = WT.mean + WT.sd, color = rep)) + theme_bw() + ggtitle("WT DSBs - MMEJscore distribution (mean +- sd)") + ylab("") + xlab("MMEJscore")
+```
+
+# Do controls MMEJscore correlate well?
+Correlation plots between replicates, are they reproducible?
+```{r}
+controls.Episcreen_DSB <- Episcreen_DSB %>% filter(sample != "drug") %>%
+                                  reshape2::dcast(plate + well + barcode + sample ~ rep, value.var = "MMEJscore")
+
+#Plot_control correlation between replicates (MMEJscore)
+pa <- replicate.correlation.plot(controls.Episcreen_DSB,"R1","R2","sample") + xlim(c(0,1)) + ylim(c(0,1)) + theme(legend.position = "none")
+pb <- replicate.correlation.plot(controls.Episcreen_DSB,"R1","R3","sample") + xlim(c(0,1)) + ylim(c(0,1)) + theme(legend.position = "none")
+pc <- replicate.correlation.plot(controls.Episcreen_DSB,"R2","R3","sample") + xlim(c(0,1)) + ylim(c(0,1)) + theme(legend.position = "none")
+pleg <- cowplot::get_legend(replicate.correlation.plot(controls.Episcreen_DSB,"2","3","sample") + xlim(c(0,0.75)) + ylim(c(0,0.75)))
+
+#Grid three plots to one panel
+rcp.l.up <- arrangeGrob(pa,pb,pc, nrow = 1)
+grid.arrange(rcp.l.up)
+```
+
+# Do KO MMEJscore correlate?
+```{r}
+KO.Episcreen_DSB <- Episcreen_DSB %>% filter(sample == "drug" & !is.na(drug)) %>%
+                                  reshape2::dcast(plate + well + drug + barcode + sample ~ rep, value.var = "MMEJscore", fun.aggregate = mean)
+
+#Plot_control correlation between replicates
+p1 <- replicate.correlation.plot(KO.Episcreen_DSB,"R1","R2","barcode") + xlim(c(0,1)) + ylim(c(0,1)) + theme(legend.position = "none")
+p2 <- replicate.correlation.plot(KO.Episcreen_DSB,"R1","R3","barcode") + xlim(c(0,1)) + ylim(c(0,1)) + theme(legend.position = "none")
+p3 <- replicate.correlation.plot(KO.Episcreen_DSB,"R2","R3","barcode") + xlim(c(0,1)) + ylim(c(0,1)) + theme(legend.position = "none")
+
+p.leg.ko <- cowplot::get_legend(replicate.correlation.plot(KO.Episcreen_DSB,"2","3","barcode") + xlim(c(0,0.75)) + ylim(c(0,0.75)))
+
+#Grid three plots to one panel
+rcp.n.up <- arrangeGrob(p1,p2,p3, nrow = 1)
+grid.arrange(rcp.n.up)
+```
+
+# Calculate z-scores for samples
+Compute z-score for each sample compare to wt distribution
+```{r}
+# Calculate z-score (per t.rep)
+z.scores.calc <- Episcreen_DSB %>% left_join(wt.Episcreen_DSB %>% dplyr::select(barcode,rep, WT.mean,WT.sd), by = c("barcode","rep")) %>% mutate(z.score = (MMEJscore - WT.mean)/WT.sd) %>% distinct()
+```
+
+```{r}
+# Control correlation with z scores
+control.z.mmej.screen.full <- z.scores.calc %>% filter(sample %in% c("WT","DNA-PKi")) %>%
+                                  reshape2::dcast(well + plate + sample + barcode ~ rep, value.var = "z.score", fun.aggregate = mean)
+
+pd <- replicate.correlation.plot(control.z.mmej.screen.full,"R1","R2","sample") + xlim(c(-5,35)) + ylim(c(-5,35)) + theme(legend.position = "none")
+pe <- replicate.correlation.plot(control.z.mmej.screen.full,"R1","R3","sample") + xlim(c(-5,35)) + ylim(c(-5,35)) + theme(legend.position = "none")
+pf <- replicate.correlation.plot(control.z.mmej.screen.full,"R2","R3","sample") + xlim(c(-5,35)) + ylim(c(-5,35)) + theme(legend.position = "none")
+
+#Grid three plots to one panel
+rcp.n.mid <- arrangeGrob(pd,pe,pf, nrow = 1)
+grid.arrange(rcp.n.mid)
+
+#KO correlation with z-scores
+KO.z.mmej.screen.full <- z.scores.calc %>% filter(sample %in% "drug") %>%
+                                  reshape2::dcast(drug + barcode ~ rep, value.var = "z.score", fun.aggregate = mean)
+
+p4 <- replicate.correlation.plot(KO.z.mmej.screen.full,"R1","R2","barcode") + xlim(c(-10,10)) + ylim(c(-10,10)) + theme(legend.position = "none")
+p5 <- replicate.correlation.plot(KO.z.mmej.screen.full,"R1","R3","barcode") + xlim(c(-10,10)) + ylim(c(-10,10)) + theme(legend.position = "none")
+p6 <- replicate.correlation.plot(KO.z.mmej.screen.full,"R2","R3","barcode") + xlim(c(-10,10)) + ylim(c(-10,10)) + theme(legend.position = "none")
+
+#Grid three plots to one panel
+rcp.n.mid <- arrangeGrob(p4,p5,p6, nrow = 1)
+grid.arrange(rcp.n.mid)
+```
+
+```{r}
+
+z.scores.calc.b <- string_db$map(z.scores.calc, "drug")
+
+saveRDS(z.scores.calc, "/DATA/projects/DSBrepair/data/R/xv20200501_Episcreen_DSB_screen_z.scores.rds")
+
+z.scores.exp <- z.scores.calc %>% dplyr::select(barcode,gene,t.rep,z.score)
+
+#Split by replicate
+list.z.scores.calc <- split(z.scores.calc, z.scores.calc$t.rep)
+
+#Arrange data for dcasting
+list.gz.mmej.screen <- lapply(list.z.scores.calc, function(x) {x %>% left_join(new.domains.c5 %>% dplyr::select(chromatin,barcode), by = c("barcode")) %>% dplyr::group_by(gene, chromatin) %>% dplyr::summarise(ch.z.score = mean(z.score, na.rm = T)) %>% ungroup() %>% group_by(gene,chromatin)})
+
+
+#dcast data for each domain
+gz.mmej.screen.dcast <- reshape2::dcast(gz.mmej.screen, gene ~ chromatin, value.var = "ch.cz.score") 
+write.xlsx(gz.mmej.screen.dcast, file = "~/XV_P3_Episcreen_DSBScreen/xv20200421_Episcreen_DSBscreen/data/xv20200427_cytoscape_mmej_gz_score.xlsx")
+
+
+#Calculate weighted z.score
+list.wz.mmej.screen.KO <- lapply(list.z.scores.calc, sep.rw.weighted.score.KO, ppi.matrix)
+list.wz.mmej.screen.controls <- lapply(list.z.scores.calc, sep.rw.weighted.score.controls) 
+list.wz.mmej.screen <- lapply(list.wz.mmej.screen.KO, bind_rows, list.wz.mmej.screen.controls)
+
+list.gwz.mmej.screen.b <- lapply(seq_along(list.gwz.mmej.screen), function(x) {mutate(list.gwz.mmej.screen[[x]], t.rep = names(list.gwz.mmej.screen[x]))})
+
+gwz.mmej.screen.full.pre <- do.call("rbind",list.gwz.mmej.screen.b)
+gwz.mmej.screen.full <- gwz.mmej.screen.full.pre %>% filter(!is.na(z.score))
+
+# Filter genes that I have three replicate evidences for
+genes.n3 <- gwz.mmej.screen.full %>% dplyr::select(prot.A, t.rep) %>% distinct() %>% dplyr::group_by(prot.A) %>% dplyr::summarise(count = n()) %>% filter(count == 3) %>% pull(prot.A)
+
+#data set n = 3
+n3.gwz.mmej.screen.full <- filter(gwz.mmej.screen.full, prot.A %in% genes.n3)
+
+```
+
+
+#Check correlations before and after correction
+```{r}
+# Control correlation with z scores
+control.z.mmej.screen.full <- z.scores.calc %>% filter(sample %in% c("WT","POLQ")) %>%
+                                  reshape2::dcast(well + plate + sample + barcode ~ t.rep, value.var = "z.score", fun.aggregate = mean)
+
+#Plot_control correlation between replicates
+p1 <- ggplot(control.z.mmej.screen.full, aes(x = R1, y = R2, color = sample)) + geom_point(alpha = 0.5) + theme_bw()  + theme(legend.position = "none")
+p2 <- ggplot(control.z.mmej.screen.full, aes(x = R2, y = R3, color = sample)) + geom_point(alpha = 0.5) + theme_bw()  + theme(legend.position = "none")
+p3 <- ggplot(control.z.mmej.screen.full, aes(x = R1, y = R3, color = sample)) + geom_point(alpha = 0.5) + theme_bw()  + theme(legend.position = "none")
+
+##################################
+
+# Control correlation with ch.scores
+control.ch.mmej.screen <- z.scores.calc %>% filter(sample %in% c("WT","POLQ")) %>% left_join(new.domains.c5 %>% dplyr::select(chromatin,barcode), by = c("barcode")) %>% dplyr::group_by(plate,well,sample, chromatin,t.rep) %>% dplyr::mutate(ch.score = sum(z.score)/n()) %>% ungroup()
+
+control.ch.mmej.screen.full <- control.ch.mmej.screen %>%
+                                  reshape2::dcast(well + plate + sample + chromatin ~ t.rep, value.var = "ch.score", fun.aggregate = mean)
+
+#Plot_control correlation between replicates
+p4 <- ggplot(control.ch.mmej.screen.full, aes(x = R1, y = R2, color = sample)) + geom_point(alpha = 0.5) + theme_bw()  + theme(legend.position = "none")
+
+p5 <- ggplot(control.ch.mmej.screen.full, aes(x = R2, y = R3, color = sample)) + geom_point(alpha = 0.5) + theme_bw()  + theme(legend.position = "none")
+p6 <- ggplot(control.ch.mmej.screen.full, aes(x = R1, y = R3, color = sample)) + geom_point(alpha = 0.5) + theme_bw()  + theme(legend.position = "none")
+
+#####################################
+# Control correlation with ch.scores
+control.ch.rep.mmej.screen <- control.ch.mmej.screen %>% dplyr::select(plate,well,sample,chromatin,ch.score) %>% distinct() %>% dplyr::group_by(plate,well,sample, chromatin) %>% dplyr::summarise(ch.score.rep = sum(ch.score)/sqrt(n()), var.rep = var(ch.score), count = n()) %>% ungroup()
+
+#Plot_control correlation between replicates
+ggplot(control.ch.rep.mmej.screen) + geom_hline(aes(yintercept = -1.96), linetype = "dashed") + geom_hline(aes(yintercept = 1.96), linetype = "dashed")  + geom_jitter(aes(x = chromatin ,y = ch.score.rep,color = sample, size = var.rep), alpha = 0.5)+ theme_bw() + theme(legend.position = "none") + coord_flip() + ggtitle("Control scores - 5. Replicates combination")
+
+
+######################################
+
+
+#Control grids
+grid1 <- grid.arrange(pa,pb,pc, top = "Control replicate correlation - 1. MMEJscore", nrow =1)
+grid2 <- grid.arrange(p1,p2,p3, top = "Control replicate correlation - 2. Z scores", nrow = 1)
+grid3 <- grid.arrange(p4,p5,p6, top = "Control replicate correlation - 4. Chromatin Z scores", nrow = 1)
+
+grid.arrange(grid1, grid2, grid3, nrow = 3)
+
+
+```
+```{r}
+# KO Correlation with z scores
+KO.z.mmej.screen.full <- gwz.mmej.screen.full %>% filter(!is.na(prot.A)) %>%
+                                  reshape2::dcast(prot.A + barcode ~ t.rep, value.var = "z.score", fun.aggregate = mean)
+
+#Plot_control correlation between replicates
+p10 <- ggplot(KO.z.mmej.screen.full, aes(x = R1, y = R2, color = barcode)) + geom_point(alpha = 0.3) + theme_bw() + theme(legend.position = "none")
+p11 <- ggplot(KO.z.mmej.screen.full, aes(x = R2, y = R3, color = barcode)) + geom_point(alpha = 0.3) + theme_bw() + theme(legend.position = "none")
+p12 <- ggplot(KO.z.mmej.screen.full, aes(x = R1, y = R3, color = barcode)) + geom_point(alpha = 0.3) + theme_bw() + theme(legend.position = "none")
+
+#Correlation with weighted  z scores
+
+KO.wz.mmej.screen.full <- gwz.mmej.screen.full %>% filter(!is.na(prot.A)) %>%
+                                  reshape2::dcast(prot.A + barcode ~ t.rep, value.var = "w.z.score", fun.aggregate = mean)
+
+#Plot_control correlation between replicates
+p13 <- ggplot(KO.wz.mmej.screen.full, aes(x = R1, y = R2, color = barcode)) + geom_point(alpha = 0.3) + theme_bw() + theme(legend.position = "none")
+p14<- ggplot(KO.wz.mmej.screen.full, aes(x = R2, y = R3, color = barcode)) + geom_point(alpha = 0.3) + theme_bw() + theme(legend.position = "none")
+p15 <- ggplot(KO.wz.mmej.screen.full, aes(x = R1, y = R3, color = barcode)) + geom_point(alpha = 0.3) + theme_bw() + theme(legend.position = "none")
+
+# Correlation with z scores
+KO.gwz.mmej.screen.full <- gwz.mmej.screen.full %>% filter(!is.na(prot.A)) %>%
+                                  reshape2::dcast(prot.A + chromatin ~ t.rep, value.var = "ch.score", fun.aggregate = mean)
+
+#Plot_control correlation between replicates
+p7 <- ggplot(KO.gwz.mmej.screen.full, aes(x = R1, y = R2, color = chromatin)) + geom_point(alpha = 0.3) + theme_bw() + theme(legend.position = "none")
+p8 <- ggplot(KO.gwz.mmej.screen.full, aes(x = R2, y = R3, color = chromatin)) + geom_point(alpha = 0.3) + theme_bw() + theme(legend.position = "none")
+p9 <- ggplot(KO.gwz.mmej.screen.full, aes(x = R1, y = R3, color = chromatin)) + geom_point(alpha = 0.3) + theme_bw() + theme(legend.position = "none")
+
+# Control correlation with ch.scores
+KO.ch.rep.mmej.screen <- gwz.mmej.screen.full %>% filter(!is.na(prot.A) & !is.na(ch.score)) %>% dplyr::select(prot.A,chromatin,ch.score,t.rep) %>% distinct() %>% dplyr::group_by(prot.A, chromatin) %>% dplyr::summarise(ch.score.rep = sum(ch.score, na.rm = T)/sqrt(length(ch.score)), var.rep = var(ch.score), count = length(ch.score)) %>% ungroup()
+
+#Plot_control correlation between replicates
+ggplot(KO.ch.rep.mmej.screen) + geom_hline(aes(yintercept = -1.96), linetype = "dashed", color = "red", size = 1) + geom_hline(aes(yintercept = 1.96), linetype = "dashed", color = "red", size = 1)  + geom_jitter(aes(x = chromatin ,y = ch.score.rep, size = var.rep), alpha = 0.3)+ theme_bw() + theme(legend.position = "none") + coord_flip() + ggtitle("KO scores - 5. Replicates combination")
+
+#KO grids
+grid4 <- grid.arrange(pd,pe,pf, top = "Replicate correlation - 1. MMEJscore", nrow =1)
+grid5 <- grid.arrange(p10,p11,p12, top = "Replicate correlation - 2. Z scores", nrow = 1)
+grid6 <- grid.arrange(p13,p14,p15, top = "Replicate correlation - 3. Weighted Z scores", nrow = 1)
+grid7 <- grid.arrange(p7,p8,p9, top = "Replicate correlation - 4. Chromatin weighted Z scores", nrow = 1)
+grid.arrange(grid4, grid5, grid6,grid7, nrow = 4)
+
+```
+
+```{r}
+
+#Add cluster data
+
+cgwz.mmej.screen.full <- gwz.mmej.screen.full %>% left_join(clusters, by = c("prot.A" = "name")) %>% dplyr::group_by(clusters, t.rep,chromatin) %>% dplyr::mutate(complex.mn = mean(w.z.score, na.rm = T)) %>% dplyr::ungroup() 
+
+tmp.cgwz.mmej.screen.full <- gwz.mmej.screen.full %>% left_join(clusters, by = c("prot.A" = "name")) %>% dplyr::group_by(clusters, t.rep,chromatin) %>% dplyr::mutate(complex.mn = median(w.z.score, na.rm = T)) %>% dplyr::ungroup() 
+
+```
+```{r}
+# Plot nine-square graphs with z-scores
+# Arrange data set for comparison (trip.het vs euch.transcr)
+gz.mmej.screen.full <- gwz.mmej.screen.full %>% dplyr::select(prot.A,chromatin,z.score,t.rep) %>%  dplyr::group_by(prot.A, chromatin, t.rep) %>% dplyr::summarise(ch.z.score = mean(z.score, na.rm = T)) %>% distinct() %>% dplyr::group_by(prot.A,chromatin) %>% dplyr::summarise(comb.ch.score = sum(ch.z.score, na.rm = T)/ sqrt(n()), variance = var(ch.z.score, na.rm = T), count = n()) %>% distinct()
+
+gz.mmej.screen.ch.score.dcast <- gz.mmej.screen.full %>% reshape2::dcast(prot.A ~ chromatin, value.var = "comb.ch.score" )
+colnames(gz.mmej.screen.ch.score.dcast) <- c("gene","euchromatin","euch_transcr","H3K27me3","trip_het","oth_het","transcription")
+#Plot some correlations (k27 vs trip.het)
+gz_trip_het.K27.dt <- gz.mmej.screen.ch.score.dcast %>% dplyr::select(gene,H3K27me3,trip_het) %>% mutate(square = case_when(H3K27me3 < -1.96 & trip_het > 1.96 ~ "1",abs(H3K27me3) < 1.96 & trip_het > 1.96 ~ "2",H3K27me3 < -1.96 & abs(trip_het) < 1.96 ~ "3", H3K27me3 > 1.96 & abs(trip_het) < 1.96 ~ "4",abs(H3K27me3) < 1.96 & trip_het < - 1.96 ~ "5",H3K27me3 > 1.96 & trip_het < -1.96 ~ "6",TRUE ~ "7"))
+gz_trip_het.K27.plot <- ggplot(gz_trip_het.K27.dt) +  
+  geom_point(aes(x = H3K27me3, y = trip_het, color = square != 7 , shape = square != "7" & abs(H3K27me3 - trip_het) > 1), size = 2)+
+  geom_text_repel(data = subset(gz_trip_het.K27.dt,(square != "7" & abs(H3K27me3 - trip_het) > 1)), aes(label = gene,H3K27me3,trip_het)) +
+  geom_vline(aes(xintercept = -1.96), linetype = "dashed", alpha = 0.5, color = "black") + 
+  geom_vline(aes(xintercept = 1.96), linetype = "dashed", alpha = 0.5, color = "black") + 
+  geom_hline(aes(yintercept = 1.96), linetype = "dashed", alpha = 0.5, color = "black") + 
+  geom_hline(aes(yintercept = -1.96), linetype = "dashed", alpha = 0.5, color = "black") + 
+  coord_cartesian(xlim = c(-6,6), ylim = c(-6,6)) +
+  theme_bw() + theme(legend.position = "none") + 
+  scale_color_manual(values = c("grey90","purple"))
+
+#Plot some correlations (k27 vs trip.het)
+gz_trip_het.euch_trans.dt <- gz.mmej.screen.ch.score.dcast %>% dplyr::select(gene,euch_transcr,trip_het) %>% mutate(square = case_when(euch_transcr < -1.96 & trip_het > 1.96 ~ "1",abs(euch_transcr) < 1.96 & trip_het > 1.96 ~ "2",euch_transcr < -1.96 & abs(trip_het) < 1.96 ~ "3", euch_transcr > 1.96 & abs(trip_het) < 1.96 ~ "4",abs(euch_transcr) < 1.96 & trip_het < - 1.96 ~ "5",euch_transcr > 1.96 & trip_het < -1.96 ~ "6",TRUE ~ "7"))
+
+gz_trip_het.euch_trans.plot <- ggplot(gz_trip_het.euch_trans.dt) +  
+  geom_point(aes(x = euch_transcr, y = trip_het, color = square != 7 , shape = square != "7" & abs(euch_transcr - trip_het) > 1), size = 2)+
+  geom_text_repel(data = subset(gz_trip_het.euch_trans.dt,(square != "7" & abs(euch_transcr - trip_het) > 1)), aes(label = gene,euch_transcr,trip_het)) +
+  geom_vline(aes(xintercept = -1.96), linetype = "dashed", alpha = 0.5, color = "black") + 
+  geom_vline(aes(xintercept = 1.96), linetype = "dashed", alpha = 0.5, color = "black") + 
+  geom_hline(aes(yintercept = 1.96), linetype = "dashed", alpha = 0.5, color = "black") + 
+  geom_hline(aes(yintercept = -1.96), linetype = "dashed", alpha = 0.5, color = "black") + 
+  coord_cartesian(xlim = c(-6,6), ylim = c(-6,6)) +
+  theme_bw() + theme(legend.position = "none") + 
+  scale_color_manual(values = c("grey90","purple"))
+
+#Plot trip.het vs transcription
+gz_trip_het.trans.dt <- gz.mmej.screen.ch.score.dcast %>% dplyr::select(gene,transcription,trip_het) %>% mutate(square = case_when(transcription < -1.96 & trip_het > 1.96 ~ "1",abs(transcription) < 1.96 & trip_het > 1.96 ~ "2",transcription < -1.96 & abs(trip_het) < 1.96 ~ "3", transcription > 1.96 & abs(trip_het) < 1.96 ~ "4",abs(transcription) < 1.96 & trip_het < - 1.96 ~ "5",transcription > 1.96 & trip_het < -1.96 ~ "6",TRUE ~ "7"))
+
+gz_trip_het.trans.plot <- ggplot(gz_trip_het.trans.dt) +  
+  geom_point(aes(x = transcription, y = trip_het, color = square != 7 , shape = square != "7" & abs(transcription - trip_het) > 1), size = 2)+
+  geom_text_repel(data = subset(gz_trip_het.trans.dt,(square != "7" & abs(transcription - trip_het) > 1)), aes(label = gene,transcription,trip_het)) +
+  geom_vline(aes(xintercept = -1.96), linetype = "dashed", alpha = 0.5, color = "black") + 
+  geom_vline(aes(xintercept = 1.96), linetype = "dashed", alpha = 0.5, color = "black") + 
+  geom_hline(aes(yintercept = 1.96), linetype = "dashed", alpha = 0.5, color = "black") + 
+  geom_hline(aes(yintercept = -1.96), linetype = "dashed", alpha = 0.5, color = "black") + 
+  coord_cartesian(xlim = c(-6,6), ylim = c(-6,6)) +
+  theme_bw() + theme(legend.position = "none") + 
+  scale_color_manual(values = c("grey90","purple"))
+
+#Plot H3K27me3 vs transcription
+gz_H3K27me3.trans.dt <- gz.mmej.screen.ch.score.dcast %>% dplyr::select(gene,transcription,H3K27me3) %>% mutate(square = case_when(transcription < -1.96 & H3K27me3 > -1.96 ~ "1",abs(transcription) < 1.96 & H3K27me3 > 1.96 ~ "2",transcription < -1.96 & abs(H3K27me3) < 1.96 ~ "3", transcription > 1.96 & abs(H3K27me3) < 1.96 ~ "4",abs(transcription) < 1.96 & H3K27me3 < - 1.96 ~ "5",transcription > 1.96 & H3K27me3 < -1.96 ~ "6",TRUE ~ "7"))
+
+gz_H3K27me3.trans.plot <- ggplot(gz_H3K27me3.trans.dt) +  
+  geom_point(aes(x = transcription, y = H3K27me3, color = square != 7 , shape = square != "7" & abs(transcription - H3K27me3) > 1), size = 2)+
+  geom_text_repel(data = subset(gz_H3K27me3.trans.dt,(square != "7" & abs(transcription - H3K27me3) > 1)), aes(label = gene,transcription,H3K27me3)) +
+  geom_vline(aes(xintercept = -1.96), linetype = "dashed", alpha = 0.5, color = "black") + 
+  geom_vline(aes(xintercept = 1.96), linetype = "dashed", alpha = 0.5, color = "black") + 
+  geom_hline(aes(yintercept = 1.96), linetype = "dashed", alpha = 0.5, color = "black") + 
+  geom_hline(aes(yintercept = -1.96), linetype = "dashed", alpha = 0.5, color = "black") + 
+  coord_cartesian(xlim = c(-6,6), ylim = c(-6,6)) +
+  theme_bw() + theme(legend.position = "none") + 
+  scale_color_manual(values = c("grey90","purple"))
+
+#Plot H3K27me3 vs transcription
+gz_H3K27me3.euch_transcr.dt <- gz.mmej.screen.ch.score.dcast %>% dplyr::select(gene,euch_transcr,H3K27me3) %>% mutate(square = case_when(euch_transcr < -1.96 & H3K27me3 > 1.96 ~ "1",abs(euch_transcr) < 1.96 & H3K27me3 > 1.96 ~ "2",euch_transcr < -1.96 & abs(H3K27me3) < 1.96 ~ "3", euch_transcr > 1.96 & abs(H3K27me3) < 1.96 ~ "4",abs(euch_transcr) < 1.96 & H3K27me3 < - 1.96 ~ "5",euch_transcr > 1.96 & H3K27me3 < -1.96 ~ "6",TRUE ~ "7"))
+
+gz_H3K27me3.euch_transcr.plot <- ggplot(gz_H3K27me3.euch_transcr.dt) +  
+  geom_point(aes(x = euch_transcr, y = H3K27me3, color = square != 7 , shape = square != "7" & abs(euch_transcr - H3K27me3) > 1), size = 2)+
+  geom_text_repel(data = subset(gz_H3K27me3.euch_transcr.dt,(square != "7" & abs(euch_transcr - H3K27me3) > 1)), aes(label = gene,euch_transcr,H3K27me3)) +
+  geom_vline(aes(xintercept = -1.96), linetype = "dashed", alpha = 0.5, color = "black") + 
+  geom_vline(aes(xintercept = 1.96), linetype = "dashed", alpha = 0.5, color = "black") + 
+  geom_hline(aes(yintercept = 1.96), linetype = "dashed", alpha = 0.5, color = "black") + 
+  geom_hline(aes(yintercept = -1.96), linetype = "dashed", alpha = 0.5, color = "black") + 
+  coord_cartesian(xlim = c(-5,5), ylim = c(-5,5)) +
+  theme_bw() + theme(legend.position = "none") + 
+  scale_color_manual(values = c("grey90","purple"))
+
+#Plot H3K27me3 vs transcription
+gz_transcription.euch_transcr.dt <- gz.mmej.screen.ch.score.dcast %>% dplyr::select(gene,euch_transcr,transcription) %>% mutate(square = case_when(euch_transcr < -1.96 & transcription > 1.96 ~ "1",abs(euch_transcr) < 1.96 & transcription > 1.96 ~ "2",euch_transcr < -1.96 & abs(transcription) < 1.96 ~ "3", euch_transcr > 1.96 & abs(transcription) < 1.96 ~ "4",abs(euch_transcr) < 1.96 & transcription < - 1.96 ~ "5",euch_transcr > 1.96 & transcription < -1.96 ~ "6",TRUE ~ "7"))
+
+gz_transcription.euch_transcr.plot <- ggplot(gz_transcription.euch_transcr.dt) +  
+  geom_point(aes(x = euch_transcr, y = transcription, color = square != 7 , shape = square != "7" & abs(euch_transcr - transcription) > 1), size = 2)+
+  geom_text_repel(data = subset(gz_transcription.euch_transcr.dt,(square != "7" & abs(euch_transcr - transcription) > 1)), aes(label = gene,euch_transcr,transcription)) +
+  geom_vline(aes(xintercept = -1.96), linetype = "dashed", alpha = 0.5, color = "black") + 
+  geom_vline(aes(xintercept = 1.96), linetype = "dashed", alpha = 0.5, color = "black") + 
+  geom_hline(aes(yintercept = 1.96), linetype = "dashed", alpha = 0.5, color = "black") + 
+  geom_hline(aes(yintercept = -1.96), linetype = "dashed", alpha = 0.5, color = "black") + 
+  coord_cartesian(xlim = c(-5,5), ylim = c(-5,5)) +
+  theme_bw() + theme(legend.position = "none") + 
+  scale_color_manual(values = c("grey90","orange"))
+
+#Grid plots
+r <- rectGrob()
+r.1 <- textGrob("Triple Heterochromatin: LAD,H3K9me2 and late replicating")
+r.2 <- textGrob("H3K27me3")
+r.3 <- textGrob("Transcription")
+r.4 <- textGrob("Transcription and euchromatin")
+gz.grid.up <- grid.arrange(gz_trip_het.K27.plot,gz_trip_het.trans.plot,gz_trip_het.euch_trans.plot, nrow = 1)
+gz.grid.cent <- grid.arrange(r,gz_H3K27me3.trans.plot,gz_H3K27me3.euch_transcr.plot, nrow = 1)
+gz.grid.bottom <- grid.arrange(r,r,gz_transcription.euch_transcr.plot, nrow = 1)
+
+pdf("~/XV_P3_Episcreen_DSBScreen/xv20200421_Episcreen_DSBscreen/export/xv20200503_screening_hits.pdf", width = 35, height = 15)
+grid.arrange(gz.grid.up,gz.grid.cent,gz.grid.bottom)
+dev.off()
+
+```
+
+```{r}
+# Plot nine-square graphs with weighted z.scores
+# Arrange data set for comparison (trip.het vs euch.transcr)
+cgwz.mmej.screen.full.dcast <- gwz.mmej.screen.full %>% dplyr::select(prot.A,chromatin,ch.score,t.rep) %>% distinct() %>% group_by(prot.A,chromatin) %>% dplyr::summarise(comb.ch.score = sum(ch.score, na.rm = T)/ sqrt(n()), variance = var(ch.score, na.rm = T)) %>% distinct()
+
+cgwz.mmej.screen.ch.score.dcast <- cgwz.mmej.screen.full.dcast %>% reshape2::dcast(prot.A ~ chromatin, value.var = "comb.ch.score" )
+colnames(cgwz.mmej.screen.ch.score.dcast) <- c("gene","euchromatin","euch_transcr","H3K27me3","trip_het","oth_het","transcription")
+
+
+#Plot some correlations (k27 vs trip.het)
+trip_het.K27.dt <- cgwz.mmej.screen.ch.score.dcast %>% dplyr::select(gene,H3K27me3,trip_het) %>% mutate(square = case_when(H3K27me3 > 1.96 & trip_het < -1.96 ~ "1",abs(H3K27me3) < 1.96 & trip_het > 1.96 ~ "2",H3K27me3 < -1.96 & abs(trip_het) < 1.96 ~ "3", H3K27me3 > 1.96 & abs(trip_het) < 1.96 ~ "4",abs(H3K27me3) < 1.96 & trip_het < - 1.96 ~ "5",H3K27me3 > 1.96 & trip_het < -1.96 ~ "6",TRUE ~ "7"))
+trip_het.K27.plot <- ggplot(trip_het.K27.dt) +  
+  geom_point(aes(x = H3K27me3, y = trip_het, color = square != 7 , shape = square != "7" & abs(H3K27me3 - trip_het) > 1), size = 2)+
+  geom_text_repel(data = subset(trip_het.K27.dt,(square != "7" & abs(H3K27me3 - trip_het) > 1)), aes(label = gene,H3K27me3,trip_het)) +
+  geom_vline(aes(xintercept = -1.96), linetype = "dashed", alpha = 0.5, color = "black") + 
+  geom_vline(aes(xintercept = 1.96), linetype = "dashed", alpha = 0.5, color = "black") + 
+  geom_hline(aes(yintercept = 1.96), linetype = "dashed", alpha = 0.5, color = "black") + 
+  geom_hline(aes(yintercept = -1.96), linetype = "dashed", alpha = 0.5, color = "black") + 
+  coord_cartesian(xlim = c(-6,6), ylim = c(-6,6)) +
+  theme_bw() + theme(legend.position = "none") + 
+  scale_color_manual(values = c("grey90","orange"))
+
+#Plot some correlations (k27 vs trip.het)
+trip_het.euch_trans.dt <- cgwz.mmej.screen.ch.score.dcast %>% dplyr::select(gene,euch_transcr,trip_het) %>% mutate(square = case_when(euch_transcr > 1.96 & trip_het < -1.96 ~ "1",abs(euch_transcr) < 1.96 & trip_het > 1.96 ~ "2",euch_transcr < -1.96 & abs(trip_het) < 1.96 ~ "3", euch_transcr > 1.96 & abs(trip_het) < 1.96 ~ "4",abs(euch_transcr) < 1.96 & trip_het < - 1.96 ~ "5",euch_transcr > 1.96 & trip_het < -1.96 ~ "6",TRUE ~ "7"))
+
+trip_het.euch_trans.plot <- ggplot(trip_het.euch_trans.dt) +  
+  geom_point(aes(x = euch_transcr, y = trip_het, color = square != 7 , shape = square != "7" & abs(euch_transcr - trip_het) > 1), size = 2)+
+  geom_text_repel(data = subset(trip_het.euch_trans.dt,(square != "7" & abs(euch_transcr - trip_het) > 1)), aes(label = gene,euch_transcr,trip_het)) +
+  geom_vline(aes(xintercept = -1.96), linetype = "dashed", alpha = 0.5, color = "black") + 
+  geom_vline(aes(xintercept = 1.96), linetype = "dashed", alpha = 0.5, color = "black") + 
+  geom_hline(aes(yintercept = 1.96), linetype = "dashed", alpha = 0.5, color = "black") + 
+  geom_hline(aes(yintercept = -1.96), linetype = "dashed", alpha = 0.5, color = "black") + 
+  coord_cartesian(xlim = c(-6,6), ylim = c(-6,6)) +
+  theme_bw() + theme(legend.position = "none") + 
+  scale_color_manual(values = c("grey90","orange"))
+
+#Plot trip.het vs transcription
+trip_het.trans.dt <- cgwz.mmej.screen.ch.score.dcast %>% dplyr::select(gene,transcription,trip_het) %>% mutate(square = case_when(transcription > 1.96 & trip_het < -1.96 ~ "1",abs(transcription) < 1.96 & trip_het > 1.96 ~ "2",transcription < -1.96 & abs(trip_het) < 1.96 ~ "3", transcription > 1.96 & abs(trip_het) < 1.96 ~ "4",abs(transcription) < 1.96 & trip_het < - 1.96 ~ "5",transcription > 1.96 & trip_het < -1.96 ~ "6",TRUE ~ "7"))
+
+trip_het.trans.plot <- ggplot(trip_het.trans.dt) +  
+  geom_point(aes(x = transcription, y = trip_het, color = square != 7 , shape = square != "7" & abs(transcription - trip_het) > 1), size = 2)+
+  geom_text_repel(data = subset(trip_het.trans.dt,(square != "7" & abs(transcription - trip_het) > 1)), aes(label = gene,transcription,trip_het)) +
+  geom_vline(aes(xintercept = -1.96), linetype = "dashed", alpha = 0.5, color = "black") + 
+  geom_vline(aes(xintercept = 1.96), linetype = "dashed", alpha = 0.5, color = "black") + 
+  geom_hline(aes(yintercept = 1.96), linetype = "dashed", alpha = 0.5, color = "black") + 
+  geom_hline(aes(yintercept = -1.96), linetype = "dashed", alpha = 0.5, color = "black") + 
+  coord_cartesian(xlim = c(-6,6), ylim = c(-6,6)) +
+  theme_bw() + theme(legend.position = "none") + 
+  scale_color_manual(values = c("grey90","orange"))
+
+#Plot H3K27me3 vs transcription
+H3K27me3.trans.dt <- cgwz.mmej.screen.ch.score.dcast %>% dplyr::select(gene,transcription,H3K27me3) %>% mutate(square = case_when(transcription > 1.96 & H3K27me3 < -1.96 ~ "1",abs(transcription) < 1.96 & H3K27me3 > 1.96 ~ "2",transcription < -1.96 & abs(H3K27me3) < 1.96 ~ "3", transcription > 1.96 & abs(H3K27me3) < 1.96 ~ "4",abs(transcription) < 1.96 & H3K27me3 < - 1.96 ~ "5",transcription > 1.96 & H3K27me3 < -1.96 ~ "6",TRUE ~ "7"))
+
+H3K27me3.trans.plot <- ggplot(H3K27me3.trans.dt) +  
+  geom_point(aes(x = transcription, y = H3K27me3, color = square != 7 , shape = square != "7" & abs(transcription - H3K27me3) > 1), size = 2)+
+  geom_text_repel(data = subset(H3K27me3.trans.dt,(square != "7" & abs(transcription - H3K27me3) > 1)), aes(label = gene,transcription,H3K27me3)) +
+  geom_vline(aes(xintercept = -1.96), linetype = "dashed", alpha = 0.5, color = "black") + 
+  geom_vline(aes(xintercept = 1.96), linetype = "dashed", alpha = 0.5, color = "black") + 
+  geom_hline(aes(yintercept = 1.96), linetype = "dashed", alpha = 0.5, color = "black") + 
+  geom_hline(aes(yintercept = -1.96), linetype = "dashed", alpha = 0.5, color = "black") + 
+  coord_cartesian(xlim = c(-6,6), ylim = c(-6,6)) +
+  theme_bw() + theme(legend.position = "none") + 
+  scale_color_manual(values = c("grey90","orange"))
+
+#Plot H3K27me3 vs transcription
+H3K27me3.euch_transcr.dt <- cgwz.mmej.screen.ch.score.dcast %>% dplyr::select(gene,euch_transcr,H3K27me3) %>% mutate(square = case_when(euch_transcr > 1.96 & H3K27me3 < -1.96 ~ "1",abs(euch_transcr) < 1.96 & H3K27me3 > 1.96 ~ "2",euch_transcr < -1.96 & abs(H3K27me3) < 1.96 ~ "3", euch_transcr > 1.96 & abs(H3K27me3) < 1.96 ~ "4",abs(euch_transcr) < 1.96 & H3K27me3 < - 1.96 ~ "5",euch_transcr > 1.96 & H3K27me3 < -1.96 ~ "6",TRUE ~ "7"))
+
+H3K27me3.euch_transcr.plot <- ggplot(H3K27me3.euch_transcr.dt) +  
+  geom_point(aes(x = euch_transcr, y = H3K27me3, color = square != 7 , shape = square != "7" & abs(euch_transcr - H3K27me3) > 1), size = 2)+
+  geom_text_repel(data = subset(H3K27me3.euch_transcr.dt,(square != "7" & abs(euch_transcr - H3K27me3) > 1)), aes(label = gene,euch_transcr,H3K27me3)) +
+  geom_vline(aes(xintercept = -1.96), linetype = "dashed", alpha = 0.5, color = "black") + 
+  geom_vline(aes(xintercept = 1.96), linetype = "dashed", alpha = 0.5, color = "black") + 
+  geom_hline(aes(yintercept = 1.96), linetype = "dashed", alpha = 0.5, color = "black") + 
+  geom_hline(aes(yintercept = -1.96), linetype = "dashed", alpha = 0.5, color = "black") + 
+  coord_cartesian(xlim = c(-5,5), ylim = c(-5,5)) +
+  theme_bw() + theme(legend.position = "none") + 
+  scale_color_manual(values = c("grey90","orange"))
+
+#Plot H3K27me3 vs transcription
+transcription.euch_transcr.dt <- cgwz.mmej.screen.ch.score.dcast %>% dplyr::select(gene,euch_transcr,transcription) %>% mutate(square = case_when(euch_transcr > 1.96 & transcription < -1.96 ~ "1",abs(euch_transcr) < 1.96 & transcription > 1.96 ~ "2",euch_transcr < -1.96 & abs(transcription) < 1.96 ~ "3", euch_transcr > 1.96 & abs(transcription) < 1.96 ~ "4",abs(euch_transcr) < 1.96 & transcription < - 1.96 ~ "5",euch_transcr > 1.96 & transcription < -1.96 ~ "6",TRUE ~ "7"))
+
+transcription.euch_transcr.plot <- ggplot(transcription.euch_transcr.dt) +  
+  geom_point(aes(x = euch_transcr, y = transcription, color = square != 7 , shape = square != "7" & abs(euch_transcr - transcription) > 1), size = 2)+
+  geom_text_repel(data = subset(transcription.euch_transcr.dt,(square != "7" & abs(euch_transcr - transcription) > 1)), aes(label = gene,euch_transcr,transcription)) +
+  geom_vline(aes(xintercept = -1.96), linetype = "dashed", alpha = 0.5, color = "black") + 
+  geom_vline(aes(xintercept = 1.96), linetype = "dashed", alpha = 0.5, color = "black") + 
+  geom_hline(aes(yintercept = 1.96), linetype = "dashed", alpha = 0.5, color = "black") + 
+  geom_hline(aes(yintercept = -1.96), linetype = "dashed", alpha = 0.5, color = "black") + 
+  coord_cartesian(xlim = c(-5,5), ylim = c(-5,5)) +
+  theme_bw() + theme(legend.position = "none") + 
+  scale_color_manual(values = c("grey90","orange"))
+
+#Grid plots
+r <- rectGrob()
+r.1 <- textGrob("Triple Heterochromatin: LAD,H3K9me2 and late replicating")
+r.2 <- textGrob("H3K27me3")
+r.3 <- textGrob("Transcription")
+r.4 <- textGrob("Transcription and euchromatin")
+grid.up <- grid.arrange(trip_het.K27.plot,trip_het.trans.plot,trip_het.euch_trans.plot, nrow = 1)
+grid.cent <- grid.arrange(r,H3K27me3.trans.plot,H3K27me3.euch_transcr.plot, nrow = 1)
+grid.bottom <- grid.arrange(r,r,transcription.euch_transcr.plot, nrow = 1)
+
+pdf("~/XV_P3_Episcreen_DSBScreen/xv20200421_Episcreen_DSBscreen/export/xv20200503_screening_hits_corr.pdf", width = 35, height = 15)
+grid.arrange(grid.up,grid.cent,grid.bottom)
+dev.off()
+
+```
+```{r}
+# Plot nine-square graphs with z-scores (only for n =3 genes)
+# Arrange data set for comparison (trip.het vs euch.transcr)
+gz.mmej.screen.full <- n3.gwz.mmej.screen.full %>% dplyr::select(prot.A,chromatin,z.score,t.rep) %>%  dplyr::group_by(prot.A, chromatin, t.rep) %>% dplyr::summarise(ch.z.score = mean(z.score, na.rm = T)) %>% distinct() %>% dplyr::group_by(prot.A,chromatin) %>% dplyr::summarise(comb.ch.score = sum(ch.z.score, na.rm = T)/ sqrt(n()), variance = var(ch.z.score, na.rm = T), count = n()) %>% distinct()
+
+gz.mmej.screen.ch.score.dcast <- gz.mmej.screen.full %>% reshape2::dcast(prot.A ~ chromatin, value.var = "comb.ch.score" )
+colnames(gz.mmej.screen.ch.score.dcast) <- c("gene","euchromatin","euch_transcr","H3K27me3","trip_het","oth_het","transcription")
+#Plot some correlations (k27 vs trip.het)
+z_trip_het.K27.dt <- gz.mmej.screen.ch.score.dcast %>% dplyr::select(gene,H3K27me3,trip_het) %>% mutate(square = case_when(H3K27me3 < -1.96 & trip_het > 1.96 ~ "1",abs(H3K27me3) < 1.96 & trip_het > 1.96 ~ "2",H3K27me3 < -1.96 & abs(trip_het) < 1.96 ~ "3", H3K27me3 > 1.96 & abs(trip_het) < 1.96 ~ "4",abs(H3K27me3) < 1.96 & trip_het < - 1.96 ~ "5",H3K27me3 > 1.96 & trip_het < -1.96 ~ "6",TRUE ~ "7"))
+gz_trip_het.K27.plot <- ggplot(gz_trip_het.K27.dt) +  
+  geom_point(aes(x = H3K27me3, y = trip_het, color = square != 7 , shape = square != "7" & abs(H3K27me3 - trip_het) > 1), size = 2)+
+  geom_text_repel(data = subset(gz_trip_het.K27.dt,(square != "7" & abs(H3K27me3 - trip_het) > 1)), aes(label = gene,H3K27me3,trip_het)) +
+  geom_vline(aes(xintercept = -1.96), linetype = "dashed", alpha = 0.5, color = "black") + 
+  geom_vline(aes(xintercept = 1.96), linetype = "dashed", alpha = 0.5, color = "black") + 
+  geom_hline(aes(yintercept = 1.96), linetype = "dashed", alpha = 0.5, color = "black") + 
+  geom_hline(aes(yintercept = -1.96), linetype = "dashed", alpha = 0.5, color = "black") + 
+  coord_cartesian(xlim = c(-6,6), ylim = c(-6,6)) +
+  theme_bw() + theme(legend.position = "none") + 
+  scale_color_manual(values = c("grey90","purple"))
+
+#Plot some correlations (k27 vs trip.het)
+gz_trip_het.euch_trans.dt <- gz.mmej.screen.ch.score.dcast %>% dplyr::select(gene,euch_transcr,trip_het) %>% mutate(square = case_when(euch_transcr < -1.96 & trip_het > 1.96 ~ "1",abs(euch_transcr) < 1.96 & trip_het > 1.96 ~ "2",euch_transcr < -1.96 & abs(trip_het) < 1.96 ~ "3", euch_transcr > 1.96 & abs(trip_het) < 1.96 ~ "4",abs(euch_transcr) < 1.96 & trip_het < - 1.96 ~ "5",euch_transcr > 1.96 & trip_het < -1.96 ~ "6",TRUE ~ "7"))
+
+gz_trip_het.euch_trans.plot <- ggplot(gz_trip_het.euch_trans.dt) +  
+  geom_point(aes(x = euch_transcr, y = trip_het, color = square != 7 , shape = square != "7" & abs(euch_transcr - trip_het) > 1), size = 2)+
+  geom_text_repel(data = subset(gz_trip_het.euch_trans.dt,(square != "7" & abs(euch_transcr - trip_het) > 1)), aes(label = gene,euch_transcr,trip_het)) +
+  geom_vline(aes(xintercept = -1.96), linetype = "dashed", alpha = 0.5, color = "black") + 
+  geom_vline(aes(xintercept = 1.96), linetype = "dashed", alpha = 0.5, color = "black") + 
+  geom_hline(aes(yintercept = 1.96), linetype = "dashed", alpha = 0.5, color = "black") + 
+  geom_hline(aes(yintercept = -1.96), linetype = "dashed", alpha = 0.5, color = "black") + 
+  coord_cartesian(xlim = c(-6,6), ylim = c(-6,6)) +
+  theme_bw() + theme(legend.position = "none") + 
+  scale_color_manual(values = c("grey90","purple"))
+
+#Plot trip.het vs transcription
+gz_trip_het.trans.dt <- gz.mmej.screen.ch.score.dcast %>% dplyr::select(gene,transcription,trip_het) %>% mutate(square = case_when(transcription < -1.96 & trip_het > 1.96 ~ "1",abs(transcription) < 1.96 & trip_het > 1.96 ~ "2",transcription < -1.96 & abs(trip_het) < 1.96 ~ "3", transcription > 1.96 & abs(trip_het) < 1.96 ~ "4",abs(transcription) < 1.96 & trip_het < - 1.96 ~ "5",transcription > 1.96 & trip_het < -1.96 ~ "6",TRUE ~ "7"))
+
+gz_trip_het.trans.plot <- ggplot(gz_trip_het.trans.dt) +  
+  geom_point(aes(x = transcription, y = trip_het, color = square != 7 , shape = square != "7" & abs(transcription - trip_het) > 1), size = 2)+
+  geom_text_repel(data = subset(gz_trip_het.trans.dt,(square != "7" & abs(transcription - trip_het) > 1)), aes(label = gene,transcription,trip_het)) +
+  geom_vline(aes(xintercept = -1.96), linetype = "dashed", alpha = 0.5, color = "black") + 
+  geom_vline(aes(xintercept = 1.96), linetype = "dashed", alpha = 0.5, color = "black") + 
+  geom_hline(aes(yintercept = 1.96), linetype = "dashed", alpha = 0.5, color = "black") + 
+  geom_hline(aes(yintercept = -1.96), linetype = "dashed", alpha = 0.5, color = "black") + 
+  coord_cartesian(xlim = c(-6,6), ylim = c(-6,6)) +
+  theme_bw() + theme(legend.position = "none") + 
+  scale_color_manual(values = c("grey90","purple"))
+
+#Plot H3K27me3 vs transcription
+gz_H3K27me3.trans.dt <- gz.mmej.screen.ch.score.dcast %>% dplyr::select(gene,transcription,H3K27me3) %>% mutate(square = case_when(transcription < -1.96 & H3K27me3 > -1.96 ~ "1",abs(transcription) < 1.96 & H3K27me3 > 1.96 ~ "2",transcription < -1.96 & abs(H3K27me3) < 1.96 ~ "3", transcription > 1.96 & abs(H3K27me3) < 1.96 ~ "4",abs(transcription) < 1.96 & H3K27me3 < - 1.96 ~ "5",transcription > 1.96 & H3K27me3 < -1.96 ~ "6",TRUE ~ "7"))
+
+gz_H3K27me3.trans.plot <- ggplot(gz_H3K27me3.trans.dt) +  
+  geom_point(aes(x = transcription, y = H3K27me3, color = square != 7 , shape = square != "7" & abs(transcription - H3K27me3) > 1), size = 2)+
+  geom_text_repel(data = subset(gz_H3K27me3.trans.dt,(square != "7" & abs(transcription - H3K27me3) > 1)), aes(label = gene,transcription,H3K27me3)) +
+  geom_vline(aes(xintercept = -1.96), linetype = "dashed", alpha = 0.5, color = "black") + 
+  geom_vline(aes(xintercept = 1.96), linetype = "dashed", alpha = 0.5, color = "black") + 
+  geom_hline(aes(yintercept = 1.96), linetype = "dashed", alpha = 0.5, color = "black") + 
+  geom_hline(aes(yintercept = -1.96), linetype = "dashed", alpha = 0.5, color = "black") + 
+  coord_cartesian(xlim = c(-6,6), ylim = c(-6,6)) +
+  theme_bw() + theme(legend.position = "none") + 
+  scale_color_manual(values = c("grey90","purple"))
+
+#Plot H3K27me3 vs transcription
+gz_H3K27me3.euch_transcr.dt <- gz.mmej.screen.ch.score.dcast %>% dplyr::select(gene,euch_transcr,H3K27me3) %>% mutate(square = case_when(euch_transcr < -1.96 & H3K27me3 > 1.96 ~ "1",abs(euch_transcr) < 1.96 & H3K27me3 > 1.96 ~ "2",euch_transcr < -1.96 & abs(H3K27me3) < 1.96 ~ "3", euch_transcr > 1.96 & abs(H3K27me3) < 1.96 ~ "4",abs(euch_transcr) < 1.96 & H3K27me3 < - 1.96 ~ "5",euch_transcr > 1.96 & H3K27me3 < -1.96 ~ "6",TRUE ~ "7"))
+
+gz_H3K27me3.euch_transcr.plot <- ggplot(gz_H3K27me3.euch_transcr.dt) +  
+  geom_point(aes(x = euch_transcr, y = H3K27me3, color = square != 7 , shape = square != "7" & abs(euch_transcr - H3K27me3) > 1), size = 2)+
+  geom_text_repel(data = subset(gz_H3K27me3.euch_transcr.dt,(square != "7" & abs(euch_transcr - H3K27me3) > 1)), aes(label = gene,euch_transcr,H3K27me3)) +
+  geom_vline(aes(xintercept = -1.96), linetype = "dashed", alpha = 0.5, color = "black") + 
+  geom_vline(aes(xintercept = 1.96), linetype = "dashed", alpha = 0.5, color = "black") + 
+  geom_hline(aes(yintercept = 1.96), linetype = "dashed", alpha = 0.5, color = "black") + 
+  geom_hline(aes(yintercept = -1.96), linetype = "dashed", alpha = 0.5, color = "black") + 
+  coord_cartesian(xlim = c(-5,5), ylim = c(-5,5)) +
+  theme_bw() + theme(legend.position = "none") + 
+  scale_color_manual(values = c("grey90","purple"))
+
+#Plot H3K27me3 vs transcription
+gz_transcription.euch_transcr.dt <- gz.mmej.screen.ch.score.dcast %>% dplyr::select(gene,euch_transcr,transcription) %>% mutate(square = case_when(euch_transcr < -1.96 & transcription > 1.96 ~ "1",abs(euch_transcr) < 1.96 & transcription > 1.96 ~ "2",euch_transcr < -1.96 & abs(transcription) < 1.96 ~ "3", euch_transcr > 1.96 & abs(transcription) < 1.96 ~ "4",abs(euch_transcr) < 1.96 & transcription < - 1.96 ~ "5",euch_transcr > 1.96 & transcription < -1.96 ~ "6",TRUE ~ "7"))
+
+gz_transcription.euch_transcr.plot <- ggplot(gz_transcription.euch_transcr.dt) +  
+  geom_point(aes(x = euch_transcr, y = transcription, color = square != 7 , shape = square != "7" & abs(euch_transcr - transcription) > 1), size = 2)+
+  geom_text_repel(data = subset(gz_transcription.euch_transcr.dt,(square != "7" & abs(euch_transcr - transcription) > 1)), aes(label = gene,euch_transcr,transcription)) +
+  geom_vline(aes(xintercept = -1.96), linetype = "dashed", alpha = 0.5, color = "black") + 
+  geom_vline(aes(xintercept = 1.96), linetype = "dashed", alpha = 0.5, color = "black") + 
+  geom_hline(aes(yintercept = 1.96), linetype = "dashed", alpha = 0.5, color = "black") + 
+  geom_hline(aes(yintercept = -1.96), linetype = "dashed", alpha = 0.5, color = "black") + 
+  coord_cartesian(xlim = c(-5,5), ylim = c(-5,5)) +
+  theme_bw() + theme(legend.position = "none") + 
+  scale_color_manual(values = c("grey90","purple"))
+
+#Grid plots
+r <- rectGrob()
+r.1 <- textGrob("Triple Heterochromatin: LAD,H3K9me2 and late replicating")
+r.2 <- textGrob("H3K27me3")
+r.3 <- textGrob("Transcription")
+r.4 <- textGrob("Transcription and euchromatin")
+gz.grid.up <- grid.arrange(gz_trip_het.K27.plot,gz_trip_het.trans.plot,gz_trip_het.euch_trans.plot, nrow = 1)
+gz.grid.cent <- grid.arrange(r,gz_H3K27me3.trans.plot,gz_H3K27me3.euch_transcr.plot, nrow = 1)
+gz.grid.bottom <- grid.arrange(r,r,gz_transcription.euch_transcr.plot, nrow = 1)
+
+pdf("~/XV_P3_Episcreen_DSBScreen/xv20200421_Episcreen_DSBscreen/export/xv20200503_screening_hits.pdf", width = 20, height = 18)
+grid.arrange(gz.grid.up,gz.grid.cent,gz.grid.bottom)
+dev.off()
+
+```
+### add diagonal visual effect (NEW PLOT)
+```{r}
+# Plot nine-square graphs with z-scores (only for n =3 genes)
+# Arrange data set for comparison (trip.het vs euch.transcr)
+gz.mmej.screen.full <- n3.gwz.mmej.screen.full %>% dplyr::select(prot.A,chromatin,z.score,t.rep) %>%  dplyr::group_by(prot.A, chromatin, t.rep) %>% dplyr::summarise(ch.z.score = mean(z.score, na.rm = T)) %>% distinct() %>% dplyr::group_by(prot.A,chromatin) %>% dplyr::summarise(comb.ch.score = sum(ch.z.score, na.rm = T)/ sqrt(n()), variance = var(ch.z.score, na.rm = T), count = n()) %>% distinct()
+
+gz.mmej.screen.ch.score.dcast <- gz.mmej.screen.full %>% reshape2::dcast(prot.A ~ chromatin, value.var = "comb.ch.score" )
+colnames(gz.mmej.screen.ch.score.dcast) <- c("gene","euchromatin","euch_transcr","H3K27me3","trip_het","oth_het","transcription")
+
+#Plot some correlations (k27 vs trip.het)
+d_gz_trip_het.K27.dt <- gz.mmej.screen.ch.score.dcast %>% dplyr::select(gene,H3K27me3,trip_het) %>% mutate(square = case_when(abs(H3K27me3 - trip_het) > 1.96 ~ "hit",TRUE ~ "no.hit"))
+
+d_gz_trip_het.K27.plot <- ggplot(d_gz_trip_het.K27.dt) +  
+  geom_point(aes(x = H3K27me3, y = trip_het, color = square), size = 2)+
+  geom_text_repel(data = subset(d_gz_trip_het.K27.dt,(square == "hit")), aes(label = gene,H3K27me3,trip_het)) +
+  geom_abline(aes(slope = 1, intercept = 1.96), linetype = "dashed", alpha = 0.5, color = "black") + 
+  geom_abline(aes(slope = 1, intercept = -1.96), linetype = "dashed", alpha = 0.5, color = "black") + 
+  coord_cartesian(xlim = c(-6,6), ylim = c(-6,6)) +
+  theme_bw() + theme(legend.position = "none") + 
+  scale_color_manual(values = c("purple","grey90"))
+
+#Plot some correlations (k27 vs trip.het)
+d_gz_trip_het.euch_trans.dt <- gz.mmej.screen.ch.score.dcast %>% dplyr::select(gene,euch_transcr,trip_het)  %>% mutate(square = case_when(abs(euch_transcr - trip_het) > 1.96 ~ "hit",TRUE ~ "no.hit"))
+
+d_gz_trip_het.euch_trans.plot <- ggplot(d_gz_trip_het.euch_trans.dt) +  
+  geom_point(aes(x = euch_transcr, y = trip_het, color = square), size = 2)+
+  geom_text_repel(data = subset(d_gz_trip_het.euch_trans.dt,(square == "hit")), aes(label = gene,euch_transcr,trip_het)) +
+  geom_abline(aes(slope = 1, intercept = 1.96), linetype = "dashed", alpha = 0.5, color = "black") + 
+  geom_abline(aes(slope = 1, intercept = -1.96), linetype = "dashed", alpha = 0.5, color = "black") + 
+  coord_cartesian(xlim = c(-6,6), ylim = c(-6,6)) +
+  theme_bw() + theme(legend.position = "none") + 
+  scale_color_manual(values = c("purple","grey90"))
+
+#Plot trip.het vs transcription
+d_gz_trip_het.trans.dt <- gz.mmej.screen.ch.score.dcast %>% dplyr::select(gene,transcription,trip_het)  %>% mutate(square = case_when(abs(transcription - trip_het) > 1.96 ~ "hit",TRUE ~ "no.hit"))
+
+d_gz_trip_het.trans.plot <- ggplot(d_gz_trip_het.trans.dt) +  
+  geom_point(aes(x = transcription, y = trip_het, color = square), size = 2)+
+  geom_text_repel(data = subset(d_gz_trip_het.trans.dt,(square == "hit")), aes(label = gene,transcription,trip_het)) +
+  geom_abline(aes(slope = 1, intercept = 1.96), linetype = "dashed", alpha = 0.5, color = "black") + 
+  geom_abline(aes(slope = 1, intercept = -1.96), linetype = "dashed", alpha = 0.5, color = "black") + 
+  coord_cartesian(xlim = c(-6,6), ylim = c(-6,6)) +
+  theme_bw() + theme(legend.position = "none") + 
+  scale_color_manual(values = c("purple","grey90")) 
+
+#Plot H3K27me3 vs transcription
+d_gz_H3K27me3.trans.dt <- gz.mmej.screen.ch.score.dcast %>% dplyr::select(gene,transcription,H3K27me3) %>% mutate(square = case_when(abs(transcription - H3K27me3) > 1.96 ~ "hit",TRUE ~ "no.hit"))
+
+d_gz_H3K27me3.trans.plot <- ggplot(d_gz_H3K27me3.trans.dt) +  
+  geom_point(aes(x = transcription, y = H3K27me3, color = square), size = 2)+
+  geom_text_repel(data = subset(d_gz_H3K27me3.trans.dt,(square == "hit")), aes(label = gene,transcription,H3K27me3)) +
+  geom_abline(aes(slope = 1, intercept = 1.96), linetype = "dashed", alpha = 0.5, color = "black") + 
+  geom_abline(aes(slope = 1, intercept = -1.96), linetype = "dashed", alpha = 0.5, color = "black") + 
+  coord_cartesian(xlim = c(-6,6), ylim = c(-6,6)) +
+  theme_bw() + theme(legend.position = "none") + 
+  scale_color_manual(values = c("purple","grey90"))
+
+#Plot H3K27me3 vs transcription
+d_gz_H3K27me3.euch_transcr.dt <- gz.mmej.screen.ch.score.dcast %>% dplyr::select(gene,euch_transcr,H3K27me3)  %>% mutate(square = case_when(abs(euch_transcr - H3K27me3) > 1.96 ~ "hit",TRUE ~ "no.hit"))
+
+d_gz_H3K27me3.euch_transcr.plot <- ggplot(d_gz_H3K27me3.euch_transcr.dt) +  
+  geom_point(aes(x = euch_transcr, y = H3K27me3, color = square), size = 2)+
+  geom_text_repel(data = subset(d_gz_H3K27me3.euch_transcr.dt,(square == "hit")), aes(label = gene,euch_transcr,H3K27me3)) +
+ geom_abline(aes(slope = 1, intercept = 1.96), linetype = "dashed", alpha = 0.5, color = "black") + 
+  geom_abline(aes(slope = 1, intercept = -1.96), linetype = "dashed", alpha = 0.5, color = "black") + 
+  coord_cartesian(xlim = c(-6,6), ylim = c(-6,6)) +
+  theme_bw() + theme(legend.position = "none") + 
+  scale_color_manual(values = c("purple","grey90"))
+
+#Plot H3K27me3 vs transcription
+d_gz_transcription.euch_transcr.dt <- gz.mmej.screen.ch.score.dcast %>% dplyr::select(gene,euch_transcr,transcription)  %>% mutate(square = case_when(abs(euch_transcr - transcription) > 1.96 ~ "hit",TRUE ~ "no.hit"))
+
+d_gz_transcription.euch_transcr.plot <- ggplot(d_gz_transcription.euch_transcr.dt) +  
+  geom_point(aes(x = euch_transcr, y = transcription, color = square), size = 2)+
+  geom_text_repel(data = subset(d_gz_transcription.euch_transcr.dt,(square == "hit")), aes(label = gene,euch_transcr,transcription)) +
+ geom_abline(aes(slope = 1, intercept = 1.96), linetype = "dashed", alpha = 0.5, color = "black") + 
+  geom_abline(aes(slope = 1, intercept = -1.96), linetype = "dashed", alpha = 0.5, color = "black") + 
+  coord_cartesian(xlim = c(-6,6), ylim = c(-6,6)) +
+  theme_bw() + theme(legend.position = "none") + 
+  scale_color_manual(values = c("purple","grey90"))
+
+#Grid plots
+r <- rectGrob()
+r.1 <- textGrob("Triple Heterochromatin: LAD,H3K9me2 and late replicating")
+r.2 <- textGrob("H3K27me3")
+r.3 <- textGrob("Transcription")
+r.4 <- textGrob("Transcription and euchromatin")
+gz.grid.up <- grid.arrange(d_gz_trip_het.K27.plot,d_gz_trip_het.trans.plot,d_gz_trip_het.euch_trans.plot, nrow = 1)
+gz.grid.cent <- grid.arrange(r,d_gz_H3K27me3.trans.plot,d_gz_H3K27me3.euch_transcr.plot, nrow = 1)
+gz.grid.bottom <- grid.arrange(r,r,d_gz_transcription.euch_transcr.plot, nrow = 1)
+
+pdf("~/XV_P3_Episcreen_DSBScreen/xv20200421_Episcreen_DSBscreen/export/xv20200503_screening_hits.pdf", width = 20, height = 18)
+grid.arrange(gz.grid.up,gz.grid.cent,gz.grid.bottom)
+dev.off()
+
+```
+
+
+```{r}
+# Plot nine-square graphs with weighted z.scores
+# Arrange data set for comparison (trip.het vs euch.transcr)
+cgwz.mmej.screen.full.dcast <- n3.gwz.mmej.screen.full %>% dplyr::select(prot.A,chromatin,ch.score,t.rep) %>% distinct() %>% group_by(prot.A,chromatin) %>% dplyr::summarise(comb.ch.score = sum(ch.score, na.rm = T)/ sqrt(n()), variance = var(ch.score, na.rm = T)) %>% distinct()
+
+cgwz.mmej.screen.ch.score.dcast <- cgwz.mmej.screen.full.dcast %>% reshape2::dcast(prot.A ~ chromatin, value.var = "comb.ch.score" )
+colnames(cgwz.mmej.screen.ch.score.dcast) <- c("gene","euchromatin","euch_transcr","H3K27me3","trip_het","oth_het","transcription")
+
+
+#Plot some correlations (k27 vs trip.het)
+trip_het.K27.dt <- cgwz.mmej.screen.ch.score.dcast %>% dplyr::select(gene,H3K27me3,trip_het) %>% mutate(square = case_when(H3K27me3 > 1.96 & trip_het < -1.96 ~ "1",abs(H3K27me3) < 1.96 & trip_het > 1.96 ~ "2",H3K27me3 < -1.96 & abs(trip_het) < 1.96 ~ "3", H3K27me3 > 1.96 & abs(trip_het) < 1.96 ~ "4",abs(H3K27me3) < 1.96 & trip_het < - 1.96 ~ "5",H3K27me3 > 1.96 & trip_het < -1.96 ~ "6",TRUE ~ "7"))
+trip_het.K27.plot <- ggplot(trip_het.K27.dt) +  
+  geom_point(aes(x = H3K27me3, y = trip_het, color = square != 7 , shape = square != "7" & abs(H3K27me3 - trip_het) > 1), size = 2)+
+  geom_text_repel(data = subset(trip_het.K27.dt,(square != "7" & abs(H3K27me3 - trip_het) > 1)), aes(label = gene,H3K27me3,trip_het)) +
+  geom_vline(aes(xintercept = -1.96), linetype = "dashed", alpha = 0.5, color = "black") + 
+  geom_vline(aes(xintercept = 1.96), linetype = "dashed", alpha = 0.5, color = "black") + 
+  geom_hline(aes(yintercept = 1.96), linetype = "dashed", alpha = 0.5, color = "black") + 
+  geom_hline(aes(yintercept = -1.96), linetype = "dashed", alpha = 0.5, color = "black") + 
+  coord_cartesian(xlim = c(-6,6), ylim = c(-6,6)) +
+  theme_bw() + theme(legend.position = "none") + 
+  scale_color_manual(values = c("grey90","orange"))
+
+#Plot some correlations (k27 vs trip.het)
+trip_het.euch_trans.dt <- cgwz.mmej.screen.ch.score.dcast %>% dplyr::select(gene,euch_transcr,trip_het) %>% mutate(square = case_when(euch_transcr > 1.96 & trip_het < -1.96 ~ "1",abs(euch_transcr) < 1.96 & trip_het > 1.96 ~ "2",euch_transcr < -1.96 & abs(trip_het) < 1.96 ~ "3", euch_transcr > 1.96 & abs(trip_het) < 1.96 ~ "4",abs(euch_transcr) < 1.96 & trip_het < - 1.96 ~ "5",euch_transcr > 1.96 & trip_het < -1.96 ~ "6",TRUE ~ "7"))
+
+trip_het.euch_trans.plot <- ggplot(trip_het.euch_trans.dt) +  
+  geom_point(aes(x = euch_transcr, y = trip_het, color = square != 7 , shape = square != "7" & abs(euch_transcr - trip_het) > 1), size = 2)+
+  geom_text_repel(data = subset(trip_het.euch_trans.dt,(square != "7" & abs(euch_transcr - trip_het) > 1)), aes(label = gene,euch_transcr,trip_het)) +
+  geom_vline(aes(xintercept = -1.96), linetype = "dashed", alpha = 0.5, color = "black") + 
+  geom_vline(aes(xintercept = 1.96), linetype = "dashed", alpha = 0.5, color = "black") + 
+  geom_hline(aes(yintercept = 1.96), linetype = "dashed", alpha = 0.5, color = "black") + 
+  geom_hline(aes(yintercept = -1.96), linetype = "dashed", alpha = 0.5, color = "black") + 
+  coord_cartesian(xlim = c(-6,6), ylim = c(-6,6)) +
+  theme_bw() + theme(legend.position = "none") + 
+  scale_color_manual(values = c("grey90","orange"))
+
+#Plot trip.het vs transcription
+trip_het.trans.dt <- cgwz.mmej.screen.ch.score.dcast %>% dplyr::select(gene,transcription,trip_het) %>% mutate(square = case_when(transcription > 1.96 & trip_het < -1.96 ~ "1",abs(transcription) < 1.96 & trip_het > 1.96 ~ "2",transcription < -1.96 & abs(trip_het) < 1.96 ~ "3", transcription > 1.96 & abs(trip_het) < 1.96 ~ "4",abs(transcription) < 1.96 & trip_het < - 1.96 ~ "5",transcription > 1.96 & trip_het < -1.96 ~ "6",TRUE ~ "7"))
+
+trip_het.trans.plot <- ggplot(trip_het.trans.dt) +  
+  geom_point(aes(x = transcription, y = trip_het, color = square != 7 , shape = square != "7" & abs(transcription - trip_het) > 1), size = 2)+
+  geom_text_repel(data = subset(trip_het.trans.dt,(square != "7" & abs(transcription - trip_het) > 1)), aes(label = gene,transcription,trip_het)) +
+  geom_vline(aes(xintercept = -1.96), linetype = "dashed", alpha = 0.5, color = "black") + 
+  geom_vline(aes(xintercept = 1.96), linetype = "dashed", alpha = 0.5, color = "black") + 
+  geom_hline(aes(yintercept = 1.96), linetype = "dashed", alpha = 0.5, color = "black") + 
+  geom_hline(aes(yintercept = -1.96), linetype = "dashed", alpha = 0.5, color = "black") + 
+  coord_cartesian(xlim = c(-6,6), ylim = c(-6,6)) +
+  theme_bw() + theme(legend.position = "none") + 
+  scale_color_manual(values = c("grey90","orange"))
+
+#Plot H3K27me3 vs transcription
+H3K27me3.trans.dt <- cgwz.mmej.screen.ch.score.dcast %>% dplyr::select(gene,transcription,H3K27me3) %>% mutate(square = case_when(transcription > 1.96 & H3K27me3 < -1.96 ~ "1",abs(transcription) < 1.96 & H3K27me3 > 1.96 ~ "2",transcription < -1.96 & abs(H3K27me3) < 1.96 ~ "3", transcription > 1.96 & abs(H3K27me3) < 1.96 ~ "4",abs(transcription) < 1.96 & H3K27me3 < - 1.96 ~ "5",transcription > 1.96 & H3K27me3 < -1.96 ~ "6",TRUE ~ "7"))
+
+H3K27me3.trans.plot <- ggplot(H3K27me3.trans.dt) +  
+  geom_point(aes(x = transcription, y = H3K27me3, color = square != 7 , shape = square != "7" & abs(transcription - H3K27me3) > 1), size = 2)+
+  geom_text_repel(data = subset(H3K27me3.trans.dt,(square != "7" & abs(transcription - H3K27me3) > 1)), aes(label = gene,transcription,H3K27me3)) +
+  geom_vline(aes(xintercept = -1.96), linetype = "dashed", alpha = 0.5, color = "black") + 
+  geom_vline(aes(xintercept = 1.96), linetype = "dashed", alpha = 0.5, color = "black") + 
+  geom_hline(aes(yintercept = 1.96), linetype = "dashed", alpha = 0.5, color = "black") + 
+  geom_hline(aes(yintercept = -1.96), linetype = "dashed", alpha = 0.5, color = "black") + 
+  coord_cartesian(xlim = c(-6,6), ylim = c(-6,6)) +
+  theme_bw() + theme(legend.position = "none") + 
+  scale_color_manual(values = c("grey90","orange"))
+
+#Plot H3K27me3 vs transcription
+H3K27me3.euch_transcr.dt <- cgwz.mmej.screen.ch.score.dcast %>% dplyr::select(gene,euch_transcr,H3K27me3) %>% mutate(square = case_when(euch_transcr > 1.96 & H3K27me3 < -1.96 ~ "1",abs(euch_transcr) < 1.96 & H3K27me3 > 1.96 ~ "2",euch_transcr < -1.96 & abs(H3K27me3) < 1.96 ~ "3", euch_transcr > 1.96 & abs(H3K27me3) < 1.96 ~ "4",abs(euch_transcr) < 1.96 & H3K27me3 < - 1.96 ~ "5",euch_transcr > 1.96 & H3K27me3 < -1.96 ~ "6",TRUE ~ "7"))
+
+H3K27me3.euch_transcr.plot <- ggplot(H3K27me3.euch_transcr.dt) +  
+  geom_point(aes(x = euch_transcr, y = H3K27me3, color = square != 7 , shape = square != "7" & abs(euch_transcr - H3K27me3) > 1), size = 2)+
+  geom_text_repel(data = subset(H3K27me3.euch_transcr.dt,(square != "7" & abs(euch_transcr - H3K27me3) > 1)), aes(label = gene,euch_transcr,H3K27me3)) +
+  geom_vline(aes(xintercept = -1.96), linetype = "dashed", alpha = 0.5, color = "black") + 
+  geom_vline(aes(xintercept = 1.96), linetype = "dashed", alpha = 0.5, color = "black") + 
+  geom_hline(aes(yintercept = 1.96), linetype = "dashed", alpha = 0.5, color = "black") + 
+  geom_hline(aes(yintercept = -1.96), linetype = "dashed", alpha = 0.5, color = "black") + 
+  coord_cartesian(xlim = c(-5,5), ylim = c(-5,5)) +
+  theme_bw() + theme(legend.position = "none") + 
+  scale_color_manual(values = c("grey90","orange"))
+
+#Plot H3K27me3 vs transcription
+transcription.euch_transcr.dt <- cgwz.mmej.screen.ch.score.dcast %>% dplyr::select(gene,euch_transcr,transcription) %>% mutate(square = case_when(euch_transcr > 1.96 & transcription < -1.96 ~ "1",abs(euch_transcr) < 1.96 & transcription > 1.96 ~ "2",euch_transcr < -1.96 & abs(transcription) < 1.96 ~ "3", euch_transcr > 1.96 & abs(transcription) < 1.96 ~ "4",abs(euch_transcr) < 1.96 & transcription < - 1.96 ~ "5",euch_transcr > 1.96 & transcription < -1.96 ~ "6",TRUE ~ "7"))
+
+transcription.euch_transcr.plot <- ggplot(transcription.euch_transcr.dt) +  
+  geom_point(aes(x = euch_transcr, y = transcription, color = square != 7 , shape = square != "7" & abs(euch_transcr - transcription) > 1), size = 2)+
+  geom_text_repel(data = subset(transcription.euch_transcr.dt,(square != "7" & abs(euch_transcr - transcription) > 1)), aes(label = gene,euch_transcr,transcription)) +
+  geom_vline(aes(xintercept = -1.96), linetype = "dashed", alpha = 0.5, color = "black") + 
+  geom_vline(aes(xintercept = 1.96), linetype = "dashed", alpha = 0.5, color = "black") + 
+  geom_hline(aes(yintercept = 1.96), linetype = "dashed", alpha = 0.5, color = "black") + 
+  geom_hline(aes(yintercept = -1.96), linetype = "dashed", alpha = 0.5, color = "black") + 
+  coord_cartesian(xlim = c(-5,5), ylim = c(-5,5)) +
+  theme_bw() + theme(legend.position = "none") + 
+  scale_color_manual(values = c("grey90","orange"))
+
+#Grid plots
+r <- rectGrob()
+r.1 <- textGrob("Triple Heterochromatin: LAD,H3K9me2 and late replicating")
+r.2 <- textGrob("H3K27me3")
+r.3 <- textGrob("Transcription")
+r.4 <- textGrob("Transcription and euchromatin")
+grid.up <- grid.arrange(trip_het.K27.plot,trip_het.trans.plot,trip_het.euch_trans.plot, nrow = 1)
+grid.cent <- grid.arrange(r,H3K27me3.trans.plot,H3K27me3.euch_transcr.plot, nrow = 1)
+grid.bottom <- grid.arrange(r,r,transcription.euch_transcr.plot, nrow = 1)
+
+pdf("~/XV_P3_Episcreen_DSBScreen/xv20200421_Episcreen_DSBscreen/export/xv20200503_screening_hits_corr.pdf", width = 35, height = 15)
+grid.arrange(grid.up,grid.cent,grid.bottom)
+dev.off()
+
+```
+#Arrange a list of hits in z scores and weigthed z scores
+```{r}
+#This is dt with weighted scores
+
+meeting.plot <- trip_het.euch_trans.dt %>% left_join(gz_trip_het.euch_trans.dt, by = "gene") %>% mutate(square.t = case_when(square.x == 7 & square.y == 7 ~ "none", square.x != 7 & square.y == 7 ~ "weighted.only", square.x == 7 & square.y != 7 ~ "z.score.only", square.x != 7 & square.y != 7 ~ "common.hit"))
+
+mp.trip_het.euch_trans.plot <- ggplot(meeting.plot) +  
+  geom_point(aes(x = euch_transcr.x, y = trip_het.x, color = square.t, alpha = square.t != "none"), size = 2)+
+  geom_vline(aes(xintercept = -1.96), linetype = "dashed", alpha = 0.5, color = "black") + 
+  geom_vline(aes(xintercept = 1.96), linetype = "dashed", alpha = 0.5, color = "black") + 
+  geom_hline(aes(yintercept = 1.96), linetype = "dashed", alpha = 0.5, color = "black") + 
+  geom_hline(aes(yintercept = -1.96), linetype = "dashed", alpha = 0.5, color = "black") + 
+  coord_cartesian(xlim = c(-6,6), ylim = c(-6,6)) +
+  theme_bw() + ggtitle("Weighted z-score") +
+  scale_color_manual(values = c("darkgreen","grey90","orange", "purple")) + scale_alpha_manual(values = c(0.3,0.75))
+
+mp.z.trip_het.euch_trans.plot <- ggplot(meeting.plot) +  
+  geom_point(aes(x = euch_transcr.y, y = trip_het.y, color = square.t, alpha = square.t != "none"), size = 2)+
+  geom_vline(aes(xintercept = -1.96), linetype = "dashed", alpha = 0.5, color = "black") + 
+  geom_vline(aes(xintercept = 1.96), linetype = "dashed", alpha = 0.5, color = "black") + 
+  geom_hline(aes(yintercept = 1.96), linetype = "dashed", alpha = 0.5, color = "black") + 
+  geom_hline(aes(yintercept = -1.96), linetype = "dashed", alpha = 0.5, color = "black") + 
+  coord_cartesian(xlim = c(-6,6), ylim = c(-6,6)) +
+  theme_bw() + ggtitle("z-score") +
+  scale_color_manual(values = c("darkgreen","grey90","orange", "purple")) + scale_alpha_manual(values = c(0.3,0.75))
+
+pdf("~/XV_P3_Episcreen_DSBScreen/xv20200421_Episcreen_DSBscreen/export/xv20200503_w_vs_z_plot.pdf")
+mp.trip_het.euch_trans.plot
+mp.z.trip_het.euch_trans.plot
+dev.off()
+```
+
+```{r}
+#Export all plots in pdf
+pdf("~/XV_P3_Episcreen_DSBScreen/xv20200421_Episcreen_DSBscreen/export/xv20200503_screening_hits_corr.pdf", width = 35, height = 15)
+#KO comparison
+grid.arrange(grid.up,grid.cent,grid.bottom)
+dev.off()
+
+#Small graphs
+pdf("~/XV_P3_Episcreen_DSBScreen/xv20200421_Episcreen_DSBscreen/export/xv20200503_finals_small_plots.pdf")
+#Plot_control correlation between replicates
+ggplot(control.ch.rep.mmej.screen) + geom_hline(aes(yintercept = -1.96), linetype = "dashed") + geom_hline(aes(yintercept = 1.96), linetype = "dashed")  + geom_jitter(aes(x = chromatin ,y = ch.score.rep,color = sample, size = var.rep), alpha = 0.5)+ theme_bw() + theme(legend.position = "none") + coord_flip() + ggtitle("Control scores - 5. Replicates combination")
+
+ggplot(KO.ch.rep.mmej.screen) + geom_hline(aes(yintercept = -1.96), linetype = "dashed", color = "red", size = 1) + geom_hline(aes(yintercept = 1.96), linetype = "dashed", color = "red", size = 1)  + geom_jitter(aes(x = chromatin ,y = ch.score.rep, size = var.rep), alpha = 0.3)+ theme_bw() + theme(legend.position = "none") + coord_flip() + ggtitle("KO scores - 5. Replicates combination")
+dev.off()
+
+#Export all plots in pdf
+pdf("~/XV_P3_Episcreen_DSBScreen/xv20200421_Episcreen_DSBscreen/export/xv20200503_controls_steps.pdf")
+#KO comparison
+grid.arrange(grid1, grid2, grid3, nrow = 3)
+dev.off()
+
+#Export all plots in pdf
+pdf("~/XV_P3_Episcreen_DSBScreen/xv20200421_Episcreen_DSBscreen/export/xv20200503_KO_steps.pdf")
+#KO comparison
+grid.arrange(grid4, grid5, grid6,grid7, nrow = 4)
+dev.off()
+
+#Export all plots in pdf
+pdf("~/XV_P3_Episcreen_DSBScreen/xv20200421_Episcreen_DSBscreen/export/xv20200503_screening_hits_corr.pdf", width = 35, height = 15)
+#KO comparison
+grid.arrange(grid.up,grid.cent,grid.bottom)
+dev.off()
+```
+
+```{r}
+#Generate data set
+cor.heatmap <- as.matrix(cor(t(gz.mmej.screen.ch.score.dcast %>% column_to_rownames(var = "gene"))))
+
+#generate heatmap
+heat.map <- pheatmap(cor.heatmap)
+
+#Generate clusters
+fviz_nbclust(cor.heatmap, kmeans, method = "gap", k.max = 50) +
+  labs(subtitle = "Elbow method")
+
+#Plot cluster number for different height parameters
+dep.clust.n <- tibble(height_filter = 1:20,clusters_dep = sapply(1:20, function(x) length(unique(cutree(heat.map$tree_row, h = x)))))
+ggplot(dep.clust.n) + geom_line(aes(height_filter,clusters_dep), color = "blue")  + theme_bw() + ggtitle("Cluster number based of different height filters") + geom_hline(aes(yintercept = 6)) + coord_cartesian(ylim = c(0,10), xlim = c(15,20))
+
+#Annotation tibble
+clust.tib <- tibble(gene = colnames(cor.heatmap),cluster_dep = cutree(heat.map$tree_row, h = 18)) %>% column_to_rownames(var = "gene")
+
+#Plot correlation map
+pheatmap(cor.heatmap, method = "eucl", show_rownames = F, show_colnames = F, cellwidth = 0.5, cellheight = 0.5, color = viridis(100),treeheight_row = 0,treeheight_col = 0, main = "Dependent z-score correlation plot", annotation_row = clust.tib, annotation_names_row = F)
+
+
+```
+
+
+
+
+
