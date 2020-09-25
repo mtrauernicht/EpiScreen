@@ -333,7 +333,7 @@ We can also try to cluster barcodes based on the above heatmaps and use these cl
 
 ## Exporting potential data. 
 ```{r}
-setwd("/DATA/usr/m.trauernicht/projects/EpiScreen/epigenetic-screening-on-trip-clone/Data/")
+setwd("/DATA/usr/m.trauernicht/projects/EpiScreen/files_scripts/")
 filename <- SetFileName("_mapping_mean", "mt")
 save(normalized_clone5, file = filename)
 
@@ -343,6 +343,11 @@ save(features.dt.long, file = filename)
 
 filename <- SetFileName("_chip_dendogram", "mt")
 save(x, file = filename)
+
+
+setwd("/DATA/usr/m.trauernicht/projects/EpiScreen/files_scripts/")
+filename <- SetFileName("_barcode_annotation.csv", "mt")
+write.csv2(barcode_annotation, file = filename)
 ```
 
 # Session Info
