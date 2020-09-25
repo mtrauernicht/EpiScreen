@@ -68,6 +68,7 @@ library(pheatmap)
 library(tibble)
 library(ggbeeswarm)
 library(RColorBrewer)
+library(ggpubr)
 ```
 ## Custom functions
 Functions used include all functions that have been used previously by Ruben (some of them might not be needed anymore, but are kept anyway). Functions 'CallTrueBarcodes' & 'RemoveLowReads' have been added by Max.
@@ -511,15 +512,31 @@ pheatmap(as.matrix(indels.df.heatmap),
          angle_col = 90, main = "MMEJscore of rep3 samples per barcode")
 ```
 
-# Normalize data
-```{r}
 
-```
+# Generate final overview
+```{r out.width= "100%", fig.align= "center", echo=FALSE, warning= FALSE}
+my_comparisons <- list(c("KDM6A", "Scr"), c("KDM6B", "Scr"), c("PolQ", "Scr"))
+
+pdf()
+# Boxplot comparing the 4 conditions
+ggplot(indels.df, aes(x = siRNA, y = MMEJscore)) +
+  geom_point() + geom_boxplot() + theme_bw() +
+  labs(title = "MMEJscore distribution per sample") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 1, size = 10), 
+        axis.text.y = element_text(size = 10))+
+  stat_compare_means(comparisons = my_comparisons)+ 
+  stat_compare_means(label.y = 0.5)
 
 
-# Generate heatmaps
-```{r}
 
+ggplot(indels.df, aes(x = siRNA, y = freqCut)) +
+  geom_point() + geom_boxplot() + theme_bw() +
+  labs(title = "freqCut distribution per sample") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 1, size = 10), 
+        axis.text.y = element_text(size = 10))+
+  stat_compare_means(comparisons = my_comparisons)+ 
+  stat_compare_means(label.y = 1)
+dev.off()
 ```
 
 
