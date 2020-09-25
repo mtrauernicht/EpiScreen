@@ -65,6 +65,7 @@ library(car)
 library(parallel)
 library(gtools)
 library(rtracklayer)
+library(platetools)
 ```
 ## Custom functions
 Functions used include all functions that have been used previously by Ruben (some of them might not be needed anymore, but are kept anyway). Functions 'CallTrueBarcodes' & 'RemoveLowReads' have been added by Max.
@@ -386,6 +387,9 @@ ggplot(RSTP2_2000_indels.df, aes(read.count)) + geom_density(fill = "#3D9F83") +
 ggplot(RSTP2_2000_indels.df, aes(read.count)) + geom_density(fill = "#3D9F83") + theme_bw() + 
   labs(title = "read distribution per drug") + 
   facet_wrap(~Drug)
+ggplot(RSTP2_2000_indels.df, aes(read.count)) + geom_density(fill = "#3D9F83") + theme_bw() + 
+  labs(title = "read distribution per drug") + 
+  facet_wrap(~V2)
 
 # Filter out noisy data
 RSTP2_2000_indels.df$read.count1.7 <- rowSums(RSTP2_2000_indels.df[,c(47,55)])
