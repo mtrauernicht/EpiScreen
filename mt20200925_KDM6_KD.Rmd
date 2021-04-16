@@ -364,6 +364,7 @@ indels.df <- indels.df %>%
          MMEJscore = freqMMEJ / (freqMMEJ + freqNHEJ),
          NHEJscore = freqNHEJ / (freqNHEJ + freqMMEJ),
          freqCut = 1 - (X0 / (X0 + all.indels)))
+indels_df <- indels.df
 indels.df <- indels.df %>%
   select(.id, barcode, siRNA, rep, freqMMEJ, freqNHEJ,
          NHEJMMEJratio, MMEJscore, NHEJscore, freqCut) %>%
@@ -393,7 +394,7 @@ barcode_ann <- barcode_ann %>%
   remove_rownames() %>%
   column_to_rownames("X")
 
-myBreaks1 <- seq(0,0.5,0.005)
+myBreaks1 <- seq(0,0.3,0.003)
 
 pheatmap(as.matrix(indels.df.heatmap),
          color = colorRampPalette(brewer.pal(n = 7, name = "Greys"))(100),
@@ -475,7 +476,7 @@ indels.df.heatmap <- indels.df.rep1 %>%
   dcast(id ~ barcode, value.var = "MMEJscore") %>%
   column_to_rownames("id")
 
-myBreaks1 <- seq(0,0.5,0.005)
+myBreaks1 <- seq(0,0.3,0.003)
 
 pheatmap(as.matrix(indels.df.heatmap),
          color = colorRampPalette(brewer.pal(n = 7, name = "Greys"))(100),
@@ -489,7 +490,7 @@ indels.df.heatmap <- indels.df.rep2 %>%
   dcast(id ~ barcode, value.var = "MMEJscore") %>%
   column_to_rownames("id")
 
-myBreaks1 <- seq(0,0.5,0.005)
+myBreaks1 <- seq(0,0.3,0.003)
 
 pheatmap(as.matrix(indels.df.heatmap),
          color = colorRampPalette(brewer.pal(n = 7, name = "Greys"))(100),
@@ -503,10 +504,25 @@ indels.df.heatmap <- indels.df.rep3 %>%
   dcast(id ~ barcode, value.var = "MMEJscore") %>%
   column_to_rownames("id")
 
-myBreaks1 <- seq(0,0.5,0.005)
+myBreaks1 <- seq(0,0.3,0.003)
 
 pheatmap(as.matrix(indels.df.heatmap),
          color = colorRampPalette(brewer.pal(n = 7, name = "Greys"))(100),
+         breaks = myBreaks1, border_color = "black", 
+         cellwidth = 12, cellheight = 10,annotation_col = barcode_ann,
+         angle_col = 90, main = "MMEJscore of rep3 samples per barcode")
+
+indels.df.heatmap <- indels.df %>%
+  select(siRNA, barcode, MMEJscore) %>%
+  mutate(MMEJscore = ave(MMEJscore, siRNA, barcode, FUN = function(x) mean(x))) %>%
+  unique() %>%
+  dcast(siRNA ~ barcode, value.var = "MMEJscore") %>%
+  column_to_rownames("siRNA")
+
+myBreaks1 <- seq(0,0.4,0.004)
+
+pheatmap(as.matrix(indels.df.heatmap),
+         color = colorRampPalette(rev(brewer.pal(n = 7, name = "RdBu")))(100),
          breaks = myBreaks1, border_color = "black", 
          cellwidth = 12, cellheight = 10,annotation_col = barcode_ann,
          angle_col = 90, main = "MMEJscore of rep3 samples per barcode")
@@ -517,11 +533,10 @@ pheatmap(as.matrix(indels.df.heatmap),
 ```{r out.width= "100%", fig.align= "center", echo=FALSE, warning= FALSE}
 my_comparisons <- list(c("KDM6A", "Scr"), c("KDM6B", "Scr"), c("PolQ", "Scr"))
 
-pdf()
 # Boxplot comparing the 4 conditions
 ggplot(indels.df, aes(x = siRNA, y = MMEJscore)) +
   geom_point() + geom_boxplot() + theme_bw() +
-  labs(title = "MMEJscore distribution per sample") +
+  labs(title = "MMEJscore distribution per condition") +
   theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 1, size = 10), 
         axis.text.y = element_text(size = 10))+
   stat_compare_means(comparisons = my_comparisons)+ 
@@ -531,15 +546,30 @@ ggplot(indels.df, aes(x = siRNA, y = MMEJscore)) +
 
 ggplot(indels.df, aes(x = siRNA, y = freqCut)) +
   geom_point() + geom_boxplot() + theme_bw() +
-  labs(title = "freqCut distribution per sample") +
+  labs(title = "freqCut distribution per condition") +
   theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 1, size = 10), 
         axis.text.y = element_text(size = 10))+
   stat_compare_means(comparisons = my_comparisons)+ 
   stat_compare_means(label.y = 1)
-dev.off()
 ```
 
+# Make beeswarm indel plots per siRNA condition
+```{r out.width= "100%", fig.align= "center", echo=FALSE, warning= FALSE}
+indels_df <- indels_df[,c(1:96)]
+indels_df_long <- melt(indels_df, id.vars = c("barcode", ".id"))
+indels_df_long$variable <- gsub("X", "", indels_df_long$variable)
+indels_df_long$variable <- gsub("[.]", "-", indels_df_long$variable)
+indels_df_long <- indels_df_long[indels_df_long$variable != 'Inf.',]
+indels_df_long$variable <- as.numeric(indels_df_long$variable)
+indels_df_long <- indels_df_long[indels_df_long$variable < 5 & indels_df_long$variable > -10,]
+indels_df_long <- indels_df_long[!is.na(indels_df_long$variable),]
+indels_df_long$value <- ave(indels_df_long$value, indels_df_long$barcode, indels_df_long$.id, 
+                               FUN = function(x) x/sum(x))
 
+# Plot it in a beeswarm plot
+ggplot(indels_df_long, aes(variable, value, group = variable)) + geom_point() + geom_boxplot() + theme_bw() +
+  facet_wrap(~`.id`) + ylab("indel percentage per barcode") + xlab("sample")
+```
 
 
 

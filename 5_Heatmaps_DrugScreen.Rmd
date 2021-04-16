@@ -81,7 +81,7 @@ SetFileName <- function(filename, initials) {
 ## Data import
 ```{r Data Import, echo = FALSE, warning = FALSE}
 # Import data from 5_HitValidation_DrugScreen.Rmd
-setwd("/DATA/usr/m.trauernicht/projects/EpiScreen/data/files_scripts/")
+setwd("/DATA/usr/m.trauernicht/projects/EpiScreen/files_scripts/")
 mapping_mean <- get(load("mt20190510_mapping_mean"))
 indel.data <- get(load("mt20200501_indel.data"))
 mapping_mean_long <- get(load("mt20190510_mapping_mean_long"))
@@ -286,6 +286,7 @@ pheatmap(as.matrix(indel.data.high.drug.ess),
          color = colorRampPalette(rev(brewer.pal(n = 7, name = "RdBu")))(100),
          breaks = myBreaks2, cluster_rows = chip_dendogram$tree_col,
          annotation_colors = annotation_colors_scr, 
+         border_color = "black",
          fontsize = 14, cellwidth = 14, cellheight = 14,
          labels_row = c("Integration 15","Integration 1","Integration 5","Integration 6",
                         "Integration 10","Integration 9","Integration 13","Integration 3",
@@ -307,6 +308,7 @@ myBreaks3 <- c(seq(min(as.matrix(indel.data.med.drug.ess)), 0,
 
 pheatmap(as.matrix(indel.data.med.drug.ess), 
          annotation_col = target,
+         border_color = "black",
          annotation_row = barcode.annotation,
          color = colorRampPalette(rev(brewer.pal(n = 7, name = "RdBu")))(100),
          breaks = myBreaks3, cluster_rows = chip_dendogram$tree_col,
@@ -335,6 +337,7 @@ pheatmap(as.matrix(indel.data.low.drug.ess),
          annotation_row = barcode.annotation,
          color = colorRampPalette(rev(brewer.pal(n = 7, name = "RdBu")))(100),
          breaks = myBreaks4, cluster_rows = chip_dendogram$tree_col,
+         border_color = "black",
          annotation_colors = annotation_colors_scr, annotation_legend = F,
          fontsize = 14, cellwidth = 14, cellheight = 14,
          labels_row = c("Integration 15","Integration 1","Integration 5","Integration 6",
@@ -379,6 +382,7 @@ pheatmap(as.matrix(indel.data.high.eff.ess),
          breaks = myBreaks5, cluster_rows = chip_dendogram$tree_col,
          annotation_colors = annotation_colors_scr, annotation_legend = F,
          cellwidth = 14, cellheight = 14,
+         border_color = "black",
          labels_row = c("Integration 15","Integration 1","Integration 5","Integration 6",
                         "Integration 10","Integration 9","Integration 13","Integration 3",
                         "Integration 17","Integration 16","Integration 18", "Integration 4",
