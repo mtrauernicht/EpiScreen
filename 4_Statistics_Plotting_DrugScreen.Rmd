@@ -1,25 +1,24 @@
 ---
-title: "Plotting of the epigenetic screening results"
+title: "Plotting main results of the drug screen"
 author: "Max Trauernicht"
 date: "`r format(Sys.time(), '%Y-%m-%d')`"
-output:
-  html_document:
-    code_folding: show
-    highlight: monochrome
-    theme: journal
-    toc: yes
-    toc_float: yes
-  pdf_document:
-    toc: yes
-  editor_options:
-    chunk_output_type: console
+output: 
+  prettydoc::html_pretty:
+    theme: leonids
+    highlight: github
+  #   toc: true
+  #   toc_float: true
+  #   code_folding: show
+  # editor_options:
+  #   chunk_output_type: console
 ---
 
-# knitr document van Steensel lab
+*knitr document van Steensel lab*
 
-# TRIP Clone identification
+# Drug screen DSB repair - main results
 
 # Introduction
+Clone 5 with ~18 sgRNA target site integrations was cut and treated with 160 epigenetic drugs. The repair outcomes of that experiment will be visualized here. I previously processed the raw sequencing data, and calculated the repair outcomes. In this script, the main results plots will be generated.
 
 ## Description of Data
 How to make a good rendering table: 
@@ -52,8 +51,8 @@ library(GGally)
 library(DESeq2)
 library(gghighlight)
 library(platetools)
-library(Laurae)
 library(ggpubr)
+library(Laurae)
 ```
 
 ### Custom functions
@@ -334,49 +333,30 @@ print(p)
 
 ## Compare viability data rep 1 & rep 2
 ```{r}
-viability.comp$plate.nr <- "1"
-viability.comp[grep("10um_rep1_plate2", viability.comp$.id),]$plate.nr <- "2"
-viability.comp[grep("10um_rep2_plate1", viability.comp$.id),]$plate.nr <- "3"
-viability.comp[grep("10um_rep2_plate2", viability.comp$.id),]$plate.nr <- "4"
-viability.comp[grep("10um_rep3_plate1", viability.comp$.id),]$plate.nr <- "5"
-viability.comp[grep("10um_rep3_plate2", viability.comp$.id),]$plate.nr <- "6"
-viability.comp[grep("1um_rep1_plate1", viability.comp$.id),]$plate.nr <- "7"
-viability.comp[grep("1um_rep1_plate2", viability.comp$.id),]$plate.nr <- "8"
-viability.comp[grep("1um_rep2_plate1", viability.comp$.id),]$plate.nr <- "9"
-viability.comp[grep("1um_rep2_plate2", viability.comp$.id),]$plate.nr <- "10"
-viability.comp[grep("1um_rep3_plate1", viability.comp$.id),]$plate.nr <- "11"
-viability.comp[grep("1um_rep3_plate2", viability.comp$.id),]$plate.nr <- "12"
-viability.comp[grep("100nm_rep1_plate1", viability.comp$.id),]$plate.nr <- "13"
-viability.comp[grep("100nm_rep1_plate2", viability.comp$.id),]$plate.nr <- "14"
-viability.comp[grep("100nm_rep2_plate1", viability.comp$.id),]$plate.nr <- "15"
-viability.comp[grep("100nm_rep2_plate2", viability.comp$.id),]$plate.nr <- "16"
-viability.comp[grep("100nm_rep3_plate1", viability.comp$.id),]$plate.nr <- "17"
-viability.comp[grep("100nm_rep3_plate2", viability.comp$.id),]$plate.nr <- "18"
-
-viability.comp <- viability.comp %>% 
-  mutate(viability = ave(viability, plate.nr, FUN = function(x) x/max(x)),
-         X = ave(X, plate.nr, FUN = function(x) x/max(x)))
-
-mirin <- c("_C1_", "_G1_", "_C12_", "_G12_")
-
-viability.comp.drugs <- viability.comp[-grep(paste(mirin, collapse = "|"), viability.comp$.id),]
+# Add viability data to indel.data
+viability.comp2 <- merge(viability.comp, indel.data) %>% 
+  setnames(old = c("V2", "X"), new = c("rn", "viability_rep2")) %>% 
+  mutate(plate.id = gsub("(.*plate[1,2]).*", "\\1", .id),
+         viability = ave(viability, plate.id, FUN = function(x) x/max(x)),
+         viability_rep2 = ave(viability_rep2, plate.id, FUN = function(x) x/max(x)))
 
 
-pao <- c("_A1_", "_E1_", "_A12_", "_E12_")
+viability.comp2$group <- "drug"
+viability.comp2$group[viability.comp2$Drug == "DMSO"] <- "DMSO"
+viability.comp2$group[viability.comp2$Drug == "PAO"] <- "PAO"
 
-viability.comp.drugs <- viability.comp[-grep(paste(pao, collapse = "|"), viability.comp$.id),]
+viability.comp2$conc <- factor(viability.comp2$conc, levels = c("100nm", "1um", "10um"))
 
-sp <- ggscatter(viability.comp.drugs, x = "viability", y = "X",
-                color = ifelse(viability.comp.drugs$X > 0.5 & 
-                                 viability.comp.drugs$viability > 0.5, "black", "red"),
-   add = "reg.line",
+sp <- ggscatter(viability.comp2, x = "viability", y = "viability_rep2",
+                color = "group", size = 1.5, add = "reg.line",
    add.params = list(color = "blue", fill = "lightgray"), title = "viability episcreen rep 1 vs. rep 2",
    conf.int = TRUE, ylab = "rep 2", xlab = "rep 1")
-sp + stat_cor(method = "pearson", label.x = 0.25, label.y = 1) + geom_abline(linetype = "dashed") 
 
-
-# Plot next to each other to visualize cutoff
-
+sp + stat_cor(method = "pearson", label.x = 0, label.y = 0.15) + 
+  geom_segment(x = 0.5, xend = 0.5, y = 0.5, yend = 1, linetype = "dashed") +
+  geom_segment(x = 0.5, xend = 1, y = 0.5, yend = 0.5, linetype = "dashed") +
+  facet_wrap(~conc) +theme_bw() +
+  scale_color_manual(values = c("#2a9d8f", "black", "#e76f51"))
 ```
 
 
@@ -384,7 +364,6 @@ sp + stat_cor(method = "pearson", label.x = 0.25, label.y = 1) + geom_abline(lin
 
 ## Data pre-processing - clean up dataframe and add important specifiers
 ```{r pre-processing, echo = FALSE, warning = FALSE}
-# Add viability data to indel.data
 indel.data <- merge(viability.data, indel.data) %>% 
   setnames(old = "V2", new = "rn")
 
@@ -394,8 +373,19 @@ indel.data <- merge(mean.ratio.data, indel.data, all = T) %>%
 all.indel.data <- indel.data
 
 # Remove barcodes with abnormal counts from analysis
+# Density plot of reads.count using only PAO data -> these are the input reads
+all.indel.data <- all.indel.data[!is.na(all.indel.data$barcode),]
+ggplot(data = all.indel.data[all.indel.data$Drug == c("PAO","DMSO"),], aes(x = read.count, fill = Drug, group = Drug)) + 
+  geom_density() + 
+  facet_wrap(~barcode, nrow = 6)+ 
+  labs(title = "read count before cutting (PAO) and after cutting (DMSO)") + 
+  theme_bw()
+
+
+
 indel.data <- indel.data[indel.data$barcode != "ACCCCTAAAGGCGCTG" &
-                           indel.data$barcode != "CTCTTAATCGCTGCC",]
+                           indel.data$barcode != "CTCTTAATCGCTGCC" &
+                           indel.data$barcode != "TGTCCCTTAGTACTTT",]
 
 
 # Set a threshold on minimun +1 and -7 read counts to exclude noisy data
@@ -409,31 +399,14 @@ indel.data <- indel.data[indel.data$read.count1.7 > 30,]
 indel.data <- indel.data[is.finite(indel.data$ratio),]
 indel.data <- indel.data[indel.data$ratio != 0,]
 
-# Add plate specifier
-indel.data$plate.nr <- "1"
-indel.data[grep("10um_rep1_plate2", indel.data$condition),]$plate.nr <- "2"
-indel.data[grep("10um_rep2_plate1", indel.data$condition),]$plate.nr <- "3"
-indel.data[grep("10um_rep2_plate2", indel.data$condition),]$plate.nr <- "4"
-indel.data[grep("10um_rep3_plate1", indel.data$condition),]$plate.nr <- "5"
-indel.data[grep("10um_rep3_plate2", indel.data$condition),]$plate.nr <- "6"
-indel.data[grep("1um_rep1_plate1", indel.data$condition),]$plate.nr <- "7"
-indel.data[grep("1um_rep1_plate2", indel.data$condition),]$plate.nr <- "8"
-indel.data[grep("1um_rep2_plate1", indel.data$condition),]$plate.nr <- "9"
-indel.data[grep("1um_rep2_plate2", indel.data$condition),]$plate.nr <- "10"
-indel.data[grep("1um_rep3_plate1", indel.data$condition),]$plate.nr <- "11"
-indel.data[grep("1um_rep3_plate2", indel.data$condition),]$plate.nr <- "12"
-indel.data[grep("100nm_rep1_plate1", indel.data$condition),]$plate.nr <- "13"
-indel.data[grep("100nm_rep1_plate2", indel.data$condition),]$plate.nr <- "14"
-indel.data[grep("100nm_rep2_plate1", indel.data$condition),]$plate.nr <- "15"
-indel.data[grep("100nm_rep2_plate2", indel.data$condition),]$plate.nr <- "16"
-indel.data[grep("100nm_rep3_plate1", indel.data$condition),]$plate.nr <- "17"
-indel.data[grep("100nm_rep3_plate2", indel.data$condition),]$plate.nr <- "18"
+# Add plate id
+indel.data$plate.id <- gsub("(.*plate[1,2]).*", "\\1", indel.data$condition)
 
 ## Compute some useful entities for data analysis
 
 indel.data <- indel.data %>% 
   mutate(logratio = ave(ratio, FUN = function(x) log2(x)), # log2(+1/-7)ratio
-         viability = ave(viability, plate.nr, FUN = function(x) x/max(x)), # relative viability
+         viability = ave(viability, plate.id, FUN = function(x) x/max(x)), # relative viability
          classifier = gsub("_rep[0-9]", "\\1", indel.data$condition), # classifier for df operations
          uniqueID = paste(indel.data$barcode, indel.data$classifier, sep = "_")) # unique well ID
 
@@ -441,7 +414,7 @@ indel.data <- indel.data %>%
 indel.data <- indel.data[indel.data$viability > 0.45,]
 
 
-# Optional: Exclude data completely (remove the remaining datapoint) if 2 out of 3 replicates were already excluded untill now
+# Optional: Exclude data completely (remove the remaining datapoint) if 2 out of 3 replicates were already excluded until now
 ## indel.data <- indel.data[indel.data$uniqueID %in% names(which(table(indel.data$uniqueID) > 1)), ]
 ```
 
@@ -453,37 +426,37 @@ indel.data <- indel.data[indel.data$viability > 0.45,]
 ```{r plate_normalization, echo = FALSE, warning = FALSE}
 ## Normalize the data
 # Plate normalization: substract log2(DMSO.mean)ratio from log2(drug)ratio per plate
-for (i in 1:18) {
+for (i in unique(indel.data$plate.id)) {
   for (j in unique(indel.data$barcode)) {
   dmso.mean <- mean(indel.data$logratio[indel.data$Drug == 
-                        "DMSO" & indel.data$plate.nr == 
+                        "DMSO" & indel.data$plate.id == 
                         i & indel.data$barcode == j])
-  indel.data$logratio.platenorm[indel.data$plate.nr == i & indel.data$barcode == j] <- 
-    indel.data$logratio[indel.data$plate.nr == i & indel.data$barcode == j] -
+  indel.data$logratio.platenorm[indel.data$plate.id == i & indel.data$barcode == j] <- 
+    indel.data$logratio[indel.data$plate.id == i & indel.data$barcode == j] -
     dmso.mean
   }
 }
 
 # Plate normalization for efficiency
-for (i in 1:18) {
+for (i in unique(indel.data$plate.id)) {
   for (j in unique(indel.data$barcode)) {
   dmso.eff.mean <- mean(indel.data$efficiency[indel.data$Drug == 
-                        "DMSO" & indel.data$plate.nr == 
+                        "DMSO" & indel.data$plate.id == 
                         i & indel.data$barcode == j])
-  indel.data$efficiency.platenorm[indel.data$plate.nr == i & indel.data$barcode == j] <-
-    indel.data$efficiency[indel.data$plate.nr == i & indel.data$barcode == j] -
+  indel.data$efficiency.platenorm[indel.data$plate.id == i & indel.data$barcode == j] <-
+    indel.data$efficiency[indel.data$plate.id == i & indel.data$barcode == j] -
     dmso.eff.mean
   }
 }
 
 # Plate normalization for MMEJ score
-for (i in 1:18) {
+for (i in unique(indel.data$plate.id)) {
   for (j in unique(indel.data$barcode)) {
   dmso.MMEJ_score <- mean(indel.data$MMEJ_score[indel.data$Drug == 
-                        "DMSO" & indel.data$plate.nr == 
+                        "DMSO" & indel.data$plate.id == 
                         i & indel.data$barcode == j])
-  indel.data$MMEJ_score_norm[indel.data$plate.nr == i & indel.data$barcode == j] <-
-    indel.data$MMEJ_score[indel.data$plate.nr == i & indel.data$barcode == j] /
+  indel.data$MMEJ_score_norm[indel.data$plate.id == i & indel.data$barcode == j] <-
+    indel.data$MMEJ_score[indel.data$plate.id == i & indel.data$barcode == j] /
     dmso.MMEJ_score
   }
 }
@@ -746,11 +719,7 @@ indel.data$efficiency.mean <-
 ## Visualization: checking quality of data
 ```{r Quality check data, out.width= "80%", fig.align= "center", echo = FALSE, warning = FALSE}
 ## save favorite colors
-colors_diverse <- c("#006D77", "#83C5BE", "#EDF6F9", "#FFDDD2", "#E29578")
-colors_diverse_2 <- c("#CB997E", "#DDBEA9", "#FFE8D6", "#B7B7A4", "#A5A58D", "#6B705C")
-colors_continous <- c("#CAD2C5", "#84A98C", "#52796F", "#354F52", "#2F3E46")
-colors_continous_2 <- c("#F8F9FA", "#E9ECEF", "#DEE2E6", "#CED4DA", "#ADB5BD", "#6C757D", "#495057", "#343A40", "#212529")
-
+colors_diverse <- c("#264653", "#2a9d8f", "#e9c46a", "#f4a261", "#e76f51") 
 
 
 ## Make some density plots to get a feeling for the data
@@ -857,9 +826,9 @@ ggplot(NULL,aes(x = reorder(Target,Target,function(x)-length(x)))) +
 
 
 indel.data2 <- indel.data
-indel.data2$zscore_change <- "<0.5"
-indel.data2$zscore_change[abs(indel.data2$MMEJ_zscore)>0.5] <- "0.5-1"
-indel.data2$zscore_change[abs(indel.data2$MMEJ_zscore)>1] <- ">1"
+indel.data2$zscore_change <- "<2"
+indel.data2$zscore_change[abs(indel.data2$MMEJ_zscore)>2] <- "2-3"
+indel.data2$zscore_change[abs(indel.data2$MMEJ_zscore)>3] <- ">3"
 indel.data2$conc <- factor(indel.data2$conc, levels = c("100nm", "1um", "10um"))
 
 
@@ -869,21 +838,13 @@ p <- ggplot(indel.data2, aes(x = reorder(Target,Target,function(x)-length(x)),
                        fill = zscore_change)) + 
       geom_bar(stat="identity") +
     labs(fill = "z-score")+
-  scale_fill_manual(values = colors_diverse[seq(2, length(colors_diverse), 2)])+
+  scale_fill_manual(values = colors_diverse[seq(1, length(colors_diverse), 2)])+
   coord_flip()+ theme_bw() +
   ylab("Amount of Drugs per Category") + theme(axis.title.y = element_blank())+
   theme(text = element_text(size = 14), axis.text.y = element_text(size = 12))+
   facet_wrap(~conc, nrow=1, ncol=3)
 print(p)
 }
-
-
-
-# Density plot of reads.count using only PAO data -> these are the input reads
-all.indel.data <- na.omit(all.indel.data)
-ggplot(data = all.indel.data[all.indel.data$Drug == c("PAO","DMSO"),], aes(x = read.count, fill = Drug, group = Drug)) + geom_density() + facet_wrap(~barcode, nrow = 6)+ labs(title = "read count before cutting (PAO) and after cutting (DMSO)") + theme_classic2()
-
-
 ```
 
 
@@ -923,7 +884,8 @@ indel.data2 <- indel.data %>% select(Drug, conc, mean.viability.drug, mean.effic
 indel.data2$conc <- factor(indel.data2$conc, levels = c("100nm", "1um", "10um"))
 
 ggplot(indel.data2, aes(x = mean.viability.drug, y = mean.efficiency_zscore.drug)) +
-  geom_point() +
+  geom_point(color = ifelse(indel.data2$mean.efficiency_zscore.drug > 2 | 
+                                         indel.data2$mean.efficiency_zscore.drug < -2, "black", "grey")) +
   xlab("Viability") + ylab("Cutting Efficiency Change") +
   #gghighlight(abs(mean.efficiency_zscore.drug) > 0.1, label_key = Drug) + 
   theme_bw() +
@@ -932,12 +894,15 @@ ggplot(indel.data2, aes(x = mean.viability.drug, y = mean.efficiency_zscore.drug
 
 
 # Correlation plot mean viability vs. mean ratio
-indel.data2 <- indel.data %>% select(Drug, conc, mean.MMEJ_zscore.drug, mean.viability.drug) %>% unique()
+indel.data2 <- indel.data %>% 
+  select(Drug, conc, mean.MMEJ_zscore.drug, mean.viability.drug) %>% 
+  filter(Drug != "DNA-PKi") %>% 
+  unique()
 indel.data2$conc <- factor(indel.data2$conc, levels = c("100nm", "1um", "10um"))
 
-ggplot(indel.data2 %>%
-         filter(Drug != "DNA-PKi"), aes(x = mean.MMEJ_zscore.drug, y = mean.viability.drug)) +
-  geom_point() +
+ggplot(indel.data2, aes(x = mean.MMEJ_zscore.drug, y = mean.viability.drug)) +
+  geom_point(color = ifelse(indel.data2$mean.MMEJ_zscore.drug > 2 | 
+                                         indel.data2$mean.MMEJ_zscore.drug < -2, "black", "grey")) +
   xlab("MMEJ z-score") + ylab("Viability") +
   #gghighlight(abs(mean.MMEJ_zscore.drug) > 1.5, label_key = Drug) + 
   theme_bw() +
@@ -975,16 +940,17 @@ ggplot(data = indel.data[indel.data$Target == "Negative Control",], aes(x=log2(m
   labs(title = "correlation logratio per integration of previous data with these data")
 
 # Correlation plots of the replicates
-indel.data.DNAPK <- indel.data[-grep("DNA-PK", indel.data$Drug),]
-indel.data.rep1 <- indel.data.DNAPK[grep("rep1", indel.data.DNAPK$condition),]
-indel.data.rep1 <- indel.data.rep1 %>% select(barcode, Number, conc, MMEJ_zscore)
-indel.data.rep2 <- indel.data.DNAPK[grep("rep2", indel.data.DNAPK$condition),]
-indel.data.rep2 <- indel.data.rep2 %>% select(barcode, Number, conc, MMEJ_zscore)
-indel.data.rep3 <- indel.data.DNAPK[grep("rep3", indel.data.DNAPK$condition),]
-indel.data.rep3 <- indel.data.rep3 %>% select(barcode, Number, conc, MMEJ_zscore)
-setnames(indel.data.rep1, old = "MMEJ_zscore", new = "rep1")
-setnames(indel.data.rep2, old = "MMEJ_zscore", new = "rep2")
-setnames(indel.data.rep3, old = "MMEJ_zscore", new = "rep3")
+indel.data2 <- indel.data[-grep("DNA-PK|DMSO", indel.data$Drug),]
+indel.data.rep1 <- indel.data2 %>%
+  filter(rep == 1) %>%
+  select(barcode, Drug, conc, 'rep1' = MMEJ_score)
+indel.data.rep2 <- indel.data2 %>%
+  filter(rep == 2) %>%
+  select(barcode, Drug, conc, 'rep2' = MMEJ_score)
+indel.data.rep3 <- indel.data2 %>%
+  filter(rep == 3) %>%
+  select(barcode, Drug, conc, 'rep3' = MMEJ_score)
+
 indel.data.rep <- merge(indel.data.rep1, indel.data.rep2, all = T)
 indel.data.rep <- merge(indel.data.rep, indel.data.rep3, all = T)
 
@@ -1070,35 +1036,37 @@ ggplot(data = indel.data) +
 
 
 # Boxplot of logratio 
-indel.data2 <- indel.data
-indel.data2$cluster <- "Active Promoter/Enhancer" 
-indel.data2$cluster[indel.data2$order == "3" | 
-                      indel.data2$order == "4"] <- "H3K9me2/3 Domain"
-indel.data2$cluster[indel.data2$order == "5" | 
-                      indel.data2$order == "6" |
-                      indel.data2$order == "7" | 
-                      indel.data2$order == "8"] <- "Active Gene Body"
-indel.data2$cluster[indel.data2$order == "9" | 
-                      indel.data2$order == "10" |
-                      indel.data2$order == "11" | 
-                      indel.data2$order == "12"] <- "LAD"
-indel.data2$cluster[indel.data2$order == "13" | 
-                      indel.data2$order == "14"] <- "No Chromatin Marks"
-indel.data2$cluster[indel.data2$order == "15" | 
-                      indel.data2$order == "16" |
-                      indel.data2$order == "17" | 
-                      indel.data2$order == "18"] <- "H3K27me3 Domain"
+indel.data$cluster <- "Active Promoter/Enhancer" 
+indel.data$cluster[indel.data$order == "3" | 
+                      indel.data$order == "4"] <- "H3K9me2/3 Domain"
+indel.data$cluster[indel.data$order == "5" | 
+                      indel.data$order == "6" |
+                      indel.data$order == "7" | 
+                      indel.data$order == "8"] <- "Active Gene Body"
+indel.data$cluster[indel.data$order == "9" | 
+                      indel.data$order == "10" |
+                      indel.data$order == "11" | 
+                      indel.data$order == "12"] <- "LAD"
+indel.data$cluster[indel.data$order == "13" | 
+                      indel.data$order == "14"] <- "No Chromatin Marks"
+indel.data$cluster[indel.data$order == "15" | 
+                      indel.data$order == "16" |
+                      indel.data$order == "17" | 
+                      indel.data$order == "18"] <- "H3K27me3 Domain"
 
-ggplot(data = indel.data2[indel.data2$Drug == "DMSO",],
-       aes(x = reorder(integration, order), 
-                             y = MMEJ_score)) +
-  geom_quasirandom() +
-  geom_boxplot(alpha = 0.4) +
+ggplot(data = indel.data[indel.data$Drug != "DMSO",],
+       aes(x = reorder(integration, order),
+           y = efficiency_zscore)) +
+  geom_quasirandom(color = ifelse(indel.data[indel.data$Drug != "DMSO",]$efficiency_zscore > 2 | 
+                                    indel.data[indel.data$Drug != "DMSO",]$efficiency_zscore < -2, 
+                                  "#343a40", "#6c757d")) +
   ylab("MMEJ score")+
   scale_fill_brewer(palette = "Pastel2")+
+  xlab("") +
   theme_bw()+
   theme(axis.text.x = element_text(angle = 90, hjust = 1.0, vjust = 0))+
-  theme(axis.title.x = element_blank())
+  theme(axis.title.x = element_blank()) +
+  coord_flip()
 
 # Are the logratios of the different barcode clusters different?
 indel.data2$int <- "1"
@@ -1243,6 +1211,50 @@ ggplot() +
 anova <- aov(MMEJ_zscore ~ integration, data = hdac.dmso)
 summary.aov(anova)
 tukey <- TukeyHSD(anova)
+
+# Make plots for all HDACs at the three concentrations
+indel.data$conc <- factor(indel.data$conc, levels = c("100nm", "1um", "10um"))
+ggplot(indel.data %>%
+         filter(Target == "HDAC" | Drug == "DMSO"),
+       aes(x = reorder(integration, order), y = efficiency_zscore, color = Target)) +
+  geom_quasirandom(dodge.width = 0.75) +
+  geom_boxplot(position = position_dodge(0.75), alpha = 0.4) +
+  theme_bw() +
+  xlab("") +
+  scale_color_manual(values = colors_diverse) +
+  facet_wrap(~conc) +
+  coord_flip()
+
+# only at the specific domains
+indel.data$cluster2 <- "open" 
+indel.data$cluster2[indel.data$order == "9" | 
+                      indel.data$order == "10" |
+                      indel.data$order == "11" | 
+                      indel.data$order == "12" |
+                     indel.data$order == "13" | 
+                      indel.data$order == "14" |
+                     indel.data$order == "15" | 
+                      indel.data$order == "16" |
+                      indel.data$order == "17" | 
+                      indel.data$order == "18"] <- "condensed"
+
+# Include detailed HDAC annotation
+hdac_annotation <- read.csv2("/DATA/usr/m.trauernicht/projects/EpiScreen/files_scripts/HDAC_categories.csv") %>%
+  select(Drug, Categorie)
+indel.data.hdac <- indel.data %>%
+  filter(Target == "HDAC" | Drug == "DMSO")
+indel.data.hdac <- merge(indel.data.hdac, hdac_annotation, all = T)
+
+ggplot(indel.data.hdac[!is.na(indel.data.hdac$conc),] %>%
+         filter(Categorie %in% c("HDAC1", "HDAC3", "DMSO")),
+       aes(x = Categorie, y = efficiency_zscore, color = cluster2)) +
+  geom_quasirandom(dodge.width = 0.75) +
+  geom_boxplot(position = position_dodge(0.75), alpha = 0.4) +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1.0, vjust = 0.5)) + 
+  xlab("") +
+  scale_color_manual(values = colors_diverse) +
+  facet_wrap(~conc)
 ```
 
 ## Conclusion
