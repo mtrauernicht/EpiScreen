@@ -357,6 +357,26 @@ sp + stat_cor(method = "pearson", label.x = 0, label.y = 0.15) +
   geom_segment(x = 0.5, xend = 1, y = 0.5, yend = 0.5, linetype = "dashed") +
   facet_wrap(~conc) +theme_bw() +
   scale_color_manual(values = c("#2a9d8f", "black", "#e76f51"))
+
+# Explore differences between rep 1 & rep 2
+viability.comp.rep <- merge(viability.comp, indel.data) %>% 
+  setnames(old = "X", new = "viability_rep2") %>% 
+  mutate(viability = ave(viability, FUN = function(x) x/max(x)),
+         viability_rep2 = ave(viability_rep2, FUN = function(x) x/max(x)),
+         dif = viability / viability_rep2) %>%
+  select(dif, Drug, Target, conc, viability, viability_rep2) %>%
+  unique()
+
+viability.comp.rep$changed <- "no"
+viability.comp.rep$changed[viability.comp.rep$dif >= 2] <- "yes"
+viability.comp.rep$conc <- factor(viability.comp.rep$conc, levels = c("100nm", "1um", "10um"))
+
+ggplot(viability.comp.rep, aes(x = Target, y = log2(dif))) +
+  geom_quasirandom() +
+  theme_bw() +
+  ylab("log2(rep 1 viability / rep 2 viabilty)") +
+  facet_wrap(~conc) +
+  coord_flip()
 ```
 
 
@@ -474,9 +494,9 @@ qqnorm(indel.data$efficiency[indel.data$Drug == "DMSO"])
 for (i in unique(indel.data$Drug)) {
   for (j in unique(indel.data$conc)) {
     indel.data$MMEJ_zscore[indel.data$Drug == i & indel.data$conc == j] <-
-      (indel.data$MMEJ_score_norm[indel.data$Drug == i & indel.data$conc == j] -
-      mean(indel.data$MMEJ_score_norm[indel.data$Drug == "DMSO" & indel.data$conc == j])) / 
-      sd(indel.data$MMEJ_score_norm[indel.data$Drug == "DMSO" & indel.data$conc == j])
+      (indel.data$MMEJ_score[indel.data$Drug == i & indel.data$conc == j] -
+      mean(indel.data$MMEJ_score[indel.data$Drug == "DMSO" & indel.data$conc == j])) / 
+      sd(indel.data$MMEJ_score[indel.data$Drug == "DMSO" & indel.data$conc == j])
   }
 } 
 
@@ -484,9 +504,9 @@ for (i in unique(indel.data$Drug)) {
 for (i in unique(indel.data$Drug)) {
   for (j in unique(indel.data$conc)) {
     indel.data$efficiency_zscore[indel.data$Drug == i & indel.data$conc == j] <-
-      (indel.data$efficiency.platenorm[indel.data$Drug == i & indel.data$conc == j] -
-      mean(indel.data$efficiency.platenorm[indel.data$Drug == "DMSO" & indel.data$conc == j])) / 
-      sd(indel.data$efficiency.platenorm[indel.data$Drug == "DMSO" & indel.data$conc == j])
+      (indel.data$efficiency[indel.data$Drug == i & indel.data$conc == j] -
+      mean(indel.data$efficiency[indel.data$Drug == "DMSO" & indel.data$conc == j])) / 
+      sd(indel.data$efficiency[indel.data$Drug == "DMSO" & indel.data$conc == j])
   }
 } 
 
@@ -728,7 +748,7 @@ indel.data <- merge(indel.data, integrations)
 # Density plot logratio of the controls
 ggplot(data = indel.data[indel.data$Drug == c("DMSO","DNA-PKi","Mirin"),], 
        aes(x = MMEJ_zscore, fill = Target)) + theme_classic() +
-  geom_density() + xlab("logratio") + labs(title = "logratio density of the controls")
+  geom_density() + xlab("MMEJ z-score") 
 
 # Beeswarm plot of MMEJ score of the controls at all IPRs
 ggplot(data = indel.data[indel.data$Drug == "DMSO",], 
@@ -737,6 +757,36 @@ ggplot(data = indel.data[indel.data$Drug == "DMSO",],
   geom_quasirandom(dodge.width = 0.75) +
   geom_boxplot(position = position_dodge(0.75), alpha = 0.7)+ xlab("integration") + 
   labs(title = "MMEJ score of DMSO-treated cells")
+
+# Beeswarm plot of MMEJ score of all drugs, highlighting controls
+indel.data$group <- "drug"
+indel.data$group[indel.data$Drug == "DMSO"] <- "DMSO"
+indel.data$conc <- factor(indel.data$conc, levels = c("100nm", "1um", "10um"))
+
+ggplot(data = indel.data %>%
+         filter(Drug != "DNA-PKi") %>%
+         mutate(MMEJ_score_drug = ave(MMEJ_score, condition, FUN = function(x) mean(x))) %>%
+         select(MMEJ_score_drug, group, condition, conc) %>%
+         unique(), 
+       aes(y = MMEJ_score_drug, x = 'x', color = group)) + theme_bw() +
+  geom_quasirandom(dodge.width = 0.75) +
+  geom_boxplot(position = position_dodge(0.75), alpha = 0.4) +
+  xlab("") + ylab("MMEJ score") +
+  scale_color_manual(values = c("#2a9d8f", "black")) +
+  facet_wrap(~conc)
+
+ggplot(data = indel.data %>%
+         filter(Drug != "DNA-PKi") %>%
+         mutate(efficiency_drug = ave(efficiency, condition, FUN = function(x) mean(x))) %>%
+         select(efficiency_drug, group, condition, conc) %>%
+         unique(), 
+       aes(y = efficiency_drug, x = 'x', color = group)) + theme_bw() +
+  geom_quasirandom(dodge.width = 0.75) +
+  geom_boxplot(position = position_dodge(0.75), alpha = 0.4) +
+  xlab("") + ylab("Cutting Efficiency") +
+  scale_color_manual(values = c("#2a9d8f", "black")) +
+  facet_wrap(~conc)
+
 
 # Density plot logratio 
 ggplot(data = indel.data, aes(x = MMEJ_zscore, fill = Target)) + 
@@ -943,13 +993,13 @@ ggplot(data = indel.data[indel.data$Target == "Negative Control",], aes(x=log2(m
 indel.data2 <- indel.data[-grep("DNA-PK|DMSO", indel.data$Drug),]
 indel.data.rep1 <- indel.data2 %>%
   filter(rep == 1) %>%
-  select(barcode, Drug, conc, 'rep1' = MMEJ_score)
+  select(barcode, Drug, conc, 'rep1' = MMEJ_zscore)
 indel.data.rep2 <- indel.data2 %>%
   filter(rep == 2) %>%
-  select(barcode, Drug, conc, 'rep2' = MMEJ_score)
+  select(barcode, Drug, conc, 'rep2' = MMEJ_zscore)
 indel.data.rep3 <- indel.data2 %>%
   filter(rep == 3) %>%
-  select(barcode, Drug, conc, 'rep3' = MMEJ_score)
+  select(barcode, Drug, conc, 'rep3' = MMEJ_zscore)
 
 indel.data.rep <- merge(indel.data.rep1, indel.data.rep2, all = T)
 indel.data.rep <- merge(indel.data.rep, indel.data.rep3, all = T)
@@ -977,6 +1027,87 @@ plt <- ggpairs(correlation.plot.rep,
 print(plt)
 
 ```
+
+
+\newpage
+## Visualizaton: Identifying local vs. global acting drugs
+```{r visualization_global-vs-local, out.width= "80%", fig.align= "center", echo = FALSE, warning = FALSE}
+# Plotting the MMEJ z-score against the SD in the MMEJ z-score between the 18 IPRs
+ggplot(indel.data %>%
+         filter(Drug != "DNA-PKi", Target != "Negative Control", Target != "MRN") %>%
+         mutate(mean_MMEJ_score_int = ave(MMEJ_score_norm, Drug, 
+                                           conc, integration, FUN = function(x) mean(x))) %>%
+         select(mean_MMEJ_score_int, Drug, integration, conc) %>%
+         unique() %>%
+         mutate(mean_MMEJ_score = ave(mean_MMEJ_score_int, Drug, conc, FUN = function(x) mean(x)),
+                sd_MMEJ_score = ave(mean_MMEJ_score_int, Drug, conc, FUN = function(x) sd(x))) %>%
+         select(mean_MMEJ_score, sd_MMEJ_score, Drug, conc) %>%
+         unique(),
+       aes(x = mean_MMEJ_score, y = sd_MMEJ_score)) +
+  geom_point() +
+  theme_bw() +
+  facet_wrap(~conc)
+
+ggplot(indel.data %>%
+         filter(Drug != "DNA-PKi", Target != "Negative Control", Target != "MRN") %>%
+         mutate(mean_MMEJ_zscore_int = ave(MMEJ_score_norm, Drug, 
+                                           conc, integration, FUN = function(x) mean(x))) %>%
+         select(mean_MMEJ_zscore_int, Drug, Target, integration, conc) %>%
+         unique() %>%
+         mutate(mean_MMEJ_zscore = ave(mean_MMEJ_zscore_int, Drug, conc, FUN = function(x) mean(x)),
+                sd_MMEJ_zscore = ave(mean_MMEJ_zscore_int, Drug, conc, FUN = function(x) sd(x)),
+                sd_percentage = 100* (sd_MMEJ_zscore / mean_MMEJ_zscore)) %>%
+         select(sd_percentage, Drug, conc, Target) %>%
+         unique(),
+       aes(x = Target, y = sd_percentage)) +
+  geom_quasirandom() +
+  geom_hline(yintercept = 15, linetype = "dashed") +
+  ylab("MMEJ score: SD of 18 IPRs relative to mean (%)") +
+  theme_bw() +
+  facet_wrap(~conc) +
+  coord_flip()
+
+ggplot(indel.data %>%
+         filter(Drug != "DNA-PKi", Target != "Negative Control", Target != "MRN") %>%
+         mutate(mean_MMEJ_score_int = ave(MMEJ_score_norm, Drug, 
+                                           conc, integration, FUN = function(x) mean(x))) %>%
+         select(mean_MMEJ_score_int, Drug, Target, integration, conc) %>%
+         unique() %>%
+         mutate(mean_MMEJ_score = ave(mean_MMEJ_score_int, Drug, conc, FUN = function(x) mean(x)),
+                sd_MMEJ_score = ave(mean_MMEJ_score_int, Drug, conc, FUN = function(x) sd(x))) %>%
+         select(sd_MMEJ_score, Drug, conc, Target) %>%
+         unique(),
+       aes(x = Target, y = sd_MMEJ_score)) +
+  geom_quasirandom() +
+  ylab("MMEJ score: SD of 18 IPRs ") +
+  geom_hline(yintercept = 0.125, linetype = "dashed") +
+  theme_bw() +
+  facet_wrap(~conc) +
+  coord_flip()
+
+ggplot(indel.data %>%
+         filter(Drug != "DNA-PKi", Target != "Negative Control", Target != "MRN") %>%
+         mutate(mean_efficiency_score_int = ave(efficiency.platenorm, Drug, 
+                                           conc, integration, FUN = function(x) mean(x))) %>%
+         select(mean_efficiency_score_int, Drug, Target, integration, conc) %>%
+         unique() %>%
+         mutate(mean_efficiency_score = ave(mean_efficiency_score_int, Drug, conc, FUN = function(x) mean(x)),
+                sd_efficiency_score = ave(mean_efficiency_score_int, Drug, conc, FUN = function(x) sd(x))) %>%
+         select(sd_efficiency_score, Drug, conc, Target) %>%
+         unique(),
+       aes(x = Target, y = sd_efficiency_score)) +
+  geom_quasirandom() +
+  ylab("efficiency: SD of 18 IPRs ") +
+  geom_hline(yintercept = 0.03, linetype = "dashed") +
+  theme_bw() +
+  facet_wrap(~conc) +
+  coord_flip()
+
+
+
+```
+
+
 
 
 \newpage
