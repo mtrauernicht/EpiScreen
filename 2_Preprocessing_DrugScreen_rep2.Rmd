@@ -79,12 +79,12 @@ SetFileName <- function(filename, initials) {
 }
 
 CallTrueBarcodes <- function(df) {
-  df <- df[df$V2 %in% barcodes.list,]
+  df <- df[df$barcode %in% barcodes.list,]
   df
 }
 
 RemoveLowReads <- function(reads) {
-  if (sum(reads$V1) < 2000) {
+  if (sum(reads$count) < 2000) {
     reads <- NULL
   } else {
     reads 
@@ -93,8 +93,8 @@ RemoveLowReads <- function(reads) {
 
 Read_Counts <- function(x) {
   #This function sums all the reads per barcode
-  tmp <- x %>% group_by(V2) %>% summarise(sum = sum(V1))
-  tmp$V2 <- as.character(tmp$V2)
+  tmp <- x %>% group_by(barcode) %>% summarise(sum = sum(count))
+  tmp$barcode <- as.character(tmp$barcode)
   colnames(tmp) <- c("barcode", "sum")
   tmp
 }
@@ -102,7 +102,7 @@ Read_Counts <- function(x) {
 
 MutationsToDataframe <- function(mutations) {
   # This function does
-  tmp <- dcast(mutations, formula = V2 ~ V4, value.var = "V1", fun = sum)
+  tmp <- dcast(mutations, formula = barcode ~ indel, value.var = "count", fun = sum)
   tmp
 }
 
@@ -115,7 +115,7 @@ RownamesList <- function(list) {
 
 IndelsOnly <- function(x) {
   #This function removes the "not_clear and "point_mut" from the indels.
-  tmp <- x[!x$V3 %in% c("not_clear", "wt_point_mut"), ]
+  tmp <- x[!x$call %in% c("not_clear", "wt_point_mut"), ]
   tmp
 }
 
@@ -270,7 +270,7 @@ CalculateDeletions <- function(deletions) {
 Data import from mapping, files were generated on 21.01.2019.
 ```{r import}
 # Set directory to the mutation output folder of the CRISPR-TRIP snakemake script
-setwd("/DATA/projects/DSBrepair/data/5280_DrugScreen/processed_190305/indelPCR_counts/")
+setwd("/DATA/usr/m.trauernicht/projects/EpiScreen/data/gcf6421/processed_20210429/indelPCR_counts/")
 
 # Import files in list and make individual tables
 file.list <- list.files(pattern='*[.]count.table')
@@ -364,21 +364,20 @@ RSTP2_2000_indels.df <- RSTP2_2000_indels.df %>%
          well = gsub(".*plate.*_(.*?)","\\1", .id))
 
 
-
 # Import the drugs and match with the df
 RSTP2_2000_indels.df <- merge(drugs.list, RSTP2_2000_indels.df) %>%
   mutate(well = gsub("_[0-9]{3}", "", well))
 
 # Let's plot the distribution of the amount of reads per drug
 RSTP2_2000_indels.df <- mutate_all(RSTP2_2000_indels.df, funs(replace(., is.na(.), 0)))
-RSTP2_2000_indels.df$read.count <- rowSums(RSTP2_2000_indels.df[,c(6:118)])
-RSTP2_2000_indels.df$all.indels <- rowSums(RSTP2_2000_indels.df[,c(6:53,55:118)])
+RSTP2_2000_indels.df$read.count <- rowSums(RSTP2_2000_indels.df[,c(6:125)])
+RSTP2_2000_indels.df$all.indels <- rowSums(RSTP2_2000_indels.df[,c(6:63,65:125)])
 ggplot(RSTP2_2000_indels.df, aes(read.count)) + geom_density(fill = "#3D9F83") + theme_bw() + 
   labs(title = "read distribution per barcode") + 
-  facet_wrap(~V2)
+  facet_wrap(~barcode)
 
 # Filter out noisy data
-RSTP2_2000_indels.df$read.count1.7 <- rowSums(RSTP2_2000_indels.df[,c(18,25)])
+RSTP2_2000_indels.df$read.count1.7 <- rowSums(RSTP2_2000_indels.df[,c(57,65)])
 
 
 # Calculate NHEJ/MMEJ ratios and efficiency
@@ -390,9 +389,9 @@ RSTP2_2000_indels.df <- RSTP2_2000_indels.df %>%
          NHEJscore = freqNHEJ / (freqNHEJ + freqMMEJ),
          freqCut = 1 - (X0 / (X0 + all.indels)))
 RSTP2_2000_indels.df <- RSTP2_2000_indels.df %>%
-  dplyr::select(Drug, Target, well, V2, rep, conc, freqMMEJ, freqNHEJ,
+  dplyr::select(Drug, Target, well, barcode, rep, conc, freqMMEJ, freqNHEJ,
          NHEJMMEJratio, MMEJscore, NHEJscore, freqCut, .id, read.count1.7)
-setnames(RSTP2_2000_indels.df, c("Drug", "Target", "V2", ".id"), c("drug", "target", "barcode", "id"))
+setnames(RSTP2_2000_indels.df, c("Drug", "Target", ".id"), c("drug", "target", "id"))
 
 # Exclude NA rows
 RSTP2_2000_indels.df <- RSTP2_2000_indels.df[rowSums(is.na(RSTP2_2000_indels.df)) != ncol(RSTP2_2000_indels.df), ]
@@ -409,7 +408,7 @@ The files will be saved in the processed data folder.
 ```{r export}
 setwd("/DATA/usr/m.trauernicht/projects/EpiScreen/files_scripts/")
 # The mutations list that can be loaded for the indel spectra plots.
-filename <- SetFileName("_drug_screen_mutations_rep1", "mt")
+filename <- SetFileName("_drug_screen_mutations_rep2", "mt")
 save(RSTP2_2000_indels.df, file = filename)
 ```
 
