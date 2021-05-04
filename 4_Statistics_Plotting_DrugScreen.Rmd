@@ -1030,7 +1030,7 @@ print(plt)
 
 
 \newpage
-## Visualizaton: Identifying local vs. global acting drugs
+## Visualizaton: Identifying locally vs. globally acting drugs
 ```{r visualization_global-vs-local, out.width= "80%", fig.align= "center", echo = FALSE, warning = FALSE}
 # Plotting the MMEJ z-score against the SD in the MMEJ z-score between the 18 IPRs
 ggplot(indel.data %>%
