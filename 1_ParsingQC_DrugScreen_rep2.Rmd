@@ -84,7 +84,7 @@ These are data from the crispr-trip.snake script, and a text file that has has b
 
 ```{r}
 # First I load the statistics data from the mapping.
-setwd("/DATA/usr/m.trauernicht/projects/EpiScreen/data/gcf6421/processed_20210429/parsed/")
+setwd("/DATA/projects/DSBrepair/data/rs20210526_EpiScreen/parsed/")
 
 file.list <- list.files(pattern='indelPCR.(.*?).statistics.txt')
 indel.statistics.list <- lapply(file.list, 
