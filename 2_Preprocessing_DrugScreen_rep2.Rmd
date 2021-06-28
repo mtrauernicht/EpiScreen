@@ -56,9 +56,7 @@ Date <- substr(gsub("-","",Sys.time()),1,8)
 # libraries:
 # library(devtools)
 # install_github("lawremi/rtracklayer")
-library(tidyr)
-library(plyr)
-library(dplyr)
+library(tidyverse)
 library(data.table)
 library(ggplot2)
 library(car)
@@ -66,6 +64,8 @@ library(parallel)
 library(gtools)
 library(rtracklayer)
 library(platetools)
+library(plyr)
+library(ggpubr)
 ```
 ## Custom functions
 Functions used include all functions that have been used previously by Ruben (some of them might not be needed anymore, but are kept anyway). Functions 'CallTrueBarcodes' & 'RemoveLowReads' have been added by Max.
@@ -270,22 +270,24 @@ CalculateDeletions <- function(deletions) {
 Data import from mapping, files were generated on 21.01.2019.
 ```{r import}
 # Set directory to the mutation output folder of the CRISPR-TRIP snakemake script
-setwd("/DATA/usr/m.trauernicht/projects/EpiScreen/data/gcf6421/processed_20210429/indelPCR_counts/")
+setwd("/DATA/projects/DSBrepair/data/rs20210526_EpiScreen/indelPCR_counts/")
 
 # Import files in list and make individual tables
 file.list <- list.files(pattern='*[.]count.table')
 df.list <- lapply(file.list, fread)
 
 # Import RSTP2 clone 5 barcode list (in total 20 barcodes)
-barcodes.list <- c("AGGGCGTAAAATATTT", "TATGGCTGTCGGGTAG", "TGTCCCTTAGTACTTT", "AGAAAATAATATGACG","CGGCCTGAAGGTCAGG","TTGAACGCGGGCTCGG","GCTAACATCACGAATC","GCGCACCCTTTAATTG","ACTGTCGAGTTGTCCG","CCGGGGACGTATGCAC","TCTTTTGAGGAGCTGA","ATATCGTTGCTGGAGA","CATCCACCACACTTCA","ACCCCTAAAGGCGCTG","ATACTATATTTAACGG","CATTTCTGATCAATAA","CTCTTAATCGCTGCC","GAGCGCGTCACCGGGT","GTACCTCTCGATAGTG","TGGCCAATATTTGTCT")
+barcodes.list <- c("AGGGCGTAAAATATTT", "TATGGCTGTCGGGTAG", "TGTCCCTTAGTACTTT", 
+                   "AGAAAATAATATGACG","CGGCCTGAAGGTCAGG","TTGAACGCGGGCTCGG",
+                   "GCTAACATCACGAATC", "GCGCACCCTTTAATTG","ACTGTCGAGTTGTCCG",
+                   "CCGGGGACGTATGCAC","TCTTTTGAGGAGCTGA","ATATCGTTGCTGGAGA",
+                   "CATCCACCACACTTCA","ACCCCTAAAGGCGCTG","ATACTATATTTAACGG",
+                   "CATTTCTGATCAATAA","CTCTTAATCGCTGCC","GAGCGCGTCACCGGGT",
+                   "GTACCTCTCGATAGTG","TGGCCAATATTTGTCT")
 
-# Import drug list 
-setwd("/DATA/usr/m.trauernicht/projects/EpiScreen/files_scripts/")
-drugs.list <- read.delim("mt20190123_EpigeneticDrugList.txt")
-drugs.list <- drugs.list %>%
-  dplyr::select(-IC50..µM.) %>%
-  setnames("Number", "well")
-  
+# Import metadata 
+file = "/DATA/projects/DSBrepair/config/rs20210526_E177_E1504_EpiScreen_metadata.txt"
+meta_data = fread(file, header = TRUE)
   
 # rename the lists
 names(df.list) <- gsub('(*?)[.]ra.*', '\\1', file.list)
@@ -297,16 +299,19 @@ head(names(df.list))
 n.samples <- length(df.list)
 
 # Import viability data and the mean +1/-7 ratio from previous experiments
-viability.data <- read.delim("mt20190124_viabilityData") %>% setnames(".id", "id")
-viability <- read.csv2("EpiscreenAllPlates.csv")
+viab1.file = "/DATA/usr/m.trauernicht/projects/EpiScreen/files_scripts/mt20190124_viabilityData"
+viability.data <- read.delim(viab1.file) %>% setnames(".id", "id")
+viab2.file = "/DATA/usr/m.trauernicht/projects/EpiScreen/files_scripts/EpiscreenAllPlates.csv"
+viability <- read.csv2(viab2.file)
 ```
 
 
 ## Visualize viability data
 ```{r viability_overview, echo = FALSE, warning = FALSE}
 # Compute relative viability per plate
-viability.df <- melt(viability) %>% 
-  mutate(value = ave(value, variable, FUN = function(x) x/max(x)))
+viability.df <- melt(as.data.table(viability)) %>% 
+  mutate(value = ave(value, variable, FUN = function(x) x/max(x)),
+         variable = gsub("X(10.*).Rep.([1-3]).Plate.([12])", "\\1_\\2_\\3", variable))
 
 for (i in unique(viability.df$variable)) {
 p <- raw_grid(data = viability.df$value[viability.df$variable == i],
@@ -323,11 +328,20 @@ print(p)
 # Call true barcodes
 df.list <- mclapply(df.list, CallTrueBarcodes, mc.cores = 10)
 
-# Remove samples with low read counts
-df.list <- mclapply(df.list, RemoveLowReads, mc.cores = 10)
-
-# Remove empty dfs
-df.list <- Filter(Negate(function(x) is.null(unlist(x))), df.list)
+# To be able to setup the functions in a general way. This means in cases where we have A
+# and B samples.
+mut.list = mclapply(names(df.list), function(exp){
+  dt = data.table(df.list[[exp]])
+  dt[, mutation := as.character(mutation)]
+  # dt = dt[mutation != "Inf"]
+  dt[type == "ssODN" & mutation == "2", mutation := "ssODN"]
+  pool = gsub("indel_.*_([AB]|clone5|clones[AB])_.*", "\\1", exp, perl = TRUE)
+  dt[,barcode := paste(barcode, pool, sep = ".")]
+  sum_count = data.table(exp = exp,
+                         dt[, list(count=sum(count)),
+                            by = c("barcode", "mutation")])
+  return(sum_count)
+}, mc.cores = 10)
 ```
 
 
@@ -358,58 +372,88 @@ indels.df <- ldply(mutations.dt.list, data.frame)
 RSTP2_2000_indels.df <- indels.df
 # Assigning identifiers to df
 RSTP2_2000_indels.df <- RSTP2_2000_indels.df %>% 
-  mutate(.id = gsub(".count.table", "\\1", .id),
-         rep = gsub(".*m_rep(.*?)_.*", "R\\1", .id),
-         conc = gsub("_rep.*", "\\1", .id),
-         well = gsub(".*plate.*_(.*?)","\\1", .id))
+  mutate(ID = gsub(".count.table", "\\1", .id)) %>%
+  as_tibble()
 
 
 # Import the drugs and match with the df
-RSTP2_2000_indels.df <- merge(drugs.list, RSTP2_2000_indels.df) %>%
-  mutate(well = gsub("_[0-9]{3}", "", well))
+# Bind the metadata 
+file = "/DATA/projects/DSBrepair/config/rs20210526_E177_E1504_EpiScreen_metadata.txt"
+meta_data = fread(file, header = TRUE)
+indels_tib = left_join(RSTP2_2000_indels.df, meta_data) %>% as_tibble()
+
 
 # Let's plot the distribution of the amount of reads per drug
-RSTP2_2000_indels.df <- mutate_all(RSTP2_2000_indels.df, funs(replace(., is.na(.), 0)))
-RSTP2_2000_indels.df$read.count <- rowSums(RSTP2_2000_indels.df[,c(6:125)])
-RSTP2_2000_indels.df$all.indels <- rowSums(RSTP2_2000_indels.df[,c(6:63,65:125)])
-ggplot(RSTP2_2000_indels.df, aes(read.count)) + geom_density(fill = "#3D9F83") + theme_bw() + 
+indels_tib <- mutate_all(indels_tib, funs(replace(., is.na(.), 0)))
+indels_tib$read.count <- rowSums(indels_tib[,c(3:125)])
+indels_tib$all.indels <- rowSums(indels_tib[,c(3:21,23:125)])
+ggplot(indels_tib, aes(read.count)) + geom_density(fill = "#3D9F83") + theme_bw() + 
   labs(title = "read distribution per barcode") + 
-  facet_wrap(~barcode)
+  facet_wrap(~barcode) + xlim(0, 200)
 
 # Filter out noisy data
-RSTP2_2000_indels.df$read.count1.7 <- rowSums(RSTP2_2000_indels.df[,c(57,65)])
+indels_tib$read.count1.7 <- rowSums(indels_tib[,c("X.7","X1")])
 
 
 # Calculate NHEJ/MMEJ ratios and efficiency
-RSTP2_2000_indels.df <- RSTP2_2000_indels.df %>%
+indels_tib <- indels_tib %>%
   mutate(freqMMEJ = X.7 / all.indels,
          freqNHEJ = X1 / all.indels,
          NHEJMMEJratio = freqMMEJ / freqNHEJ,
          MMEJscore = freqMMEJ / (freqMMEJ + freqNHEJ),
          NHEJscore = freqNHEJ / (freqNHEJ + freqMMEJ),
          freqCut = 1 - (X0 / (X0 + all.indels)))
-RSTP2_2000_indels.df <- RSTP2_2000_indels.df %>%
-  dplyr::select(Drug, Target, well, barcode, rep, conc, freqMMEJ, freqNHEJ,
-         NHEJMMEJratio, MMEJscore, NHEJscore, freqCut, .id, read.count1.7)
-setnames(RSTP2_2000_indels.df, c("Drug", "Target", ".id"), c("drug", "target", "id"))
+indels_tib <- indels_tib %>%
+  dplyr::select(drug, target, well, barcode, replicate, tech, concentration, plate, drug_plate, freqMMEJ, freqNHEJ,
+         NHEJMMEJratio, MMEJscore, NHEJscore, freqCut, read.count1.7, ID, run)
+
 
 # Exclude NA rows
-RSTP2_2000_indels.df <- RSTP2_2000_indels.df[rowSums(is.na(RSTP2_2000_indels.df)) != ncol(RSTP2_2000_indels.df), ]
+indels_tib <- indels_tib[rowSums(is.na(indels_tib)) != ncol(indels_tib), ]
 
 # Add sample identifier
-RSTP2_2000_indels.df$sample <- "drug"
-RSTP2_2000_indels.df$sample[RSTP2_2000_indels.df$drug == "DMSO"] <- "DMSO"
-RSTP2_2000_indels.df$sample[RSTP2_2000_indels.df$drug == "DNA-PKi"] <- "DNA-PKi"
-RSTP2_2000_indels.df$sample[RSTP2_2000_indels.df$drug == "Mirin"] <- "Mirin"
+indels_tib$sample <- "drug"
+indels_tib$sample[indels_tib$drug == "DMSO"] <- "DMSO"
+indels_tib$sample[indels_tib$drug == "DNA-PKi"] <- "DNA-PKi"
+indels_tib$sample[indels_tib$drug == "Mirin"] <- "Mirin"
+
+
+
+indels_tib %>% distinct(replicate, MMEJscore, concentration, plate, drug_plate, tech, barcode, drug, well, target, sample, run) %>% filter(replicate == "E1504") %>%
+  spread(run, MMEJscore) %>% 
+  mutate(class = ifelse(target == "HDAC", "HDAC", sample)) %>% 
+  filter(class %in% c("DMSO", "HDAC")) %>%
+           ggplot(., aes(run1, run2)) +  
+    geom_point() +
+    geom_smooth(method= "loess") +
+    theme_bw(base_size = 16) +
+    stat_cor(method = "spearman", label.x.npc = "left", label.y.npc = 0.1) + 
+    coord_fixed()
+
+indels_tib %>% distinct(replicate, MMEJscore, concentration, plate, drug_plate, tech, barcode, drug, well, target, sample, run) %>% filter(run == "run1") %>%
+  spread(replicate, MMEJscore) %>% 
+  mutate(class = ifelse(target == "HDAC", "HDAC", sample)) %>% 
+  filter(class %in% c("DMSO", "HDAC")) %>%
+           ggplot(., aes(E1504, E177)) +  
+    geom_point() +
+    geom_smooth(method= "loess") +
+    theme_bw(base_size = 16) +
+    stat_cor(method = "spearman", label.x.npc = "left", label.y.npc = 0.1) + 
+    coord_fixed()
+
+
+indels_tib %>% distinct(replicate, read.count1.7, concentration, plate, drug_plate, tech, barcode, drug, well, target, sample, run) %>% filter(replicate == "E1504") %>% group_by(plate, concentration) %>% dplyr::summarise(total_plus1min7_reads = sum(read.count1.7)) %>% ggplot(., aes(plate, total_plus1min7_reads, fill = as.character(concentration))) + geom_bar(stat = "identity")  + 
+  theme_bw(base_size = 16) + 
+  ylab("total +1 & -7 reads")
 ```
 
 ## Processed data export
 The files will be saved in the processed data folder.
 ```{r export}
-setwd("/DATA/usr/m.trauernicht/projects/EpiScreen/files_scripts/")
+setwd("/DATA/projects/DSBrepair/data/R/EpiScreen/")
 # The mutations list that can be loaded for the indel spectra plots.
-filename <- SetFileName("_drug_screen_mutations_rep2", "mt")
-save(RSTP2_2000_indels.df, file = filename)
+filename <- SetFileName("_drug_screen_mutations_rep2", "rs")
+save(indels_tib, file = filename)
 ```
 
 ### Conclusions 

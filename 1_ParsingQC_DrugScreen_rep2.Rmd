@@ -28,8 +28,7 @@ StartTime <-Sys.time()
 Date <- substr(gsub("-","",Sys.time()),1,8) 
 
 # libraries:
-library(plyr)
-library(dplyr)
+library(tidyverse)
 library(GenomicRanges)
 library(RColorBrewer)
 library(ggplot2)
@@ -84,28 +83,25 @@ These are data from the crispr-trip.snake script, and a text file that has has b
 
 ```{r}
 # First I load the statistics data from the mapping.
-setwd("/DATA/usr/m.trauernicht/projects/EpiScreen/data/gcf6421/processed_20210429/parsed/")
 
-file.list <- list.files(pattern='indelPCR.(.*?).statistics.txt')
+
+file.list <- list.files("/DATA/projects/DSBrepair/data/rs20210526_EpiScreen/parsed/", pattern='indelPCR.(.*?).statistics.txt', full.names = TRUE)
 indel.statistics.list <- lapply(file.list, 
                                 read.table, 
-                                header = TRUE)
-names(indel.statistics.list)<- gsub('indelPCR.(.*?).statistics.txt', 
+                                header = TRUE, sep = "\t")
+names(indel.statistics.list)<- gsub('.*indelPCR.(.*?).statistics.txt', 
                                     '\\1', 
                                     file.list)
 # we need to remove the index column for the time being
-indel.statistics.list <- lapply(indel.statistics.list, function(x) { x["index"] <- NULL; x })
 indel.statistics.df <- do.call(rbind.data.frame, 
-                               indel.statistics.list)
-indel.statistics.df$sample.well <- rownames(indel.statistics.df)
-indel.statistics.df$concentration <- gsub("^(.*)_rep.*", "\\1", indel.statistics.df$sample.well)
-indel.statistics.df$replicate <- gsub("^.*_(.*?)_.*", "\\1", indel.statistics.df$sample.well)
-#indel.statistics.df$plate <- as.character(rep(c(1:18), each = 96))
-indel.statistics.df$sample <- gsub("(.*_.*_.*?)_.*_.*$", "\\1", indel.statistics.df$sample.well)
-indel.statistics.df$well <- gsub(".*_.*_(.*?)_[0-999]*", "\\1", indel.statistics.df$sample.well)
-indel.statistics.df$row <- gsub("[0-999]", "\\1", indel.statistics.df$well)
-indel.statistics.df$column <- gsub("[A-Z]", "\\1", indel.statistics.df$well)
-indel.statistics.df$drug <- gsub(".*_([0-999])", "\\1", indel.statistics.df$sample.well)
+                               indel.statistics.list) %>% rownames_to_column(var = "ID")
+
+# Bind the metadata 
+file = "/DATA/projects/DSBrepair/config/rs20210526_E177_E1504_EpiScreen_metadata.txt"
+meta_data = fread(file, header = TRUE)
+
+statistics_tib = left_join(indel.statistics.df, meta_data) %>% as_tibble()
+
 ```
 
 ### Indel parsing  
@@ -114,6 +110,8 @@ indel.statistics.df$drug <- gsub(".*_([0-999])", "\\1", indel.statistics.df$samp
 ```{r}
 low.reads.indel.stat.df <- indel.statistics.df[order(indel.statistics.df[, "reads"]), ][1:100, ]
 mypalette5<-brewer.pal(5,"Greens")
+
+statistics_tib %>% ggplot(., aes(reads, color = concentration)) + geom_density() + facet_wrap(replicate ~ plate, scales = "free")
 
 barplot(as.matrix(t(low.reads.indel.stat.df[c(1:20),c(1,3,6:8)])), 
         col = mypalette5,
@@ -166,28 +164,33 @@ indel.statistics.df %>% group_by(row) %>% summarise(reads = sum(reads))
 # How many reads per column?
 indel.statistics.df %>% group_by(column) %>% summarise(reads = sum(reads))
 # How many reads per well (for the 96 index)?
-well.statistics <- indel.statistics.df %>% group_by(well) %>% summarise(reads = sum(reads))
+well.statistics <- statistics_tib %>% group_by(well, replicate) %>% dplyr::summarise(reads = sum(reads))
 well.statistics
-raw_map(well.statistics$reads, 
-                 well.statistics$well) + scale_fill_distiller(type = "div", name = "reads")
+E177_stats = filter(well.statistics, replicate == "E177")
+raw_map(E177_stats$reads, 
+                 E177_stats$well) + 
+  scale_fill_distiller(type = "div", name = "reads")
+
+E1504_stats = filter(well.statistics, replicate == "E1504")
+raw_map(E1504_stats$reads, 
+                 E1504_stats$well) + 
+  scale_fill_distiller(type = "div", name = "reads")
 
 # % of reads written from the total reads :
-indelreadswritten.vec <- indel.statistics.df$reads_written/indel.statistics.df$reads*100
-names(indelreadswritten.vec) <- rownames(indel.statistics.df)
-barplot(indelreadswritten.vec, 
-        las=2, 
-        cex.names = 0.6)
+statistics_tib %>% ggplot(., aes(reads_written/reads*100, ID, color = plate)) + geom_bar(stat = "identity")
 
 ```
 
 ```{r, fig.width = 12, fig.height = 4}
-for (i in unique(indel.statistics.df$sample)) {
+statistics_tib %<>% mutate(sample = paste(replicate, plate, concentration, tech, drug_plate, sep = "_"))
+
+for (i in unique(statistics_tib$sample)) {
   
   # Select the flowjo data set
-  data <- indel.statistics.df[indel.statistics.df$sample == i, ]
+  data <- statistics_tib[statistics_tib$sample == i, ]
   
   # Find reasonable limits 
-  limits <- c(2000, 25000)
+  limits <- c(1000, 20000)
 
   # Plot this, first the PI staining with a custom color-coded density
   y <- density(data$reads)
