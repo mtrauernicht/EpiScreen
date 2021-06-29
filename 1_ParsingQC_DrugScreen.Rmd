@@ -176,37 +176,66 @@ raw_map(well.statistics$reads,
 
 ```
 
-```{r, fig.width = 12, fig.height = 4}
+```{r reads per well replicate 1, fig.width = 12, fig.height = 4}
 for (i in 1:18) {
   
   # Select the flowjo data set
-  data <- indel.statistics.tib[indel.statistics.tib$plate == i, ]
+  data <- filter(indel.statistics.tib, plate == i, replicate == "E177")
   
   # Find reasonable limits 
-  limits <- c(2000, 25000)
-
-  # Plot this, first the PI staining with a custom color-coded density
+  limits <- c(1000, 35000)
+  
+    # Plot this, first the read cound density
   y <- density(data$reads)
   plt1 <- ggplot(data.frame(x = y$x, y = y$y),
                  aes(x = x, y = y)) +
     geom_line() +
     geom_segment(aes(xend = x, yend = 0, colour = x)) +
     xlim(limits) +
-    ggtitle(paste("Cell cycle -",
-                unique(data$sample))) +
-    scale_color_distiller(type = "div", limits = limits, name = "PI_area") +
+    scale_color_distiller(type = "div", limits = limits, name = "reads") +
     theme_bw() +
     theme(legend.position="none")
   
   # Then the plate with color-coded wells
   plt2 <- raw_map(data$reads, 
                  data$well) +
-    ggtitle(unique(data$sample)) +
+    ggtitle(unique(gsub("(.*)_...$", "\\1", data$ID))) +
     scale_fill_distiller(type = "div", limits = limits, name = "reads")
-  plt2
+  
   grid.arrange(plt1, plt2, ncol = 2, widths = c(1, 1.3))
 }
 ```
+
+```{r reads per well replicate 2, fig.width = 12, fig.height = 4}
+for (i in 1:18) {
+  
+  # Select the flowjo data set
+  data <- filter(indel.statistics.tib, plate == i, replicate == "E1504")
+  
+  # Find reasonable limits 
+  limits <- c(1000, 300000)
+
+  # Plot this, first the read cound density
+  y <- density(data$reads)
+  plt1 <- ggplot(data.frame(x = y$x, y = y$y),
+                 aes(x = x, y = y)) +
+    geom_line() +
+    geom_segment(aes(xend = x, yend = 0, colour = x)) +
+    xlim(limits) +
+    scale_color_distiller(type = "div", limits = limits, name = "reads") +
+    theme_bw() +
+    theme(legend.position="none")
+  
+  # Then the plate with color-coded wells
+  plt2 <- raw_map(data$reads, 
+                 data$well) +
+    ggtitle(unique(gsub("(.*)_...$", "\\1", data$ID))) +
+    scale_fill_distiller(type = "div", limits = limits, name = "reads")
+  
+  grid.arrange(plt1, plt2, ncol = 2, widths = c(1, 1.3))
+}
+```
+
 
 # Conclusion
 - In general, the data looks very good
