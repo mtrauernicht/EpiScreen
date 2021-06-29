@@ -48,6 +48,7 @@ library(magrittr)
 library(platetools)
 library(grid)
 library(gridExtra)
+library(purrr)
 ```
  
 ## Custom functions  
@@ -94,96 +95,84 @@ SetFileName <- function(filename, initials) {
 These are data from the crispr-trip.snake script, and a text file that has has been obtained as explained above.  
 
 ```{r}
-# First I load the statistics data from the mapping.
-setwd("/DATA/projects/DSBrepair/data/5280_DrugScreen/processed/parsed/")
+# Import metadata 
+file = "/DATA/projects/DSBrepair/config/rs20210628_E177_E1504_EpiScreen_metadata.txt"
+meta_data = fread(file, header = TRUE)
 
-file.list <- list.files(pattern='mutation*.*statistics.txt')
-indel.statistics.list <- lapply(file.list, 
-                                read.table, 
-                                header = TRUE)
-names(indel.statistics.list)<- gsub('mutation.(.*?).statistics.txt', 
-                                    '\\1', 
-                                    file.list)
-# we need to remove the index column for the time being
-indel.statistics.list <- lapply(indel.statistics.list, function(x) { x["index"] <- NULL; x })
-indel.statistics.df <- do.call(rbind.data.frame, 
-                               indel.statistics.list)
-indel.statistics.df$sample.well <- rownames(indel.statistics.df)
-indel.statistics.df$concentration <- gsub("^(.*)_rep.*", "\\1", indel.statistics.df$sample.well)
-indel.statistics.df$replicate <- gsub("^.*_(.*?)_.*", "\\1", indel.statistics.df$sample.well)
-indel.statistics.df$plate <- as.character(rep(c(1:18), each = 96))
-indel.statistics.df$sample <- gsub("(.*_.*_.*?)_.*_.*$", "\\1", indel.statistics.df$sample.well)
-indel.statistics.df$well <- gsub(".*_.*_(.*?)_[0-999]*", "\\1", indel.statistics.df$sample.well)
-indel.statistics.df$row <- gsub("[0-999]", "\\1", indel.statistics.df$well)
-indel.statistics.df$column <- gsub("[A-Z]", "\\1", indel.statistics.df$well)
-indel.statistics.df$drug <- gsub(".*_([0-999])", "\\1", indel.statistics.df$sample.well)
+# load the statistics data from the indels.
+file.list <- list.files(path = "/DATA/projects/DSBrepair/data/rs20210628_EpiScreen/parsed", pattern="indel*.*statistics.txt", full.names = TRUE)
+indel.statistics.list <- lapply(file.list, read.table, 
+                                  header = TRUE)
+names(indel.statistics.list)<- gsub(".*//indelPCR.indel_(.*?).statistics.txt", 
+                                      "\\1", 
+                                      file.list)
+
+# Format the statistics and bind the meta data
+indel.statistics.tib <- do.call(rbind.data.frame, 
+                               indel.statistics.list) %>% 
+  rownames_to_column(var = "ID") %>%
+  as_tibble() %>%
+  mutate(ID = gsub(".*indelPCR.(.*).statistics.txt", "\\1", ID)) %>%
+  left_join(meta_data)
+  
+# Calculate fraction written
+indel.statistics.tib %<>% 
+  mutate(r_written_pct = reads_written / reads)
 ```
 
 ### Indel parsing  
 
 
 ```{r}
-low.reads.indel.stat.df <- indel.statistics.df[order(indel.statistics.df[, "reads"]), ][1:100, ]
-mypalette5<-brewer.pal(5,"Greens")
+ggplot(indel.statistics.tib, aes(well, log10(reads))) + 
+  geom_bar(stat = "identity", aes(fill = as.character(concentration))) + 
+  facet_grid(replicate ~ plate, scales = "free")
 
-barplot(as.matrix(t(low.reads.indel.stat.df[c(1:20),c(1,3,6:8)])), 
-        col = mypalette5,
-        beside = T, 
-        main = "Read parsing statistics", 
-        ylab = "reads", 
-        legend = colnames(indel.statistics.df[,c(1,3,6:8)]), 
-        las = 2,
-        cex.names = 0.4,
-        cex.axis = 0.6,
-        args.legend = list(x = "topright", cex = 0.6))
-
-barplot(as.matrix(t(low.reads.indel.stat.df[c(1:50),c(1,3)])), 
-        col = c("Red", "Orange"),
-        beside = T, 
-        main = "Read parsing statistics", 
-        ylab = "reads", 
-        legend = colnames(indel.statistics.df[,c(1,3)]), 
-        las = 2,
-        cex.names = 0.4,
-        cex.axis = 0.6,
-        args.legend = list(x = "topright", cex = 0.6))
-
-barplot(as.matrix(t(low.reads.indel.stat.df[c(51:100),c(1,3)])), 
-        col = c("Red", "Orange"),
-        beside = T, 
-        main = "Read parsing statistics ", 
-        ylab = "reads", 
-        legend = colnames(indel.statistics.df[,c(1,3)]), 
-        las = 2,
-        cex.names = 0.4,
-        cex.axis = 0.6,
-        args.legend = list(x = "topright", cex = 0.6))
-
-
-b <- ggplot(indel.statistics.df, aes(sample, reads)) + geom_bar(stat = "identity", aes(fill = concentration))
-b
-b <- ggplot(indel.statistics.df, aes(sample, reads)) + geom_bar(stat = "identity", aes(fill = plate))
-b
-b <- ggplot(indel.statistics.df[indel.statistics.df$replicate=="rep2" & indel.statistics.df$concentration=="1um", ], aes(sample, reads)) + geom_bar(stat = "identity", aes(fill = replicate))
-b
 # How many reads per sample?
-indel.statistics.df %>% group_by(sample) %>% summarise(reads = sum(reads))
+indel.statistics.tib %>% 
+  group_by(replicate, seq_barcode) %>% 
+  dplyr::summarise(reads = sum(reads)) %>%
+  ggplot(., aes(seq_barcode, reads, fill = seq_barcode)) + 
+  geom_bar(stat = "identity") + 
+  facet_grid(. ~ replicate)
 # How many reads per row?
-indel.statistics.df %>% group_by(row) %>% summarise(reads = sum(reads))
+indel.statistics.tib %>% 
+  separate(well, c("column", "row"), sep = 1) %>% 
+  group_by(replicate, row) %>% dplyr::summarise(reads = sum(reads)) %>%
+  ggplot(., aes(row, reads, fill = row)) + 
+  geom_bar(stat = "identity") + 
+  facet_grid(. ~ replicate)
 # How many reads per column?
-indel.statistics.df %>% group_by(column) %>% summarise(reads = sum(reads))
-# How many reads per well (for the 96 index)?
-well.statistics <- indel.statistics.df %>% group_by(well) %>% summarise(reads = sum(reads))
-well.statistics
+indel.statistics.tib %>% 
+  separate(well, c("column", "row"), sep = 1) %>% 
+  group_by(replicate, column) %>% dplyr::summarise(reads = sum(reads)) %>%
+  ggplot(., aes(column, reads, fill = column)) + 
+  geom_bar(stat = "identity") + 
+  facet_grid(. ~ replicate)
+
+# How many reads per well (for the 96 index) replicate 1?
+well.statistics <- indel.statistics.tib %>% 
+  filter(replicate == "E177") %>%
+  group_by(well) %>% 
+  dplyr::summarise(reads = sum(reads))
+
 raw_map(well.statistics$reads, 
-                 well.statistics$well) + scale_fill_distiller(type = "div", name = "reads")
+                 well.statistics$well) + 
+  scale_fill_distiller(type = "div", name = "reads")
+
+# How many reads per well (for the 96 index) replicate 2?
+well.statistics <- indel.statistics.tib %>% 
+  filter(replicate == "E1504") %>%
+  group_by(well) %>% 
+  dplyr::summarise(reads = sum(reads))
+  
+raw_map(well.statistics$reads, 
+                 well.statistics$well) + 
+  scale_fill_distiller(type = "div", name = "reads")
+
 
 # % of reads written from the total reads :
-indelreadswritten.vec <- indel.statistics.df$reads_written/indel.statistics.df$reads*100
-names(indelreadswritten.vec) <- rownames(indel.statistics.df)
-barplot(indelreadswritten.vec, 
-        las=2, 
-        cex.names = 0.4)
+
 
 ```
 
@@ -191,7 +180,7 @@ barplot(indelreadswritten.vec,
 for (i in 1:18) {
   
   # Select the flowjo data set
-  data <- indel.statistics.df[indel.statistics.df$plate == i, ]
+  data <- indel.statistics.tib[indel.statistics.tib$plate == i, ]
   
   # Find reasonable limits 
   limits <- c(2000, 25000)
