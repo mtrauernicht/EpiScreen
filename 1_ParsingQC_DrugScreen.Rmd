@@ -39,8 +39,7 @@ StartTime <-Sys.time()
 Date <- substr(gsub("-","",Sys.time()),1,8) 
 
 # libraries:
-library(plyr)
-library(dplyr)
+library(tidyverse)
 library(GenomicRanges)
 library(RColorBrewer)
 library(ggplot2)
@@ -49,6 +48,8 @@ library(platetools)
 library(grid)
 library(gridExtra)
 library(purrr)
+library(cowplot)
+library(data.table)
 ```
  
 ## Custom functions  
@@ -94,10 +95,10 @@ SetFileName <- function(filename, initials) {
 
 These are data from the crispr-trip.snake script, and a text file that has has been obtained as explained above.  
 
-```{r}
+```{r Data import}
 # Import metadata 
-file = "/DATA/projects/DSBrepair/config/rs20210628_E177_E1504_EpiScreen_metadata.txt"
-meta_data = fread(file, header = TRUE)
+file = "/DATA/projects/DSBrepair/config/rs20210712_E177_E1504_EpiScreen_metadata.txt"
+screen_meta_data = fread(file, header = TRUE)
 
 # load the statistics data from the indels.
 file.list <- list.files(path = "/DATA/projects/DSBrepair/data/rs20210628_EpiScreen/parsed", pattern="indel*.*statistics.txt", full.names = TRUE)
@@ -113,69 +114,125 @@ indel.statistics.tib <- do.call(rbind.data.frame,
   rownames_to_column(var = "ID") %>%
   as_tibble() %>%
   mutate(ID = gsub(".*indelPCR.(.*).statistics.txt", "\\1", ID)) %>%
-  left_join(meta_data)
+  left_join(screen_meta_data)
   
 # Calculate fraction written
 indel.statistics.tib %<>% 
   mutate(r_written_pct = reads_written / reads)
+
+# Import the cell viability data
+cell.viab.data = fread("/DATA/projects/DSBrepair/git/EpiScreen/files_scripts/mt20200618_viability_rep1-2.csv", sep = ";", col.names = c("ID", "E177", "E1504"))
+
+# Process the cell viability and add it to the indel stat table. 
+# Rename the ID to match this pattern : E1504_01_100_1_1_A01
+cell.viab.data %<>% mutate(ID = gsub("nm|um|plate|rep", "", ID)) %>% 
+  separate(ID, into = c("concentration", "tech", "drug_plate", "well", "drug_no"), sep = "_") %>% 
+  mutate(concentration = as.integer(concentration),
+         tech = as.integer(tech),
+         drug_plate = as.integer(drug_plate),
+         drug_no = as.integer(drug_no)) %>%
+  gather(E177, E1504, key = "replicate", value = "viability")
+
+indel.statistics.tib %<>% left_join(cell.viab.data)
+
 ```
 
-### Indel parsing  
 
+# Data plotting
 
-```{r}
+Couple of plots to see how the reads are distributed. This will tell us if there are any biases. 
+
+## Plotting the general read counts per index, barcode, column and row 
+
+```{r general plots}
 ggplot(indel.statistics.tib, aes(well, log10(reads))) + 
   geom_bar(stat = "identity", aes(fill = as.character(concentration))) + 
   facet_grid(replicate ~ plate, scales = "free")
 
-# How many reads per sample?
+# How many reads per index?
 indel.statistics.tib %>% 
-  group_by(replicate, seq_barcode) %>% 
+  group_by(replicate, plate, seq_barcode) %>% 
   dplyr::summarise(reads = sum(reads)) %>%
-  ggplot(., aes(seq_barcode, reads, fill = seq_barcode)) + 
+  ggplot(., aes(plate, reads, fill = seq_barcode)) + 
   geom_bar(stat = "identity") + 
+  ggtitle("reads per index") +
   facet_grid(. ~ replicate)
 # How many reads per row?
 indel.statistics.tib %>% 
-  separate(well, c("column", "row"), sep = 1) %>% 
+  separate(well, c("row", "column"), sep = 1) %>% 
   group_by(replicate, row) %>% dplyr::summarise(reads = sum(reads)) %>%
   ggplot(., aes(row, reads, fill = row)) + 
   geom_bar(stat = "identity") + 
+  ggtitle("reads per row") +
   facet_grid(. ~ replicate)
 # How many reads per column?
 indel.statistics.tib %>% 
-  separate(well, c("column", "row"), sep = 1) %>% 
+  separate(well, c("row", "column"), sep = 1) %>% 
   group_by(replicate, column) %>% dplyr::summarise(reads = sum(reads)) %>%
   ggplot(., aes(column, reads, fill = column)) + 
   geom_bar(stat = "identity") + 
+  ggtitle("reads per column") +
   facet_grid(. ~ replicate)
-
-# How many reads per well (for the 96 index) replicate 1?
-well.statistics <- indel.statistics.tib %>% 
-  filter(replicate == "E177") %>%
-  group_by(well) %>% 
-  dplyr::summarise(reads = sum(reads))
-
-raw_map(well.statistics$reads, 
-                 well.statistics$well) + 
-  scale_fill_distiller(type = "div", name = "reads")
-
-# How many reads per well (for the 96 index) replicate 2?
-well.statistics <- indel.statistics.tib %>% 
-  filter(replicate == "E1504") %>%
-  group_by(well) %>% 
-  dplyr::summarise(reads = sum(reads))
-  
-raw_map(well.statistics$reads, 
-                 well.statistics$well) + 
-  scale_fill_distiller(type = "div", name = "reads")
-
-
-# % of reads written from the total reads :
-
 
 ```
 
+```{r reads written per compound plate and replicate}
+# How many reads per well (for the 96 index) replicate 1 compound plate 1?
+well.statistics <- indel.statistics.tib %>% 
+  filter(replicate == "E177" & drug_plate == 1) %>%
+  group_by(well) %>% 
+  dplyr::summarise(reads = sum(reads))
+
+p1 = raw_map(well.statistics$reads, 
+                 well.statistics$well) + 
+  scale_fill_distiller(type = "div", name = "reads") + 
+  ggtitle("total reads: replicate 1 drug plate 1")
+
+# How many reads per well (for the 96 index) replicate 1 compound plate 2?
+well.statistics <- indel.statistics.tib %>% 
+  filter(replicate == "E177" & drug_plate == 2) %>%
+  group_by(well) %>% 
+  dplyr::summarise(reads = sum(reads))
+
+p2 = raw_map(well.statistics$reads, 
+                 well.statistics$well) + 
+  scale_fill_distiller(type = "div", name = "reads") + 
+  ggtitle("total reads: replicate 1 drug plate 2")
+
+# How many reads per well (for the 96 index) replicate 2 compound plate 1?
+well.statistics <- indel.statistics.tib %>% 
+  filter(replicate == "E1504" & drug_plate == 1) %>%
+  group_by(well) %>% 
+  dplyr::summarise(reads = sum(reads))
+  
+p3 = raw_map(well.statistics$reads, 
+                 well.statistics$well) + 
+  scale_fill_distiller(type = "div", name = "reads") + 
+  ggtitle("total reads: replicate 2 drug plate 1")
+
+# How many reads per well (for the 96 index) replicate 2 compound plate 2?
+well.statistics <- indel.statistics.tib %>% 
+  filter(replicate == "E1504" & drug_plate == 2) %>%
+  group_by(well) %>% 
+  dplyr::summarise(reads = sum(reads))
+  
+p4 = raw_map(well.statistics$reads, 
+                 well.statistics$well) + 
+  scale_fill_distiller(type = "div", name = "reads") + 
+  ggtitle("total reads: replicate 2 drug plate 2")
+
+# Compound plate 1 replicate 1
+p1
+# Compound plate 2 replicate 1
+p2 
+# Compound plate 1 replicate 2
+p3
+# Compound plate 2 replicate 2
+p4
+```
+
+
+## Plate plots - total reads per well
 ```{r reads per well replicate 1, fig.width = 12, fig.height = 4}
 for (i in 1:18) {
   
@@ -183,7 +240,7 @@ for (i in 1:18) {
   data <- filter(indel.statistics.tib, plate == i, replicate == "E177")
   
   # Find reasonable limits 
-  limits <- c(1000, 35000)
+  limits <- c(2000, 35000)
   
     # Plot this, first the read cound density
   y <- density(data$reads)
@@ -213,7 +270,7 @@ for (i in 1:18) {
   data <- filter(indel.statistics.tib, plate == i, replicate == "E1504")
   
   # Find reasonable limits 
-  limits <- c(1000, 300000)
+  limits <- c(2000, 300000)
 
   # Plot this, first the read cound density
   y <- density(data$reads)
@@ -236,10 +293,178 @@ for (i in 1:18) {
 }
 ```
 
+## Cell viability checks
+We need to check how well the cell viability worked. If the controls are ok, if it was reproducible between experiments and if the viability can explain some of the missing reads.
+
+```{r}
+
+```
+
+
+## Checking how many reads are written after the snakemake script per plate.
+### Combined plates
+
+```{r percent reads written per compound plate and replicate}
+# % of reads written from the total reads :
+# How many % written per well (for the 96 index) replicate 1 compound plate 1?
+well.statistics <- indel.statistics.tib %>% 
+  filter(replicate == "E177" & drug_plate == 1) %>%
+  group_by(well) %>% 
+  dplyr::summarise(r_written_pct = sum(r_written_pct))
+
+p1 = raw_map(well.statistics$r_written_pct, 
+                 well.statistics$well) + 
+  scale_fill_distiller(type = "div", name = "% written") + 
+  ggtitle("% of reads written from the total reads: replicate 1 drug plate 1")
+
+# How many % written per well (for the 96 index) replicate 1 compound plate 2?
+well.statistics <- indel.statistics.tib %>% 
+  filter(replicate == "E177" & drug_plate == 2) %>%
+  group_by(well) %>% 
+  dplyr::summarise(r_written_pct = sum(r_written_pct))
+
+p2 = raw_map(well.statistics$r_written_pct, 
+                 well.statistics$well) + 
+  scale_fill_distiller(type = "div", name = "% written") + 
+  ggtitle("% of reads written from the total reads: replicate 1 drug plate 2")
+
+# How many % written per well (for the 96 index) replicate 2 compound plate 1?
+well.statistics <- indel.statistics.tib %>% 
+  filter(replicate == "E1504" & drug_plate == 1) %>%
+  group_by(well) %>% 
+  dplyr::summarise(r_written_pct = sum(r_written_pct))
+  
+p3 = raw_map(well.statistics$r_written_pct, 
+                 well.statistics$well) + 
+  scale_fill_distiller(type = "div", name = "% written") + 
+  ggtitle("% of reads written from the total reads: replicate 2 drug plate 1")
+
+# How many % written per well (for the 96 index) replicate 2 compound plate 2?
+well.statistics <- indel.statistics.tib %>% 
+  filter(replicate == "E1504" & drug_plate == 2) %>%
+  group_by(well) %>% 
+  dplyr::summarise(r_written_pct = sum(r_written_pct))
+  
+p4 = raw_map(well.statistics$r_written_pct, 
+                 well.statistics$well) + 
+  scale_fill_distiller(type = "div", name = "% written") + 
+  ggtitle("% of reads written from the total reads: replicate 2 drug plate 2")
+
+# Compound plate 1 replicate 1
+p1
+# Compound plate 2 replicate 1
+p2 
+# Compound plate 1 replicate 2
+p3
+# Compound plate 2 replicate 2
+p4
+```
+
+### Numbers per individual plate
+
+
+```{r percent reads written per well replicate 1 and 2, fig.width = 12, fig.height = 4}
+for (i in seq(1, 18, 2)) {
+  
+  # Select the flowjo data set
+  data_dp1_rep1 <- filter(indel.statistics.tib, plate == i, replicate == "E177")
+  data_dp2_rep1 <- filter(indel.statistics.tib, plate == i+1, replicate == "E177")  
+  data_dp1_rep2 <- filter(indel.statistics.tib, plate == i, replicate == "E1504")
+  data_dp2_rep2 <- filter(indel.statistics.tib, plate == i+1, replicate == "E1504")
+  # Find reasonable limits 
+  limits <- c(0, 1)
+  
+    # Then the plate with color-coded wells compound plate 1 rep 1
+  plt1 <- raw_map(data_dp1_rep1$r_written_pct, 
+                 data_dp1_rep1$well) +
+    ggtitle(unique(gsub("(.*)_...$", "\\1", data_dp1_rep1$ID))) +
+    scale_fill_distiller(type = "div", limits = limits, name = "r_written_pct")
+  
+  # Then the plate with color-coded wells compound plate 2 rep 1
+  plt2 <- raw_map(data_dp2_rep1$r_written_pct, 
+                 data_dp2_rep1$well) +
+    ggtitle(unique(gsub("(.*)_...$", "\\1", data_dp2_rep1$ID))) +
+    scale_fill_distiller(type = "div", limits = limits, name = "r_written_pct")
+
+      # Then the plate with color-coded wells compound plate 1 rep 2
+  plt3 <- raw_map(data_dp1_rep2$r_written_pct, 
+                 data_dp1_rep2$well) +
+    ggtitle(unique(gsub("(.*)_...$", "\\1", data_dp1_rep2$ID))) +
+    scale_fill_distiller(type = "div", limits = limits, name = "r_written_pct")
+  
+  # Then the plate with color-coded wells compound plate 2 rep 2
+  plt4 <- raw_map(data_dp2_rep2$r_written_pct, 
+                 data_dp2_rep2$well) +
+    ggtitle(unique(gsub("(.*)_...$", "\\1", data_dp2_rep2$ID))) +
+    scale_fill_distiller(type = "div", limits = limits, name = "r_written_pct")
+    
+  grid.arrange(plt1, plt2, plt3, plt4, ncol = 2)
+}
+```
+I these plots we see that a couple of plates have low percentage reads written generally - average ~ 50% reads written (E1504 plates 11 & 13) and some other plates have some sparse wells with 0 reads written (E1504 plates 1, 3, 7, 12, & 15) and one plates that has many wells that have pat1 missing (E1504 plate 2).
+
+### Identification of the low reads written
+```{r}
+low_pct_reads_written = indel.statistics.tib %>%
+  filter(r_written_pct < .7) %>% # filter for less than 50% reads written 
+  mutate(pat1_missing = pat1 / reads, 
+         pat2_missing = pat2 / reads) %>%
+  gather(key = "string", value = "pct", pat1_missing, pat2_missing)
+
+low_pct_reads_written %>% 
+  filter(replicate == "E1504" & plate %in% c(11, 13)) %>%
+  ggplot(., aes(as.character(well), pct, color = string)) + 
+  geom_jitter(width = 0.3, height = 0) + 
+  facet_wrap(replicate ~ plate, scales = "free_x") +
+  ylim(0, 1)
+
+low_pct_reads_written %>%
+  filter(!plate %in% c(11, 13, 2)) %>%
+  ggplot(., aes(as.character(well), pct, color = string)) + 
+  geom_jitter(width = 0.3, height = 0) + 
+  facet_wrap(replicate ~ plate, scales = "free_x") +
+  ylim(0, 1)
+
+low_pct_reads_written %>% 
+  filter(replicate == "E1504" & plate == 2) %>%
+  ggplot(., aes(as.character(well), pct, color = string)) + 
+  geom_jitter(width = 0.3, height = 0) + 
+  facet_wrap(replicate ~ plate, scales = "free_x") +
+  ylim(0, 1)
+```
+
+Plates 11 and 13 from replicate E1504 seem to have a rather poor quality. 
+
+E1504 plate 2 seems to be missing a whole part of the plate, why I don't know.
+
+E1504 plate 12 is missing a complete column. It also has very low reads, it seems that the robot made a mistake for that set and missed a whole column while pipetting PCR1. 
+
+## What is up with these low read wells
+Some of these wells have very low reads, part is due to sequence quality as seen from above, missing patterns in the sequence.. I will check the raw reads to try to understand what is going on. But I also want to know why some wells have in general low reads, not due to the pipeline filtering them out.
+
+```{r low read wells}
+# Filter all the wells for less than 2000 reads, this would be equal to about 1000 reads per barcode per well
+# That ratio is the minimal ratio we want for our balance calculations
+low.reads = indel.statistics.tib %>% filter(reads < 2000)
+
+# How many wells are there? 
+low_r = indel.statistics.tib %>% filter(reads < 2000) %>% nrow(.)
+low_r
+hi_r = indel.statistics.tib %>% filter(reads >= 2000) %>% nrow(.)
+hi_r
+# Fraction of total:
+low_r / hi_r
+
+# 
+```
+The proportion of wells that we cannot use for the balance is in general super low < 5%.
 
 # Conclusion
 - In general, the data looks very good
-- Some plates have wells with 0 reads - other wells take over the reads in this plate - we have to investigate further whether this can be a problem.
+- Plates 11 and 13 from replicate E1504 seem to have a rather poor quality. 
+- E1504 plate 2 seems to be missing a whole part of the plate, why I don't know.
+- E1504 plate 12 is missing a complete column. It also has very low reads, it seems that the robot made a mistake for that set and missed a whole column while pipetting PCR1. 
+
 
 # Session Info  
 ```{r}
