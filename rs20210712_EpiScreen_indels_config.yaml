@@ -1,0 +1,138 @@
+outdir: '/DATA/projects/DSBrepair/data/rs20210628_EpiScreen'
+
+
+## META_INFO has to contain the following headers in a tab seperated file format:
+# ID: unique identifier for experiment set (e.g. indelPCR and bcPCR pair)
+# PCR_type: type of the PCR used [bcPCR, indelPCR or iPCR]
+# file: name of the input file (path from indir directory)
+META_INFO: '/DATA/projects/DSBrepair/git/EpiScreen/rs20210713_E177_E1504_EpiScreen_metadata.txt'
+
+## This meta-data file was generated from the directory with input files,
+## in the following way:
+#
+# ls *TimeSeries*.fq.gz | \
+#     awk -F '_' -vOFS='\t' '
+#         BEGIN{
+#             print "ID", "index", "well", "series", "PCR_type", "clone",
+#                   "guide", "t", "file"
+#         }{
+#             print $3"_"$5"_"$6"_"$7, $2, $8, $3, $4, $5, $6, $7, $0
+#         }' > ../../../../cl20190306_metadata_timeseries.tsv
+
+
+structure:
+  iPCR: |
+    ID      5'      3'      type    req     second-read     pos   keep-bases
+    index   %i      -       const   present False   fixed   -
+    map_pat1a       GTCACAAGGGCCGGC   -       const   present False   fixed   -
+    const_bar       CACAA{16}TGATC  -       const_bar       present False   fixed   -
+    rev_map_complement      -       TTAACCCTAGAAAGATAATCATATTGTGACGTAC      const   -       False   var   -
+    rev_map GTACGTCACAATATGATTATCTTTCTAGGGTTAA      -       const   present True    fixed   4
+    fwd_map_complement      -       GATCA[BC]TTGTGGCCGGCCCTTGTGAC     const_bar_comp  -       True    var   -
+
+  indelPCR: |
+    ID      5'      3'      type    req     second-read     pos   keep-bases
+    index   %i      -       const   present False   fixed   -
+    pat1       GTCACAAGGGCCGGCCACAA   -       const   present False   fixed   -
+    barcode 16 - barcode present False fixed -
+    pat2       TGATCG   -       const   present False   fixed   6
+
+  bcPCR: |
+    ID      5'      3'      type    req     second-read     pos   keep-bases
+    index   %i      -       const   present False   fixed   -
+    pat1       GTCACAAGGGCCGGCCACAA   -       const   present False   fixed   -
+    barcode 16 - barcode present False fixed -
+    pat2       TGATCG   -       const   present False   fixed   6
+
+lev_dist: 2
+
+min_count:
+    iPCR: 3
+    indelPCR: 0
+    bcPCR: 0
+
+celltype: K562
+
+bowtie:
+  index:  /DATA/data/human/hg38/index/bowtie2/hg38_1-22_XYM
+  options:
+      '1': ['--very-sensitive']
+      '2': ['--very-sensitive-local']
+max_dist:
+  '1': 500
+  '2': 20
+
+# crispr_target:
+#     wt: 'GTGGTAAGAGGTCGATGG'
+#     ssODN: 'GTGGTAAGAGATGTCGAT'
+# crispr_gap: 10
+# breaksite: 73
+
+
+
+sequence:
+    "TGATCGGTACCAACTCCAGCAGGACCATGTGATCGAAAATGCCAAGTAGGAAATTTGCCGATGGTGAAGTGGTAAGAGGTCGATGGCCTGGGAGTTCACTTT"
+
+
+crispr_info:
+    LBR1:
+        seq:
+            "TGATCGGTACCAACTCCAGCAGGACCATGTGATCGAAAATGCCAAGTAGGA\
+             AATTTGCCGATGGTGAAGTGGTAAGAGGTCGATGGCCTGGGAGTTCACTTT\
+             ATTATGAAGTAGAAATTAGATCGGAAGAGCACACGTCTGAACTCCAGTCAC"
+        cut_site: 66
+        pam_site: 69
+        target:
+            wt: 'CCGATGGTGAAGTGGTAA'
+        spacer_list: ['TGGCCT', 'GGAGTT', 'CACTTT', 'ATTATG', 'GAAGTA', 'ATTAGA', 'GGAAGA']
+        gap_list: [83, 90, 96, 102, 107, 116, 124]
+
+    LBR2:
+        seq:
+            "TGATCGGTACCAACTCCAGCAGGACCATGTGATCGAAAATGCCAAGTAGGA\
+             AATTTGCCGATGGTGAAGTGGTAAGAGGTCGATGGCCTGGGAGTTCACTTT\
+             ATTATGAAGTAGAAATTAGATCGGAAGAGCACACGTCTGAACTCCAGTCAC"
+        cut_site: 73
+        pam_site: 76
+        target:
+            wt: 'GTGGTAAGAGGTCGATGG'
+            ssODN: 'GTGGTAAGAGATGTCGAT'
+        spacer_list: ['TGGCCT', 'GGAGTT', 'CACTTT', 'ATTATG', 'GAAGTA', 'ATTAGA', 'GGAAGA']
+        gap_list: [83, 90, 96, 102, 107, 116, 124]
+
+    LBR12:
+        seq:
+            "TGATCGGTACCAACTCCAGCAGGACCATGTGATCGAAAATGCCAAGTAGGA\
+             AATTTGCCGATGGTGAAGTGGTAAGAGGTCGATGGCCTGGGAGTTCACTTT\
+             ATTATGAAGTAGAAATTAGATCGGAAGAGCACACGTCTGAACTCCAGTCAC"
+        cut_site: 80
+        pam_site: 83
+        target:
+            wt: 'GTGAAGTGGTAAGAGGTCGA'
+        spacer_list: ['TGGCCT', 'GGAGTT', 'CACTTT', 'ATTATG', 'GAAGTA', 'ATTAGA', 'GGAAGA']
+        gap_list: [83, 90, 96, 102, 107, 116, 124]
+
+    LBR15:
+        seq:
+            "TGATCGGTACCAACTCCAGCAGGACCATGTGATCGAAAATGCCAAGTAGGA\
+             AATTTGCCGATGGTGAAGTGGTAAGAGGTCGATGGCCTGGGAGTTCACTTT\
+             ATTATGAAGTAGAAATTAGATCGGAAGAGCACACGTCTGAACTCCAGTCAC"
+        cut_site: 92
+        pam_site: 86
+        target:
+            wt: 'TGGCCTGGGAGTTCACTTTA'
+        spacer_list: ['CACTTT','ATTATG', 'GAAGTA', 'ATTAGA', 'GGAAGA']
+        gap_list: [96, 102, 107, 116, 124]
+
+    default:
+        seq:
+            "TGATCGGTACCAACTCCAGCAGGACCATGTGATCGAAAATGCCAAGTAGGA\
+             AATTTGCCGATGGTGAAGTGGTAAGAGGTCGATGGCCTGGGAGTTCACTTT\
+             ATTATGAAGTAGAAATTAGATCGGAAGAGCACACGTCTGAACTCCAGTCAC"
+        cut_site: 73
+        pam_site: 76
+        target:
+            wt: 'GTGGTAAGAGGTCGATGG'
+            ssODN: 'GTGGTAAGAGATGTCGAT'
+        spacer_list: ['TGGCCT', 'GGAGTT', 'CACTTT', 'ATTATG', 'GAAGTA', 'ATTAGA', 'GGAAGA']
+        gap_list: [83, 90, 96, 102, 107, 116, 124]

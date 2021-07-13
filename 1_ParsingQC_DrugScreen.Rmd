@@ -3,16 +3,14 @@ title: "Parsing_QC"
 author: "Ruben Schep"
 date: "`r format(Sys.time(), '%Y-%m-%d')`"
 output:
-  pdf_document:
-    toc: yes
-  editor_options:
-    chunk_output_type: console
   html_document:
-    theme: journal
+    theme: journal #cerulean
     highlight: monochrome
-    toc: yes
-    toc_float: yes
+    toc: true
+    toc_float: true
     code_folding: show
+  editor_options:rm - 
+    chunk_output_type: console
 ---
 
 knitr document van Steensel lab
@@ -97,7 +95,7 @@ These are data from the crispr-trip.snake script, and a text file that has has b
 
 ```{r Data import}
 # Import metadata 
-file = "/DATA/projects/DSBrepair/config/rs20210712_E177_E1504_EpiScreen_metadata.txt"
+file = "/DATA/projects/DSBrepair/git/EpiScreen/rs20210713_E177_E1504_EpiScreen_metadata.txt"
 screen_meta_data = fread(file, header = TRUE)
 
 # load the statistics data from the indels.
@@ -127,13 +125,24 @@ cell.viab.data = fread("/DATA/projects/DSBrepair/git/EpiScreen/files_scripts/mt2
 # Rename the ID to match this pattern : E1504_01_100_1_1_A01
 cell.viab.data %<>% mutate(ID = gsub("nm|um|plate|rep", "", ID)) %>% 
   separate(ID, into = c("concentration", "tech", "drug_plate", "well", "drug_no"), sep = "_") %>% 
+  # change the class of the variables to integers
   mutate(concentration = as.integer(concentration),
          tech = as.integer(tech),
          drug_plate = as.integer(drug_plate),
-         drug_no = as.integer(drug_no)) %>%
-  gather(E177, E1504, key = "replicate", value = "viability")
+         drug_no = as.integer(drug_no),
+         well = str_replace_all(well, "(\\D)(?=\\d(\\D|\\b))", "\\10")) %>% # add leading 0 to the well string
+  gather(E177, E1504, key = "replicate", value = "viability") # make long
 
-indel.statistics.tib %<>% left_join(cell.viab.data)
+
+## FIX THIS...
+indel.statistics.tib %>% left_join(cell.viab.data) %>%
+  dplyr::group_by(drug, replicate) %>%
+  dplyr::mutate(ctrl_mean = mean(viability[drug == "DMSO"]),
+         viab_norm = viability / ctrl_mean) %>%
+  View()
+  
+  # dplyr::select(-ctrl_mean)
+  
 
 ```
 
@@ -455,7 +464,9 @@ hi_r
 # Fraction of total:
 low_r / hi_r
 
-# 
+#
+
+indel.statistics.tib %>% distinct(ID, drug, well, concentration, replicate, viab_norm) %>% spread(replicate, viab_norm) 
 ```
 The proportion of wells that we cannot use for the balance is in general super low < 5%.
 
