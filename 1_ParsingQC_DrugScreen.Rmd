@@ -49,6 +49,8 @@ library(purrr)
 library(cowplot)
 library(data.table)
 library(gghighlight)
+
+out.dir = "/DATA/projects/DSBrepair/git/EpiScreen/files_scripts/"
 ```
  
 ## Custom functions  
@@ -120,7 +122,8 @@ indel.statistics.tib %<>%
   mutate(r_written_pct = reads_written / reads)
 
 # Import the cell viability data
-cell.viab.data = fread("/DATA/projects/DSBrepair/git/EpiScreen/files_scripts/mt20200618_viability_rep1-2.csv", sep = ";", col.names = c("ID", "E177", "E1504"))
+cell.viab.data = fread(paste0(out.dir, "mt20200618_viability_rep1-2.csv"), 
+                       sep = ";", col.names = c("ID", "E177", "E1504"))
 
 # Process the cell viability and add it to the indel stat table. 
 # Rename the ID to match this pattern : E1504_01_100_1_1_A01
@@ -144,7 +147,15 @@ indel.statistics.tib %<>% left_join(cell.viab.data) %>%
                             paste0(concentration, " µM")),
                          conc_char = factor(conc_char, 
                                             levels = c("100 nM", "1 µM", "10 µM"))) %>%
-  dplyr::select(-ctrl_mean) # remove this column
+  dplyr::select(-ctrl_mean, -bp, -bp_written) # remove this column
+
+
+indel.statistics.tib %>% 
+  dplyr::select(-reads_written, -n_tooshort, 
+                -index, -pat1, -barcode,  -pat2) %>% 
+  write_rds(., 
+            file = paste0(out.dir, 
+                          "rs20210626_Episcreen_Reads_Viab_Metadata.RDS"))
 ```
 
 

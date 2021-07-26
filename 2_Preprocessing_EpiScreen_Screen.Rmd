@@ -348,27 +348,57 @@ pointmut / all * 100
 # remove the point mutations from the datatable
 mutations.dt = mutations.dt[type != "wt_point_mut"]
 dim(mutations.dt)
+
+## For the time being, let's also remove the +1 and -1 WT. 
+# until I understand what Christ means with it
+mutations.dt = mutations.dt[!(type == "wt" & mutation != 0)]
+dim(mutations.dt)
+# same for ssODN
+mutations.dt = mutations.dt[type != "ssODN"]
+dim(mutations.dt)
 ```
+
+```{r}
+mutations.dt[, norm:=count/sum(count), by=exp,]
+mutations.dt[, freq := norm/sum(norm, na.rm = TRUE), 
+             by = c("barcode","exp")]
+
+mutations.dt[!mutation%in%c(0,NA), 
+             ratio_indels := norm/sum(norm, na.rm = TRUE), 
+             by=c("barcode","exp")]
+```
+
 
 0.27% of all the reads are not clear and 1.8% of all the reads are point mutations in the guide sequence.
 
+```{r merge metadata and filtering}
+screen_indels_tib = as_tibble(mutations.dt) %>% left_join(indel_statistics_tib, by = c("exp" = "ID")) %>%
+  mutate(sum_bc_reads )
+
+screen_indels_tib %>%
+  filter(viab_norm > .5)
+```
+
+
 # Add identifiers and compute indel ratios
 ```{r calculate_ratios}
-screen_indels_tib = as_tibble(mutations.dt) %>% left_join(indel_statistics_tib, by = c("exp" = "ID"))
 
 
-# Let's plot the distribution of the amount of reads per drug
-ggplot(indels_tib, aes(read.count)) + geom_density(fill = "#3D9F83") + theme_bw() + 
-  labs(title = "read distribution per barcode") + 
-  facet_wrap(~barcode) + xlim(0, 200)
 
-# Filter out noisy data
-indels_tib$read.count1.7 <- rowSums(indels_tib[,c("X.7","X1")])
+# # Let's plot the distribution of the amount of reads per drug
+# ggplot(indels_tib, aes(read.count)) + geom_density(fill = "#3D9F83") + theme_bw() + 
+#   labs(title = "read distribution per barcode") + 
+#   facet_wrap(~barcode) + xlim(0, 200)
 
 
 # Calculate NHEJ/MMEJ ratios and efficiency
-indels_tib <- indels_tib %>%
-  mutate(freqMMEJ = X.7 / all.indels,
+indels_tib <- screen_indels_tib %>%
+  dplyr::select(exp, barcode, mutation, count) %>% 
+  pivot_wider(names_from = mutation, 
+              values_from = count, 
+              values_fill = 0)
+  mutate(
+    freqMMEJ = X.7 / all.indels,
          freqNHEJ = X1 / all.indels,
          NHEJMMEJratio = freqMMEJ / freqNHEJ,
          MMEJscore = freqMMEJ / (freqMMEJ + freqNHEJ),
