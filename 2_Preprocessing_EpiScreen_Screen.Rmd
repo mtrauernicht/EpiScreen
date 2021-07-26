@@ -360,8 +360,9 @@ mutations.dt = mutations.dt[type != "ssODN"]
 dim(mutations.dt)
 ```
 
+0.27% of all the reads are not clear and 1.8% of all the reads are point mutations in the guide sequence.
 
-```{r}
+```{r merging technical replicates and calculating frequencies}
 # First measure the ratio before doing the sum of the technical replicates: 
 mutations.dt[, norm := count/sum(count), by=exp,]
 mutations.dt[, c("freq", "sum_bc_tech_reads") := list(norm/sum(norm, na.rm = TRUE), sum(count)), 
@@ -400,48 +401,32 @@ mutations.pool.dt[!mutation%in%c(0,NA),
              ratio_indels_pooled := norm_pooled/sum(norm_pooled, na.rm = TRUE), 
              by=c("barcode","ID")]
 
-
-```
-
-
-
-0.27% of all the reads are not clear and 1.8% of all the reads are point mutations in the guide sequence.
-
-```{r merge metadata and filtering}
-
-screen_indels_tib %>%
-  # Join the reads per bc
-  left_join(sum_bc_reads, by = c("barcode", "ID")) %>%
-  # Join the summed tech reads
-  left_join(count_rep, by = c("barcode", "ID", "mutation")) %>%
-  filter(sum_bc_reads > 200) # Filter for samples with at least 200 total reads. 
+# Merge the data
+indel.dt = merge(mutations.dt, mutations.pool.dt, by = c("barcode", "ID", "mutation", "count_rep"))
 ```
 
 
 # Add identifiers and compute indel ratios
 ```{r calculate_ratios}
+# Calculate NHEJ/MMEJ ratios and efficiences
 
-
-
-# # Let's plot the distribution of the amount of reads per drug
-# ggplot(indels_tib, aes(read.count)) + geom_density(fill = "#3D9F83") + theme_bw() + 
-#   labs(title = "read distribution per barcode") + 
-#   facet_wrap(~barcode) + xlim(0, 200)
-
-
-# Calculate NHEJ/MMEJ ratios and efficiency
-indels_tib <- screen_indels_tib %>%
-  dplyr::select(exp, barcode, mutation, count) %>% 
+### WIP #####
+ratios_split_tib <- indel.dt %>%
+  as_tibble() %>%
+  dplyr::distinct(exp, barcode, mutation, freq) %>% 
   pivot_wider(names_from = mutation, 
-              values_from = count, 
-              values_fill = 0)
-  mutate(
-    freqMMEJ = X.7 / all.indels,
-         freqNHEJ = X1 / all.indels,
+              values_from = ratio_indels, 
+              values_fill = 0) %>%
+  mutate(freqMMEJ = `-7` / (1 - `0`),
+         freqNHEJ = `1` / (1 - `0`),
          NHEJMMEJratio = freqMMEJ / freqNHEJ,
          MMEJscore = freqMMEJ / (freqMMEJ + freqNHEJ),
          NHEJscore = freqNHEJ / (freqNHEJ + freqMMEJ),
-         freqCut = 1 - (X0 / (X0 + all.indels)))
+         freqCut = 1 - (`0`)) %>%
+  distinct(exp, barcode, freqMMEJ, freqNHEJ, NHEJMMEJratio, freqCut)
+
+##### STOPPED HERE 20210726 ########
+
 indels_tib <- indels_tib %>%
   dplyr::select(drug, target, well, barcode, replicate, tech, concentration, plate, drug_plate, freqMMEJ, freqNHEJ,
          NHEJMMEJratio, MMEJscore, NHEJscore, freqCut, read.count1.7, ID, run)
