@@ -293,7 +293,9 @@ head(names(df.list))
 n.samples <- length(df.list)
 
 # Load the indel statistics with the metadata generated in the parsing script.
-indel_statistics_tib = readRDS("/DATA/projects/DSBrepair/git/EpiScreen/files_scripts/rs20210626_Episcreen_Reads_Viab_Metadata.RDS")
+indel.statistics.dt = as.data.table(readRDS("/DATA/projects/DSBrepair/git/EpiScreen/files_scripts/rs20210626_Episcreen_Reads_Viab_Metadata.RDS"))
+
+setnames(indel.statistics.dt, "ID", "exp")
 
 # Import RSTP2 clone 5 barcode list (in total 19 barcodes) - "CTCTTAATCGCTGCC" (20)
 barcodes.list <- c("AGGGCGTAAAATATTT", "TATGGCTGTCGGGTAG", "TGTCCCTTAGTACTTT", 
@@ -320,12 +322,6 @@ mut.list = mclapply(names(df.list), function(exp){
                          dt)
   return(dt_exp)
 }, mc.cores = 10)
-
-mutations.dt = do.call(rbind, c(mut.list, fill = T))
-dim(mutations.dt) 
-# Remove NA counts
-mutations.dt = mutations.dt[!is.na(count)]
-dim(mutations.dt)
 ```
 
 
@@ -333,6 +329,12 @@ dim(mutations.dt)
 Check how many reads are in general not clear or called as point mutations. 
 
 ```{r indeldataframe}
+mutations.dt = do.call(rbind, c(mut.list, fill = T))
+dim(mutations.dt) 
+# Remove NA counts
+mutations.dt = mutations.dt[!is.na(count)]
+dim(mutations.dt)
+
 ## Not clear reads:
 notclear = mutations.dt %>% filter(type == "not_clear") %>% pull(count) %>% sum()
 all = mutations.dt %>%  pull(count) %>% sum()
@@ -358,25 +360,61 @@ mutations.dt = mutations.dt[type != "ssODN"]
 dim(mutations.dt)
 ```
 
+
 ```{r}
-mutations.dt[, norm:=count/sum(count), by=exp,]
-mutations.dt[, freq := norm/sum(norm, na.rm = TRUE), 
+# First measure the ratio before doing the sum of the technical replicates: 
+mutations.dt[, norm := count/sum(count), by=exp,]
+mutations.dt[, c("freq", "sum_bc_tech_reads") := list(norm/sum(norm, na.rm = TRUE), sum(count)), 
              by = c("barcode","exp")]
 
 mutations.dt[!mutation%in%c(0,NA), 
              ratio_indels := norm/sum(norm, na.rm = TRUE), 
              by=c("barcode","exp")]
+
+mutations.dt = mutations.dt[sum_bc_tech_reads > 200]
+
+# Add an ID column that removes the technical replicates information 
+mutations.dt[, ID := gsub("^(E1504|E177)_[0-9][0-9]_(1|10|100)_[123]_([12]_...$)", 
+                                   "\\1_\\2_\\3", 
+                                   exp, 
+                                   perl = TRUE)]
+# Merge the indel statistics
+mutations.dt = merge(mutations.dt, indel.statistics.dt)
+# Filter the low viability reads
+mutations.dt = mutations.dt[viab_norm > 0.5]
+
+# Calculate the data now from the summed values. 
+mutations.dt[, c("count_rep", "viab_norm_pooled") := list(sum(count), mean(viab_norm)), by = c("ID", "barcode", "mutation")]
+
+cols = c("barcode", "ID", "mutation", "count_rep")
+mutations.pool.dt = mutations.dt[, ..cols]
+mutations.pool.dt = unique(mutations.pool.dt)
+
+mutations.pool.dt[, norm_pooled := count_rep/sum(count_rep), by = ID]
+
+mutations.pool.dt[, c("freq_pooled", "sum_pooled_bc_reads") := 
+               list(norm_pooled/sum(norm_pooled, na.rm = TRUE), sum(count_rep)), 
+             by = c("barcode","ID")]
+
+mutations.pool.dt[!mutation%in%c(0,NA), 
+             ratio_indels_pooled := norm_pooled/sum(norm_pooled, na.rm = TRUE), 
+             by=c("barcode","ID")]
+
+
 ```
+
 
 
 0.27% of all the reads are not clear and 1.8% of all the reads are point mutations in the guide sequence.
 
 ```{r merge metadata and filtering}
-screen_indels_tib = as_tibble(mutations.dt) %>% left_join(indel_statistics_tib, by = c("exp" = "ID")) %>%
-  mutate(sum_bc_reads )
 
 screen_indels_tib %>%
-  filter(viab_norm > .5)
+  # Join the reads per bc
+  left_join(sum_bc_reads, by = c("barcode", "ID")) %>%
+  # Join the summed tech reads
+  left_join(count_rep, by = c("barcode", "ID", "mutation")) %>%
+  filter(sum_bc_reads > 200) # Filter for samples with at least 200 total reads. 
 ```
 
 
