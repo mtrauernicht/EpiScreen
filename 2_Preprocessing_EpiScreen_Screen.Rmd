@@ -1,0 +1,441 @@
+---
+title: "Indel data & viability preprocessing"
+author: "Max Trauernicht & Ruben Schep"
+date: "`r format(Sys.time(), '%Y-%m-%d')`"
+output:
+  html_document:
+    theme: journal #cerulean
+    highlight: monochrome
+    toc: true
+    toc_float: true
+    code_folding: show
+  editor_options:
+    chunk_output_type: console
+---
+knitr document van Steensel lab
+
+# Preprocessing of the indel data
+# Introduction
+
+In this script I want to prepocess the raw data from the epigenetic screening into one dataframe containing all information: +1/-7 ratio, efficiency, etc. This should all be integrated with the drug and the drug target group corresponding to the well. 
+This will be used for plotting indel patterns, calculating ratios later on and such.
+
+* Efficiency (All mutations / Total or (Total - WT sequences) / Total)  
+* +1 / -7  
+
+
+## Description of Data
+
+For this analysis we need the mapping and the indel data of the TRIP integrations. These 
+files are obtained with the crispr_trip.snake script that C. Leemans edited. This data 
+contains the genomic locations of the TRIP integrations (hg38) and the indel frequencies 
+at each integration.
+
+The mutations were called by counting the distance between two constant regions. These
+were separated by barcode. The barcodes were also filtered on the starcode, to pick out
+the most abundant, and considered real, ones.
+
+Mutations files : *genuine_mapped.table
+
+| barcode  | type | score | 
+| ------- | --------- | ----- | 
+| TTCTATTCGCACACAA | ins | 1 |
+| TTTCCCACATCAGGAG | wt | 0 |
+| CCATAGTAGTGATTAC | del | -4 |
+
+# Data importing and processing
+## Path, Libraries, Parameters and Useful Functions
+```{r setup, message=FALSE, warnings=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+StartTime <-Sys.time()
+
+# 6-digit Date tag:
+Date <- substr(gsub("-","",Sys.time()),1,8) 
+
+# libraries:
+# library(devtools)
+# install_github("lawremi/rtracklayer")
+library(tidyverse)
+library(data.table)
+library(ggplot2)
+library(car)
+library(parallel)
+library(gtools)
+library(rtracklayer)
+library(platetools)
+library(plyr)
+library(ggpubr)
+```
+## Custom functions
+Functions used include all functions that have been used previously by Ruben (some of them might not be needed anymore, but are kept anyway). Functions 'CallTrueBarcodes' & 'RemoveLowReads' have been added by Max.
+```{r functions}
+SetFileName <- function(filename, initials) {
+  # Set filename with extension and initials to make filename with date integrated.
+  filename <- substitute(filename)
+  initials <- substitute(initials)
+  filename <- paste0(initials, substr(gsub("-","",Sys.time()),1,8), filename)
+  filename
+}
+
+CallTrueBarcodes <- function(df) {
+  df %<>% filter(barcode %in% barcodes.list)
+  df
+}
+
+RemoveLowReads <- function(reads) {
+  if (sum(reads$count) < 2000) {
+    reads <- NULL
+  } else {
+    reads 
+  } 
+}
+
+Read_Counts <- function(x) {
+  #This function sums all the reads per barcode
+  tmp <- x %>% group_by(barcode) %>% summarise(sum = sum(count))
+  tmp$barcode <- as.character(tmp$barcode)
+  colnames(tmp) <- c("barcode", "sum")
+  tmp
+}
+
+
+MutationsToDataframe <- function(mutations) {
+  # This function does
+  tmp <- dcast(mutations, formula = barcode ~ indel, value.var = "count", fun = sum)
+  tmp
+}
+
+RownamesList <- function(list) {
+  rownames(list) <- list$"V2"
+  list
+}
+  # n <- colnames(tmp)
+  # names(tmp) <- n
+
+IndelsOnly <- function(x) {
+  #This function removes the "not_clear and "point_mut" from the indels.
+  tmp <- x[!x$call %in% c("not_clear", "wt_point_mut"), ]
+  tmp
+}
+
+Not_Clear_Counts <- function(x){
+  tmp <- x[x$V3 == "not_clear", ]
+  tmp <- tmp[, c("V2", "V1")]
+  colnames(tmp) <- c("barcode", "not_clear")
+  tmp
+}
+
+Point_Mut_Counts <- function(x){
+  tmp <- x[x$V3 == "wt_point_mut", ]
+  tmp <- tmp[, c("V2", "V1")]
+  colnames(tmp) <- c("barcode", "point_mut")
+  tmp
+}
+
+RenameBarcodes <- function(list, pool) {
+# This function renames the barcodes in the samples to barcode.pool to remove ambuguity between the cell pools
+    for (i in pool) {
+    list[[i]]$V2 <- paste(list[[i]]$V2, deparse(substitute(pool)), sep = ".")
+  }
+  list
+}
+
+NAToZero <- function(DT) {
+  # This function changes NA to 0 in a data.table by name :
+  for (j in names(DT))
+    set(DT,which(is.na(DT[[j]])),j,0)
+  return(DT)
+  }
+
+RemoveBarcodeFromList_RN <- function(x, barcode) {
+  tmp <- x[!rownames(x)==barcode, ]
+  tmp
+}
+
+RemoveBarcodeFromList_barcode <- function(x, barcode) {
+  tmp <- x[!x$barcode==barcode, ]
+  tmp
+}
+
+CalculateRatio <- function(mutations, indel) {
+  # This function calculates the proportion of any indel over all the indels using the 
+  # dataframe created with MutationsToDataframe.
+  if (as.character(indel) %in% names(mutations)) {
+    indel_reads <- mutations[,as.character(indel)]
+    indel_reads <- as.matrix(indel_reads)
+    rownames(indel_reads) <- rownames(mutations)
+    
+    ratio=ifelse(((indel_reads==0) | mutations[, "0"]==0), NA, 
+                 as.numeric(mutations[,as.character(indel)]/(rowSums(mutations)-mutations[, "0"])))
+                 
+    ratio=round(ratio,3)
+    
+    df <- data.frame(barcode = as.character(row.names(mutations)),
+             ratio = ratio,
+             stringsAsFactors = FALSE)
+    colnames(df) <- c("barcode", paste0("ratio.", as.character(indel)))
+    df
+  } else {
+    df <- data.frame(barcode = as.character(row.names(mutations)),
+             ratio = NA, 
+             stringsAsFactors = FALSE) 
+    colnames(df) <- c("barcode", paste0("ratio.", as.character(indel)))
+    df
+  }
+}
+
+CalculatePercentage <- function(mutations, indel) {
+  # This function calculates the proportion of any indel over all the indels using the 
+  # dataframe created with MutationsToDataframe.
+  if (as.character(indel) %in% names(mutations)) {
+    indel_reads <- mutations[,as.character(indel)]
+    indel_reads <- as.matrix(indel_reads)
+    rownames(indel_reads) <- rownames(mutations)
+    
+    percentage=ifelse((indel_reads==0), 0, 
+                 as.numeric(mutations[,as.character(indel)]/(rowSums(mutations))*100))
+                 
+    percentage=round(percentage,3)
+    
+    df <- data.frame(barcode = as.character(row.names(mutations)),
+             percentage = percentage,
+             stringsAsFactors = FALSE) 
+    colnames(df) <- c("barcode", paste0("percentage.", as.character(indel)))
+    df
+  } else {
+    df <- data.frame(barcode = as.character(row.names(mutations)),
+             ratio = NA,
+             stringsAsFactors = FALSE) 
+    colnames(df) <- c("barcode", paste0("percentage.", as.character(indel)))
+    df
+  }
+}
+
+
+CalculateRatio_internal <- function(mutations, indel1, indel2){
+   # This function calculates the proportion of any indel over all the indels using the 
+  # dataframe created with MutationsToDataframe.
+  if (as.character(indel1) %in% names(mutations) & as.character(indel2) %in% names(mutations)) {
+    indel1_reads <- mutations[,as.character(indel1)]
+    indel1_reads <- as.matrix(indel1_reads)
+    rownames(indel1_reads) <- rownames(mutations)
+    
+    indel2_reads <- mutations[,as.character(indel2)]
+    indel2_reads <- as.matrix(indel2_reads)
+    rownames(indel2_reads)=rownames(mutations)
+    
+    ratio=ifelse(((indel1_reads==0 & indel2_reads==0) | indel2_reads==0), NA, 
+                 as.numeric(mutations[,as.character(indel1)]/mutations[,as.character(indel2)]))
+                 
+    ratio=round(ratio,3)
+    
+    df <- data.frame(barcode = row.names(mutations),
+             ratio = ratio,
+             stringsAsFactors = FALSE) 
+    colnames(df) <- c("barcode", paste0("ratio.", as.character(indel1), "_", as.character(indel2)))
+    df
+  } else {
+    df <- data.frame(barcode = row.names(mutations),
+             ratio = NA, 
+             stringsAsFactors = FALSE) 
+    colnames(df) <- c("barcode", paste0("ratio.", as.character(indel1), "_", as.character(indel2)))
+    df
+  }
+}
+
+CalculateEfficiencies <- function(efficiencies) {
+  # This function calculates the efficiency of the cut and repair at each barcode
+  # using the dataframe created with MutationsToDataframe.
+  data.frame(barcode = row.names(efficiencies),
+             efficiency = (1 - efficiencies[, "0"] / rowSums(efficiencies)) * 100)
+}
+
+CalculateInsertions <- function(insertions) {
+  # This function calculates the efficiency of the cut and repair at each barcode
+  # using the dataframe created with MutationsToDataframe.
+  data.frame(barcode = row.names(insertions),
+             insertions = (rowSums(insertions[, -grep('^[-0]',colnames(insertions))]) / rowSums(insertions)) * 100)
+}
+
+CalculateDeletions <- function(deletions) {
+  # This function calculates the efficiency of the cut and repair at each barcode
+  # using the dataframe created with MutationsToDataframe.
+  data.frame(barcode = row.names(deletions),
+             deletions = (rowSums(deletions[ ,grep('-',colnames(deletions))]) / rowSums(deletions)) * 100)
+}
+```
+
+## Data import
+Data import from mapping, files were generated on 21.01.2019.
+```{r import}
+# Import files in list and make individual tables
+# I use this if all the samples are good. Here however I do not use all the samples.
+file.list <- list.files("/DATA/projects/DSBrepair/data/rs20210628_EpiScreen/indelPCR_counts/",
+                        pattern="_.*[.]count", full.names=T)
+
+# import the data
+df.list <- mclapply(file.list, 
+                    read.table, 
+                    mc.cores = 20, 
+                    header = TRUE, 
+                    stringsAsFactors = FALSE, 
+                    col.names = c("barcode", "type", 
+                                  "mutation", "count"))
+# rename the lists
+names(df.list) <- gsub(".*?/(.*?)[.]cou.*", "\\1", file.list)
+# names(df.list) <- gsub("split", "-", names(df.list))
+
+
+# names(df.list) <- file.list
+# these are the samples
+head(names(df.list))
+# count the sample number
+n.samples <- length(df.list)
+
+# Load the indel statistics with the metadata generated in the parsing script.
+indel_statistics_tib = readRDS("/DATA/projects/DSBrepair/git/EpiScreen/files_scripts/rs20210626_Episcreen_Reads_Viab_Metadata.RDS")
+
+# Import RSTP2 clone 5 barcode list (in total 19 barcodes) - "CTCTTAATCGCTGCC" (20)
+barcodes.list <- c("AGGGCGTAAAATATTT", "TATGGCTGTCGGGTAG", "TGTCCCTTAGTACTTT", 
+                   "AGAAAATAATATGACG","CGGCCTGAAGGTCAGG","TTGAACGCGGGCTCGG",
+                   "GCTAACATCACGAATC", "GCGCACCCTTTAATTG","ACTGTCGAGTTGTCCG",
+                   "CCGGGGACGTATGCAC","TCTTTTGAGGAGCTGA","ATATCGTTGCTGGAGA",
+                   "CATCCACCACACTTCA","ACCCCTAAAGGCGCTG","ATACTATATTTAACGG",
+                   "CATTTCTGATCAATAA","GAGCGCGTCACCGGGT",
+                   "GTACCTCTCGATAGTG","TGGCCAATATTTGTCT")
+```
+
+
+```{r indel data table list}
+# Call true barcodes
+df.list <- mclapply(df.list, CallTrueBarcodes, mc.cores = 10)
+
+# To be able to setup the functions in a general way. This means in cases where we have A
+# and B samples.
+mut.list = mclapply(names(df.list), function(exp){
+  dt = data.table(df.list[[exp]])
+  dt[, mutation := as.character(mutation)]
+  # dt = dt[!type %in% c("not_clear", "wt_point_mut")] Let's keep this for later
+  dt_exp = data.table(exp = exp,
+                         dt)
+  return(dt_exp)
+}, mc.cores = 10)
+
+mutations.dt = do.call(rbind, c(mut.list, fill = T))
+dim(mutations.dt) 
+# Remove NA counts
+mutations.dt = mutations.dt[!is.na(count)]
+dim(mutations.dt)
+```
+
+
+### not clear and point mutatins
+Check how many reads are in general not clear or called as point mutations. 
+
+```{r indeldataframe}
+## Not clear reads:
+notclear = mutations.dt %>% filter(type == "not_clear") %>% pull(count) %>% sum()
+all = mutations.dt %>%  pull(count) %>% sum()
+notclear / all * 100
+
+# remove the inf from the datatable
+mutations.dt = mutations.dt[type != "not_clear"]
+dim(mutations.dt)
+# Point mutations: 
+pointmut = mutations.dt %>% filter(type == "wt_point_mut") %>% pull(count) %>% sum()
+pointmut / all * 100
+
+# remove the point mutations from the datatable
+mutations.dt = mutations.dt[type != "wt_point_mut"]
+dim(mutations.dt)
+```
+
+0.27% of all the reads are not clear and 1.8% of all the reads are point mutations in the guide sequence.
+
+# Add identifiers and compute indel ratios
+```{r calculate_ratios}
+screen_indels_tib = as_tibble(mutations.dt) %>% left_join(indel_statistics_tib, by = c("exp" = "ID"))
+
+
+# Let's plot the distribution of the amount of reads per drug
+ggplot(indels_tib, aes(read.count)) + geom_density(fill = "#3D9F83") + theme_bw() + 
+  labs(title = "read distribution per barcode") + 
+  facet_wrap(~barcode) + xlim(0, 200)
+
+# Filter out noisy data
+indels_tib$read.count1.7 <- rowSums(indels_tib[,c("X.7","X1")])
+
+
+# Calculate NHEJ/MMEJ ratios and efficiency
+indels_tib <- indels_tib %>%
+  mutate(freqMMEJ = X.7 / all.indels,
+         freqNHEJ = X1 / all.indels,
+         NHEJMMEJratio = freqMMEJ / freqNHEJ,
+         MMEJscore = freqMMEJ / (freqMMEJ + freqNHEJ),
+         NHEJscore = freqNHEJ / (freqNHEJ + freqMMEJ),
+         freqCut = 1 - (X0 / (X0 + all.indels)))
+indels_tib <- indels_tib %>%
+  dplyr::select(drug, target, well, barcode, replicate, tech, concentration, plate, drug_plate, freqMMEJ, freqNHEJ,
+         NHEJMMEJratio, MMEJscore, NHEJscore, freqCut, read.count1.7, ID, run)
+
+
+# Exclude NA rows
+indels_tib <- indels_tib[rowSums(is.na(indels_tib)) != ncol(indels_tib), ]
+
+# Add sample identifier
+indels_tib$sample <- "drug"
+indels_tib$sample[indels_tib$drug == "DMSO"] <- "DMSO"
+indels_tib$sample[indels_tib$drug == "DNA-PKi"] <- "DNA-PKi"
+indels_tib$sample[indels_tib$drug == "Mirin"] <- "Mirin"
+
+
+
+indels_tib %>% distinct(replicate, MMEJscore, concentration, plate, drug_plate, tech, barcode, drug, well, target, sample, run) %>% filter(replicate == "E1504") %>%
+  spread(run, MMEJscore) %>% 
+  mutate(class = ifelse(target == "HDAC", "HDAC", sample)) %>% 
+  filter(class %in% c("DMSO", "HDAC")) %>%
+           ggplot(., aes(run1, run2)) +  
+    geom_point() +
+    geom_smooth(method= "loess") +
+    theme_bw(base_size = 16) +
+    stat_cor(method = "spearman", label.x.npc = "left", label.y.npc = 0.1) + 
+    coord_fixed()
+
+indels_tib %>% distinct(replicate, MMEJscore, concentration, plate, drug_plate, tech, barcode, drug, well, target, sample, run) %>% filter(run == "run1") %>%
+  spread(replicate, MMEJscore) %>% 
+  mutate(class = ifelse(target == "HDAC", "HDAC", sample)) %>% 
+  filter(class %in% c("DMSO", "HDAC")) %>%
+           ggplot(., aes(E1504, E177)) +  
+    geom_point() +
+    geom_smooth(method= "loess") +
+    theme_bw(base_size = 16) +
+    stat_cor(method = "spearman", label.x.npc = "left", label.y.npc = 0.1) + 
+    coord_fixed()
+
+
+indels_tib %>% distinct(replicate, read.count1.7, concentration, plate, drug_plate, tech, barcode, drug, well, target, sample, run) %>% filter(replicate == "E1504") %>% group_by(plate, concentration) %>% dplyr::summarise(total_plus1min7_reads = sum(read.count1.7)) %>% ggplot(., aes(plate, total_plus1min7_reads, fill = as.character(concentration))) + geom_bar(stat = "identity")  + 
+  theme_bw(base_size = 16) + 
+  ylab("total +1 & -7 reads")
+```
+
+## Processed data export
+The files will be saved in the processed data folder.
+```{r export}
+setwd("/DATA/projects/DSBrepair/data/R/EpiScreen/")
+# The mutations list that can be loaded for the indel spectra plots.
+filename <- SetFileName("_drug_screen_mutations_rep2", "rs")
+save(indels_tib, file = filename)
+```
+
+### Conclusions 
+Looks all fine! Now, we can generate indel plots and look in detail at the ratios.
+
+### Session Info
+```{r session_info}
+sessionInfo()
+getwd()
+date()
+paste("Run time: ",format(Sys.time()-StartTime))
+
+```
+
