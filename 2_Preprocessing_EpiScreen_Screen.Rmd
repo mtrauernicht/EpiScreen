@@ -52,6 +52,11 @@ StartTime <-Sys.time()
 # 6-digit Date tag:
 Date <- substr(gsub("-","",Sys.time()),1,8) 
 
+## Select outdir
+out.dir = paste0("/DATA/projects/DSBrepair/data/R/rs", Date, "_episcreen/")
+dir.create(out.dir, showWarnings = FALSE)
+
+
 # libraries:
 # library(devtools)
 # install_github("lawremi/rtracklayer")
@@ -65,15 +70,17 @@ library(rtracklayer)
 library(platetools)
 library(plyr)
 library(ggpubr)
+library(magrittr)
+library(cowplot)
 ```
 ## Custom functions
-Functions used include all functions that have been used previously by Ruben (some of them might not be needed anymore, but are kept anyway). Functions 'CallTrueBarcodes' & 'RemoveLowReads' have been added by Max.
+Functions used include all functions that have been used previously by Ruben (some of them might not be needed anymore, but are kept anyway). Functions 'CallTrueBarcodes' has been added by Max.
 ```{r functions}
 SetFileName <- function(filename, initials) {
   # Set filename with extension and initials to make filename with date integrated.
   filename <- substitute(filename)
   initials <- substitute(initials)
-  filename <- paste0(initials, substr(gsub("-","",Sys.time()),1,8), filename)
+  filename <- paste0(out.dir, initials, substr(gsub("-","",Sys.time()),1,8), filename)
   filename
 }
 
@@ -81,197 +88,15 @@ CallTrueBarcodes <- function(df) {
   df %<>% filter(barcode %in% barcodes.list)
   df
 }
-
-RemoveLowReads <- function(reads) {
-  if (sum(reads$count) < 2000) {
-    reads <- NULL
-  } else {
-    reads 
-  } 
-}
-
-Read_Counts <- function(x) {
-  #This function sums all the reads per barcode
-  tmp <- x %>% group_by(barcode) %>% summarise(sum = sum(count))
-  tmp$barcode <- as.character(tmp$barcode)
-  colnames(tmp) <- c("barcode", "sum")
-  tmp
-}
-
-
-MutationsToDataframe <- function(mutations) {
-  # This function does
-  tmp <- dcast(mutations, formula = barcode ~ indel, value.var = "count", fun = sum)
-  tmp
-}
-
-RownamesList <- function(list) {
-  rownames(list) <- list$"V2"
-  list
-}
-# n <- colnames(tmp)
-# names(tmp) <- n
-
-IndelsOnly <- function(x) {
-  #This function removes the "not_clear and "point_mut" from the indels.
-  tmp <- x[!x$call %in% c("not_clear", "wt_point_mut"), ]
-  tmp
-}
-
-Not_Clear_Counts <- function(x){
-  tmp <- x[x$V3 == "not_clear", ]
-  tmp <- tmp[, c("V2", "V1")]
-  colnames(tmp) <- c("barcode", "not_clear")
-  tmp
-}
-
-Point_Mut_Counts <- function(x){
-  tmp <- x[x$V3 == "wt_point_mut", ]
-  tmp <- tmp[, c("V2", "V1")]
-  colnames(tmp) <- c("barcode", "point_mut")
-  tmp
-}
-
-RenameBarcodes <- function(list, pool) {
-  # This function renames the barcodes in the samples to barcode.pool to remove ambuguity between the cell pools
-  for (i in pool) {
-    list[[i]]$V2 <- paste(list[[i]]$V2, deparse(substitute(pool)), sep = ".")
-  }
-  list
-}
-
-NAToZero <- function(DT) {
-  # This function changes NA to 0 in a data.table by name :
-  for (j in names(DT))
-    set(DT,which(is.na(DT[[j]])),j,0)
-  return(DT)
-}
-
-RemoveBarcodeFromList_RN <- function(x, barcode) {
-  tmp <- x[!rownames(x)==barcode, ]
-  tmp
-}
-
-RemoveBarcodeFromList_barcode <- function(x, barcode) {
-  tmp <- x[!x$barcode==barcode, ]
-  tmp
-}
-
-CalculateRatio <- function(mutations, indel) {
-  # This function calculates the proportion of any indel over all the indels using the 
-  # dataframe created with MutationsToDataframe.
-  if (as.character(indel) %in% names(mutations)) {
-    indel_reads <- mutations[,as.character(indel)]
-    indel_reads <- as.matrix(indel_reads)
-    rownames(indel_reads) <- rownames(mutations)
-    
-    ratio=ifelse(((indel_reads==0) | mutations[, "0"]==0), NA, 
-                 as.numeric(mutations[,as.character(indel)]/(rowSums(mutations)-mutations[, "0"])))
-    
-    ratio=round(ratio,3)
-    
-    df <- data.frame(barcode = as.character(row.names(mutations)),
-                     ratio = ratio,
-                     stringsAsFactors = FALSE)
-    colnames(df) <- c("barcode", paste0("ratio.", as.character(indel)))
-    df
-  } else {
-    df <- data.frame(barcode = as.character(row.names(mutations)),
-                     ratio = NA, 
-                     stringsAsFactors = FALSE) 
-    colnames(df) <- c("barcode", paste0("ratio.", as.character(indel)))
-    df
-  }
-}
-
-CalculatePercentage <- function(mutations, indel) {
-  # This function calculates the proportion of any indel over all the indels using the 
-  # dataframe created with MutationsToDataframe.
-  if (as.character(indel) %in% names(mutations)) {
-    indel_reads <- mutations[,as.character(indel)]
-    indel_reads <- as.matrix(indel_reads)
-    rownames(indel_reads) <- rownames(mutations)
-    
-    percentage=ifelse((indel_reads==0), 0, 
-                      as.numeric(mutations[,as.character(indel)]/(rowSums(mutations))*100))
-    
-    percentage=round(percentage,3)
-    
-    df <- data.frame(barcode = as.character(row.names(mutations)),
-                     percentage = percentage,
-                     stringsAsFactors = FALSE) 
-    colnames(df) <- c("barcode", paste0("percentage.", as.character(indel)))
-    df
-  } else {
-    df <- data.frame(barcode = as.character(row.names(mutations)),
-                     ratio = NA,
-                     stringsAsFactors = FALSE) 
-    colnames(df) <- c("barcode", paste0("percentage.", as.character(indel)))
-    df
-  }
-}
-
-
-CalculateRatio_internal <- function(mutations, indel1, indel2){
-  # This function calculates the proportion of any indel over all the indels using the 
-  # dataframe created with MutationsToDataframe.
-  if (as.character(indel1) %in% names(mutations) & as.character(indel2) %in% names(mutations)) {
-    indel1_reads <- mutations[,as.character(indel1)]
-    indel1_reads <- as.matrix(indel1_reads)
-    rownames(indel1_reads) <- rownames(mutations)
-    
-    indel2_reads <- mutations[,as.character(indel2)]
-    indel2_reads <- as.matrix(indel2_reads)
-    rownames(indel2_reads)=rownames(mutations)
-    
-    ratio=ifelse(((indel1_reads==0 & indel2_reads==0) | indel2_reads==0), NA, 
-                 as.numeric(mutations[,as.character(indel1)]/mutations[,as.character(indel2)]))
-    
-    ratio=round(ratio,3)
-    
-    df <- data.frame(barcode = row.names(mutations),
-                     ratio = ratio,
-                     stringsAsFactors = FALSE) 
-    colnames(df) <- c("barcode", paste0("ratio.", as.character(indel1), "_", as.character(indel2)))
-    df
-  } else {
-    df <- data.frame(barcode = row.names(mutations),
-                     ratio = NA, 
-                     stringsAsFactors = FALSE) 
-    colnames(df) <- c("barcode", paste0("ratio.", as.character(indel1), "_", as.character(indel2)))
-    df
-  }
-}
-
-CalculateEfficiencies <- function(efficiencies) {
-  # This function calculates the efficiency of the cut and repair at each barcode
-  # using the dataframe created with MutationsToDataframe.
-  data.frame(barcode = row.names(efficiencies),
-             efficiency = (1 - efficiencies/ rowSums(efficiencies)) * 100)
-}
-
-CalculateInsertions <- function(insertions) {
-  # This function calculates the efficiency of the cut and repair at each barcode
-  # using the dataframe created with MutationsToDataframe.
-  data.frame(barcode = row.names(insertions),
-             insertions = (rowSums(insertions[, -grep('^[-0]',colnames(insertions))]) / rowSums(insertions)) * 100)
-}
-
-CalculateDeletions <- function(deletions) {
-  # This function calculates the efficiency of the cut and repair at each barcode
-  # using the dataframe created with MutationsToDataframe.
-  data.frame(barcode = row.names(deletions),
-             deletions = (rowSums(deletions[ ,grep('-',colnames(deletions))]) / rowSums(deletions)) * 100)
-}
 ```
 
 ## Data import
 Data import from mapping, files were generated on 21.01.2019.
 ```{r import}
 # Import files in list and make individual tables
-# I use this if all the samples are good. Here however I do not use all the samples.
+# First list the files from the screen (E177 & 1504). The other will be processed in another script.
 file.list <- list.files("/DATA/projects/DSBrepair/data/rs20210628_EpiScreen/indelPCR_counts/",
-                        pattern="_.*[.]count", full.names=T)
+                        pattern="[E177|E1504]_.*[.]count", full.names=T)
 
 # import the data
 df.list <- mclapply(file.list, 
@@ -295,7 +120,11 @@ n.samples <- length(df.list)
 # Load the indel statistics with the metadata generated in the parsing script.
 indel.statistics.dt = as.data.table(readRDS("/DATA/projects/DSBrepair/git/EpiScreen/files_scripts/rs20210626_Episcreen_Reads_Viab_Metadata.RDS"))
 
-setnames(indel.statistics.dt, "ID", "exp")
+setnames(indel.statistics.dt, 
+         c("ID", "viability", "viab_norm", 
+           "r_written_pct", "reads"), 
+         c("exp", "viability_split", "viab_norm_split", 
+           "r_written_pct_split", "reads_split"))
 
 # Import RSTP2 clone 5 barcode list (in total 19 barcodes) - "CTCTTAATCGCTGCC" (20)
 barcodes.list <- c("AGGGCGTAAAATATTT", "TATGGCTGTCGGGTAG", "TGTCCCTTAGTACTTT", 
@@ -309,8 +138,8 @@ barcodes.list <- c("AGGGCGTAAAATATTT", "TATGGCTGTCGGGTAG", "TGTCCCTTAGTACTTT",
 
 
 ```{r indel data table list}
-# Call true barcodes
-df.list <- mclapply(df.list, CallTrueBarcodes, mc.cores = 10)
+# Call true barcodes for clone 5 experiments
+df.list = mclapply(df.list, CallTrueBarcodes, mc.cores = 10)
 
 # To be able to setup the functions in a general way. This means in cases where we have A
 # and B samples.
@@ -366,15 +195,18 @@ setnames(mutations.dt, "type", "mut_type")
 
 ```{r merging technical replicates and calculating frequencies}
 # First measure the ratio before doing the sum of the technical replicates: 
-mutations.dt[, norm_split := count/sum(count), by=exp,]
-mutations.dt[, c("freq_split", "sum_bc_tech_reads") := list(norm_split/sum(norm_split, na.rm = TRUE), sum(count)), 
+setnames(mutations.dt,"count", "count_split")
+
+mutations.dt[, norm_split := count_split/sum(count_split), by=exp,]
+mutations.dt[, c("freq_split", "sum_bc_reads_split") := 
+               list(norm_split/sum(norm_split, na.rm = TRUE), sum(count_split)), 
              by = c("barcode","exp")]
 
 mutations.dt[!mutation%in%c(0,NA), 
              ratio_indels_split := norm_split/sum(norm_split, na.rm = TRUE), 
              by=c("barcode","exp")]
 
-mutations.dt = mutations.dt[sum_bc_tech_reads > 100]
+mutations.dt = mutations.dt[sum_bc_reads_split > 100]
 
 # Add an ID column that removes the technical replicates information 
 mutations.dt[, ID := gsub("^(E1504|E177)_[0-9][0-9]_(1|10|100)_[123]_([12]_...$)", 
@@ -384,19 +216,23 @@ mutations.dt[, ID := gsub("^(E1504|E177)_[0-9][0-9]_(1|10|100)_[123]_([12]_...$)
 # Merge the indel statistics
 mutations.dt = merge(mutations.dt, indel.statistics.dt)
 # Filter the low viability reads
-mutations.dt = mutations.dt[viab_norm > 0.5]
+mutations.dt = mutations.dt[viab_norm_split > 0.5]
 
 # Calculate the data now from the summed values. 
-mutations.dt[, c("pooled_counts", "count_rep", "viab_norm_pooled") := list(sum(count), sum(norm_split), mean(viab_norm)), by = c("ID", "barcode", "mutation")]
+mutations.dt[, c("count", "reads", "norm") := 
+               list(sum(count_split), sum(reads_split), sum(norm_split)), by = c("ID", "barcode", "mutation")]
+mutations.dt[, c("viab_norm", "r_written_pct") := 
+               list(mean(viab_norm_split), mean(r_written_pct_split)), 
+             by = c("ID", "barcode")]
 
-cols = c("barcode", "ID", "mutation", "count_rep", "pooled_counts")
+cols = c("barcode", "ID", "mutation", "norm", "count")
 mutations.pool.dt = mutations.dt[, ..cols]
 mutations.pool.dt = unique(mutations.pool.dt)
 
-mutations.pool.dt[, norm_pooled := count_rep/sum(count_rep), by = ID]
+mutations.pool.dt[, norm_pooled := norm/sum(norm), by = ID]
 
 mutations.pool.dt[, c("freq_pooled", "sum_pooled_bc_reads") := 
-                    list(norm_pooled/sum(norm_pooled, na.rm = TRUE), sum(pooled_counts)), 
+                    list(norm_pooled/sum(norm_pooled, na.rm = TRUE), sum(count)), 
                   by = c("barcode","ID")]
 
 mutations.pool.dt[!mutation%in%c(0,NA), 
@@ -404,12 +240,19 @@ mutations.pool.dt[!mutation%in%c(0,NA),
                   by=c("barcode","ID")]
 
 # Merge the data
-screen.indel.dt = merge(mutations.dt, mutations.pool.dt, by = c("barcode", "ID", "mutation", "count_rep", "pooled_counts"))
+screen.indel.dt = merge(mutations.dt, mutations.pool.dt, 
+                        by = c("barcode", "ID", "mutation", "norm", "count"))
 ```
 
+dim(mutations.dt)
+[1] 1956008      33
+dim(mutations.pool.dt)
+[1] 928364      9
+dim(screen.indel.dt)
+[1] 1956008      37
 
 ```{r}
-# c("barcode", "ID", "mutation", "count_rep", "pooled_counts", "exp",  "type", "count",  "norm_split", "freq_split", "sum_bc_tech_reads", "ratio_indels_split", "reads", "replicate",  "plate", "concentration", "tech", "drug_plate", "well", "seq_barcode", "seq_index", "file", "PCR_type",  "index_length", "drug_no",  "drug_well", "drug", "target",  "r_written_pct", "viability", "viab_norm", "conc_char", "viab_norm_pooled", "norm_pooled", "freq_pooled", "sum_pooled_bc_reads", "ratio_indels_pooled")
+# c("barcode", "ID", "mutation", "norm", "count", "exp",  "type", "count",  "norm_split", "freq_split", "sum_bc_reads_split", "ratio_indels_split", "reads", "replicate",  "plate", "concentration", "tech", "drug_plate", "well", "seq_barcode", "seq_index", "file", "PCR_type",  "index_length", "drug_no",  "drug_well", "drug", "target",  "r_written_pct", "viability", "viab_norm", "conc_char", "viab_norm_pooled", "norm_pooled", "freq_pooled", "sum_pooled_bc_reads", "ratio_indels_pooled")
 
 # Fix large deletions for every deletion above 25
 largedels <- as.character(seq(-130, -15))
@@ -418,32 +261,36 @@ largedels <- as.character(seq(-130, -15))
 
 mutations.large.del.dt = screen.indel.dt[mutation %in% largedels, ]
 mutations.large.del.dt = mutations.large.del.dt[, lapply(.SD, sum, na.rm=TRUE), by=c("exp", "barcode"),
-                                                .SDcols=c("count_rep", "pooled_counts", "count",  
-                                                          "norm_split", "freq_split", "sum_bc_tech_reads",
+                                                .SDcols=c("norm", "count", "count_split",  
+                                                          "norm_split", "freq_split", "sum_bc_reads_split",
                                                           "ratio_indels_split", "reads",  "norm_pooled", 
                                                           "freq_pooled", "sum_pooled_bc_reads", 
                                                           "ratio_indels_pooled")]
 
 mutations.large.del.dt[, c("mutation", "mut_type") := list("<-14", "del")]
-colslargedels = colnames(mutations.large.del.dt)[3:ncol(mutations.large.del.dt)]
-base.dt = copy(screen.indel.dt)
-base.dt[, (colslargedels) := NULL ]
-base.dt = unique(base.dt)
 
-mutations.large.del.dt = base.dt %>% left_join(mutations.large.del.dt)
+colslargedels = colnames(mutations.large.del.dt)[3:ncol(mutations.large.del.dt)]
+base.dt = screen.indel.dt %>% 
+  select(!all_of(colslargedels)) %>% unique()
+
+mutations.large.del.dt = base.dt %>% 
+  left_join(mutations.large.del.dt) %>% 
+  unique()
 
 # Fix large insertions for every insertions above 3
 largeins <- as.character(seq(3, 20))
 mutations.large.ins.dt = screen.indel.dt[mutation %in% largeins, ]
 mutations.large.ins.dt = mutations.large.ins.dt[, lapply(.SD, sum, na.rm=TRUE),  by=c("exp", "barcode"),
-                                                .SDcols=c("count_rep", "pooled_counts", "count",  
-                                                          "norm_split", "freq_split", "sum_bc_tech_reads",
+                                                .SDcols=c("norm", "count", "count_split",  
+                                                          "norm_split", "freq_split", "sum_bc_reads_split",
                                                           "ratio_indels_split", "reads",  "norm_pooled", 
                                                           "freq_pooled", "sum_pooled_bc_reads", 
                                                           "ratio_indels_pooled")]
 
 mutations.large.ins.dt[, c("mutation", "mut_type") := list(">2", "ins")]
-mutations.large.ins.dt = base.dt %>% left_join(mutations.large.ins.dt)
+mutations.large.ins.dt = base.dt %>% 
+  left_join(mutations.large.ins.dt) %>%
+  unique()
 
 mutations.large.del.dt
 mutations.large.ins.dt
@@ -476,7 +323,12 @@ screen.indel.dt[, c("sample", "type", "color") :=  list(
 screen.indel.dt[, mutation := factor(screen.indel.dt$mutation, levels=indels)]
 ```
 
-
+dim(screen.indel.dt)
+[1] 1956008      37
+dim(large.indels.dt)
+[1] 104566     37
+dim(screen.indel.dt)
+[1] 2060574      40
 
 # Add identifiers and compute indel ratios
 ```{r calculate_ratios}
@@ -522,7 +374,10 @@ freqs_ratios_tib <- screen.indel.dt %>%
 
 screen.indel.dt = merge(screen.indel.dt, freqs_ratios_tib, by = c("exp", "ID", "barcode"))
 ```
-
+dim(screen.indel.dt)
+[1] 2060574      40
+dim(screen.indel.dt)
+[1] 2060574      52
 
 ```{r calculating z-scores}
 # First check if the DMSO data is normally distributed. For both split and pooled and MMEJscore and freqCut
@@ -537,11 +392,11 @@ for (i in barcodes.list) {
   plt2 = qplot(sample = MMEJscore, data = norm_pooled, color=replicate) +
     theme_bw() +
     ggtitle(paste0("pooled MMEJscore Barcode: ", i))
-  grid.arrange(plt1, plt2)
+  plot_grid(plt1, plt2)
 }
 
 for (i in barcodes.list) {
-  norm_pooled = screen_indel_tib %>%
+  norm_pooled = screen.indel.dt %>%
     filter(drug == "DMSO", barcode == i) %>%
     distinct(exp, barcode, freqCut_split, MMEJscore_split, replicate)
   plt1 = qplot(sample = freqCut_split, data = norm_pooled, color=replicate) +
@@ -550,24 +405,209 @@ for (i in barcodes.list) {
   plt2 = qplot(sample = MMEJscore_split, data = norm_pooled, color=replicate) +
     theme_bw() +
     ggtitle(paste0("split MMEJscore Barcode: ", i))
-  grid.arrange(plt1, plt2)
+  plot_grid(plt1, plt2)
 }
 ```
 
 
 ```{r loading and adding the chromatin data}
+# Plate normalization for cutting/repair efficiency - calculate efficiency relative to mean DMSO efficiency per concentration, barcode and replicate
+dmso.efficiency <- screen.indel.dt %>%
+  filter(drug == "DMSO") %>%
+  dplyr::select('DMSO' = freqCut_split, barcode, replicate, tech) %>%
+  mutate(DMSO = ave(DMSO, barcode, replicate, tech, FUN = mean)) %>%
+  unique()
+
+screen.indel.dt <- merge(screen.indel.dt, dmso.efficiency, by = c("barcode", "replicate", "tech"))
+
+screen.indel.dt <- screen.indel.dt %>%
+  mutate(freqCut_norm_split = freqCut_split / DMSO) %>%
+  dplyr::select(-DMSO)
+
+# Grouped technical replicates
+dmso.efficiency <- screen.indel.dt %>%
+  filter(drug == "DMSO") %>%
+  dplyr::select('DMSO' = freqCut, barcode, replicate) %>%
+  mutate(DMSO = ave(DMSO, barcode, replicate, FUN = mean)) %>%
+  unique()
+
+screen.indel.dt <- merge(screen.indel.dt, dmso.efficiency, by = c("barcode", "replicate"))
+
+screen.indel.dt <- screen.indel.dt %>%
+  mutate(freqCut_norm = freqCut / DMSO) %>%
+  dplyr::select(-DMSO)
 
 
+# MMEJscore z-score - calculate drug scores relative to DMSO MMEJ score distribution per concentration, barcode and replicate
+dmso.mmej.score <- screen.indel.dt %>%
+  filter(drug == "DMSO") %>%
+  dplyr::select('DMSO' = MMEJscore, barcode, replicate) %>%
+  mutate(mean_DMSO = ave(DMSO, barcode, replicate, FUN = mean), 
+         sd_DMSO = ave(DMSO, barcode, replicate, FUN = sd)) %>%
+  dplyr::select(-DMSO) %>%
+  unique()
+
+screen.indel.dt <- merge(screen.indel.dt, dmso.mmej.score)
+
+screen.indel.dt <- screen.indel.dt %>%
+  mutate(MMEJ_zscore = (MMEJscore - mean_DMSO)/ sd_DMSO) %>%
+  dplyr::select(-mean_DMSO, -sd_DMSO)
+
+# Same for split scores
+dmso.mmej.score <- screen.indel.dt %>%
+  filter(drug == "DMSO") %>%
+  dplyr::select('DMSO' = MMEJscore_split, barcode, replicate, tech) %>%
+  mutate(mean_DMSO = ave(DMSO, barcode, replicate, tech, FUN = mean), 
+         sd_DMSO = ave(DMSO, barcode, replicate, tech, FUN = sd)) %>%
+  dplyr::select(-DMSO) %>%
+  unique()
+
+screen.indel.dt <- merge(screen.indel.dt, dmso.mmej.score, by = c("barcode", "replicate", "tech"))
+
+screen.indel.dt <- screen.indel.dt %>%
+  mutate(MMEJ_zscore_split = (MMEJscore_split - mean_DMSO)/ sd_DMSO) %>%
+  dplyr::select(-mean_DMSO, -sd_DMSO)
+
+# Calculate mean MMEJ score per drug and concentration per replicate (MMEJ_zscore_mean_bio) and the mean of the two replicates (MMEJ_zscore_mean)
+screen.indel.dt <- screen.indel.dt %>%
+  mutate(MMEJ_zscore_mean_bio = 
+           ave(MMEJ_zscore, barcode, drug, concentration, replicate, 
+               FUN = mean),
+         MMEJ_zscore_mean = 
+           ave(MMEJ_zscore_mean_bio, barcode, drug, concentration, 
+               FUN = mean))
+
+screen.indel.dt <- screen.indel.dt %>%
+  mutate(MMEJ_zscore_mean_bio_split = 
+           ave(MMEJ_zscore_split, barcode, drug, concentration, replicate, 
+               FUN = mean),
+         MMEJ_zscore_mean_split = 
+           ave(MMEJ_zscore_mean_bio_split, barcode, drug, concentration, 
+               FUN = mean))
+
+# Do the same for the normalized efficiency
+screen.indel.dt <- screen.indel.dt %>%
+  mutate(freqCut_norm_mean_bio = 
+           ave(freqCut_norm, barcode, drug, concentration, replicate, 
+               FUN = mean),
+         freqCut_norm_mean = 
+           ave(freqCut_norm_mean_bio, barcode, drug, concentration, 
+               FUN = mean))
+
+# Do the same for the normalized efficiency but split data
+screen.indel.dt <- screen.indel.dt %>%
+  mutate(freqCut_norm_mean_bio_split = 
+           ave(freqCut_norm_split, barcode, drug, concentration, replicate, 
+               FUN = mean),
+         freqCut_norm_mean_split = 
+           ave(freqCut_norm_mean_bio_split, barcode, drug, concentration, 
+               FUN = mean))
+
+# Mean values independent of IPR (mean effect of the drug)
+screen.indel.dt <- screen.indel.dt %>%
+  mutate(MMEJ_zscore_mean_bio_drug = 
+           ave(MMEJ_zscore_mean_bio, drug, concentration, replicate, 
+               FUN = mean),
+         MMEJ_zscore_mean_drug = 
+           ave(MMEJ_zscore_mean, drug, concentration, 
+               FUN = mean),
+         freqCut_norm_mean_bio_drug = 
+           ave(freqCut_norm_mean_bio, drug, concentration, replicate, 
+               FUN = mean),
+         freqCut_norm_mean_drug = 
+           ave(freqCut_norm_mean_bio, drug, concentration, 
+               FUN = mean))
+
+# Mean values independent of IPR (mean effect of the drug) - same but split
+screen.indel.dt <- screen.indel.dt %>%
+  mutate(MMEJ_zscore_mean_bio_drug_split = 
+           ave(MMEJ_zscore_mean_bio_split, drug, concentration, replicate, 
+               FUN = mean),
+         MMEJ_zscore_mean_drug_split = 
+           ave(MMEJ_zscore_mean_split, drug, concentration, 
+               FUN = mean),
+         freqCut_norm_mean_bio_drug_split = 
+           ave(freqCut_norm_mean_bio_split, drug, concentration, replicate, 
+               FUN = mean),
+         freqCut_norm_mean_drug_split = 
+           ave(freqCut_norm_mean_bio_split, drug, concentration, 
+               FUN = mean))
+```
+
+dim(screen.indel.dt)
+[1] 2060574      52
+dim(screen.indel.dt)
+[1] 2060574      72
+
+```{r split data sepereately}
+
+# Make base table without any numeric data.
+base.dt = screen.indel.dt %>% 
+  select_if(negate(is.numeric)) %>% 
+  dplyr::select(-mutation, -mut_type, -type, -color) %>% 
+  unique()
+
+
+# Make tibble with only the split technical replicates data.
+base.mut.dt = screen.indel.dt %>% 
+  select_if(negate(is.numeric)) %>% 
+  unique()
+
+
+split.dt = screen.indel.dt %>% 
+  dplyr::select(barcode, exp, mutation, contains("split"))
+
+screen_indel_split_tib = base.mut.dt %>%
+  left_join(split.dt, 
+            by = c("barcode", "exp", "mutation")) %>% 
+  unique() %>%
+  as_tibble()
+
+# Make tibble with only the pooled technical replicates data. 
+screen_indel_mut_tib = screen.indel.dt %>%
+  dplyr::select(!contains("split"), 
+                -plate, -tech, -exp, -seq_barcode, 
+                -seq_index, -file) %>%
+  unique() %>%
+  as_tibble()
+
+# Table with only ratios from the pooled set
+screen_indel_tib = screen.indel.dt %>%
+  dplyr::select(!contains("split"), 
+                -plate, -tech, -exp, -seq_barcode, 
+                -seq_index, -file, -mutation, 
+                -mut_type, -type, -color) %>%
+  unique() %>%
+  as_tibble()
+```
+
+### Loading and binding the chromatin data
+We'll use the table from Schep et al. 2021 to bind directly all the relevant chromatin data. 
+```{r chromatin data}
+clone5_chrom_tib <- readRDS("~/DSBrepair/data/R/rs20200519_clone5_newdoms_chromatin.RDS")
+
+screen_indel_split_tib %<>% left_join(clone5_chrom_tib, by = "barcode")
+
+screen_indel_tib %<>% left_join(clone5_chrom_tib, by = "barcode")
+
+screen_indel_mut_tib %<>% left_join(clone5_chrom_tib, by = "barcode")
 ```
 
 
 ## Processed data export
 The files will be saved in the processed data folder.
 ```{r export}
-setwd("/DATA/projects/DSBrepair/data/R/EpiScreen/")
 # The mutations list that can be loaded for the indel spectra plots.
-filename <- SetFileName("_drug_screen_mutations_rep2", "rs")
-save(indels_tib, file = filename)
+filename <- SetFileName("_episcreen_mutations.RDS", "rs")
+saveRDS(screen_indel_mut_tib, file = filename)
+
+# The ratios list of the split technical replicates
+filename <- SetFileName("_episcreen_ratios_split.RDS", "rs")
+saveRDS(screen_indel_split_tib, file = filename)
+
+# The ratios list of the merged technical replicates
+filename <- SetFileName("_episcreen_ratios.RDS", "rs")
+saveRDS(screen_indel_tib, file = filename)
 ```
 
 ### Conclusions 
