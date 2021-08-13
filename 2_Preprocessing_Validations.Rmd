@@ -658,7 +658,7 @@ tib_ratios = tib_ratios %>% mutate(ins_del = insertions/deletions,
                                    SSTR_MMEJSSTR = SSTR/(SSTR+MMEJ),
                                    SSTR_NHEJSSTR = SSTR/(SSTR+NHEJ))
 
-validation_ratios_tib =  tib_ratios
+validation_indels_tib =  tib_ratios
 ```
 
 
@@ -668,10 +668,10 @@ clone5_chrom_tib <- readRDS("~/DSBrepair/data/R/rs20200519_clone5_newdoms_chroma
   mutate(barcode = paste0(barcode, ".B"))
 
 library(magrittr)
-validation_ratios_tib %<>% left_join(schep_et_al_tib)
+validation_indels_tib %<>% left_join(schep_et_al_tib)
 
 # Table with only ratios
-validation_indels_tib = validation_ratios_tib %>%
+validation_ratios_tib = validation_indels_tib %>%
   dplyr::select(-exp, -seq_barcode, 
                 -seq_index, -mutation, 
                 -type, -color, -count, -norm, 
