@@ -124,12 +124,12 @@ setnames(indel.statistics.dt,
          c("exp", "viability_split", "viab_norm_split", 
            "r_written_pct_split", "reads_split"))
 
-# Import RSTP2 clone 5 barcode list (in total 19 barcodes) - "CTCTTAATCGCTGCC" (20)
+# Import RSTP2 clone 5 barcode list (in total 18 barcodes) - "ACCCCTAAAGGCGCTG" (19) + "CTCTTAATCGCTGCC" (20)
 barcodes.list <- c("AGGGCGTAAAATATTT", "TATGGCTGTCGGGTAG", "TGTCCCTTAGTACTTT", 
                    "AGAAAATAATATGACG","CGGCCTGAAGGTCAGG","TTGAACGCGGGCTCGG",
                    "GCTAACATCACGAATC", "GCGCACCCTTTAATTG","ACTGTCGAGTTGTCCG",
                    "CCGGGGACGTATGCAC","TCTTTTGAGGAGCTGA","ATATCGTTGCTGGAGA",
-                   "CATCCACCACACTTCA","ACCCCTAAAGGCGCTG","ATACTATATTTAACGG",
+                   "CATCCACCACACTTCA","ATACTATATTTAACGG",
                    "CATTTCTGATCAATAA","GAGCGCGTCACCGGGT",
                    "GTACCTCTCGATAGTG","TGGCCAATATTTGTCT")
 ```
@@ -218,7 +218,16 @@ mutations.dt[, ID := gsub("^(E1504|E177)_[0-9][0-9]_(1|10|100)_[123]_([12]_...$)
 # Merge the indel statistics
 mutations.dt = merge(mutations.dt, indel.statistics.dt)
 # Filter the low viability reads
-mutations.dt = mutations.dt[viab_norm_split > 0.5]
+remove_drugs <- mutations.dt %>%
+  filter(viab_norm_split < 0.45) %>%
+  dplyr::select(conc_char, drug) %>%
+  unique() %>%
+  mutate(conc_char_drug = paste(conc_char, drug, sep = "_"))
+
+mutations.dt <- mutations.dt %>%
+  mutate(conc_char_drug = paste(conc_char, drug, sep = "_")) %>%
+  filter(!conc_char_drug %in% remove_drugs$conc_char_drug ) %>%
+  dplyr::select(-conc_char_drug)
 
 # Calculate the data now from the summed values. 
 mutations.dt[, c("count", "reads", "norm") := 
