@@ -43,7 +43,7 @@ Mutations files : *genuine_mapped.table
 | TTTCCCACATCAGGAG | wt | 0 |
 | CCATAGTAGTGATTAC | del | -4 |
 
-# Data importing and processing
+# Setup
 ## Path, Libraries, Parameters and Useful Functions
 ```{r setup, message=FALSE, warnings=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
@@ -58,23 +58,20 @@ dir.create(out.dir, showWarnings = FALSE)
 
 
 # libraries:
-# library(devtools)
-# install_github("lawremi/rtracklayer")
 library(tidyverse)
 library(data.table)
 library(ggplot2)
-library(car)
 library(parallel)
-library(gtools)
-library(rtracklayer)
-library(platetools)
-library(plyr)
 library(ggpubr)
 library(magrittr)
 library(cowplot)
+library(report)
 ```
+
 ## Custom functions
+
 Functions used include all functions that have been used previously by Ruben (some of them might not be needed anymore, but are kept anyway). Functions 'CallTrueBarcodes' has been added by Max.
+
 ```{r functions}
 SetFileName <- function(filename, initials) {
   # Set filename with extension and initials to make filename with date integrated.
@@ -90,7 +87,8 @@ CallTrueBarcodes <- function(df) {
 }
 ```
 
-## Data import
+# Data import
+
 Data import from mapping, files were generated on 21.01.2019.
 ```{r import}
 # Import files in list and make individual tables
@@ -136,6 +134,7 @@ barcodes.list <- c("AGGGCGTAAAATATTT", "TATGGCTGTCGGGTAG", "TGTCCCTTAGTACTTT",
                    "GTACCTCTCGATAGTG","TGGCCAATATTTGTCT")
 ```
 
+## Reading the indel data tables
 
 ```{r indel data table list}
 # Call true barcodes for clone 5 experiments
@@ -146,7 +145,6 @@ df.list = mclapply(df.list, CallTrueBarcodes, mc.cores = 10)
 mut.list = mclapply(names(df.list), function(exp){
   dt = data.table(df.list[[exp]])
   dt[, mutation := as.character(mutation)]
-  # dt = dtLet's keep this for later
   dt_exp = data.table(exp = exp,
                       dt)
   return(dt_exp)
@@ -154,10 +152,12 @@ mut.list = mclapply(names(df.list), function(exp){
 ```
 
 
-### not clear and point mutatins
+# Processing
+
+## Transform into data table and filtering
 Check how many reads are in general not clear or called as point mutations. 
 
-```{r indeldataframe}
+```{r indel dataframe}
 mutations.dt = do.call(rbind, c(mut.list, fill = T))
 dim(mutations.dt) 
 # Remove NA counts
@@ -192,6 +192,8 @@ setnames(mutations.dt, "type", "mut_type")
 ```
 
 0.27% of all the reads are not clear and 1.8% of all the reads are point mutations in the guide sequence.
+
+## Normalising counts, calculating frequencies and merging metadata.
 
 ```{r merging technical replicates and calculating frequencies}
 # First measure the ratio before doing the sum of the technical replicates: 
@@ -260,6 +262,8 @@ dim(mutations.pool.dt)
 [1] 928364      9
 dim(screen.indel.dt)
 [1] 1956008      37
+
+## Pooling large indels for indel spectrum plotting
 
 ```{r}
 # c("barcode", "ID", "mutation", "norm", "count", "exp",  "type", "count",  "norm_split", "freq_split", "sum_bc_reads_split", "ratio_indels_split", "reads", "replicate",  "plate", "concentration", "tech", "drug_plate", "well", "seq_barcode", "seq_index", "file", "PCR_type",  "index_length", "drug_no",  "drug_well", "drug", "target",  "r_written_pct", "viability", "viab_norm", "conc_char", "viab_norm_pooled", "norm_pooled", "freq_pooled", "sum_pooled_bc_reads", "ratio_indels_pooled")
@@ -340,7 +344,8 @@ dim(large.indels.dt)
 dim(screen.indel.dt)
 [1] 2060574      40
 
-# Add identifiers and compute indel ratios
+## Add identifiers and compute indel ratios
+
 ```{r calculate_ratios}
 # Calculate NHEJ/MMEJ ratios and efficiences
 ### WIP #####
@@ -403,6 +408,10 @@ dim(screen.indel.dt)
 dim(screen.indel.dt)
 [1] 2060574      52
 
+## Calculating the z-scores
+
+### Checking for data normality
+
 ```{r calculating z-scores}
 # First check if the DMSO data is normally distributed. For both split and pooled and MMEJscore and freqCut
 # Pooled
@@ -433,6 +442,7 @@ for (i in barcodes.list) {
 }
 ```
 
+## Calculating the z-scores and normalised efficiencies
 
 ```{r loading and adding the chromatin data}
 # Plate normalization for cutting/repair efficiency - calculate efficiency relative to mean DMSO efficiency per concentration, barcode and replicate
@@ -592,11 +602,14 @@ dim(screen.indel.dt)
 dim(screen.indel.dt)
 [1] 2060574      72
 
-```{r split data sepereately}
+# Data export
 
+## Prepare data for export
+
+```{r split data sepereately}
 # Make base table without any numeric data.
 base.dt = screen.indel.dt %>% 
-  select_if(negate(is.numeric)) %>% 
+  select_if(negate(is.numeric)) %>% #### FIX THIS
   dplyr::select(-mutation, -mut_type, -type, -color) %>% 
   unique()
 
@@ -635,7 +648,7 @@ screen_indel_tib = screen.indel.dt %>%
   as_tibble()
 ```
 
-### Loading and binding the chromatin data
+## Loading and binding the chromatin data
 We'll use the table from Schep et al. 2021 to bind directly all the relevant chromatin data. 
 ```{r chromatin data}
 clone5_chrom_tib <- readRDS("/DATA/projects/DSBrepair/data/R/rs20200519_clone5_newdoms_chromatin.RDS")
@@ -664,15 +677,21 @@ filename <- SetFileName("_episcreen_ratios.RDS", "rs")
 saveRDS(screen_indel_tib, file = filename)
 ```
 
-### Conclusions 
+# Conclusions 
 Looks all fine! Now, we can generate indel plots and look in detail at the ratios.
 
-### Session Info
+# Bibliography
+```{r citations}
+cite_packages()
+```
+
+# Session Info
 ```{r session_info}
 sessionInfo()
 getwd()
 date()
 paste("Run time: ",format(Sys.time()-StartTime))
-
+rm(list = ls(all.names = TRUE)) #will clear all objects includes hidden objects.
+gc() #free up memrory and report the memory usage.
 ```
 

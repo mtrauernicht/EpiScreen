@@ -71,23 +71,16 @@ Starttime <-Sys.time()
 Date <- substr(gsub("-","",Sys.time()),1,8)
 
 # libraries:
-library(rtracklayer)
-library(tidyr)
-library(plyr)
-library(dplyr)
+library(tidyverse)
 library(data.table)
 library(ggplot2)
 library(report)
 library(parallel)
 library(gtools)
-library(tibble)
 
 ## Select outdir
-out.dir = paste0("/DATA/projects/DSBrepair/data/R/rs", Date, "/")
+out.dir = paste0("/DATA/projects/DSBrepair/data/R/rs", Date, "_episcreen/")
 dir.create(out.dir)
-
-in.dir.date = 20210311
-in.dir = paste0("/DATA/projects/DSBrepair/data/R/rs", in.dir.date, "/")
 ``` 
 
 ## Custom functions
@@ -122,6 +115,14 @@ MeanExperiments <- function(mutdt) {
   # print("nexp max")
   # print(max(dt$nexp))
   dt
+}
+
+SetFileName <- function(filename, initials) {
+  # Set filename with extension and initials to make filename with date integrated.
+  filename <- substitute(filename)
+  initials <- substitute(initials)
+  filename <- paste0(out.dir, initials, substr(gsub("-","",Sys.time()),1,8), filename)
+  filename
 }
 ```
 
@@ -173,6 +174,26 @@ barcodes.list <- c("AGGGCGTAAAATATTT", "TATGGCTGTCGGGTAG", "TGTCCCTTAGTACTTT",
                    "CATCCACCACACTTCA","ACCCCTAAAGGCGCTG","ATACTATATTTAACGG",
                    "CATTTCTGATCAATAA","GAGCGCGTCACCGGGT",
                    "GTACCTCTCGATAGTG","TGGCCAATATTTGTCT")
+
+clone5barcodes <- c("AGGGCGTAAAATATTT.clone5",
+                    "TATGGCTGTCGGGTAG.clone5",
+                    "TGTCCCTTAGTACTTT.clone5",
+                    "AGAAAATAATATGACG.clone5",
+                    "CGGCCTGAAGGTCAGG.clone5",
+                    "TTGAACGCGGGCTCGG.clone5",
+                    "GCTAACATCACGAATC.clone5",
+                    "GCGCACCCTTTAATTG.clone5",
+                    "ACTGTCGAGTTGTCCG.clone5",
+                    "CCGGGGACGTATGCAC.clone5",
+                    "TCTTTTGAGGAGCTGA.clone5",
+                    "ATATCGTTGCTGGAGA.clone5",
+                    "CATCCACCACACTTCA.clone5",
+                    "ACCCCTAAAGGCGCTG.clone5",
+                    "ATACTATATTTAACGG.clone5",
+                    "CATTTCTGATCAATAA.clone5",
+                    "GAGCGCGTCACCGGGT.clone5",
+                    "GTACCTCTCGATAGTG.clone5",
+                    "TGGCCAATATTTGTCT.clone5")
 ```
 
 # Data processing into large data table
@@ -198,7 +219,7 @@ mut.list = mclapply(names(df.list), function(exp){
 
 ## list of mapped barcodes
 ```{r generating mapped barcode list}
-mapped_barcodes <- c(analysis.mapped.integrations.df$barcode, clone5barcodes)
+mapped_barcodes <- c(analysis.mapped.integrations.df$barcode, barcodes.list)
 ```
 
 
@@ -335,12 +356,12 @@ complete.mutations.mapped.meta.dt = complete.mutations.mapped.dt[metadata,on = c
 dim(complete.mutations.mapped.meta.dt)
 
 # Clear out the global environment of these large lists
-# remove(mut.list)
-# remove(df.list)
-# remove(mutations.dt)
-# remove(mutations.cutoff.dt)
-# remove(complete.mutations.dt)
-# remove(complete.mutations.mapped.dt)
+remove(mut.list)
+remove(df.list)
+remove(mutations.dt)
+remove(mutations.cutoff.dt)
+remove(complete.mutations.dt)
+remove(complete.mutations.mapped.dt)
 ```
 
 ## Calculate frequencies
@@ -537,12 +558,6 @@ all.mutations.dt[, c("type", "color") :=  list(
 all.mutations.dt[, mutation := factor(all.mutations.dt$mutation, levels=indels)]
 ```
 
-## Save combinded data for indel mapping
-```{r export seperate mutations}
-# The mutations list that can be loaded for the indel spectra plots.
-filename <- paste0(out.dir, "mutation_frequencies_trunc.RDS")
-saveRDS(all.mutations.trunc.dt, file = filename)
-```
 
 We now have 3 data files that we can use for subsequent analysis.
 1. The indel list of the summed experiments for the indel spectra plotting.
@@ -553,7 +568,7 @@ We now have 3 data files that we can use for subsequent analysis.
 We will not calculate the +1 / -7 ratios, we will count the proportion of "-7" / ("-7"  + "+1"). I want to have the total insertions, total deletions and efficiences.
 ```{r calculate_ratios}
 # Make all the sums, pct and ratios :
-tib_ratios <-  as_tibble(all.mutations.dt) %>% filter(count != 0)
+tib_ratios = as_tibble(all.mutations.dt)# %>% filter(count != 0)
 
 MMEJ <- all.mutations.dt[mutation == -7, sum(ratio_indels, na.rm = TRUE) , by=c("barcode","exp")]
 tib_ratios <- full_join(tib_ratios, y = MMEJ, by = c("barcode","exp"))
@@ -643,15 +658,38 @@ tib_ratios = tib_ratios %>% mutate(ins_del = insertions/deletions,
                                    SSTR_MMEJSSTR = SSTR/(SSTR+MMEJ),
                                    SSTR_NHEJSSTR = SSTR/(SSTR+NHEJ))
 
-tib_RSTP2_2000_mutations <- tib_ratios
+validation_indels_tib =  tib_ratios
+```
+
+
+```{r add chromatin data from Schep et al}
+schep_et_al_tib = readRDS("/DATA/projects/DSBrepair/data/R/RSTP2_Chromatin_2kb_Schep_et_al.RDS")
+clone5_chrom_tib <- readRDS("~/DSBrepair/data/R/rs20200519_clone5_newdoms_chromatin.RDS") %>% 
+  mutate(barcode = paste0(barcode, ".B"))
+
+library(magrittr)
+validation_indels_tib %<>% left_join(schep_et_al_tib)
+
+# Table with only ratios
+validation_ratios_tib = validation_indels_tib %>%
+  dplyr::select(-exp, -seq_barcode, 
+                -seq_index, -mutation, 
+                -type, -color, -count, -norm, 
+                -sd_norm, -ratio_indels, -sd_ratio_indels, 
+                -freq, -sd_freq) %>%
+  unique()
 ```
 
 ## Processed data export
 The files will be saved in the processed data folder.
 ```{r export}
-# The ratios data for the efficiency analysis
-filename <- paste0(out.dir, "total_indel_data.RDS")
-saveRDS(tib_RSTP2_2000_mutations, file = filename)
+# The ratios of the validations
+filename <- SetFileName("_episcreen_validation_ratios.RDS", "rs")
+saveRDS(validation_ratios_tib, file = filename)
+
+# The indels of the validations
+filename <- SetFileName("_episcreen_validation_indels.RDS", "rs")
+saveRDS(validation_indels_tib, file = filename)
 ```
 # Conclusions
 I"m happy with the output I"ve generated. I should still work on checking what the best amount of reads is that I need for correct correlations etc.
