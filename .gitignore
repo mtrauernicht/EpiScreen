@@ -6,6 +6,7 @@
 /figures/
 /results/
 /data/
+/docs/
 *.table
 
 ### R ###
