@@ -102,7 +102,7 @@ file = "/DATA/projects/DSBrepair/git/EpiScreen/config/rs20210713_E177_E1504_EpiS
 screen_meta_data = fread(file, header = TRUE)
 
 # load the statistics data from the indels.
-file.list <- list.files(path = "/DATA/projects/DSBrepair/data/rs20210628_EpiScreen/parsed", pattern="indel*.*statistics.txt", full.names = TRUE)
+file.list <- list.files(path = "/DATA/projects/DSBrepair/data/rs20210628_EpiScreen/parsed", pattern="indelPCR[.]E1.*statistics.txt", full.names = TRUE)
 indel.statistics.list <- lapply(file.list, read.table, 
                                   header = TRUE)
 names(indel.statistics.list)<- gsub(".*//indelPCR.indel_(.*?).statistics.txt", 
@@ -155,7 +155,7 @@ indel.statistics.tib %>%
                 -index, -pat1, -barcode,  -pat2) %>% 
   write_rds(., 
             file = paste0(out.dir, 
-                          "rs20210626_Episcreen_Reads_Viab_Metadata.RDS"))
+                          "rs20211007_Episcreen_Reads_Viab_Metadata.RDS"))
 ```
 
 
@@ -484,6 +484,7 @@ viab_plot_tib = indel.statistics.tib %>%
   dplyr::select(-viab_norm) %>%
   pivot_wider(names_from = replicate, values_from = c(viab_mean, viab_var)) %>%
   filter(!is.na(conc_char)) %>%
+  mutate(viab_diff = abs(viab_mean_E1504-viab_mean_E177)) %>%
   distinct(drug,
            target,
            conc_char,
@@ -546,20 +547,19 @@ for (i in unique(viab_plot_tib$target)) {
     ggplot(.,
            aes(viab_mean_E1504, viab_mean_E177)) + 
     geom_point() +
-    gghighlight(!(between(viab_ratio, 1/1.5, 1.5)) &
+    gghighlight(viab_diff > 0.25 &
                   (viab_mean_E1504 > .5 |
                      viab_mean_E177 > .5),
                 label_key = drug,
                 max_highlight = 100L) +
-    geom_abline(slope = 1.5/1, intercept = 0, 
+    geom_abline(slope = 1, intercept = 0.2, 
                 linetype = "dashed", alpha = 0.3) +
-    geom_abline(slope = 1/1.5, intercept = 0, 
+    geom_abline(slope = 1, intercept = -0.2, 
                 linetype = "dashed", alpha = 0.3) +
     geom_vline(xintercept = 0.5, 
                 linetype = "dashed", alpha = 0.3) +
     geom_hline(yintercept = 0.5, 
                 linetype = "dashed", alpha = 0.3) +
-    
     coord_fixed() +
     ylim(0, 1.2) +
     xlim(0, 1.2) +

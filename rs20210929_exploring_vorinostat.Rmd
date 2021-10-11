@@ -838,7 +838,7 @@ signif_IPRs_tib = validations_ratios %>%
   add_significance() %>% 
   distinct(barcode, p.signif, p)
 
-signif_bcs = signif_IPRs_full_tib %>% filter(p < 0.05) %>% pull(barcode)
+signif_bcs = signif_IPRs_full_tib %>% filter(p < 0.001) %>% pull(barcode)
 
 
 ```
