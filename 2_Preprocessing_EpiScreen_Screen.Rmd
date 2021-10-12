@@ -669,17 +669,21 @@ dim(screen.indel.dt)
 
 ```{r split data sepereately}
 # Make base table without any numeric data.
+num.base.dt = screen.indel.dt %>% select(barcode, exp, plate, concentration, drug_plate, drug_no) %>% unique()
+
 base.dt = screen.indel.dt %>% 
   select_if(negate(is.numeric)) %>% #### FIX THIS
   dplyr::select(-mutation, -mut_type, -type, -color) %>% 
-  unique()
+  unique() %>% 
+  left_join(num.base.dt)
 
 
 # Make tibble with only the split technical replicates data.
 screen.indel.dt$tech <- as.character(screen.indel.dt$tech)
 base.mut.dt = screen.indel.dt %>% 
   select_if(negate(is.numeric)) %>% 
-  unique()
+  unique() %>%
+  left_join(num.base.dt)
 
 
 split.dt = screen.indel.dt %>% 
@@ -704,7 +708,8 @@ screen_indel_tib = screen.indel.dt %>%
   dplyr::select(!contains("split"), 
                 -plate, -exp, -seq_barcode, 
                 -seq_index, -file, -mutation, 
-                -mut_type, -type, -color) %>%
+                -mut_type, -type, -color, 
+                -tech, -norm, -count) %>%
   unique() %>%
   as_tibble()
 ```
