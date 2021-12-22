@@ -49,6 +49,9 @@ library(purrr)
 library(cowplot)
 library(data.table)
 library(gghighlight)
+library(PerformanceAnalytics)
+library(corrr)
+
 
 out.dir = "/DATA/projects/DSBrepair/git/EpiScreen/files_scripts/"
 ```
@@ -139,23 +142,16 @@ cell.viab.data %<>% mutate(ID = gsub("nm|um|plate|rep", "", ID)) %>%
 
 # calculate the % of the DMSO control (here we take the mean of DMSO per replicate)
 indel.statistics.tib %<>% left_join(cell.viab.data) %>%
-  dplyr::group_by(replicate) %>%
-  dplyr::mutate(ctrl_mean = mean(viability[drug == "DMSO"]),
+  group_by(replicate) %>%
+  mutate(viability = viability - min(viability)) %>%
+  mutate(ctrl_mean = mean(viability[drug == "DMSO"]),
          viab_norm = viability / ctrl_mean,
          conc_char = ifelse(concentration == 100, 
                             paste0(concentration, " nM"), 
                             paste0(concentration, " µM")),
                          conc_char = factor(conc_char, 
                                             levels = c("100 nM", "1 µM", "10 µM"))) %>%
-  dplyr::select(-ctrl_mean, -bp, -bp_written) # remove this column
-
-
-indel.statistics.tib %>% 
-  dplyr::select(-reads_written, -n_tooshort, 
-                -index, -pat1, -barcode,  -pat2) %>% 
-  write_rds(., 
-            file = paste0(out.dir, 
-                          "rs20211007_Episcreen_Reads_Viab_Metadata.RDS"))
+  select(-ctrl_mean, -bp, -bp_written) # remove this column
 ```
 
 
@@ -173,7 +169,7 @@ ggplot(indel.statistics.tib, aes(well, log10(reads))) +
 # How many reads per index?
 indel.statistics.tib %>% 
   group_by(replicate, plate, seq_barcode) %>% 
-  dplyr::summarise(reads = sum(reads)) %>%
+  summarise(reads = sum(reads)) %>%
   ggplot(., aes(plate, reads, fill = seq_barcode)) + 
   geom_bar(stat = "identity") + 
   ggtitle("reads per index") +
@@ -181,7 +177,7 @@ indel.statistics.tib %>%
 # How many reads per row?
 indel.statistics.tib %>% 
   separate(well, c("row", "column"), sep = 1) %>% 
-  group_by(replicate, row) %>% dplyr::summarise(reads = sum(reads)) %>%
+  group_by(replicate, row) %>% summarise(reads = sum(reads)) %>%
   ggplot(., aes(row, reads, fill = row)) + 
   geom_bar(stat = "identity") + 
   ggtitle("reads per row") +
@@ -189,7 +185,7 @@ indel.statistics.tib %>%
 # How many reads per column?
 indel.statistics.tib %>% 
   separate(well, c("row", "column"), sep = 1) %>% 
-  group_by(replicate, column) %>% dplyr::summarise(reads = sum(reads)) %>%
+  group_by(replicate, column) %>% summarise(reads = sum(reads)) %>%
   ggplot(., aes(column, reads, fill = column)) + 
   geom_bar(stat = "identity") + 
   ggtitle("reads per column") +
@@ -205,7 +201,7 @@ indel.statistics.tib %>%
 well.statistics <- indel.statistics.tib %>% 
   filter(replicate == "E177" & drug_plate == 1) %>%
   group_by(well) %>% 
-  dplyr::summarise(reads = sum(reads))
+  summarise(reads = sum(reads))
 
 p1 = raw_map(well.statistics$reads, 
                  well.statistics$well) + 
@@ -216,7 +212,7 @@ p1 = raw_map(well.statistics$reads,
 well.statistics <- indel.statistics.tib %>% 
   filter(replicate == "E177" & drug_plate == 2) %>%
   group_by(well) %>% 
-  dplyr::summarise(reads = sum(reads))
+  summarise(reads = sum(reads))
 
 p2 = raw_map(well.statistics$reads, 
                  well.statistics$well) + 
@@ -230,7 +226,7 @@ p2 = raw_map(well.statistics$reads,
 well.statistics <- indel.statistics.tib %>% 
   filter(replicate == "E1504" & drug_plate == 1) %>%
   group_by(well) %>% 
-  dplyr::summarise(reads = sum(reads))
+  summarise(reads = sum(reads))
   
 p3 = raw_map(well.statistics$reads, 
                  well.statistics$well) + 
@@ -241,7 +237,7 @@ p3 = raw_map(well.statistics$reads,
 well.statistics <- indel.statistics.tib %>% 
   filter(replicate == "E1504" & drug_plate == 2) %>%
   group_by(well) %>% 
-  dplyr::summarise(reads = sum(reads))
+  summarise(reads = sum(reads))
   
 p4 = raw_map(well.statistics$reads, 
                  well.statistics$well) + 
@@ -340,7 +336,7 @@ limits <- c(0.6, 1)
 well.statistics <- indel.statistics.tib %>% 
   filter(replicate == "E177" & drug_plate == 1) %>%
   group_by(well) %>% 
-  dplyr::summarise(r_written_pct = mean(r_written_pct))
+  summarise(r_written_pct = mean(r_written_pct))
 
 p1 = raw_map(well.statistics$r_written_pct, 
                  well.statistics$well) + 
@@ -351,7 +347,7 @@ p1 = raw_map(well.statistics$r_written_pct,
 well.statistics <- indel.statistics.tib %>% 
   filter(replicate == "E177" & drug_plate == 2) %>%
   group_by(well) %>% 
-  dplyr::summarise(r_written_pct = mean(r_written_pct))
+  summarise(r_written_pct = mean(r_written_pct))
 
 p2 = raw_map(well.statistics$r_written_pct, 
                  well.statistics$well) + 
@@ -362,7 +358,7 @@ p2 = raw_map(well.statistics$r_written_pct,
 well.statistics <- indel.statistics.tib %>% 
   filter(replicate == "E1504" & drug_plate == 1) %>%
   group_by(well) %>% 
-  dplyr::summarise(r_written_pct = mean(r_written_pct))
+  summarise(r_written_pct = mean(r_written_pct))
   
 p3 = raw_map(well.statistics$r_written_pct, 
                  well.statistics$well) + 
@@ -373,7 +369,7 @@ p3 = raw_map(well.statistics$r_written_pct,
 well.statistics <- indel.statistics.tib %>% 
   filter(replicate == "E1504" & drug_plate == 2) %>%
   group_by(well) %>% 
-  dplyr::summarise(r_written_pct = mean(r_written_pct))
+  summarise(r_written_pct = mean(r_written_pct))
   
 p4 = raw_map(well.statistics$r_written_pct, 
                  well.statistics$well) + 
@@ -478,10 +474,10 @@ viab_plot_tib = indel.statistics.tib %>%
   distinct(drug, well, conc_char,
            drug_plate, tech, plate,
            replicate, target, viab_norm) %>%
-  dplyr::group_by(drug, conc_char, replicate) %>%
-  dplyr::mutate(viab_var = var(viab_norm),
+  group_by(drug, conc_char, replicate) %>%
+  mutate(viab_var = var(viab_norm),
                 viab_mean = mean(viab_norm)) %>%
-  dplyr::select(-viab_norm) %>%
+  select(-viab_norm) %>%
   pivot_wider(names_from = replicate, values_from = c(viab_mean, viab_var)) %>%
   filter(!is.na(conc_char)) %>%
   mutate(viab_diff = abs(viab_mean_E1504-viab_mean_E177)) %>%
@@ -501,7 +497,7 @@ DMSO_data = viab_plot_tib %>% filter(drug == "DMSO")
 Mirin_data = viab_plot_tib %>% filter(drug == "Mirin")
 
 odd_data = viab_plot_tib %>% 
-  filter(viab_diff > 0.25)
+  filter(viab_diff > 0.20)
 
 control.colors <- c("PAO" = "red", "DMSO" = "yellow", "Mirin" = "brown", "Not reproducible" = "orange")
 
@@ -547,7 +543,7 @@ for (i in unique(viab_plot_tib$target)) {
     ggplot(.,
            aes(viab_mean_E1504, viab_mean_E177)) + 
     geom_point() +
-    gghighlight(viab_diff > 0.25 &
+    gghighlight(viab_diff > 0.20 &
                   (viab_mean_E1504 > .5 |
                      viab_mean_E177 > .5),
                 label_key = drug,
@@ -574,17 +570,24 @@ for (i in unique(viab_plot_tib$target)) {
 
 
 ```{r low read wells}
-# Filter all the wells for less than 2000 reads, this would be equal to about 1000 reads per barcode per well
+# Filter all the wells for less than 2000 reads, this would be equal to about 100 reads per 
+# barcode per well. This is a rough check, we might go for this or for 30 reads min for 
+# +1/-7.
 # That ratio is the minimal ratio we want for our balance calculations
 low.reads = indel.statistics.tib %>% filter(reads < 2000)
 
 # How many wells are there? 
-low_r = indel.statistics.tib %>% filter(reads < 2000) %>% nrow(.)
-low_r
-hi_r = indel.statistics.tib %>% filter(reads >= 2000) %>% nrow(.)
-hi_r
+low_r = indel.statistics.tib %>% filter(reads < 2000) %>% 
+  distinct(ID, concentration) %>% 
+  group_by(concentration, replicate) %>% 
+  summarise(count_low = n())
+hi_r = indel.statistics.tib %>% filter(reads >= 2000) %>% 
+  distinct(ID, concentration) %>% 
+  group_by(concentration, replicate) %>% 
+  summarise(count_high = n()) %>% left_join(low_r)
+
 # Fraction of total:
-low_r / hi_r
+hi_r %>% mutate(fraction = count_low / (count_low+count_high))
 
 # Quick plot to check if this is related to the cell viability
 indel.statistics.tib %>% 
@@ -594,9 +597,54 @@ indel.statistics.tib %>%
            facet_grid(replicate ~ conc_char) 
 ```
 
-The proportion of wells that we cannot use for the balance is in general super low < 5%.
+The proportion of wells that we cannot use for the balance is in general very low ~ 5%. The one plate in E1504 100 nM lost 25% of the wells, makes sense with the plots above.
 
 In general there are fewer reads in the low cell viability samples but the lowest ones are more due to library prep, missing primers (for the 8 samples in E1504). Let's keep it simple. However we should still make sure the viability correlates between replicates. Let's plot that in Supplemental figure 1. 
+```{r correlation between experiments}
+viab_matrix = indel.statistics.tib %>%
+  mutate(ID = gsub("^E.*_.._(.*_)[123]_([12]_...)$", "\\1\\2", ID)) %>% 
+  distinct(ID, tech, replicate, viab_norm) %>%
+  pivot_wider(., names_from = c("replicate", "tech"), values_from = "viab_norm") %>%
+  column_to_rownames(., var = "ID")
+
+
+cor_df = viab_matrix %>% 
+  correlate() %>% 
+  shave() # Shave off the upper triangle for a clean result
+
+cor_df
+
+rplot(cor_df)
+
+# 
+chart.Correlation(viab_matrix, histogram=TRUE, pch=19)
+
+```
+
+The two replicates correlate quite well except for some of these outlyers in E1504 that were less deadly to the cells.
+
+
+```{r data export}
+viab_plot_tib %<>% 
+  pivot_longer(., c("viab_mean_E1504", "viab_mean_E177"), 
+               names_to = "replicate", 
+               values_to = "viab_mean") %>% 
+  mutate(replicate = gsub("viab_mean_", "", replicate)) %>%
+  pivot_longer(., c("viab_var_E1504", "viab_var_E177"), 
+               names_to = "replicate2", 
+               values_to = "viab_var") %>%
+  select(-replicate2) %>%
+  unique()
+
+indel.statistics.tib %>%
+  select(-reads_written, -n_tooshort,
+                -index, -pat1, -barcode,  -pat2) %>%
+  left_join(viab_plot_tib) %>%
+  write_rds(.,
+            file = paste0(out.dir,
+                          "rs20211221_Episcreen_Reads_Viab_Metadata.RDS"))
+```
+
 
 # Conclusion
 - In general, the data looks very good
