@@ -45,7 +45,7 @@ StartTime <-Sys.time()
 # 8-digit Date tag:
 Date <- substr(gsub("-","",Sys.time()),1,8) 
 # libraries:
-library(dplyr)
+library(tidyverse)
 library(outliers)
 library(ggplot2)
 library(ggbeeswarm)
@@ -55,12 +55,9 @@ library(pheatmap)
 library(gridGraphics)
 library(gridExtra)
 library(RColorBrewer)
-library(tidyr)
 library(VennDiagram)
 library(ggforce)
-library(tibble)
 library(ggpubr)
-library(Laurae)
 ```
 
 ### Custom functions
@@ -78,7 +75,15 @@ SetFileName <- function(filename, initials) {
 
 ## Data import
 ```{r Data Import, echo = FALSE, warning = FALSE}
-# Import data from 5_HitValidation_drugScreen.Rmd
+file_list = list.files("/DATA/projects/DSBrepair/data/R/rs20210813_episcreen_2", full.names = TRUE)
+file_list
+episcreen_indels = readRDS(file_list[[1]])
+episcreen_ratios_split = readRDS(file_list[[2]])
+episcreen_ratios = readRDS(file_list[[3]])
+validations_indels = readRDS(file_list[[4]])
+validations_ratios = readRDS(file_list[[5]])
+
+# # Import data from 5_HitValidation_drugScreen.Rmd
 setwd("/DATA/usr/m.trauernicht/projects/EpiScreen/files_scripts/")
 mapping_mean <- get(load("mt20190510_mapping_mean"))
 indel.data <- get(load("mt20210608_indel.data"))
@@ -86,11 +91,221 @@ mapping_mean_long <- get(load("mt20190510_mapping_mean_long"))
 chip_dendogram <- get(load("mt20190510_chip_dendogram"))
 mapping_mean_all <- get(load("mt20190329_mapping_mean_all"))
 barcode.order <- read.table("barcode_order.txt", header = T)
+# 
+# setwd("/DATA/projects/DSBrepair/scratch/")
+# delay.df <- read.table("cl20190329_minus7_delay.tsv", header = T)
+```
+## Annotate heatmap columns and rows
+```{r}
+# Row annotation: annotate drugs with the target group
+target <- episcreen_ratios %>% 
+  filter(!target %in% c("Negative Control", "MRN", "DNA-PK")) %>% 
+  distinct(drug, target) %>% 
+  column_to_rownames(var="drug")
 
-setwd("/DATA/projects/DSBrepair/scratch/")
-delay.df <- read.table("cl20190329_minus7_delay.tsv", header = T)
+
+
+chromatin <- readRDS(
+  "/DATA/usr/x.vergara/XV_ChIPIndels/XV20200902_DDR_RS_revision/XV20200902_DDR_RS_revision/data/xv20200915_DDR_data_CHIP.rds") %>% 
+  distinct(barcode, chromatin) %>%
+  left_join(distinct(episcreen_ratios, barcode, IPR)) %>%
+  filter(IPR != "<NA>") %>% 
+  select(-barcode) %>%
+  column_to_rownames(var="IPR")
+
+chrom_colors2 = c("Euchromatin" = "#F7941D", 
+                     "other-heterochromatin" = "#838687",  
+                     "H3K27me3" = "#D21F8A", 
+                     "Triple Heterochromatin" = "#662D91")
+
+
+
+# Change colors of annotations
+colors <- brewer.pal(length(unique(barcode.annotation$cluster)), "Pastel2")
+names(colors) <- unique(barcode.annotation$cluster)
+
+annotation_colors_scr = list(
+  chromatin = chrom_colors2,
+  type = c(Active="#669966", Repressive="grey90"),
+  target = c(HDAC="#60988D", HAT="#C6D0A8", Sirtuin="#8FCAAC",
+             HMT="#FDCDAC", DNMT="#D69C81", `Histone Demethylase`="#FFF2AE",
+             HIF="#E3DCD5", JAK="#C8D7E2", PIM="#9AB8C4", `Aurora Kinase`="#F4CAE4",
+             PARP="#CB546F", `Epigenetic Reader Domain`= "#476D61", `DNA-PK`="#E07A43"
+             ))
+
+
+
+# Order the annotation legend
+ordered_marks <- c("Euchromatin", 
+                     "other-heterochromatin",  
+                     "H3K27me3", 
+                     "Triple Heterochromatin")
+
+annotation_colors_scr$chromatin <- annotation_colors_scr$chromatin[ordered_marks]
+
+ordered_marks2 <- c("DNA-PK","Epigenetic Reader Domain", "HDAC",  "Sirtuin", "HAT", 
+                    "Histone Demethylase", "HMT", "DNMT", 
+                    "HIF", "JAK", "PIM",
+                    "Aurora Kinase", "PARP")
+annotation_colors_scr$target <- annotation_colors_scr$target[ordered_marks2]
 ```
 
+# Quick validation plot
+```{r}
+validations_ratios %>% 
+  filter(drug %in% c("DMSO", "Vorinostat"),
+         plasmid == "LBR2", 
+         replicate == "mean") %>% 
+  distinct(barcode, drug, MMEJ_MMEJNHEJ, HDAC1, H3K27me3) %>% 
+  group_by(barcode) %>% 
+  pivot_wider(names_from = drug, values_from = MMEJ_MMEJNHEJ) %>%
+  mutate(MMEJ_diff = Vorinostat - DMSO,
+         MMEJ_ratio = Vorinostat - DMSO) %>%
+  ungroup() %>%
+  ggplot(., aes(HDAC1, MMEJ_diff, color = H3K27me3)) + geom_point() +
+geom_smooth(method= "loess") +
+stat_cor(method = "spearman", label.x.npc = "center", label.y.npc = "top")
+
+
+
+tib.model = validations_ratios %>% 
+  filter(drug %in% c("DMSO", "Vorinostat"),
+         plasmid == "LBR2", 
+         replicate == "mean") %>% 
+  distinct(barcode, drug, MMEJ_MMEJNHEJ, CTCF, EZH2, 
+           H2AFZ, H3K27ac, H3K27me3, H3K36me3,
+           H3K4me1, H3K4me2, H3K4me3, H3K79me2, H3K9me2, 
+           H4K5acK8ac, HDAC1, HDAC2, HDAC3, POL2,
+           POL2AS2, SMC3 , LMNB1, Dam,  DNAse ,   
+           m5C, late_replicating,  TTseq) %>% 
+  pivot_wider(names_from = drug, values_from = MMEJ_MMEJNHEJ) %>%
+  mutate(MMEJ_diff = Vorinostat - DMSO,
+         MMEJ_ratio = Vorinostat - DMSO) %>% 
+  dplyr::select(-barcode, -Vorinostat, -DMSO) %>%
+  filter(!is.na(MMEJ_diff))
+
+
+y <- "MMEJ_diff"
+x <- names(tib.model)[!names(tib.model) %in% y]
+mymodel <- as.formula(paste(y, paste(x, collapse="+"), sep="~"))
+
+
+mymodel <- MMEJ_diff ~ HDAC1
+mymodel <- MMEJ_diff ~ H3K27me3
+mymodel <- MMEJ_diff ~ H3K27ac
+
+mymodel <- MMEJ_diff ~ H3K4me1
+
+vorino_model <-lm(mymodel, data = tib.model)
+
+get_regression_table(vorino_model, conf.level = 0.99)
+
+
+vorino_model <- glm(MMEJ_diff~ , data = tib.model, family = 'binomial')
+tib.model
+
+```
+
+
+
+```{r}
+chip.mat = episcreen_ratios %>% distinct(IPR, CTCF, EZH2, H2AFZ, H3K27ac, H3K27me3, H3K36me3,
+                                         H3K4me1, H3K4me2, H3K4me3, H3K79me2, H3K9me2, 
+                                         H4K5acK8ac, HDAC1, HDAC2, HDAC3, POL2,
+                                         POL2AS2, SMC3 , LMNB1, Dam,  DNAse ,   
+                                         m5C, late_replicating,  TTseq) %>% 
+  column_to_rownames(var="IPR") %>%
+  as.matrix()
+
+tree = pheatmap(chip.mat,
+         color = colorRampPalette(rev(brewer.pal(n = 7, name = "RdBu")))(500),
+         annotation_colors = annotation_colors_scr, 
+         border_color = "black", 
+         annotation_row = chromatin, 
+         cellwidth = 8, 
+         cellheight = 12, 
+         scale = "column")
+
+tree
+
+drugs100 = episcreen_ratios %>%
+  filter(concentration == 100, sample == "drug", abs(MMEJ_zscore) > 4) %>% pull(drug) %>% unique()
+
+drugs100
+
+# Same as above, but using logratio data for each IPR vs each drug
+ratios_mmej_score <- episcreen_ratios %>%
+  filter(drug %in% drugs100) %>%
+  dplyr::select(IPR, replicate, drug, concentration, MMEJ_zscore) %>%
+  unique() %>%
+  pivot_wider(values_from = MMEJ_zscore, names_from = drug)
+
+mmej.mat = ratios_mmej_score %>%
+  filter(concentration == 100, replicate == "E1504") %>%
+  select_if(~all(!is.na(.))) %>%
+  # remove_rownames %>%
+  column_to_rownames(var="IPR") %>%
+  select(-concentration, -replicate) %>%
+  as.matrix(.)
+
+paletteLength <- 400
+
+myBreaks <- c(seq(min(mmej.mat), 0, length.out=ceiling(paletteLength/2) + 1),
+              seq(-min(mmej.mat)/paletteLength, -min(mmej.mat), length.out=floor(paletteLength/2)))
+
+colors_filter = colorRampPalette(rev(brewer.pal(n = 7, name = "RdBu")))(400)
+
+colors_filter[between(myBreaks, -3, 3)] = "gray80"
+
+pheatmap(mmej.mat,
+         color = colors_filter,
+         breaks = myBreaks,
+         annotation_col = target,
+         cluster_rows = tree$tree_row,
+         annotation_colors = annotation_colors_scr, 
+         border_color = "black", 
+         annotation_row = chromatin, 
+         cellwidth = 8, 
+         cellheight = 12)
+
+
+
+# Same as above, but using logratio data for each IPR vs each drug
+ratios_eff_score <- episcreen_ratios %>%
+  filter(drug %in% drugs100) %>%
+  dplyr::select(IPR, replicate, drug, concentration, freqCut_norm ) %>%
+  unique() %>%
+  pivot_wider(values_from = freqCut_norm, names_from = drug)
+
+eff.mat = ratios_eff_score %>%
+  filter(concentration == 100, replicate == "E1504") %>%
+  select_if(~all(!is.na(.))) %>%
+  # remove_rownames %>%
+  column_to_rownames(var="IPR") %>%
+  select(-concentration, -replicate) %>%
+  as.matrix(.)
+
+paletteLength <- 400
+
+myBreaks <- c(seq(min(eff.mat), 1, length.out=ceiling(paletteLength/2)),
+              seq(1, max(eff.mat), length.out=floor(paletteLength/2)))[-201]
+
+colors_filter = colorRampPalette(rev(brewer.pal(n = 7, name = "RdBu")))(400)
+
+colors_filter[between(myBreaks, .95, 1.05)] = "gray80"
+
+pheatmap(eff.mat,
+         color = colors_filter,
+         breaks = myBreaks,
+         annotation_col = target,
+         cluster_rows = tree$tree_row,
+         annotation_colors = annotation_colors_scr, 
+         border_color = "black", 
+         annotation_row = chromatin, 
+         cellwidth = 8, 
+         cellheight = 12)
+
+```
 
 
 
@@ -137,60 +352,6 @@ indel.data.low.drug <- indel.data.low %>% dplyr::select(IPR, drug, MMEJ_zscore_m
 
 
 
-## Annotate heatmap columns and rows
-```{r}
-# Row annotation: annotate drugs with the target group
-target <- indel.data[indel.data$target != c("Negative Control", "MRN", "DNA-PK"),] %>% 
-  dplyr::select(drug, target) %>% unique() %>% remove_rownames %>% 
-  column_to_rownames(var="drug")
-
-# Add type of chr. mark (repressive or active)
-type <- mapping_mean_long %>% dplyr::select(variable, type) %>% unique() %>%
-  remove_rownames %>% column_to_rownames(var="variable")
-
-# Add annotation of barcodes (based on clustering in 0_Clone5_Annotation.Rmd)
-# barcode.annotation <- readRDS('/DATA/projects/DSBrepair/data/R/rs20200311_domains_clone5.RDS') %>%
-#   dplyr::select('domain' = group, IPR) %>%
-#   column_to_rownames("IPR")
-# Add annotation of barcodes (based on clustering in 0_Clone5_Annotation.Rmd)
-barcode.annotation <- unique(as.data.frame(indel.data.high$IPR))
-
-## Manually added these tags: check/rewrite this
-barcode.annotation$cluster[c(18,2)] <- "Active Promoter/Enhancer"
-barcode.annotation$cluster[c(12,8)] <- "H3K9me2/3 Domain"
-barcode.annotation$cluster[c(3,14,4,17)] <- "Active Gene Body"
-barcode.annotation$cluster[c(5,13,6,15)] <- "LAD"
-barcode.annotation$cluster[c(7,16)] <- "No Marks Present"
-barcode.annotation$cluster[c(1,10,9,11)] <- "H3K27me3 Domain"
-
-barcode.annotation <- barcode.annotation %>% remove_rownames() %>%
-  column_to_rownames("indel.data.high$IPR")
-
-# Change colors of annotations
-colors <- brewer.pal(length(unique(barcode.annotation$cluster)), "Pastel2")
-names(colors) <- unique(barcode.annotation$cluster)
-
-annotation_colors_scr = list(
-  cluster = colors,
-  type = c(Active="#669966", Repressive="grey90"),
-  target = c(HDAC="#60988D", HAT="#C6D0A8", Sirtuin="#8FCAAC",
-             HMT="#FDCDAC", DNMT="#D69C81", `Histone Demethylase`="#FFF2AE",
-             HIF="#E3DCD5", JAK="#C8D7E2", PIM="#9AB8C4", `Aurora Kinase`="#F4CAE4",
-             PARP="#CB546F", `Epigenetic Reader Domain`= "#476D61", `DNA-PK`="#E07A43"
-             ))
-
-
-
-# Order the annotation legend
-ordered_marks <- c("Active Promoter/Enhancer", "Active Gene Body", "No Marks Present", "H3K27me3 Domain",  "H3K9me2/3 Domain", "LAD")
-annotation_colors_scr$cluster <- annotation_colors_scr$cluster[ordered_marks]
-
-ordered_marks2 <- c("DNA-PK","Epigenetic Reader Domain", "HDAC",  "Sirtuin", "HAT", 
-                    "Histone Demethylase", "HMT", "DNMT", 
-                    "HIF", "JAK", "PIM",
-                    "Aurora Kinase", "PARP")
-annotation_colors_scr$target <- annotation_colors_scr$target[ordered_marks2]
-```
 
 
 
