@@ -66,6 +66,9 @@ library(platetools)
 library(ggpubr)
 library(tidyr)
 library(Laurae)
+library(tibble)
+library(pheatmap)
+library(RColorBrewer)
 ```
 
 ### Functions
