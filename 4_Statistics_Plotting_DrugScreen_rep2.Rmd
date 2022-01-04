@@ -315,13 +315,13 @@ corColor <- function(data, mapping, color = I("black"), sizeRange = c(1, 3), ...
 
 ```{r data import, echo = FALSE, warning = FALSE}
 # Import data from preprocessing script
-indel.data <- readRDS("/DATA/projects/DSBrepair/data/R/rs20210813_episcreen/rs20210813_episcreen_ratios.RDS")
-indel.data.split <- readRDS("/DATA/projects/DSBrepair/data/R/rs20210813_episcreen/rs20210813_episcreen_ratios_split.RDS")
-indel.data.mut <- readRDS("/DATA/projects/DSBrepair/data/R/rs20210813_episcreen/rs20210813_episcreen_mutations.RDS")
+indel.data <- readRDS("/DATA/projects/DSBrepair/data/R/rs20220103_episcreen/rs20220103_episcreen_ratios.RDS")
+indel.data.split <- readRDS("/DATA/projects/DSBrepair/data/R/rs20220103_episcreen/rs20220103_episcreen_ratios_split.RDS")
+indel.data.mut <- readRDS("/DATA/projects/DSBrepair/data/R/rs20220103_episcreen/rs20220103_episcreen_mutations.RDS")
 
 # Complete data without exlcluding wells <0.5 viability (I need this for plotting)
-viability.data = as.data.table(readRDS("/DATA/projects/DSBrepair/git/EpiScreen/files_scripts/rs20210626_Episcreen_Reads_Viab_Metadata.RDS")) %>%
-  dplyr::select(ID, drug, target, replicate, viab_norm, conc_char, tech)
+viability.data = as.data.table(readRDS("/DATA/projects/DSBrepair/git/EpiScreen/files_scripts/rs20211221_Episcreen_Reads_Viab_Metadata.RDS")) %>%
+  dplyr::select(ID, drug, target, replicate, viability, conc_char, tech)
 ```
 
 
@@ -337,7 +337,29 @@ viability.data$group[viability.data$drug == "DMSO"] <- "DMSO"
 viability.data$group[viability.data$drug == "PAO"] <- "PAO"
 viability.data$ID <- gsub("^E[0-9]{3,4}_", "", viability.data$ID)
 
+# re-scale viability data so DMSO is set at 1 and PAO at 0 per experiment
+pao.viab <- viability.data %>%
+  filter(group == "PAO") %>%
+  dplyr::select(replicate, 'pao' = viability) %>%
+  mutate(pao = ave(pao, replicate, FUN = function(x) mean(x))) %>%
+  unique()
+
+dmso.viab <- viability.data %>%
+  filter(group == "DMSO") %>%
+  dplyr::select(replicate, 'dmso' = viability) %>%
+  mutate(dmso = ave(dmso, replicate, FUN = function(x) mean(x))) %>%
+  unique()
+
+viability.data <- merge(viability.data, pao.viab)
+viability.data <- merge(viability.data, dmso.viab)
+
+viability.data <- viability.data %>%
+  mutate(viab_norm = viability - pao,
+         dmso = dmso - pao) %>%
+  mutate(viab_norm = viab_norm / dmso)
+
 viability.data2 <- viability.data %>%
+  unique() %>%
   spread(key = replicate, value = viab_norm)
 
 # Correlate viability data from the 2 replicates, highlight controls
