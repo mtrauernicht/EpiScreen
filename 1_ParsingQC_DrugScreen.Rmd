@@ -621,7 +621,7 @@ chart.Correlation(viab_matrix, histogram=TRUE, pch=19)
 
 ```
 
-The two replicates correlate quite well except for some of these outlyers in E1504 that were less deadly to the cells.
+The two replicates correlate quite well except for some of these outliers in E1504 that were less deadly to the cells.
 
 
 ```{r data export}
