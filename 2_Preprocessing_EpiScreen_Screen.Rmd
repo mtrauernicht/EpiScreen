@@ -296,37 +296,40 @@ remove_drugs <- mutations.stat.dt %>%
   filter(viab_norm_split < 0.45) %>%
   dplyr::select(conc_char, drug) %>%
   unique() %>%
-  mutate(conc_char_drug = paste(conc_char, drug, sep = "_"))
+  mutate(conc_char_drug = paste(conc_char, drug, sep = " "))
 
 mutations.stat.dt <- mutations.stat.dt %>%
-  mutate(conc_char_drug = paste(conc_char, drug, sep = "_")) %>%
+  mutate(conc_char_drug = paste(conc_char, drug, sep = " ")) %>%
   filter(!conc_char_drug %in% remove_drugs$conc_char_drug) %>%
   dplyr::select(-conc_char_drug, -mut.counts)
 
-# Calculate the data now from the summed values. 
-mutations.stat.dt[, c("count", "reads", "norm") := 
-               list(sum(count_split), sum(reads_split), sum(norm_split)), by = c("ID", "barcode", "mutation")]
-mutations.stat.dt[, c("viab_norm", "r_written_pct") := 
-               list(mean(viab_norm_split), mean(r_written_pct_split)), 
-             by = c("ID", "barcode")]
+### MAX THIS IS COMMENTED OUT BECAUSE WE DONT NEED IT ANYMORE #####
+# # Calculate the data now from the summed values. 
+# mutations.stat.dt[, c("count", "reads", "norm") := 
+#                list(sum(count_split), sum(reads_split), sum(norm_split)), by = c("ID", "barcode", "mutation")]
+# mutations.stat.dt[, c("viab_norm", "r_written_pct") := 
+#                list(mean(viab_norm_split), mean(r_written_pct_split)), 
+#              by = c("ID", "barcode")]
+# 
+# cols = c("barcode", "ID", "mutation", "norm", "count")
+# mutations.pool.dt = mutations.stat.dt[, ..cols]
+# mutations.pool.dt = unique(mutations.pool.dt)
+# 
+# mutations.pool.dt[, norm_pooled := norm/sum(norm), by = ID]
+# 
+# mutations.pool.dt[, c("freq_pooled", "sum_pooled_bc_reads") := 
+#                     list(norm_pooled/sum(norm_pooled, na.rm = TRUE), sum(count)), 
+#                   by = c("barcode","ID")]
+# 
+# mutations.pool.dt[!mutation%in%c(0,NA), 
+#                   ratio_indels_pooled := norm_pooled/sum(norm_pooled, na.rm = TRUE), 
+#                   by=c("barcode","ID")]
+# 
+# # Merge the data
+# screen.indel.dt = merge(mutations.stat.dt, mutations.pool.dt, 
+#                         by = c("barcode", "ID", "mutation", "norm", "count"))
 
-cols = c("barcode", "ID", "mutation", "norm", "count")
-mutations.pool.dt = mutations.stat.dt[, ..cols]
-mutations.pool.dt = unique(mutations.pool.dt)
-
-mutations.pool.dt[, norm_pooled := norm/sum(norm), by = ID]
-
-mutations.pool.dt[, c("freq_pooled", "sum_pooled_bc_reads") := 
-                    list(norm_pooled/sum(norm_pooled, na.rm = TRUE), sum(count)), 
-                  by = c("barcode","ID")]
-
-mutations.pool.dt[!mutation%in%c(0,NA), 
-                  ratio_indels_pooled := norm_pooled/sum(norm_pooled, na.rm = TRUE), 
-                  by=c("barcode","ID")]
-
-# Merge the data
-screen.indel.dt = merge(mutations.stat.dt, mutations.pool.dt, 
-                        by = c("barcode", "ID", "mutation", "norm", "count"))
+screen.indel.dt = copy(mutations.stat.dt)
 
 # Quick random check of the data for a specific barcode and drug: 
 screen.indel.dt[barcode == "ACTGTCGAGTTGTCCG" & drug == "Zebularine" & mutation == -7, 
@@ -342,6 +345,24 @@ dim(mutations.pool.dt)
 [1] 928364      9
 dim(screen.indel.dt)
 [1] 1956008      37
+## We will also remove samples that not least in 2 technical replicates (out of 3) and are present in at least both biological replicates. 
+
+```{r filter for reproducibility}
+screen.indel.dt %>% 
+  distinct(concentration, replicate, tech, drug) %>% 
+  group_by(concentration, replicate, drug) %>% 
+  summarise(count = n()) %>% 
+  filter(count < 2)
+
+screen.indel.dt %>% 
+  distinct(concentration, replicate, drug) %>% 
+  group_by(concentration, drug) %>% 
+  summarise(count = n()) %>% 
+  filter(count < 2)
+```
+
+These two tables are empty, that means that all the samples we have here are all in at least 2 same screen replicates and 2 difference screen replicates.
+
 
 ## Pooling large indels for indel spectrum plotting
 
@@ -359,11 +380,9 @@ mutations.large.del.dt = screen.indel.dt[mutation %in% largedels, ]
 mutations.large.del.sum.dt = 
   mutations.large.del.dt[, lapply(.SD, sum, na.rm=TRUE), 
                          by=c("exp", "barcode"),
-                         .SDcols=c("norm", "count", "count_split",  
+                         .SDcols=c("count_split",  
                                    "norm_split", "freq_split", "sum_bc_reads_split",
-                                   "ratio_indels_split", "reads",  "norm_pooled", 
-                                   "freq_pooled", "sum_pooled_bc_reads", 
-                                   "ratio_indels_pooled")]
+                                   "ratio_indels_split")]
 # Add indel info
 mutations.large.del.sum.dt[, c("mutation", "mut_type") := list("<-14", "del")]
 
@@ -387,11 +406,9 @@ largeins <- as.character(seq(3, 20))
 mutations.large.ins.dt = screen.indel.dt[mutation %in% largeins, ]
 # Sum large ins
 mutations.large.ins.sum.dt = mutations.large.ins.dt[, lapply(.SD, sum, na.rm=TRUE),  by=c("exp", "barcode"),
-                                                .SDcols=c("norm", "count", "count_split",  
+                                                .SDcols=c("count_split",  
                                                           "norm_split", "freq_split", "sum_bc_reads_split",
-                                                          "ratio_indels_split", "reads",  "norm_pooled", 
-                                                          "freq_pooled", "sum_pooled_bc_reads", 
-                                                          "ratio_indels_pooled")]
+                                                          "ratio_indels_split")]
 # Add indel info
 mutations.large.ins.sum.dt[, c("mutation", "mut_type") := list(">2", "ins")]
 
@@ -451,7 +468,11 @@ rm(list = ls()[grep("mutations.dt", ls())])
 
 ```{r calculate_ratios}
 # Calculate NHEJ/MMEJ ratios and efficiences
-### WIP #####
+### WIP MAX YOU CAN START HERE. CALCULATING THE RATIOS AND 
+### THEN BELOW WE SHOULD CALCULATE THE ZSCORES AND FINALLY COMBINE THE ZSCORES
+#### MOST OF THESE CHUNKS SHOULD WORK 
+### THE _SPLIT COLUMNS ARE THE TECHNICAL REPS THAT ARE NOT POOLED YET, 
+#### BELOW THEY ARE AVERAGED BUT NEED FIXING ####
 ratios_split_tib <- screen.indel.dt %>%
   filter(mutation %in% c("1", "-7")) %>%
   dplyr::distinct(exp, barcode, mutation, ratio_indels_split) %>% 
@@ -469,20 +490,6 @@ ratios_split_tib <- screen.indel.dt %>%
 # This is to calculate the overall effect of the drug on the average MMEJ score in the cell.
 ratios_split_tib <- ratios_split_tib %>%
   mutate(MMEJscore_split_drug = ave(MMEJscore_split, exp, FUN = function(x) mean(x)))
-
-ratios_pooled_tib <- screen.indel.dt %>%
-  filter(mutation %in% c("1", "-7")) %>%
-  dplyr::distinct(ID, barcode, mutation, ratio_indels_pooled) %>% 
-    unique() %>%
-  pivot_wider(names_from = mutation, 
-              values_from = ratio_indels_pooled, 
-              values_fill = 0) %>%
-  mutate(freqMMEJ = `-7` / 1,
-         freqNHEJ = `1` / 1,
-         NHEJMMEJratio = freqMMEJ / freqNHEJ,
-         MMEJscore = freqMMEJ / (freqMMEJ + freqNHEJ),
-         NHEJscore = freqNHEJ / (freqNHEJ + freqMMEJ)) %>%
-  distinct(ID, barcode, freqMMEJ, freqNHEJ, NHEJMMEJratio, MMEJscore, NHEJscore)
 
 # Make ID name without the technical replicate to make means.
 ratios_pooled_tib$ID_2 <- gsub("^E[0-9]{3,4}_", "", ratios_pooled_tib$ID)
