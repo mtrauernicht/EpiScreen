@@ -308,6 +308,34 @@ corColor <- function(data, mapping, color = I("black"), sizeRange = c(1, 3), ...
 #                       required_aes = c("x", "y")
 # )
 
+theme_classic_lines <- function() {
+  theme_pubr(border = F, legend = "top") +
+            theme(panel.grid.major = element_line(colour = "#adb5bd", size = 0.25),
+                  strip.background = element_rect(fill = "#ced4da")
+            )
+}
+theme_classic_lines_45 <- function() {
+  theme_pubr(border = T, legend = "top", x.text.angle = 45) +
+            theme(panel.grid.major = element_line(colour = "#adb5bd", size = 0.25),
+                  strip.background = element_rect(fill = "#ced4da")
+            )
+}
+
+theme_classic_lines_90 <- function() {
+  theme_pubr(border = T, legend = "top", x.text.angle = 90) +
+            theme(panel.grid.major = element_line(colour = "#adb5bd", size = 0.25),
+                  strip.background = element_rect(fill = "#ced4da")
+            )
+}
+
+theme_set(theme_classic_lines())
+
+colors_diverse <- c("#264653", "#9AC1AE", "#5D987B", "#f2cc8f", "#e76f51")
+
+ggplot_custom <- function(...) ggplot2::ggplot_custom(...) + 
+  scale_color_manual(values = colors_diverse) + 
+  scale_fill_manual(values = colors_diverse)
+
 ```
 
 
@@ -337,6 +365,20 @@ viability.data$group[viability.data$drug == "DMSO"] <- "DMSO"
 viability.data$group[viability.data$drug == "PAO"] <- "PAO"
 viability.data$ID <- gsub("^E[0-9]{3,4}_", "", viability.data$ID)
 
+# Plot amount of drugs per target 
+targets <- viability.data %>% 
+  filter(group == "drug", target != "MRN", target != "DNA-PK") %>%
+  dplyr::select(drug, target) %>% 
+  unique() %>%
+  mutate(number = ave(target, target, FUN = function(x) length(x))) %>% 
+  mutate(number = as.numeric(number)) %>%
+  dplyr::select(target, number) %>% 
+  unique()
+
+ggplot_custom(targets, aes(y = reorder(target, +number), x = number)) + 
+  geom_bar(stat = "identity")  + 
+  ylab("")
+
 # re-scale viability data so DMSO is set at 1 and PAO at 0 per experiment
 pao.viab <- viability.data %>%
   filter(group == "PAO") %>%
@@ -359,32 +401,30 @@ viability.data <- viability.data %>%
   mutate(viab_norm = viab_norm / dmso)
 
 viability.data2 <- viability.data %>%
+  dplyr::select(-pao, -dmso, -viability) %>%
   unique() %>%
   spread(key = replicate, value = viab_norm)
 
 # Correlate viability data from the 2 replicates, highlight controls
-ggplot(viability.data2, aes(x = E177, y = E1504)) +
+ggplot_custom(viability.data2, aes(x = E177, y = E1504)) +
   geom_point(aes(color = group), size = 1) +
   geom_smooth(method = "lm", color = colors_diverse[1]) +
   geom_segment(x = 0.5, xend = 0.5, y = 0.5, yend = 1.2, linetype = "dashed") +
   geom_segment(x = 0.5, xend = 1.2, y = 0.5, yend = 0.5, linetype = "dashed") +
-  theme_pubr(border = T) +
   scale_color_manual(values = colors_diverse[c(2,1,3)]) +
   facet_wrap(~conc_char)
 
 # Viability mean across replicates
-ggplot(viability.data2 %>%
-         filter(group != "PAO") %>%
+ggplot_custom(viability.data2 %>%
+         filter(group != "PAO", group != "DMSO") %>%
          mutate(viab_norm = (E1504 + E177) / 2) %>%
          dplyr::select(drug, group, conc_char, viab_norm) %>%
+         mutate(viab_norm = ave(viab_norm, drug, conc_char, FUN = function(x) mean(x))) %>%
          unique(),
-       aes(x = "x", y = viab_norm, color = group)) +
-  geom_quasirandom(dodge.width = 0.75) +
-  geom_boxplot(position = position_dodge(0.75), alpha = 0.7) +
-  geom_hline(yintercept = .5, linetype = "dashed")+
-  theme_pubr(border = T) +
-  scale_color_manual(values = c(colors_diverse[2], colors_diverse[1])) +
-  facet_wrap(~conc_char)
+       aes(x = conc_char, y = viab_norm, color = ifelse(viab_norm < 0.45, "red", colors_diverse[1]))) +
+  geom_quasirandom() +
+  geom_hline(yintercept = .45, linetype = "dashed")+
+  scale_color_manual(values = c(colors_diverse[1], colors_diverse[4]))
 
 
 # Explore differences between rep 1 & rep 2
@@ -396,9 +436,9 @@ viability.data2 <- viability.data2 %>%
 viability.data2$changed <- "no"
 viability.data2$changed[viability.data2$dif >= 2 | viability.data2$dif <= .5] <- "yes"
 
-ggplot(viability.data2, aes(x = target, y = log2(dif), color = changed)) +
+ggplot_custom(viability.data2, aes(x = target, y = log2(dif), color = changed)) +
   geom_quasirandom() +
-  theme_bw() +
+  
   scale_color_manual(values = colors_diverse)+
   ylab("log2(E1504_viability/E177_viabilty)") +
   facet_wrap(~conc_char) +
@@ -422,12 +462,11 @@ pheatmap(viability.data2.cor,
          border_color = "black",
          color = colorRampPalette(brewer.pal(n = 7, name = "Greys"))(100))
 
-ggplot(viability.data2, aes(x = E1504_1, y = E177_1)) +
+ggplot_custom(viability.data2, aes(x = E1504_1, y = E177_1)) +
   geom_point() +
   geom_smooth(method = "lm", color = colors_diverse[1]) +
   geom_segment(x = 0.5, xend = 0.5, y = 0.5, yend = 1.2, linetype = "dashed") +
-  geom_segment(x = 0.5, xend = 1.2, y = 0.5, yend = 0.5, linetype = "dashed") +
-  theme_pubr(border = T) 
+  geom_segment(x = 0.5, xend = 1.2, y = 0.5, yend = 0.5, linetype = "dashed") 
 ```
 A lot of HDACs seem to have a lower viability in rep 2. In general, the viability correlates quite well. 
 
@@ -439,12 +478,12 @@ A lot of HDACs seem to have a lower viability in rep 2. In general, the viabilit
 
 ```{r, warning = FALSE}
 # Plot MMEJ scores at each barcode for the two bioreps
-ggplot(indel.data %>% 
+ggplot_custom(indel.data %>% 
          dplyr::select(MMEJscore, ID, IPR, drug, replicate) %>%
          filter(drug == "DMSO") %>%
          unique(), aes(x = IPR, MMEJscore)) +
   geom_quasirandom() +
-  theme_bw() +
+  
   coord_flip() +
   facet_wrap(~replicate)
 
@@ -461,8 +500,7 @@ sp <- ggscatter(indel.data.DMSO.rep, x = "E177", y = "E1504", color = "chromatin
    add.params = list(color = "black", fill = "lightgray"),
    conf.int = TRUE, ylab = "rep 2", xlab = "rep 1")
 
-sp + stat_cor(method = "pearson", label.x = 0.1, label.y = 0.4) + 
-  theme_pubr(border = T) + 
+sp + stat_cor(method = "pearson", label.x = 0.1, label.y = 0.4)
   scale_color_manual(values = c(colors_diverse, "grey"))
 
 # Correlation DMSO cutting efficiency
@@ -489,17 +527,17 @@ sp + stat_cor(method = "pearson", label.x = 0.6, label.y = 0.9) +
 
 ```{r Quality check data, warning = FALSE}
 # Density plot logratio of the controls
-ggplot(data = indel.data[indel.data$drug == c("DMSO","DNA-PKi","Mirin"),], 
+ggplot_custom(data = indel.data[indel.data$drug == c("DMSO","DNA-PKi","Mirin"),], 
        aes(x = MMEJ_zscore, color = target)) + 
-  theme_bw() +
+  
   geom_density() + 
   xlab("MMEJ z-score") +
   facet_wrap(~replicate) +
   scale_color_manual(values = colors_diverse)
 
 # Beeswarm plot of MMEJ score of the controls at all IPRs
-ggplot(data = indel.data[indel.data$drug == "DMSO",], 
-       aes(y = MMEJscore, x = IPR)) + theme_bw() +
+ggplot_custom(data = indel.data[indel.data$drug == "DMSO",], 
+       aes(y = MMEJscore, x = IPR)) + 
   theme(axis.text.x = element_text(angle = 90, hjust = 1.0, vjust = 0.5)) + 
   geom_quasirandom(dodge.width = 0.75) +
   geom_boxplot(position = position_dodge(0.75), alpha = 0.7)+ xlab("IPR") + 
@@ -507,30 +545,40 @@ ggplot(data = indel.data[indel.data$drug == "DMSO",],
   facet_wrap(~replicate)
 
 # Beeswarm plot of MMEJ score of all drugs, highlighting controls
-ggplot(data = indel.data %>%
+ggplot_custom(data = indel.data %>%
          dplyr::select(MMEJ_zscore, sample, drug, conc_char, IPR, replicate) %>%
          unique(), 
-       aes(y = MMEJ_zscore, x = 'x', color = sample)) + theme_bw() +
+       aes(y = MMEJ_zscore, x = 'x', color = sample)) + 
   geom_quasirandom(dodge.width = 0.75) +
   geom_boxplot(position = position_dodge(0.75), alpha = 0.4) +
   xlab("") + ylab("MMEJ z-score") +
   scale_color_manual(values = colors_diverse) +
   facet_grid(replicate~conc_char)
 
+ggplot_custom(data = indel.data %>%
+                filter(sample != "DNA-PKi (NHEJ control)", sample != "Mirin (MMEJ control)") %>%
+                  dplyr::select(MMEJ_zscore_mean_drug, sample, drug, conc_char) %>%
+                  unique(), 
+              aes(y = MMEJ_zscore_mean_drug, x = conc_char, color = sample)) + 
+    geom_quasirandom(dodge.width = 0.75) +
+    geom_boxplot(position = position_dodge(0.75), alpha = 0.4) +
+    xlab("") + ylab("MMEJ z-score") +
+    scale_color_manual(values = c("#65BFA4", "#B3B3B3"))
+
 # Integral of MMEJ-zscore density plot per target group
-ggplot(data = indel.data, 
+ggplot_custom(data = indel.data, 
        aes(x = MMEJ_zscore)) +
-  xlab("logratio") + ylab("acumulative value")+ stat_ecdf(aes(colour = target))+ theme_classic() +
+  xlab("logratio") + ylab("acumulative value")+ stat_ecdf(aes(colour = target))+ 
   labs(title = "accumulative logratio of all targets") + facet_wrap(~replicate)
 
 # Integral of freqCut density plot
-ggplot(data = indel.data, 
+ggplot_custom(data = indel.data, 
        aes(x = freqCut_mean)) +
-  xlab("efficiency: normalized over plate") + stat_ecdf(aes(colour = target))+ theme_classic() +
+  xlab("efficiency: normalized over plate") + stat_ecdf(aes(colour = target))+ 
   labs(title = "integral of efficiency density")
 
 # Total amount of drugs per target group
-ggplot(indel.data, aes(x = reorder(target,target, function(x)-length(x)))) +
+ggplot_custom(indel.data, aes(x = reorder(target,target, function(x)-length(x)))) +
   geom_bar()+theme_classic() +
   theme(axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1, size = 12))+ 
   ylab("datapoints") + xlab("target group")+ labs(title = "datapoints per target group")
@@ -546,7 +594,7 @@ indel.data2 <- indel.data2 %>%
          total_size = ave(target, target, conc_char, replicate, FUN = function(x) length(x)))
 
 
-ggplot(indel.data2 %>%
+ggplot_custom(indel.data2 %>%
          dplyr::select(target, size, zscore_change, conc_char, total_size, replicate) %>%
          unique(), aes(x = reorder(target, as.numeric(total_size)), 
                    y = as.numeric(size), 
@@ -554,7 +602,7 @@ ggplot(indel.data2 %>%
       geom_bar(stat="identity") +
     labs(fill = "z-score")+
   scale_fill_manual(values = colors_diverse[rev(seq(1, length(colors_diverse), 2))])+
-  coord_flip()+ theme_bw() +
+  coord_flip()+ 
   ylab("Amount of drugs per Category") + theme(axis.title.y = element_blank())+
   theme(text = element_text(size = 14), axis.text.y = element_text(size = 12))+
   facet_grid(replicate~conc_char)
@@ -584,10 +632,9 @@ pheatmap(indel.data2.cor,
          border_color = "black",
          color = colorRampPalette(brewer.pal(n = 7, name = "Greys"))(100))
 
-ggplot(indel.data2, aes(x = E1504_1, y = E177_1)) +
+ggplot_custom(indel.data2, aes(x = E1504_1, y = E177_1)) +
   geom_point() +
-  geom_smooth(method = "lm", color = colors_diverse[1]) +
-  theme_pubr(border = T) 
+  geom_smooth(method = "lm", color = colors_diverse[1]) 
 
 
 
@@ -600,13 +647,12 @@ indel.data2 <- indel.data %>%
          MMEJ_zscore_drug_sd = sqrt(MMEJ_zscore_drug_sd),
          mean_MMEJ = ave(MMEJscore_drug, ID_2, FUN = function(x) mean(x)))
 
-ggplot(indel.data2, aes(x = abs(mean_MMEJ), y = MMEJ_zscore_drug_sd)) +
+ggplot_custom(indel.data2, aes(x = abs(mean_MMEJ), y = MMEJ_zscore_drug_sd)) +
   xlab("MMEJ score - mean per drug") +
   ylab("sqrt of SD of the two replicates") +
   geom_smooth() +
   geom_point() +
-  geom_abline(intercept = 0.3, slope = 0.15, linetype = "dashed")+
-  theme_pubr(border = T)
+  geom_abline(intercept = 0.3, slope = 0.15, linetype = "dashed")
 
 # The same but for the raw -7 counts
 indel.data2 <- indel.data %>% 
@@ -619,13 +665,12 @@ indel.data2 <- indel.data %>%
          mean_MMEJ = ave(freqMMEJ, ID_2, FUN = function(x) mean(x))) %>%
   unique()
 
-ggplot(indel.data2, aes(x = abs(mean_MMEJ), y = MMEJ_count_sd)) +
+ggplot_custom(indel.data2, aes(x = abs(mean_MMEJ), y = MMEJ_count_sd)) +
   xlab("MMEJ z-score - mean per drug") +
   ylab("sqrt of SD of the two replicates") +
   geom_smooth() +
-  geom_point() +
- # geom_hline(yintercept = 0.5, linetype = "dashed") +
-  theme_pubr(border = T)
+  geom_point() 
+ # geom_hline(yintercept = 0.5, linetype = "dashed") 
 
 
 # Plot viability against read counts (for already filtered data)
@@ -645,12 +690,11 @@ indel.data2 <- indel.data %>%
   filter(drug != "DNA-PKi") %>%
   unique()
 
-ggplot(indel.data2, aes(x = MMEJ_zscore_mean_drug, y = log2(freqCut_norm_mean_drug), color = MMEJ_zscore_mean_drug)) +
+ggplot_custom(indel.data2, aes(x = MMEJ_zscore_mean_drug, y = log2(freqCut_norm_mean_drug), color = MMEJ_zscore_mean_drug)) +
   geom_point()+
   scale_color_gradient() +
   xlab("MMEJ z-score") + ylab("Efficiency relative to DMSO (log2)") +
-  #gghighlight(abs(mean.MMEJ_zscore.drug) > 5, label_key = drug) + 
-  theme_pubr(border = T) +
+  #gghighlight(abs(mean.MMEJ_zscore.drug) > 5, label_key = drug) 
   theme(text = element_text(size = 14)) +
   facet_wrap(~conc_char)
 
@@ -663,11 +707,10 @@ indel.data2 <- indel.data %>%
   dplyr::select(-viab_norm) %>%
   unique()
 
-ggplot(indel.data2, aes(x = viability_drug, y = log2(freqCut_norm_mean_drug))) +
+ggplot_custom(indel.data2, aes(x = viability_drug, y = log2(freqCut_norm_mean_drug))) +
   geom_point() +
   xlab("Viability") + ylab("Cutting Efficiency Change") +
   #gghighlight(abs(mean.efficiency_zscore.drug) > 0.1, label_key = drug) + 
-  theme_pubr(border = T) +
   facet_wrap(~conc_char) +
   geom_smooth(method = "lm", color = "black")
 
@@ -678,22 +721,22 @@ indel.data2 <- indel.data %>%
   filter(drug != "DNA-PKi") %>% 
   unique()
 
-ggplot(indel.data2, aes(x = MMEJ_zscore_mean_bio_drug, y = mean.viability.drug)) +
+ggplot_custom(indel.data2, aes(x = MMEJ_zscore_mean_bio_drug, y = mean.viability.drug)) +
   geom_point(color = ifelse(abs(indel.data2$MMEJ_zscore_mean_bio_drug) > 1, "black", "grey")) +
   xlab("MMEJ z-score") + ylab("Viability") +
   #gghighlight(abs(mean.MMEJ_zscore.drug) > 1.5, label_key = drug) + 
-  theme_bw() +
+  
   theme(text = element_text(size = 14)) +
   facet_wrap(~concentration, nrow = 1, ncol = 3)
 
 
-ggplot(indel.data2[indel.data2$drug != "DNA-PKi",], aes(x = MMEJ_zscore_mean_bio_drug, y = mean.viability.drug)) +
+ggplot_custom(indel.data2[indel.data2$drug != "DNA-PKi",], aes(x = MMEJ_zscore_mean_bio_drug, y = mean.viability.drug)) +
   geom_point()+
   xlab("MMEJ z-score") + ylab("Viability")+
   geom_smooth(method = lm, color = "grey") +
   theme(text = element_text(size = 14))+
   facet_wrap(~concentration, nrow = 1, ncol = 3)+
-  theme_bw()
+  
 # Do we need a more stringent viability cutoff? 0.7?
 
 
@@ -732,30 +775,30 @@ plt_replicate1 <- ggpairs(correlation.plot.rep1,
                lower = list(continuous = function(data, mapping, ...) {
                    ggally_points(data = data[n, ], mapping = mapping, alpha = 0.1, size = 0.5) +
                    geom_abline(slope = 1, lty = "dashed", col = "red") +
-                   theme_bw()}),
+                   }),
                diag = list(continuous = function(data, mapping, ...) {
                    ggally_densityDiag(data = data, mapping = mapping, alpha = 0.3, fill = "red") +
-                   theme_bw()})) +
+                   })) +
   ggtitle("Correlation Between Technical Replicates - replicate 1") +
   theme(text = element_text(size = 20))+
   xlab("MMEJ score") +
   ylab("MMEJ score") 
-  # theme_bw()
+  # 
 
 plt_replicate2 <- ggpairs(correlation.plot.rep2,
                upper = list(continuous = corColor),
                lower = list(continuous = function(data, mapping, ...) {
                    ggally_points(data = data[n, ], mapping = mapping, alpha = 0.1, size = 0.5) +
                    geom_abline(slope = 1, lty = "dashed", col = "red") +
-                   theme_bw()}),
+                   }),
                diag = list(continuous = function(data, mapping, ...) {
                    ggally_densityDiag(data = data, mapping = mapping, alpha = 0.3, fill = "red") +
-                   theme_bw()})) +
+                   })) +
   ggtitle("Correlation Between Technical Replicates - replicate 2") +
   theme(text = element_text(size = 20))+
   xlab("MMEJ score") +
   ylab("MMEJ score") 
-  # theme_bw()
+  # 
 
 print(plt_replicate1)
 print(plt_replicate2)
@@ -774,7 +817,7 @@ sp <- ggscatter(indel.data2, x = "E177", y = "E1504",
    conf.int = TRUE, ylab = "rep 2", xlab = "rep 1")
 
 sp + stat_cor(method = "pearson", label.x = -2, label.y = 1) + 
-  facet_wrap(~concentration) +theme_bw() 
+  facet_wrap(~concentration) + 
 
 
 # Correlation between biological replicates - only DMSO - all IPRs
@@ -788,7 +831,7 @@ sp <- ggscatter(indel.data2, x = "E177", y = "E1504",
    add.params = list(color = "blue", fill = "lightgray"), title = "mean drug effects on efficiency rep 1 vs. rep 2",
    conf.int = TRUE, ylab = "rep 2", xlab = "rep 1")
 
-sp + stat_cor(method = "pearson", label.x = 0.8, label.y = 0.7) + theme_bw() 
+sp + stat_cor(method = "pearson", label.x = 0.8, label.y = 0.7) +  
 ```
 
 
@@ -797,28 +840,28 @@ sp + stat_cor(method = "pearson", label.x = 0.8, label.y = 0.7) + theme_bw()
 
 ```{r, warning = FALSE}
 # Plotting efficiency per drug per IPR
-ggplot(indel.data %>%
+ggplot_custom(indel.data %>%
          filter(drug != "DNA-PKi", target != "Negative Control", target != "MRN") %>%
          mutate(freqCut_mean = ave(freqCut, IPR, drug, concentration, FUN = function(x) mean(x))) %>% 
          dplyr::select(freqCut_mean, IPR, drug, concentration) %>% unique(), aes(x = IPR, y = freqCut_mean)) +
   geom_quasirandom() +
-  theme_bw() +
+  
   facet_wrap(~concentration) +
   coord_flip()
 
 # Plotting MMEJscore per drug per IPR
-ggplot(indel.data %>%
+ggplot_custom(indel.data %>%
          filter(drug != "DNA-PKi", target != "Negative Control", target != "MRN") %>%
          dplyr::select(MMEJ_zscore_mean, IPR, drug) %>% unique(), aes(x = IPR, y = MMEJ_zscore_mean)) +
   geom_quasirandom() +
-  theme_bw() +
+  
   coord_flip()
 
 
 
 
 # Plotting the MMEJ z-score against the SD in the MMEJ z-score between the 18 IPRs
-ggplot(indel.data %>%
+ggplot_custom(indel.data %>%
          filter(drug != "DNA-PKi", target != "Negative Control", target != "MRN") %>%
          mutate(MMEJ_zscore_sd_drug = ave(MMEJ_zscore_mean, drug, concentration, FUN = function(x) sd(x))) %>%
          dplyr::select(MMEJ_zscore_mean_drug, MMEJ_zscore_sd_drug, drug, concentration) %>%
@@ -829,14 +872,13 @@ ggplot(indel.data %>%
   geom_hline(yintercept = 1, linetype = "dashed", alpha = 0.3) +
   geom_vline(xintercept = 0.5, linetype = "dashed", alpha = 0.3) +
   geom_vline(xintercept = -0.5, linetype = "dashed", alpha = 0.3) +
-  theme_pubr(border = T) +
   xlab("MMEJ z-score per drug") +
   ylab("MMEJ z-score sd of IPRs") +
   facet_wrap(~concentration) +
   scale_color_identity()
 
 
-ggplot(indel.data %>%
+ggplot_custom(indel.data %>%
          filter(drug != "DNA-PKi", target != "Negative Control", target != "MRN") %>%
          mutate(MMEJ_zscore_sd_drug = ave(MMEJ_zscore_mean, drug, concentration, FUN = function(x) sd(x))) %>%
          dplyr::select(MMEJ_zscore_mean_drug, MMEJ_zscore_sd_drug, drug, concentration, target) %>%
@@ -847,7 +889,6 @@ ggplot(indel.data %>%
   geom_hline(yintercept = 1, linetype = "dashed", alpha = 0.3) +
   geom_vline(xintercept = 0.5, linetype = "dashed", alpha = 0.3) +
   geom_vline(xintercept = -0.5, linetype = "dashed", alpha = 0.3) +
-    theme_pubr(border = T)  +
     xlab("mean MMEJ z-score") +
     ylab("SD between IPRs") +
     facet_grid(concentration~target) +
@@ -868,7 +909,7 @@ indel.data2 <- indel.data2 %>%
          total_size = ave(target, target, concentration, FUN = function(x) length(x)))
 
 
-ggplot(indel.data2 %>%
+ggplot_custom(indel.data2 %>%
          filter(concentration == "1") %>%
          dplyr::select(target, size, local, concentration, total_size) %>%
          unique(), aes(x = reorder(target, as.numeric(total_size)), 
@@ -877,14 +918,14 @@ ggplot(indel.data2 %>%
       geom_bar(stat="identity") +
     labs(fill = "locally acting drugs")+
   scale_fill_manual(values = colors_diverse[seq(1, length(colors_diverse), 2)])+
-  coord_flip()+ theme_pubr(border = T)  +
+  coord_flip()+ 
   ylab("Amount of drugs per Category") + theme(axis.title.y = element_blank())+
   theme(text = element_text(size = 14), axis.text.y = element_text(size = 12))
 
 
 
 
-ggplot(indel.data %>%
+ggplot_custom(indel.data %>%
          filter(drug != "DNA-PKi", target != "Negative Control", target != "MRN") %>%
          mutate(freqCut_norm_sd_drug = ave(freqCut_norm_mean, drug, concentration, FUN = function(x) sd(x))) %>%
          dplyr::select(freqCut_norm_sd_drug, freqCut_norm_mean_drug, drug, concentration) %>%
@@ -894,7 +935,7 @@ ggplot(indel.data %>%
   geom_point() +
   geom_hline(yintercept = 0.02, linetype = "dashed", alpha = 0.3) +
   geom_vline(xintercept = 1, linetype = "dashed", alpha = 0.3) +
-  theme_bw() +
+  
   xlab("efficiency per drug") +
   ylab("efficiency sd of IPRs") +
   facet_grid(~concentration) +
@@ -905,7 +946,7 @@ indel.data2$drug_category <- "drug"
 indel.data2$drug_category[indel.data2$target == "HDAC"] <- "HDAC"
 indel.data2$drug_category[indel.data2$drug == "DMSO"] <- "DMSO"
 
-ggplot(indel.data2 %>%
+ggplot_custom(indel.data2 %>%
            filter(drug != "DNA-PKi", target != "Negative Control", target != "MRN") %>%
            mutate(freqCut_norm_sd_drug = ave(freqCut_norm_mean, drug, concentration, FUN = function(x) sd(x))) %>%
            dplyr::select(freqCut_norm_sd_drug, freqCut_norm_mean_drug, drug, concentration, replicate, drug_category) %>%
@@ -915,13 +956,13 @@ ggplot(indel.data2 %>%
     geom_quasirandom() +
     geom_hline(yintercept = 0.02, linetype = "dashed", alpha = 0.3) +
   geom_vline(xintercept = 1, linetype = "dashed", alpha = 0.3) +
-    theme_bw() +
+    
     xlab("efficiency per drug") +
     ylab("efficiency sd of IPRs") +
     facet_wrap(~drug_category) +
     scale_color_identity()
 
-ggplot(indel.data2 %>%
+ggplot_custom(indel.data2 %>%
            filter(drug != "DNA-PKi", target != "Negative Control", target != "MRN") %>%
            mutate(freqCut_norm_sd_drug = ave(freqCut_norm_mean, drug, concentration, FUN = function(x) sd(x))) %>%
            dplyr::select(freqCut_norm_sd_drug, freqCut_norm_mean_drug, drug, concentration, replicate, drug_category) %>%
@@ -929,13 +970,13 @@ ggplot(indel.data2 %>%
        aes(x = drug_category, y = freqCut_norm_mean_drug)) +
     geom_quasirandom() +
   geom_boxplot(alpha = 0.7) +
-    theme_bw() +
+    
     xlab("") +
     ylab("mean cutting efficiency") +
   facet_wrap(~concentration) +
     scale_color_identity()
 
-ggplot(indel.data2 %>%
+ggplot_custom(indel.data2 %>%
            filter(drug != "DNA-PKi", target != "Negative Control", target != "MRN") %>%
            mutate(freqCut_norm_sd_drug = ave(freqCut_norm_mean, drug, concentration, FUN = function(x) sd(x))) %>%
            dplyr::select(freqCut_norm_sd_drug, freqCut_norm_mean_drug, drug, concentration, replicate, drug_category) %>%
@@ -943,7 +984,7 @@ ggplot(indel.data2 %>%
        aes(x = drug_category, y = freqCut_norm_sd_drug)) +
     geom_quasirandom() +
   geom_boxplot(alpha = 0.7) +
-    theme_bw() +
+    
     xlab("") +
     ylab("mean cutting efficiency") +
   facet_wrap(~concentration) +
@@ -962,15 +1003,15 @@ ggplot(indel.data2 %>%
 # indel.data2 <- indel.data2[!duplicated(indel.data2),]
 # indel.data2$concentration <- factor(indel.data2$concentration, levels=c("100nm", "1um", "10um"))
 # 
-# ggplot(indel.data2 %>%
+# ggplot_custom(indel.data2 %>%
 #          filter(drug != "DNA-PKi"), aes(x=concentration, y=MMEJ_zscore)) +
 #   geom_quasirandom() + 
-#   gghighlight(abs(MMEJ_zscore) > 6, label_key = drug) + theme_bw()
+#   gghighlight(abs(MMEJ_zscore) > 6, label_key = drug) + 
 #   
 # # The same but only the range between 1 & 2
-# ggplot(indel.data2[abs(indel.data2$MMEJ_zscore) < 2,], aes(x=concentration, y=MMEJ_zscore)) +
+# ggplot_custom(indel.data2[abs(indel.data2$MMEJ_zscore) < 2,], aes(x=concentration, y=MMEJ_zscore)) +
 #   geom_quasirandom() + 
-#   gghighlight(abs(MMEJ_zscore) > 1.7, label_key = drug) + theme_bw()
+#   gghighlight(abs(MMEJ_zscore) > 1.7, label_key = drug) + 
 # 
 # # Spot outliers by plotting DMSO versus drugs
 # indel.data2 <- indel.data
@@ -993,14 +1034,14 @@ ggplot(indel.data2 %>%
 #   geom_text(aes(x = 0.4, y = 0.52, label = "+10% efficiency", angle = 35)) +
 #   scale_x_continuous(limits = c(0.25, 1)) +
 #   scale_y_continuous(limits = c(0.25, 1)) +
-#   labs(title = "Efficiency compared to DMSO for each IPR") + theme_bw()
+#   labs(title = "Efficiency compared to DMSO for each IPR") + 
 # 
 # # Make a beeswarm plot with alternative colors for outliers based on chi square scores
-# ggplot(data = indel.data) +
+# ggplot_custom(data = indel.data) +
 #   geom_quasirandom(mapping = 
 #                      aes(x = reorder(IPR, order), y = logratio.mean, 
 #                          colour = ifelse(p.value > 0.05,
-#                                          "non-outlier","outlier")), alpha = 0.5) + theme_bw() +
+#                                          "non-outlier","outlier")), alpha = 0.5) + 
 #   theme(axis.text.x = element_text(angle = 90, hjust = 1.0, vjust = 0)) + 
 #   ylab("log2(+1/-7 ratio)") + xlab("IPR") + 
 #   labs(title = "Outlier plot", colour = "Outlier based on p value < 0.05") + 
@@ -1027,7 +1068,7 @@ ggplot(indel.data2 %>%
 #                       indel.data$order == "17" | 
 #                       indel.data$order == "18"] <- "H3K27me3 Domain"
 # 
-# ggplot(data = indel.data[indel.data$drug != "DMSO",],
+# ggplot_custom(data = indel.data[indel.data$drug != "DMSO",],
 #        aes(x = reorder(IPR, order),
 #            y = efficiency_zscore)) +
 #   geom_quasirandom(color = ifelse(indel.data[indel.data$drug != "DMSO",]$efficiency_zscore > 2 | 
@@ -1036,7 +1077,7 @@ ggplot(indel.data2 %>%
 #   ylab("MMEJ score")+
 #   scale_fill_brewer(palette = "Pastel2")+
 #   xlab("") +
-#   theme_bw()+
+#   +
 #   theme(axis.text.x = element_text(angle = 90, hjust = 1.0, vjust = 0))+
 #   theme(axis.title.x = element_blank()) +
 #   coord_flip()
@@ -1067,17 +1108,17 @@ ggplot(indel.data2 %>%
 # 
 # 
 # # Boxplot of efficiencies normalized
-# ggplot(data = indel.data[indel.data$drug == "DMSO",]) +
-#   geom_boxplot(mapping = aes(x = reorder(IPR,order), y = efficiency.platenorm)) + theme_bw() +
+# ggplot_custom(data = indel.data[indel.data$drug == "DMSO",]) +
+#   geom_boxplot(mapping = aes(x = reorder(IPR,order), y = efficiency.platenorm)) + 
 #   theme(axis.text.x = element_text(angle = 90, hjust = 1.0, vjust = 0)) + 
 #   labs(title = "Efficiency distribution per IPR after normalization") 
 # 
 # # Beeswarm plot of efficiencies
-# ggplot(data = indel.data) +
+# ggplot_custom(data = indel.data) +
 #   geom_quasirandom(mapping = 
 #                      aes(x = reorder(IPR,order), y = efficiency.mean, 
 #                          colour = ifelse(p.value > 0.05,
-#                                          "non-outlier","outlier"))) + theme_bw() +
+#                                          "non-outlier","outlier"))) + 
 #   theme(axis.text.x = element_text(angle = 90, hjust = 1.0, vjust = 0)) + 
 #   ylab("efficiency") + xlab("IPR") + labs(title = "Efficiency plot, outliers (based on logratio) in yellow", colour = "Logratio outlier based on p value < 0.05") + scale_color_manual(values=c("#999999", "#E69F00"))
 # 
@@ -1085,8 +1126,8 @@ ggplot(indel.data2 %>%
 # # Make a loop of plots, plotting the ratio per drug target group together with DMSO
 # for (i in unique(indel.data$target)) {
 #   data <- indel.data[indel.data$target == i | indel.data$target == "Negative Control", ]
-#   p <- ggplot(data = data) +
-#     geom_quasirandom(mapping = aes(x = reorder(IPR,order), y = MMEJ_zscore, colour = target), alpha = 0.8, dodge.width = -0.5) + theme_bw() +
+#   p <- ggplot_custom(data = data) +
+#     geom_quasirandom(mapping = aes(x = reorder(IPR,order), y = MMEJ_zscore, colour = target), alpha = 0.8, dodge.width = -0.5) + 
 #     theme(axis.text.x = element_text(angle = 90, hjust = 1.0, vjust = 0))+ 
 #     ylab("log2(+1/-7 ratio)") + xlab("IPR")+ labs(title= paste("logratio of",i, "compared to DMSO"))
 #   print(p)
@@ -1097,7 +1138,7 @@ ggplot(indel.data2 %>%
 # indel.data.med <- indel.data[indel.data$concentration == "1um",]
 # aurora.dmso <- indel.data.med[indel.data.med$drug == "DMSO" | indel.data.med$target == "Aurora Kinase",]
 # aurora.dmso$target <- factor(aurora.dmso$target, levels = c("Negative Control", "Aurora Kinase"))
-# ggplot(data =  aurora.dmso) +
+# ggplot_custom(data =  aurora.dmso) +
 #     geom_quasirandom(aes(x = reorder(IPR,order), y = MMEJ_zscore, colour = target, group = target), 
 #                      alpha = 0.8, dodge.width = -0.5, width = 0.1) + 
 #   scale_colour_brewer(palette = "Set2")+
@@ -1115,7 +1156,7 @@ ggplot(indel.data2 %>%
 # decitabine.dmso$drug <- factor(decitabine.dmso$drug, levels = c("DMSO", "Decitabine"))
 # decitabine.dmso$concentration <- factor(decitabine.dmso$concentration, levels = c("100nm", "1um", "10um"))
 # 
-# ggplot(decitabine.dmso, aes(x = reorder(IPR,order), 
+# ggplot_custom(decitabine.dmso, aes(x = reorder(IPR,order), 
 #                             y = MMEJ_zscore, 
 #                             colour = drug, group = drug,
 #                             dodge.width = -0.5,
@@ -1128,7 +1169,7 @@ ggplot(indel.data2 %>%
 #   xlab("") +
 #   theme(text = element_text(size = 14)) +
 #   geom_hline(yintercept = 0, linetype = "dashed", alpha = 0.5) +
-#   theme_bw() + facet_wrap(~concentration)
+#    facet_wrap(~concentration)
 # 
 # # HDACs (efficiency and logratio)
 # hdac.dmso <- indel.data[indel.data$drug == "Vorinostat (SAHA, MK0683)"|
@@ -1154,7 +1195,7 @@ ggplot(indel.data2 %>%
 # hdac.dmso$mean2 <- ave(hdac.dmso$efficiency_zscore, hdac.dmso$IPR,
 #                       FUN = function(x) mean(x))
 # 
-# ggplot() +
+# ggplot_custom() +
 #   geom_bar(data = hdac.dmso %>%
 #              dplyr::select(mean, IPR, order) %>%
 #              unique(), stat="identity", aes(x =  reorder(IPR,order), y = mean, alpha = 0.2)) +
@@ -1165,9 +1206,9 @@ ggplot(indel.data2 %>%
 #   ylab("MMEJ z-score")+
 #   xlab("") +
 #   theme(text = element_text(size = 14))+
-#   theme_bw()
+#   
 # 
-# ggplot() +
+# ggplot_custom() +
 #   geom_bar(data = hdac.dmso %>%
 #              dplyr::select(mean2, IPR, order) %>%
 #              unique(), stat="identity", aes(x =  reorder(IPR,order), y = mean2, alpha = 0.2)) +
@@ -1178,7 +1219,7 @@ ggplot(indel.data2 %>%
 #   ylab("efficiency z-score")+
 #   xlab("") +
 #   theme(text = element_text(size = 14))+
-#   theme_bw()
+#   
 # 
 # # Statistical significance? Is IPR 17 different?
 # anova <- aov(MMEJ_zscore ~ IPR, data = hdac.dmso)
@@ -1187,12 +1228,12 @@ ggplot(indel.data2 %>%
 # 
 # # Make plots for all HDACs at the three concentrations
 # indel.data$concentration <- factor(indel.data$concentration, levels = c("100nm", "1um", "10um"))
-# ggplot(indel.data %>%
+# ggplot_custom(indel.data %>%
 #          filter(target == "HDAC" | drug == "DMSO"),
 #        aes(x = reorder(IPR, order), y = efficiency_zscore, color = target)) +
 #   geom_quasirandom(dodge.width = 0.75) +
 #   geom_boxplot(position = position_dodge(0.75), alpha = 0.4) +
-#   theme_bw() +
+#   
 #   xlab("") +
 #   scale_color_manual(values = colors_diverse) +
 #   facet_wrap(~concentration) +
@@ -1218,12 +1259,12 @@ ggplot(indel.data2 %>%
 #   filter(target == "HDAC" | drug == "DMSO")
 # indel.data.hdac <- merge(indel.data.hdac, hdac_annotation, all = T)
 # 
-# ggplot(indel.data.hdac[!is.na(indel.data.hdac$concentration),] %>%
+# ggplot_custom(indel.data.hdac[!is.na(indel.data.hdac$concentration),] %>%
 #          filter(Categorie %in% c("HDAC1", "HDAC3", "DMSO")),
 #        aes(x = Categorie, y = efficiency_zscore, color = cluster2)) +
 #   geom_quasirandom(dodge.width = 0.75) +
 #   geom_boxplot(position = position_dodge(0.75), alpha = 0.4) +
-#   theme_bw() +
+#   
 #   theme(axis.text.x = element_text(angle = 90, hjust = 1.0, vjust = 0.5)) + 
 #   xlab("") +
 #   scale_color_manual(values = colors_diverse) +
