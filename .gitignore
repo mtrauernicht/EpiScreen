@@ -1,3 +1,15 @@
+<<<<<<< HEAD
+.Rproj.user
+.Rhistory
+.RData
+.Ruserdata
+results/
+data/
+misc/
+Mapping_Clone5_9
+files_scripts/
+FACS/
+=======
 ### Results ###
 *.html
 *.pdf
@@ -58,3 +70,4 @@ rsconnect/
 # R package: bookdown caching files
 /*_files/
 *.Rproj.user
+>>>>>>> d33b494fb117bd21726c6f691654de1c86f27642

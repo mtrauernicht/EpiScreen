@@ -5,7 +5,7 @@
 #I split the integrations into several data frames by expression groups (ins_lo etc.) because I wanted to plot them in discrete colors
 #below I also added another version of the graph with insertions color-coded by expression as gradient
 library(ggplot2)
-chromsizes<-read.table("/home/r.schep/mydata/data/genomes/GRCh38/hg38_chromsizes2.txt",header=F, stringsAsFactors = F)
+chromsizes<-read.table("/DATA/scratch/usr/t.v.schaik/data/genomes/GRCh38/hg38.chrom.sizes",header=F, stringsAsFactors = F)
 chromsizes
 names(chromsizes)<-c("chr_r","pos_r")
 
