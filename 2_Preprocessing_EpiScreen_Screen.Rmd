@@ -291,19 +291,23 @@ mutations.dt[, ID := gsub("^(E1504|E177)_[0-9][0-9]_(1|10|100)_[123]_([12]_...$)
 mutations.stat.dt = merge(mutations.dt, indel.statistics.dt)
 
 # Filter the low viability reads
-# This filters out all drugs at a certain concentration were one of the replicates was below .45 viability.
+# This filters out all drugs at a certain concentration were at least 2/3 technical replicates were below 0.45 in at least one biological replicate 
 remove_drugs <- mutations.stat.dt %>%
   filter(viab_norm_split < 0.45) %>%
-  dplyr::select(conc_char, drug) %>%
+  dplyr::select(conc_char, drug, tech, replicate) %>%
   unique() %>%
-  mutate(conc_char_drug = paste(conc_char, drug, sep = " "))
+  mutate(conc_char_drug = paste(conc_char, drug, sep = " "),
+         tech_n = ave(conc_char_drug, conc_char_drug, replicate, FUN = length)) %>%
+  filter(tech_n > 1) %>%
+  dplyr::select(-tech_n, -tech, -replicate) %>%
+  unique()
 
 mutations.stat.dt <- mutations.stat.dt %>%
   mutate(conc_char_drug = paste(conc_char, drug, sep = " ")) %>%
   filter(!conc_char_drug %in% remove_drugs$conc_char_drug) %>%
   dplyr::select(-conc_char_drug, -mut.counts)
 
-### MAX THIS IS COMMENTED OUT BECAUSE WE DONT NEED IT ANYMORE #####
+### THIS IS COMMENTED OUT BECAUSE WE DONT NEED IT ANYMORE #####
 # # Calculate the data now from the summed values. 
 # mutations.stat.dt[, c("count", "reads", "norm") := 
 #                list(sum(count_split), sum(reads_split), sum(norm_split)), by = c("ID", "barcode", "mutation")]
@@ -468,52 +472,29 @@ rm(list = ls()[grep("mutations.dt", ls())])
 
 ```{r calculate_ratios}
 # Calculate NHEJ/MMEJ ratios and efficiences
-### WIP MAX YOU CAN START HERE. CALCULATING THE RATIOS AND 
-### THEN BELOW WE SHOULD CALCULATE THE ZSCORES AND FINALLY COMBINE THE ZSCORES
-#### MOST OF THESE CHUNKS SHOULD WORK 
-### THE _SPLIT COLUMNS ARE THE TECHNICAL REPS THAT ARE NOT POOLED YET, 
-#### BELOW THEY ARE AVERAGED BUT NEED FIXING ####
-ratios_split_tib <- screen.indel.dt %>%
+ratios_tib <- screen.indel.dt %>%
   filter(mutation %in% c("1", "-7")) %>%
   dplyr::distinct(exp, barcode, mutation, ratio_indels_split) %>% 
   pivot_wider(names_from = mutation, 
               values_from = ratio_indels_split, 
               values_fill = 0) %>%
-  mutate(freqMMEJ_split = `-7` / 1,
-         freqNHEJ_split = `1` / 1,
-         NHEJMMEJratio_split = freqMMEJ_split / freqNHEJ_split,
-         MMEJscore_split = freqMMEJ_split / (freqMMEJ_split + freqNHEJ_split),
-         NHEJscore_split = freqNHEJ_split / (freqNHEJ_split + freqMMEJ_split)) %>%
-  distinct(exp, barcode, freqMMEJ_split, freqNHEJ_split, 
-           NHEJMMEJratio_split, MMEJscore_split, NHEJscore_split)
+  mutate(freqMMEJ = `-7` / 1,
+         freqNHEJ = `1` / 1,
+         NHEJMMEJratio = freqMMEJ / freqNHEJ,
+         MMEJscore = freqMMEJ / (freqMMEJ + freqNHEJ),
+         NHEJscore = freqNHEJ / (freqNHEJ+ freqMMEJ)) %>%
+  distinct(exp, barcode, MMEJscore) 
 
-# This is to calculate the overall effect of the drug on the average MMEJ score in the cell.
-ratios_split_tib <- ratios_split_tib %>%
-  mutate(MMEJscore_split_drug = ave(MMEJscore_split, exp, FUN = function(x) mean(x)))
-
-# Make ID name without the technical replicate to make means.
-ratios_pooled_tib$ID_2 <- gsub("^E[0-9]{3,4}_", "", ratios_pooled_tib$ID)
-ratios_pooled_tib <- ratios_pooled_tib %>%
-  mutate(MMEJscore_mean = ave(MMEJscore, ID_2, barcode, FUN = function(x) mean(x)),
-         MMEJscore_drug = ave(MMEJscore, ID, FUN = function(x) mean(x)),
-         MMEJscore_mean_drug = ave(MMEJscore, ID_2, FUN = function(x) mean(x)))
 
 freqs_ratios_tib <- screen.indel.dt %>%
   as_tibble() %>%
   filter(mutation == "0") %>%
-  dplyr::distinct(exp, ID, barcode, mutation, freq_split, freq_pooled) %>% 
-  mutate(freqCut_split = 1 - freq_split,
-         freqCut = 1 - freq_pooled) %>%
-  distinct(ID, exp, barcode, freqCut_split, freqCut) %>% 
-  left_join(ratios_split_tib) %>%
-  left_join(ratios_pooled_tib)
+  dplyr::distinct(exp, barcode, mutation, freq_split) %>% 
+  mutate(freqCut = 1 - freq_split) %>%
+  distinct(exp, barcode, freqCut) %>% 
+  left_join(ratios_tib) 
 
-freqs_ratios_tib <- freqs_ratios_tib %>%
-  mutate(freqCut_mean = ave(freqCut, ID_2, barcode, FUN = function(x) mean(x)),
-         freqCut_drug = ave(freqCut, ID, FUN = function(x) mean(x)),
-         freqCut_mean_drug = ave(freqCut, ID_2, FUN = function(x) mean(x)))
-
-screen.indel.dt = merge(screen.indel.dt, freqs_ratios_tib, by = c("exp", "ID", "barcode"))
+screen.indel.dt = merge(screen.indel.dt, freqs_ratios_tib, by = c("exp", "barcode"))
 ```
 dim(screen.indel.dt)
 [1] 2060574      40
@@ -525,8 +506,8 @@ dim(screen.indel.dt)
 ### Checking for data normality
 
 ```{r calculating z-scores}
-# First check if the DMSO data is normally distributed. For both split and pooled and MMEJscore and freqCut
-# Pooled
+# First check if the DMSO data is normally distributed for MMEJscore and freqCut
+# Split only (pooled were removed)
 for (i in barcodes.clone5) {
   norm_pooled = screen.indel.dt %>%
     filter(drug == "DMSO", barcode == i) %>%
@@ -539,19 +520,6 @@ for (i in barcodes.clone5) {
     ggtitle(paste0("pooled MMEJscore Barcode: ", i))
   plot_grid(plt1, plt2)
 }
-
-for (i in barcodes.clone5) {
-  norm_pooled = screen.indel.dt %>%
-    filter(drug == "DMSO", barcode == i) %>%
-    distinct(exp, barcode, freqCut_split, MMEJscore_split, replicate)
-  plt1 = qplot(sample = freqCut_split, data = norm_pooled, color=replicate) +
-    theme_bw() +
-    ggtitle(paste0("split freqCut Barcode: ", i))
-  plt2 = qplot(sample = MMEJscore_split, data = norm_pooled, color=replicate) +
-    theme_bw() +
-    ggtitle(paste0("split MMEJscore Barcode: ", i))
-  plot_grid(plt1, plt2)
-}
 ```
 
 ## Calculating the z-scores and normalised efficiencies
@@ -560,14 +528,14 @@ for (i in barcodes.clone5) {
 # Plate normalization for cutting/repair efficiency - calculate efficiency relative to mean DMSO efficiency per concentration, barcode and replicate
 dmso.efficiency <- screen.indel.dt %>%
   filter(drug == "DMSO") %>%
-  dplyr::select('DMSO' = freqCut_split, barcode, replicate, tech) %>%
+  dplyr::select('DMSO' = freqCut, barcode, replicate, tech) %>%
   mutate(DMSO = ave(DMSO, barcode, replicate, tech, FUN = mean)) %>%
   unique()
 
 screen.indel.dt <- merge(screen.indel.dt, dmso.efficiency, by = c("barcode", "replicate", "tech"))
 
 screen.indel.dt <- screen.indel.dt %>%
-  mutate(freqCut_norm_split = freqCut_split / DMSO) %>%
+  mutate(freqCut_norm_split = freqCut / DMSO) %>%
   dplyr::select(-DMSO)
 
 
@@ -581,8 +549,9 @@ dmso.efficiency <- screen.indel.dt %>%
 screen.indel.dt <- merge(screen.indel.dt, dmso.efficiency, by = c("barcode", "replicate"))
 
 screen.indel.dt <- screen.indel.dt %>%
-  mutate(freqCut_norm = freqCut / DMSO) %>%
-  dplyr::select(-DMSO)
+  mutate(freqCut_mean = ave(freqCut, barcode, replicate, concentration, drug, FUN = mean)) %>%
+  mutate(freqCut_norm = freqCut_mean / DMSO) %>%
+  dplyr::select(-DMSO, -freqCut_mean)
 
 # Grouped technical & biological replicates
 dmso.efficiency <- screen.indel.dt %>%
@@ -594,8 +563,9 @@ dmso.efficiency <- screen.indel.dt %>%
 screen.indel.dt <- merge(screen.indel.dt, dmso.efficiency, by = c("barcode"))
 
 screen.indel.dt <- screen.indel.dt %>%
+  mutate(freqCut_mean = ave(freqCut, barcode, drug, concentration, FUN = mean)) %>%
   mutate(freqCut_norm_mean = freqCut_mean / DMSO) %>%
-  dplyr::select(-DMSO)
+  dplyr::select(-DMSO, -freqCut_mean)
 
 # Mean values independent of IPR (mean effect of the drug)
 dmso.efficiency <- screen.indel.dt %>%
@@ -607,8 +577,9 @@ dmso.efficiency <- screen.indel.dt %>%
 screen.indel.dt <- merge(screen.indel.dt, dmso.efficiency, by = c("replicate"))
 
 screen.indel.dt <- screen.indel.dt %>%
+  mutate(freqCut_drug = ave(freqCut, replicate, drug, concentration, FUN = mean)) %>%
   mutate(freqCut_norm_drug = freqCut_drug / DMSO) %>%
-  dplyr::select(-DMSO)
+  dplyr::select(-DMSO, -freqCut_drug)
 
 # Mean values independent of IPR (mean effect of the drug) & mean over replicates
 dmso.efficiency <- screen.indel.dt %>%
@@ -618,7 +589,9 @@ dmso.efficiency <- screen.indel.dt %>%
   unique()
 
 screen.indel.dt <- screen.indel.dt %>%
-  mutate(freqCut_norm_mean_drug = freqCut_mean_drug / dmso.efficiency$DMSO)
+  mutate(freqCut_mean_drug = ave(freqCut, drug, concentration, FUN = mean)) %>%
+  mutate(freqCut_norm_mean_drug = freqCut_mean_drug / dmso.efficiency$DMSO) %>%
+  dplyr::select(-freqCut_mean_drug)
 
 
 # MMEJscore z-score - calculate drug scores relative to DMSO MMEJ score distribution per concentration, barcode and replicate
@@ -633,53 +606,10 @@ dmso.mmej.score <- screen.indel.dt %>%
 screen.indel.dt <- merge(screen.indel.dt, dmso.mmej.score)
 
 screen.indel.dt <- screen.indel.dt %>%
-  mutate(MMEJ_zscore = (MMEJscore - mean_DMSO)/ sd_DMSO) %>%
+  mutate(MMEJ_score_mean = ave(MMEJscore, drug, concentration, barcode, replicate, FUN = mean)) %>%
+  mutate(MMEJ_zscore = (MMEJ_score_mean - mean_DMSO)/ sd_DMSO) %>%
   dplyr::select(-mean_DMSO, -sd_DMSO)
 
-# Same for split scores
-dmso.mmej.score <- screen.indel.dt %>%
-  filter(drug == "DMSO") %>%
-  dplyr::select('DMSO' = MMEJscore_split, barcode, replicate, tech) %>%
-  mutate(mean_DMSO = ave(DMSO, barcode, replicate, tech, FUN = mean), 
-         sd_DMSO = ave(DMSO, barcode, replicate, tech, FUN = sd)) %>%
-  dplyr::select(-DMSO) %>%
-  unique()
-
-screen.indel.dt <- merge(screen.indel.dt, dmso.mmej.score, by = c("barcode", "replicate", "tech"))
-
-screen.indel.dt <- screen.indel.dt %>%
-  mutate(MMEJ_zscore_split = (MMEJscore_split - mean_DMSO)/ sd_DMSO) %>%
-  dplyr::select(-mean_DMSO, -sd_DMSO)
-
-# Same for split scores - mean per drug
-dmso.mmej.score <- screen.indel.dt %>%
-  filter(drug == "DMSO") %>%
-  dplyr::select('DMSO' = MMEJscore_split, replicate, tech) %>%
-  mutate(mean_DMSO = ave(DMSO, replicate, tech, FUN = mean), 
-         sd_DMSO = ave(DMSO, replicate, tech, FUN = sd)) %>%
-  dplyr::select(-DMSO) %>%
-  unique()
-
-screen.indel.dt <- merge(screen.indel.dt, dmso.mmej.score, by = c("replicate", "tech"))
-
-screen.indel.dt <- screen.indel.dt %>%
-  mutate(MMEJ_zscore_split_drug = (MMEJscore_split_drug - mean_DMSO)/ sd_DMSO) %>%
-  dplyr::select(-mean_DMSO, -sd_DMSO)
-
-# Same for mean of biological replicates
-dmso.mmej.score <- screen.indel.dt %>%
-  filter(drug == "DMSO") %>%
-  dplyr::select('DMSO' = MMEJscore, barcode) %>%
-  mutate(mean_DMSO = ave(DMSO, barcode, FUN = mean), 
-         sd_DMSO = ave(DMSO, barcode, FUN = sd)) %>%
-  dplyr::select(-DMSO) %>%
-  unique()
-
-screen.indel.dt <- merge(screen.indel.dt, dmso.mmej.score)
-
-screen.indel.dt <- screen.indel.dt %>%
-  mutate(MMEJ_zscore_mean = (MMEJscore_mean - mean_DMSO)/ sd_DMSO) %>%
-  dplyr::select(-mean_DMSO, -sd_DMSO)
 
 # Mean values independent of IPR (mean effect of the drug)
 dmso.mmej.score <- screen.indel.dt %>%
@@ -693,22 +623,11 @@ dmso.mmej.score <- screen.indel.dt %>%
 screen.indel.dt <- merge(screen.indel.dt, dmso.mmej.score)
 
 screen.indel.dt <- screen.indel.dt %>%
-  mutate(MMEJ_zscore_drug = (MMEJscore_drug - mean_DMSO)/ sd_DMSO) %>%
+  mutate(MMEJ_score_mean_drug = ave(MMEJscore, drug, concentration, replicate, FUN = mean)) %>%
+  mutate(MMEJ_zscore_drug = (MMEJ_score_mean_drug - mean_DMSO)/ sd_DMSO) %>%
   dplyr::select(-mean_DMSO, -sd_DMSO)
 
-# Mean values independent of IPR (mean effect of the drug) & mean over replicates
-dmso.mmej.score <- screen.indel.dt %>%
-  filter(drug == "DMSO") %>%
-  dplyr::select('DMSO' = MMEJscore) %>%
-  mutate(mean_DMSO = ave(DMSO, FUN = mean), 
-         sd_DMSO = ave(DMSO, FUN = sd)) %>%
-  dplyr::select(-DMSO) %>%
-  unique()
-
-screen.indel.dt <- screen.indel.dt %>%
-  mutate(MMEJ_zscore_mean_drug = (MMEJscore_mean_drug - dmso.mmej.score$mean_DMSO)/ dmso.mmej.score$sd_DMSO)
-
-screen.indel.dt = screen.indel.dt[count != 0]
+#screen.indel.dt = screen.indel.dt[count != 0]
 ```
 
 dim(screen.indel.dt)
@@ -721,6 +640,30 @@ dim(screen.indel.dt)
 ## Prepare data for export
 
 ```{r split data sepereately}
+#### I took a shortcut here to just extract the relevant data for script 4 - this can be changed if needed
+# Select relevant columns from data table
+screen.indel.dt.export <- screen.indel.dt %>%
+  distinct(replicate, barcode, tech, exp, ID, plate, concentration, drug_plate, well, drug, target, conc_char, sample, freqCut, MMEJscore, freqCut_norm_split, freqCut_norm,
+           freqCut_norm_mean, freqCut_norm_drug, freqCut_norm_mean_drug, MMEJ_score_mean, MMEJ_score_mean_drug, MMEJ_zscore, MMEJ_zscore_drug, 'viability' = viab_norm_split)
+  
+# Combine z-scores of the two biological replicates: stouffer's method = sum(z-scores)/sqrt(number_of_z-scores)
+zscores_comb <- screen.indel.dt.export %>%
+  distinct(MMEJ_zscore, drug, conc_char, barcode) %>%
+  mutate(MMEJ_zscore_comb = ave(MMEJ_zscore, drug, conc_char, barcode, FUN = function(x) sum(x)/sqrt(length(x)))) 
+
+zscores_comb_drug <- screen.indel.dt.export %>%
+  distinct(MMEJ_zscore_drug, drug, conc_char) %>%
+  mutate(MMEJ_zscore_drug_comb = ave(MMEJ_zscore_drug, drug, conc_char, FUN = function(x) sum(x)/sqrt(length(x)))) %>%
+  distinct(MMEJ_zscore_drug_comb, drug, conc_char)
+
+screen.indel.dt.export <- merge(screen.indel.dt.export, zscores_comb)
+screen.indel.dt.export <- merge(screen.indel.dt.export, zscores_comb_drug, by = c("conc_char", "drug"))
+
+```
+
+
+```{r split data sepereately}
+#### not executed from here on atm
 # Make base table without any numeric data.
 num.base.dt = screen.indel.dt %>% select(barcode, exp, plate, concentration, drug_plate, drug_no) %>% unique()
 
@@ -901,16 +844,12 @@ We'll use the table from Schep et al. 2021 to bind directly all the relevant chr
 ```{r chromatin data}
 clone5_chrom_tib <- readRDS("/DATA/projects/DSBrepair/data/R/rs20200519_clone5_newdoms_chromatin.RDS")
 
-screen_indel_split_tib %<>% left_join(clone5_chrom_tib, by = "barcode")
+screen.indel.dt.export <- screen.indel.dt.export %>% left_join(clone5_chrom_tib, by = "barcode")
 
-screen_indel_tib %<>% left_join(clone5_chrom_tib, by = "barcode")
 
 screen_indel_mut_tib %<>% left_join(clone5_chrom_tib, by = "barcode")
 ```
-
-
-## Processed data export
-The files will be saved in the processed data folder.
+## Processed data export The files will be saved in the processed data folder.
 ```{r export}
 # The mutations list that can be loaded for the indel spectra plots.
 filename <- SetFileName("_episcreen_mutations.RDS", "rs")
