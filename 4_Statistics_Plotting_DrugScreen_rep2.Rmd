@@ -331,8 +331,9 @@ theme_classic_lines_90 <- function() {
 theme_set(theme_classic_lines())
 
 colors_diverse <- c("#264653", "#9AC1AE", "#5D987B", "#f2cc8f", "#e76f51")
+#colors_diverse <- c("#264653", "#2a9d8f", "#e9c46a", "#f4a261", "#e76f51") 
 
-ggplot_custom <- function(...) ggplot2::ggplot_custom(...) + 
+ggplot_custom <- function(...) ggplot2::ggplot(...) + 
   scale_color_manual(values = colors_diverse) + 
   scale_fill_manual(values = colors_diverse)
 
@@ -343,11 +344,9 @@ ggplot_custom <- function(...) ggplot2::ggplot_custom(...) +
 
 ```{r data import, echo = FALSE, warning = FALSE}
 # Import data from preprocessing script
-indel.data <- readRDS("/DATA/projects/DSBrepair/data/R/rs20220103_episcreen/rs20220103_episcreen_ratios.RDS")
-indel.data.split <- readRDS("/DATA/projects/DSBrepair/data/R/rs20220103_episcreen/rs20220103_episcreen_ratios_split.RDS")
-indel.data.mut <- readRDS("/DATA/projects/DSBrepair/data/R/rs20220103_episcreen/rs20220103_episcreen_mutations.RDS")
+indel.data <- readRDS("/DATA/usr/m.trauernicht/projects/EpiScreen/files_scripts/mt20220105_episcreen.RDS")
 
-# Complete data without exlcluding wells <0.5 viability (I need this for plotting)
+# Complete data without exlcluding wells <0.45 viability (I need this for plotting)
 viability.data = as.data.table(readRDS("/DATA/projects/DSBrepair/git/EpiScreen/files_scripts/rs20211221_Episcreen_Reads_Viab_Metadata.RDS")) %>%
   dplyr::select(ID, drug, target, replicate, viability, conc_char, tech)
 ```
@@ -356,75 +355,9 @@ viability.data = as.data.table(readRDS("/DATA/projects/DSBrepair/git/EpiScreen/f
 ## Viability data
 
 ```{r, warning = FALSE}
-## save favorite colors
-colors_diverse <- c("#264653", "#2a9d8f", "#e9c46a", "#f4a261", "#e76f51") 
 
-viability.data <- viability.data
-viability.data$group <- "drug"
-viability.data$group[viability.data$drug == "DMSO"] <- "DMSO"
-viability.data$group[viability.data$drug == "PAO"] <- "PAO"
-viability.data$ID <- gsub("^E[0-9]{3,4}_", "", viability.data$ID)
 
-# Plot amount of drugs per target 
-targets <- viability.data %>% 
-  filter(group == "drug", target != "MRN", target != "DNA-PK") %>%
-  dplyr::select(drug, target) %>% 
-  unique() %>%
-  mutate(number = ave(target, target, FUN = function(x) length(x))) %>% 
-  mutate(number = as.numeric(number)) %>%
-  dplyr::select(target, number) %>% 
-  unique()
 
-ggplot_custom(targets, aes(y = reorder(target, +number), x = number)) + 
-  geom_bar(stat = "identity")  + 
-  ylab("")
-
-# re-scale viability data so DMSO is set at 1 and PAO at 0 per experiment
-pao.viab <- viability.data %>%
-  filter(group == "PAO") %>%
-  dplyr::select(replicate, 'pao' = viability) %>%
-  mutate(pao = ave(pao, replicate, FUN = function(x) mean(x))) %>%
-  unique()
-
-dmso.viab <- viability.data %>%
-  filter(group == "DMSO") %>%
-  dplyr::select(replicate, 'dmso' = viability) %>%
-  mutate(dmso = ave(dmso, replicate, FUN = function(x) mean(x))) %>%
-  unique()
-
-viability.data <- merge(viability.data, pao.viab)
-viability.data <- merge(viability.data, dmso.viab)
-
-viability.data <- viability.data %>%
-  mutate(viab_norm = viability - pao,
-         dmso = dmso - pao) %>%
-  mutate(viab_norm = viab_norm / dmso)
-
-viability.data2 <- viability.data %>%
-  dplyr::select(-pao, -dmso, -viability) %>%
-  unique() %>%
-  spread(key = replicate, value = viab_norm)
-
-# Correlate viability data from the 2 replicates, highlight controls
-ggplot_custom(viability.data2, aes(x = E177, y = E1504)) +
-  geom_point(aes(color = group), size = 1) +
-  geom_smooth(method = "lm", color = colors_diverse[1]) +
-  geom_segment(x = 0.5, xend = 0.5, y = 0.5, yend = 1.2, linetype = "dashed") +
-  geom_segment(x = 0.5, xend = 1.2, y = 0.5, yend = 0.5, linetype = "dashed") +
-  scale_color_manual(values = colors_diverse[c(2,1,3)]) +
-  facet_wrap(~conc_char)
-
-# Viability mean across replicates
-ggplot_custom(viability.data2 %>%
-         filter(group != "PAO", group != "DMSO") %>%
-         mutate(viab_norm = (E1504 + E177) / 2) %>%
-         dplyr::select(drug, group, conc_char, viab_norm) %>%
-         mutate(viab_norm = ave(viab_norm, drug, conc_char, FUN = function(x) mean(x))) %>%
-         unique(),
-       aes(x = conc_char, y = viab_norm, color = ifelse(viab_norm < 0.45, "red", colors_diverse[1]))) +
-  geom_quasirandom() +
-  geom_hline(yintercept = .45, linetype = "dashed")+
-  scale_color_manual(values = c(colors_diverse[1], colors_diverse[4]))
 
 
 # Explore differences between rep 1 & rep 2
@@ -438,37 +371,83 @@ viability.data2$changed[viability.data2$dif >= 2 | viability.data2$dif <= .5] <-
 
 ggplot_custom(viability.data2, aes(x = target, y = log2(dif), color = changed)) +
   geom_quasirandom() +
-  
   scale_color_manual(values = colors_diverse)+
   ylab("log2(E1504_viability/E177_viabilty)") +
   facet_wrap(~conc_char) +
   coord_flip()
-
-# Correlation between technical replicates
-viability.data2 <- viability.data %>%
-  filter(group == "drug", drug != "Mirin", drug != "DNA-PKi", conc_char == "1 µM") %>%
-  mutate(rep = paste(replicate, tech, sep = "_")) %>%
-  dplyr::select(-ID, -replicate, -tech, -target, -conc_char, -group) %>%
-  spread(rep, viab_norm) %>%
-  column_to_rownames("drug")
-
-viability.data2.cor <- cor(viability.data2)
-
-mybreaks <- seq(0.6,1,0.004)
-pheatmap(viability.data2.cor, 
-         breaks = mybreaks, 
-         cluster_rows = F,
-         cluster_cols = F,
-         border_color = "black",
-         color = colorRampPalette(brewer.pal(n = 7, name = "Greys"))(100))
-
-ggplot_custom(viability.data2, aes(x = E1504_1, y = E177_1)) +
-  geom_point() +
-  geom_smooth(method = "lm", color = colors_diverse[1]) +
-  geom_segment(x = 0.5, xend = 0.5, y = 0.5, yend = 1.2, linetype = "dashed") +
-  geom_segment(x = 0.5, xend = 1.2, y = 0.5, yend = 0.5, linetype = "dashed") 
 ```
 A lot of HDACs seem to have a lower viability in rep 2. In general, the viability correlates quite well. 
+
+
+## Figure 1
+
+```{r}
+# B: Drugs per target group
+## Plot from viability data table (because there all drugs are included)
+targets <- viability.data %>% 
+  filter(!drug %in% c("Mirin", "DNA-PKi", "DMSO", "PAO")) %>%
+  dplyr::distinct(drug, target) %>% 
+  mutate(number = ave(target, target, FUN = function(x) length(x))) %>% 
+  mutate(number = as.numeric(number)) %>%
+  dplyr::distinct(target, number)
+
+ggplot_custom(targets, aes(y = reorder(target, +number), x = number)) + 
+  geom_bar(stat = "identity")  + 
+  ylab("")
+
+# C: Viability filtering
+## Calculate normalized viability (same as in script 1)
+viability.data$ID <- gsub("^E[0-9]{3,4}_", "", viability.data$ID)
+viability.data <- viability.data %>%
+  group_by(replicate) %>%
+  mutate(viability = viability - min(viability)) %>%
+  mutate(ctrl_mean = mean(viability[drug == "DMSO"]),
+         viab_norm = viability / ctrl_mean) %>%
+  dplyr::select(-viability, -ctrl_mean) %>%
+  unique() 
+
+remove_drugs <- viability.data %>%
+  filter(viab_norm < 0.45) %>%
+  dplyr::distinct(conc_char, drug, tech, replicate) %>%
+  mutate(conc_char_drug = paste(conc_char, drug, sep = " "),
+         tech_n = ave(conc_char_drug, conc_char_drug, replicate, FUN = length)) %>%
+  filter(tech_n > 1) %>%
+  ungroup() %>%
+  dplyr::select(-tech_n, -tech, -replicate) %>%
+  unique() %>%
+  mutate(removed = "removed") %>%
+  dplyr::select(-conc_char_drug)
+
+viability.data <- merge(viability.data, remove_drugs, all = T)
+viability.data$removed[is.na(viability.data$removed)] <- "kept"
+
+viability.data <- viability.data %>%
+  spread(key = replicate, value = viab_norm) %>%
+  mutate(mean_viab = (E1504+E177) / 2)
+
+viability.data$group <- "drug"
+viability.data$group[viability.data$drug == "DMSO"] <- "DMSO"
+viability.data$group[viability.data$drug == "PAO"] <- "PAO"
+
+## Viability mean across the two biological replicates - color highlight removed drugs
+ggplot_custom(viability.data %>%
+                filter(group == "drug") %>%
+                mutate(mean_viab = ave(mean_viab, drug, conc_char, FUN = mean)) %>%
+                dplyr::distinct(mean_viab, drug, conc_char, removed),
+       aes(x = conc_char, y = mean_viab, color = removed)) +
+  geom_quasirandom() +
+  scale_color_manual(values = c(colors_diverse[1], colors_diverse[4]))
+
+# S_A: Correlate viability data from the 2 replicates, highlight controls
+ggplot_custom(viability.data %>%
+                filter(group == "drug"), aes(x = E177, y = E1504)) +
+  geom_point(aes(color = removed), size = 1) +
+  geom_smooth(method = "lm", color = colors_diverse[1]) +
+  geom_segment(x = 0.5, xend = 0.5, y = 0.5, yend = 1.2, linetype = "dashed") +
+  geom_segment(x = 0.5, xend = 1.2, y = 0.5, yend = 0.5, linetype = "dashed") +
+  scale_color_manual(values = c(colors_diverse[1], colors_diverse[4])) +
+  facet_wrap(~conc_char)
+```
 
 
 
@@ -477,13 +456,12 @@ A lot of HDACs seem to have a lower viability in rep 2. In general, the viabilit
 ## DMSO indel scores
 
 ```{r, warning = FALSE}
-# Plot MMEJ scores at each barcode for the two bioreps
+# Plot MMEJ scores at each IPR for the two bioreps
 ggplot_custom(indel.data %>% 
          dplyr::select(MMEJscore, ID, IPR, drug, replicate) %>%
          filter(drug == "DMSO") %>%
          unique(), aes(x = IPR, MMEJscore)) +
   geom_quasirandom() +
-  
   coord_flip() +
   facet_wrap(~replicate)
 
@@ -556,14 +534,34 @@ ggplot_custom(data = indel.data %>%
   facet_grid(replicate~conc_char)
 
 ggplot_custom(data = indel.data %>%
-                filter(sample != "DNA-PKi (NHEJ control)", sample != "Mirin (MMEJ control)") %>%
-                  dplyr::select(MMEJ_zscore_mean_drug, sample, drug, conc_char) %>%
+                filter(sample != "DNA-PKi (NHEJ control)", sample != "Mirin (MMEJ control)", sample != "DMSO (neg control)") %>%
+                  dplyr::select(MMEJ_zscore_drug_comb, sample, drug, conc_char) %>%
                   unique(), 
-              aes(y = MMEJ_zscore_mean_drug, x = conc_char, color = sample)) + 
+              aes(y = MMEJ_zscore_drug_comb, x = conc_char)) + 
     geom_quasirandom(dodge.width = 0.75) +
     geom_boxplot(position = position_dodge(0.75), alpha = 0.4) +
-    xlab("") + ylab("MMEJ z-score") +
-    scale_color_manual(values = c("#65BFA4", "#B3B3B3"))
+    xlab("") + ylab("MMEJ z-score") 
+
+ggplot_custom(data = indel.data %>%
+                filter(sample != "DNA-PKi (NHEJ control)", sample != "Mirin (MMEJ control)", sample != "DMSO (neg control)") %>%
+                  dplyr::select(freqCut_norm_mean_drug, sample, drug, conc_char) %>%
+                  unique(), 
+              aes(y = log2(freqCut_norm_mean_drug) , x = conc_char)) + 
+    geom_quasirandom(dodge.width = 0.75) +
+    geom_boxplot(position = position_dodge(0.75), alpha = 0.4) +
+    xlab("") + ylab("log2(cutting efficiency)") 
+
+ggplot_custom(data = indel.data %>%
+                filter(sample != "DNA-PKi (NHEJ control)", sample != "Mirin (MMEJ control)", sample != "DMSO (neg control)", conc_char == "100 nM") %>%
+                  dplyr::select(freqCut_norm_mean_drug, sample, drug, conc_char, target) %>%
+                  unique() %>%
+                mutate(mean_eff_target = ave(freqCut_norm_mean_drug, target, FUN = mean)), 
+              aes(y = log2(freqCut_norm_mean_drug), x = reorder(target, -mean_eff_target))) + 
+  geom_quasirandom() +
+    geom_boxplot(position = position_dodge(0.75), alpha = 0.4) +
+    xlab("") + ylab("log2(cutting efficiency)") +
+      theme_classic_lines_90()
+      
 
 # Integral of MMEJ-zscore density plot per target group
 ggplot_custom(data = indel.data, 
@@ -746,13 +744,13 @@ ggplot_custom(indel.data2[indel.data2$drug != "DNA-PKi",], aes(x = MMEJ_zscore_m
 indel.data2 <- indel.data[-grep("DNA-PK|DMSO", indel.data$drug),]
 indel.data.rep1 <- indel.data2 %>%
   filter(tech == '1') %>%
-  dplyr::select(barcode, replicate, drug, concentration, 'R1' = MMEJscore)
+  dplyr::select(IPR, replicate, drug, concentration, 'R1' = MMEJscore)
 indel.data.rep2 <- indel.data2 %>%
   filter(tech == '2') %>%
-  dplyr::select(barcode, replicate, drug, concentration, 'R2' = MMEJscore)
+  dplyr::select(IPR, replicate, drug, concentration, 'R2' = MMEJscore)
 indel.data.rep3 <- indel.data2 %>%
   filter(tech == '3') %>%
-  dplyr::select(barcode, replicate, drug, concentration, 'R3' = MMEJscore)
+  dplyr::select(IPR, replicate, drug, concentration, 'R3' = MMEJscore)
 
 indel.data.rep <- merge(indel.data.rep1, indel.data.rep2, all = T)
 indel.data.rep <- merge(indel.data.rep, indel.data.rep3, all = T)
@@ -1017,13 +1015,13 @@ ggplot_custom(indel.data2 %>%
 # indel.data2 <- indel.data
 # indel.data2$mean.ratio.bc.drug.conc <- ave(indel.data2$efficiency, 
 #                                            indel.data2$concentration, indel.data2$drug, 
-#                                            indel.data2$barcode, FUN = function(x) mean(x))
-# indel.data2 <- indel.data2 %>% dplyr::select(barcode, drug, concentration, mean.ratio.bc.drug.conc)
+#                                            indel.data2$IPR, FUN = function(x) mean(x))
+# indel.data2 <- indel.data2 %>% dplyr::select(IPR, drug, concentration, mean.ratio.bc.drug.conc)
 # indel.data2 <- indel.data2[!duplicated(indel.data2),]
 # indel.data2.high <- indel.data2[grep("1um", indel.data2$concentration),]
 # indel.data2.high <- indel.data2.high[,-3]
 # 
-# indel.data2.high <- dcast(indel.data2.high, barcode ~ drug, value.var = "mean.ratio.bc.drug.conc")
+# indel.data2.high <- dcast(indel.data2.high, IPR ~ drug, value.var = "mean.ratio.bc.drug.conc")
 # 
 # 
 # gghighlight_point(indel.data2.high, aes(x = DMSO, y = `Vorinostat (SAHA, MK0683)`), `Vorinostat (SAHA, MK0683)` - DMSO > 0.1) +
@@ -1082,7 +1080,7 @@ ggplot_custom(indel.data2 %>%
 #   theme(axis.title.x = element_blank()) +
 #   coord_flip()
 # 
-# # Are the logratios of the different barcode clusters different?
+# # Are the logratios of the different IPR clusters different?
 # indel.data2$int <- "1"
 # indel.data2$int[indel.data2$order >= 9] <- "2"
 # indel.data2$logratio <- ave(indel.data2$logratio, 
@@ -1180,10 +1178,10 @@ ggplot_custom(indel.data2 %>%
 # hdac.dmso <- hdac.dmso[hdac.dmso$concentration == "1um",]
 # 
 # hdac.dmso$MMEJ_zscore <- ave(hdac.dmso$MMEJ_zscore, 
-#                              hdac.dmso$barcode, hdac.dmso$drug,
+#                              hdac.dmso$IPR, hdac.dmso$drug,
 #                              FUN = function(x) mean(x))
 # hdac.dmso$efficiency_zscore <- ave(hdac.dmso$efficiency_zscore, 
-#                                     hdac.dmso$barcode, hdac.dmso$drug,
+#                                     hdac.dmso$IPR, hdac.dmso$drug,
 #                                     FUN = function(x) mean(x))
 # 
 # 
