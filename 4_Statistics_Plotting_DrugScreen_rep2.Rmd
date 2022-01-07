@@ -69,6 +69,7 @@ library(Laurae)
 library(tibble)
 library(pheatmap)
 library(RColorBrewer)
+library(ggrastr)
 ```
 
 ### Functions
@@ -331,6 +332,7 @@ theme_classic_lines_90 <- function() {
 theme_set(theme_classic_lines())
 
 colors_diverse <- c("#264653", "#9AC1AE", "#5D987B", "#f2cc8f", "#e76f51")
+colors_drugs <- c("#FA8D62", "#65BFA4", "#8CA0C4", "#808184", "#F6D289", "#E5E5E5", "#ACACAC", "#737373")
 #colors_diverse <- c("#264653", "#2a9d8f", "#e9c46a", "#f4a261", "#e76f51") 
 
 ggplot_custom <- function(...) ggplot2::ggplot(...) + 
@@ -350,33 +352,6 @@ indel.data <- readRDS("/DATA/usr/m.trauernicht/projects/EpiScreen/files_scripts/
 viability.data = as.data.table(readRDS("/DATA/projects/DSBrepair/git/EpiScreen/files_scripts/rs20211221_Episcreen_Reads_Viab_Metadata.RDS")) %>%
   dplyr::select(ID, drug, target, replicate, viability, conc_char, tech)
 ```
-
-
-## Viability data
-
-```{r, warning = FALSE}
-
-
-
-
-
-# Explore differences between rep 1 & rep 2
-viability.data2 <- viability.data2 %>%
-  mutate(dif = E1504 / E177) %>%
-  dplyr::select(dif, drug, target, conc_char, E1504, E177) %>%
-  unique()
-
-viability.data2$changed <- "no"
-viability.data2$changed[viability.data2$dif >= 2 | viability.data2$dif <= .5] <- "yes"
-
-ggplot_custom(viability.data2, aes(x = target, y = log2(dif), color = changed)) +
-  geom_quasirandom() +
-  scale_color_manual(values = colors_diverse)+
-  ylab("log2(E1504_viability/E177_viabilty)") +
-  facet_wrap(~conc_char) +
-  coord_flip()
-```
-A lot of HDACs seem to have a lower viability in rep 2. In general, the viability correlates quite well. 
 
 
 ## Figure 1
@@ -447,23 +422,210 @@ ggplot_custom(viability.data %>%
   geom_segment(x = 0.5, xend = 1.2, y = 0.5, yend = 0.5, linetype = "dashed") +
   scale_color_manual(values = c(colors_diverse[1], colors_diverse[4])) +
   facet_wrap(~conc_char)
+
+# C: Cutting efficiency per drug - vulcano plot?
+eff.data <- indel.data %>%
+                dplyr::distinct(drug, freqCut_norm_mean_drug, freqCut_norm_split, conc_char, sample,
+                                tech, replicate) %>%
+  mutate(freqCut_norm_split = ave(freqCut_norm_split, drug, conc_char, replicate, tech, FUN = mean)) %>%
+  unique()
+
+for (i in unique(eff.data$drug)) {
+  for (j in unique(eff.data$conc_char)) {
+    if (nrow(eff.data[eff.data$drug == i & eff.data$conc_char == j]) >= 2) {
+    eff.data$pval[eff.data$drug == i & eff.data$conc_char == j] <- 
+      t.test(eff.data$freqCut_norm_split[eff.data$drug == i & eff.data$conc_char == j], 
+                            eff.data$freqCut_norm_split[eff.data$drug == "DMSO"])$p.value
+    }
+  }
+}
+#eff.data$pval <- p.adjust(eff.data$pval, method = "fdr")
+
+
+ggplot_custom(eff.data %>%
+                filter(sample == "drug") %>%
+                dplyr::select(-freqCut_norm_split) %>%
+                unique(),
+              aes(x = log2(freqCut_norm_mean_drug), y = -log10(pval), color = ifelse(pval < 0.05, "red", "black"))) +
+  geom_quasirandom() +
+  facet_wrap(~conc_char)
+
+# D: MMEJ-z-score per drug
+eff.data <- indel.data %>%
+                dplyr::distinct(drug, conc_char, MMEJ_zscore_drug_comb, MMEJscore, sample,
+                                tech, replicate) 
+
+dmso.mmej.score <- indel.data %>%
+  filter(drug == "DMSO") %>%
+  dplyr::select('DMSO' = MMEJscore, replicate) %>%
+  mutate(mean_DMSO = ave(DMSO, replicate, FUN = mean), 
+         sd_DMSO = ave(DMSO, replicate, FUN = sd)) %>%
+  dplyr::select(-DMSO) %>%
+  unique()
+
+eff.data <- merge(eff.data, dmso.mmej.score)
+
+eff.data <- eff.data %>%
+  mutate(MMEJ_zscore = (MMEJscore - mean_DMSO) / sd_DMSO) %>%
+  mutate(MMEJ_zscore = ave(MMEJ_zscore, replicate, drug, tech, FUN = mean)) %>%
+  dplyr::select(-MMEJscore) %>%
+  unique()
+
+
+for (i in unique(eff.data$drug)) {
+  for (j in unique(eff.data$conc_char)) {
+    if (nrow(eff.data[eff.data$drug == i & eff.data$conc_char == j]) >= 2) {
+    eff.data$pval[eff.data$drug == i & eff.data$conc_char == j] <- 
+      t.test(eff.data$MMEJ_zscore[eff.data$drug == i & eff.data$conc_char == j], 
+                            eff.data$MMEJ_zscore[eff.data$drug == "DMSO"])$p.value
+    }
+  }
+}
+
+ggplot_custom(eff.data %>%
+                filter(sample == "drug") %>%
+                dplyr::select(-MMEJ_zscore) %>%
+                unique(),
+              aes(x = MMEJ_zscore_drug_comb, y = -log10(pval), color = ifelse(pval < 0.05, "red", "black"))) +
+  geom_quasirandom() +
+  facet_wrap(~conc_char)
+
+
+# S_B: Correlation between technical replicates MMEJ score
+techn_repl <- indel.data %>%
+  filter(sample == "drug") %>%
+  dplyr::distinct(MMEJscore, drug, tech, replicate, conc_char, sample) %>%
+  mutate(MMEJscore = ave(MMEJscore, drug, tech, replicate, conc_char, FUN = mean)) %>%
+  unique() %>%
+  mutate(rep = paste(replicate, tech, sep = "_")) %>%
+  dplyr::select(-replicate, -tech) %>%
+  spread(rep, MMEJscore) %>%
+  na.omit()
+
+ggpairs(techn_repl %>% dplyr::select(contains("E1")),
+               upper = list(continuous = corColor),
+               lower = list(continuous = function(data, mapping, ...) {
+                   ggally_points(data = data[n, ], mapping = mapping, alpha = 0.6, size = 0.5) +
+                   geom_abline(slope = 1, lty = "dashed", col = "red")}),
+               diag = list(continuous = function(data, mapping, ...) {
+                   ggally_densityDiag(data = data, mapping = mapping, alpha = 0.3, fill = "red")})) +
+  xlab("MMEJ score") +
+  ylab("MMEJ score")
+
+# S_C: Correlation between technical replicates efficiency
+techn_repl <- indel.data %>%
+  filter(sample == "drug") %>%
+  dplyr::distinct(freqCut_norm_split, drug, tech, replicate, conc_char, sample) %>%
+  mutate(freqCut_norm_split = ave(freqCut_norm_split, drug, tech, replicate, conc_char, FUN = mean)) %>%
+  unique() %>%
+  mutate(rep = paste(replicate, tech, sep = "_")) %>%
+  dplyr::select(-replicate, -tech) %>%
+  spread(rep, freqCut_norm_split) %>%
+  na.omit()
+
+ggpairs(techn_repl %>% dplyr::select(contains("E1")),
+               upper = list(continuous = corColor),
+               lower = list(continuous = function(data, mapping, ...) {
+                   ggally_points(data = data[n, ], mapping = mapping, alpha = 0.6, size = 0.5) +
+                   geom_abline(slope = 1, lty = "dashed", col = "red")}),
+               diag = list(continuous = function(data, mapping, ...) {
+                   ggally_densityDiag(data = data, mapping = mapping, alpha = 0.3, fill = "red")})) +
+  xlab("Cutting efficiency") +
+  ylab("Cutting efficiency")
+
+# S_D: Correlation between biological replicates MMEJ score
+biol_repl <- indel.data %>%
+  filter(sample == "drug") %>%
+  dplyr::distinct(MMEJ_zscore_drug, drug, replicate, conc_char, sample) %>%
+  spread(replicate, MMEJ_zscore_drug) %>%
+  na.omit()
+
+ggpairs(biol_repl %>% dplyr::select(contains("E1")),
+               upper = list(continuous = corColor),
+               lower = list(continuous = function(data, mapping, ...) {
+                   ggally_points(data = data[n, ], mapping = mapping, alpha = 0.6, size = 0.5) +
+                   geom_abline(slope = 1, lty = "dashed", col = "red")}),
+               diag = list(continuous = function(data, mapping, ...) {
+                   ggally_densityDiag(data = data, mapping = mapping, alpha = 0.3, fill = "red")})) +
+  xlab("MMEJ score") +
+  ylab("MMEJ score")
+
+# S_E: Correlation between biological replicates efficiency
+biol_repl <- indel.data %>%
+  filter(sample == "drug") %>%
+  dplyr::distinct(freqCut_norm_drug, drug, replicate, conc_char, sample) %>%
+  spread(replicate, freqCut_norm_drug) %>%
+  na.omit()
+
+ggpairs(biol_repl %>% dplyr::select(contains("E1")),
+               upper = list(continuous = corColor),
+               lower = list(continuous = function(data, mapping, ...) {
+                   ggally_points(data = data[n, ], mapping = mapping, alpha = 0.6, size = 0.5) +
+                   geom_abline(slope = 1, lty = "dashed", col = "red")}),
+               diag = list(continuous = function(data, mapping, ...) {
+                   ggally_densityDiag(data = data, mapping = mapping, alpha = 0.3, fill = "red")})) +
+  xlab("Cutting efficiency") +
+  ylab("Cutting efficiency")
+
+
+
 ```
 
 
+## Figure 2
+
+```{r}
+# A: Correlation of efficiency of DMSO samples of all genomic locations between biological replicates
+ggplot_custom(indel.data %>%
+         filter(drug == "DMSO") %>%
+         dplyr::distinct(freqCut, replicate, barcode, tech, plate, conc_char, well) %>%
+         spread(replicate, freqCut) %>%
+         na.omit(),
+       aes(x = E177, y = E1504)) +
+  geom_point() +
+  geom_abline(linetype = "dashed") +
+  geom_smooth(method = "lm", color = "grey", fill = "lightgrey") 
+
+
+# B: Cutting efficiency in DMSO per IPR
+indel.data2 <- indel.data
+
+indel.data2$sample[indel.data2$sample == "drug" & indel.data2$concentration == 100] <- "drug_100nM"
+indel.data2$sample[indel.data2$sample == "drug" & indel.data2$concentration == 10] <- "drug_10uM"
+indel.data2$sample[indel.data2$sample == "drug" & indel.data2$concentration == 1] <- "drug_1uM"
+sample_order <- c("DMSO (neg control)" , "DNA-PKi (NHEJ control)", "Mirin (MMEJ control)", "drug_100nM", "drug_1uM", "drug_10uM")
+indel.data2$sample <- factor(indel.data2$sample, levels = sample_order)
+indel.data2 <- indel.data2 %>%
+  mutate(IPR = gsub("IPR", "", IPR))
+ipr_order <- c("1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19")
+indel.data2$IPR <- factor(indel.data2$IPR, levels = ipr_order)
+
+
+ggplot(indel.data2 %>%
+         filter(sample != "DNA-PKi (NHEJ control)", sample != "Mirin (MMEJ control)") %>%
+         dplyr::distinct(freqCut, IPR, tech, plate, conc_char, drug, sample) %>%
+           mutate(freqCut = ave(freqCut, IPR, tech, plate, conc_char, drug, FUN = mean)),
+       aes(x = IPR, y = freqCut)) +
+  geom_quasirandom_rast(aes(color = sample), dodge.width = 0.75) +
+  scale_color_manual(values = c(colors_drugs[2], colors_drugs[6], colors_drugs[7], colors_drugs[4]))
+
+
+ggplot(indel.data2 %>%
+         filter(sample != "DNA-PKi (NHEJ control)", sample != "Mirin (MMEJ control)") %>%
+         dplyr::distinct(freqCut, IPR, tech, plate, conc_char, drug, sample) %>%
+           mutate(freqCut = ave(freqCut, IPR, tech, plate, conc_char, drug, FUN = mean)),
+       aes(x = IPR, y = freqCut)) +
+  geom_quasirandom_rast(aes(color = sample), dodge.width = 0.75) +
+  scale_color_manual(values = c(colors_drugs[2], colors_drugs[6], colors_drugs[7], colors_drugs[4]))
+
+```
 
 
 
 ## DMSO indel scores
 
 ```{r, warning = FALSE}
-# Plot MMEJ scores at each IPR for the two bioreps
-ggplot_custom(indel.data %>% 
-         dplyr::select(MMEJscore, ID, IPR, drug, replicate) %>%
-         filter(drug == "DMSO") %>%
-         unique(), aes(x = IPR, MMEJscore)) +
-  geom_quasirandom() +
-  coord_flip() +
-  facet_wrap(~replicate)
+
 
 # Correlation DMSO MMEJ scores
 indel.data$ID_2 <-  gsub("^E[0-9]{3,4}_", "", indel.data$ID)
