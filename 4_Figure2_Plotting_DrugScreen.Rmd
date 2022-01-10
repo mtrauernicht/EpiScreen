@@ -356,7 +356,7 @@ Are there any drugs (per concentration) that significantly change the cutting ef
 ```{r}
 # A: Cutting efficiency per drug - vulcano plot
 eff.data <- indel.data %>%
-                dplyr::distinct(drug, freqCut_norm_mean_drug, freqCut_norm_split, conc_char, sample,
+                dplyr::distinct(drug, freqCut_norm_mean_drug, freqCut_norm_split, conc_char, sample, target,
                                 tech, replicate) %>%
   mutate(freqCut_norm_split = ave(freqCut_norm_split, drug, conc_char, replicate, tech, FUN = mean)) %>%
   unique()
@@ -391,16 +391,21 @@ Conclusion: Yes, some drugs do alter cutting efficiency significantly. Changes g
 Are there any target groups that are prone to changes in cutting efficiency?
 ```{r}
 # B: Cutting efficiency change per target group, all concentrations together
-ggplot_custom(data = indel.data %>%
-                filter(sample != "DNA-PKi (NHEJ control)", sample != "Mirin (MMEJ control)", sample != "DMSO (neg control)") %>%
-                  dplyr::select(freqCut_norm_mean_drug, sample, drug, conc_char, target) %>%
+eff.data.2 <- eff.data %>%
+                filter(sample != "DNA-PKi (NHEJ control)", sample != "Mirin (MMEJ control)", sample != "DMSO (neg control)", conc_char == "100 nM") %>%
+                  dplyr::select(freqCut_norm_mean_drug, pval, sample, drug, conc_char, target) %>%
                   unique() %>%
-                mutate(mean_eff_target = ave(freqCut_norm_mean_drug, target, FUN = mean)), 
-              aes(y = log2(freqCut_norm_mean_drug), x = reorder(target, -mean_eff_target))) + 
-  geom_quasirandom() +
+                mutate(mean_eff_target = ave(freqCut_norm_mean_drug, target, FUN = mean),
+                       pval = -log10(pval),
+                       freqCut_norm_mean_drug = log2(freqCut_norm_mean_drug))
+
+ggplot_custom(data = eff.data.2, 
+              aes(y = freqCut_norm_mean_drug, x = reorder(target, -mean_eff_target))) + 
+  geom_quasirandom(aes(color = eff.data.2$pval)) +
     geom_boxplot(position = position_dodge(0.75), alpha = 0.4) +
     xlab("") + ylab("log2(cutting efficiency)") +
-      theme_classic_lines_90()
+      theme_classic_lines_90()+
+  scale_color_viridis_b()
 ```
 *Figure 2B: Compound-induced change in cutting efficiency per compound target groups.*
 
