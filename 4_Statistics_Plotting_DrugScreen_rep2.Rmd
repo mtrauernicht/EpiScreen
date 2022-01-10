@@ -612,9 +612,9 @@ ggplot(indel.data2 %>%
 
 ggplot(indel.data2 %>%
          filter(sample != "DNA-PKi (NHEJ control)", sample != "Mirin (MMEJ control)") %>%
-         dplyr::distinct(freqCut, IPR, tech, plate, conc_char, drug, sample) %>%
-           mutate(freqCut = ave(freqCut, IPR, tech, plate, conc_char, drug, FUN = mean)),
-       aes(x = IPR, y = freqCut)) +
+         dplyr::distinct(MMEJscore, IPR, tech, plate, conc_char, drug, sample) %>%
+           mutate(freqCut = ave(MMEJscore, IPR, tech, plate, conc_char, drug, FUN = mean)),
+       aes(x = IPR, y = MMEJscore)) +
   geom_quasirandom_rast(aes(color = sample), dodge.width = 0.75) +
   scale_color_manual(values = c(colors_drugs[2], colors_drugs[6], colors_drugs[7], colors_drugs[4]))
 
