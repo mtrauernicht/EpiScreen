@@ -451,8 +451,20 @@ ggplot(indel.data2 %>%
          dplyr::distinct(freqCut, IPR, tech, plate, conc_char, drug, sample) %>%
            mutate(freqCut = ave(freqCut, IPR, tech, plate, conc_char, drug, FUN = mean)),
        aes(x = IPR, y = freqCut)) +
-  geom_quasirandom_rast(aes(color = sample), dodge.width = 0.75) +
-  scale_color_manual(values = c(colors_drugs[2], colors_drugs[6], colors_drugs[7], colors_drugs[4]))
+  geom_violin(aes(fill = sample), position = position_dodge(0.75), draw_quantiles = 0.5, width = 3) +
+  scale_fill_manual(values = c(colors_drugs[2], colors_drugs[6], colors_drugs[7], colors_drugs[4]))+
+  coord_polar()+
+  ylim(0,1)
+
+ggplot(indel.data2 %>%
+         filter(sample != "DNA-PKi (NHEJ control)", sample != "Mirin (MMEJ control)", replicate == "E1504") %>%
+         dplyr::distinct(freqCut, IPR, tech, plate, conc_char, drug, sample) %>%
+           mutate(freqCut = ave(freqCut, IPR, tech, plate, conc_char, drug, FUN = mean)),
+       aes(x = IPR, y = freqCut)) +
+  geom_quasirandom_rast(aes(color = sample), dodge.width = 0.75, raster.dpi = 600) +
+  scale_color_manual(values = c(colors_drugs[2], colors_drugs[7], colors_drugs[4], "#000000")) +
+  coord_polar()+
+  ylim(0,1)
 ```
 *Figure 1D: Compound-induced changes in cutting efficiency on the 19 genomic locations. The three probed concentrations are plotted next to each other.*
 
@@ -467,10 +479,22 @@ How do the drugs impact MMEJ score in general? Does the genomic location & conce
 ggplot(indel.data2 %>%
          filter(sample != "DNA-PKi (NHEJ control)", sample != "Mirin (MMEJ control)") %>%
          dplyr::distinct(MMEJscore, IPR, tech, plate, conc_char, drug, sample) %>%
-           mutate(freqCut = ave(MMEJscore, IPR, tech, plate, conc_char, drug, FUN = mean)),
+           mutate(MMEJscore = ave(MMEJscore, IPR, tech, plate, conc_char, drug, FUN = mean)),
        aes(x = IPR, y = MMEJscore)) +
-  geom_quasirandom_rast(aes(color = sample), dodge.width = 0.75) +
-  scale_color_manual(values = c(colors_drugs[2], colors_drugs[6], colors_drugs[7], colors_drugs[4]))
+  geom_violin(aes(fill = sample), position = position_dodge(0.75), draw_quantiles = 0.5, width = 1.5) +
+  scale_fill_manual(values = c(colors_drugs[2], colors_drugs[6], colors_drugs[7], colors_drugs[4])) +
+  coord_polar()+
+  ylim(-0.2,0.55)
+
+ggplot(indel.data2 %>%
+         filter(sample != "DNA-PKi (NHEJ control)", sample != "Mirin (MMEJ control)") %>%
+         dplyr::distinct(MMEJscore, IPR, tech, plate, conc_char, drug, sample) %>%
+           mutate(MMEJscore = ave(MMEJscore, IPR, tech, plate, conc_char, drug, FUN = mean)),
+       aes(x = IPR, y = MMEJscore)) +
+  geom_quasirandom_rast(aes(color = sample), dodge.width = 0.75, raster.dpi = 600) +
+  scale_color_manual(values = c(colors_drugs[2], colors_drugs[7], colors_drugs[4], "#000000")) +
+  coord_polar() +
+  ylim(-0.4,0.4)
 ```
 *Figure 1E: Compound-induced changes in MMEJ score on the 19 genomic locations. The three probed concentrations are plotted next to each other.*
 
@@ -511,10 +535,11 @@ techn_repl <- indel.data %>%
   spread(rep, MMEJscore) %>%
   na.omit()
 
+boundaries <- c(0.7,0.75,0.8,0.85)
 ggpairs(techn_repl %>% dplyr::select(contains("E1")),
                upper = list(continuous = corColor),
                lower = list(continuous = function(data, mapping, ...) {
-                   ggally_points(data = data[n, ], mapping = mapping, alpha = 0.6, size = 0.5) +
+                   ggally_points(data = data, mapping = mapping, alpha = 0.6, size = 0.5) +
                    geom_abline(slope = 1, lty = "dashed", col = "red")}),
                diag = list(continuous = function(data, mapping, ...) {
                    ggally_densityDiag(data = data, mapping = mapping, alpha = 0.3, fill = "red")})) +
@@ -532,19 +557,19 @@ How well does the cutting efficiency correlate between the six technical replica
 ```{r}
 # C: Correlation between technical replicates efficiency
 techn_repl <- indel.data %>%
-  filter(sample == "drug") %>%
-  dplyr::distinct(freqCut_norm_split, drug, tech, replicate, conc_char, sample) %>%
-  mutate(freqCut_norm_split = ave(freqCut_norm_split, drug, tech, replicate, conc_char, FUN = mean)) %>%
+  filter(sample == "drug" | drug == "DMSO") %>%
+  dplyr::distinct(freqCut, drug, tech, replicate, conc_char, sample) %>%
+  mutate(freqCut = ave(freqCut, drug, tech, replicate, conc_char, FUN = mean)) %>%
   unique() %>%
   mutate(rep = paste(replicate, tech, sep = "_")) %>%
   dplyr::select(-replicate, -tech) %>%
-  spread(rep, freqCut_norm_split) %>%
+  spread(rep, freqCut) %>%
   na.omit()
 
 ggpairs(techn_repl %>% dplyr::select(contains("E1")),
                upper = list(continuous = corColor),
                lower = list(continuous = function(data, mapping, ...) {
-                   ggally_points(data = data[n, ], mapping = mapping, alpha = 0.6, size = 0.5) +
+                   ggally_points(data = data, mapping = mapping, alpha = 0.6, size = 0.5) +
                    geom_abline(slope = 1, lty = "dashed", col = "red")}),
                diag = list(continuous = function(data, mapping, ...) {
                    ggally_densityDiag(data = data, mapping = mapping, alpha = 0.3, fill = "red")})) +
@@ -587,8 +612,10 @@ How well does the cutting efficiency correlate between the biologcial replicates
 # E: Correlation between biological replicates efficiency
 biol_repl <- indel.data %>%
   filter(sample == "drug") %>%
-  dplyr::distinct(freqCut_norm_drug, drug, replicate, conc_char, sample) %>%
-  spread(replicate, freqCut_norm_drug) %>%
+  dplyr::distinct(freqCut, drug, replicate, conc_char, sample) %>%
+  mutate(freqCut = ave(freqCut, drug, conc_char, replicate, FUN = mean)) %>%
+  unique() %>%
+  spread(replicate, freqCut) %>%
   na.omit()
 
 ggpairs(biol_repl %>% dplyr::select(contains("E1")),

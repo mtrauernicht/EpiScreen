@@ -121,8 +121,8 @@ chrom_colors2 = c("Euchromatin" = "#F7941D",
 
 
 # Change colors of annotations
-colors <- brewer.pal(length(unique(barcode.annotation$cluster)), "Pastel2")
-names(colors) <- unique(barcode.annotation$cluster)
+colors <- brewer.pal(length(unique(barcode.order$cluster)), "Pastel2")
+names(colors) <- unique(barcode.order$cluster)
 
 annotation_colors_scr = list(
   chromatin = chrom_colors2,

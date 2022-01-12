@@ -357,8 +357,9 @@ Are the compounds (per concentration) that significantly alter the MMEJ score?
 ```{r}
 # A: MMEJ-z-score per drug
 eff.data <- indel.data %>%
+  filter(replicate == "E1504") %>%
                 dplyr::distinct(drug, conc_char, MMEJ_zscore_drug_comb, MMEJscore, sample,
-                                tech, replicate) 
+                                tech, replicate, target) 
 
 dmso.mmej.score <- indel.data %>%
   filter(drug == "DMSO") %>%
@@ -371,9 +372,8 @@ dmso.mmej.score <- indel.data %>%
 eff.data <- merge(eff.data, dmso.mmej.score)
 
 eff.data <- eff.data %>%
-  mutate(MMEJ_zscore = (MMEJscore - mean_DMSO) / sd_DMSO) %>%
-  mutate(MMEJ_zscore = ave(MMEJ_zscore, replicate, drug, tech, FUN = mean)) %>%
-  dplyr::select(-MMEJscore) %>%
+  mutate(MMEJ_score_mean = ave(MMEJscore, drug, conc_char, FUN = mean),
+         MMEJscore = ave(MMEJscore, drug, conc_char, tech, replicate, FUN = mean)) %>%
   unique()
 
 
@@ -381,17 +381,18 @@ for (i in unique(eff.data$drug)) {
   for (j in unique(eff.data$conc_char)) {
     if (nrow(eff.data[eff.data$drug == i & eff.data$conc_char == j]) >= 2) {
     eff.data$pval[eff.data$drug == i & eff.data$conc_char == j] <- 
-      t.test(eff.data$MMEJ_zscore[eff.data$drug == i & eff.data$conc_char == j], 
-                            eff.data$MMEJ_zscore[eff.data$drug == "DMSO"])$p.value
+      t.test(eff.data$MMEJscore[eff.data$drug == i & eff.data$conc_char == j], 
+                            eff.data$MMEJscore[eff.data$drug == "DMSO"])$p.value
     }
   }
 }
 
+
 ggplot_custom(eff.data %>%
                 filter(sample == "drug") %>%
-                dplyr::select(-MMEJ_zscore) %>%
+                dplyr::select(-MMEJscore) %>%
                 unique(),
-              aes(x = MMEJ_zscore_drug_comb, y = -log10(pval), color = ifelse(pval < 0.05, "red", "black"))) +
+              aes(x = MMEJ_score_mean, y = -log10(pval), color = ifelse(pval < 0.05, "red", "black"))) +
   geom_quasirandom() +
   facet_wrap(~conc_char)
 ```
@@ -399,9 +400,131 @@ ggplot_custom(eff.data %>%
 
 Conclusion: Yes, there are a lot of interesting hits at all tested concentrations. 
 
+---
+
+## B: MMEJ z-score heatmap: drug vs genomic location
+Which drugs are changing MMEJ score? Do they act globally or locally? 
+```{r}
+# Set annotation for heatmap
+# Row annotation: annotate drugs with the target group
+target <- indel.data %>% 
+  filter(!target %in% c("Negative Control", "MRN", "DNA-PK")) %>% 
+  distinct(drug, target) %>% 
+  column_to_rownames(var="drug")
+
+chromatin <- readRDS(
+  "/DATA/usr/x.vergara/XV_ChIPIndels/XV20200902_DDR_RS_revision/XV20200902_DDR_RS_revision/data/xv20200915_DDR_data_CHIP.rds") %>% 
+  distinct(barcode, chromatin) %>%
+  left_join(distinct(episcreen_ratios, barcode, IPR)) %>%
+  filter(IPR != "<NA>") %>% 
+  select(-barcode) %>%
+  column_to_rownames(var="IPR")
+
+# Change colors of annotations
+chrom_colors = c("Euchromatin" = "#264653",
+                  "other-heterochromatin" = "#e9c46a",  
+                     "H3K27me3" = "#e76f51", 
+                  "Triple Heterochromatin" = "#f4a261")
+
+# colors <- brewer.pal(length(unique(barcode.annotation$cluster)), "Pastel2")
+# names(colors) <- unique(barcode.annotation$cluster)
+
+annotation_colors_scr = list(
+  chromatin = chrom_colors,
+  type = c(Active="#669966", Repressive="grey90"),
+  target = c(HDAC="#60988D", HAT="#C6D0A8", Sirtuin="#8FCAAC",
+             HMT="#FDCDAC", DNMT="#D69C81", `Histone Demethylase`="#FFF2AE",
+             HIF="#E3DCD5", JAK="#C8D7E2", PIM="#9AB8C4", `Aurora Kinase`="#F4CAE4",
+             PARP="#CB546F", `Epigenetic Reader Domain`= "#476D61", `DNA-PK`="#E07A43"
+             ))
 
 
 
+# Order the annotation legend
+ordered_marks <- c("Euchromatin", 
+                     "other-heterochromatin",  
+                     "H3K27me3", 
+                     "Triple Heterochromatin")
+
+annotation_colors_scr$chromatin <- annotation_colors_scr$chromatin[ordered_marks]
+
+ordered_marks2 <- c("DNA-PK","Epigenetic Reader Domain", "HDAC",  "Sirtuin", "HAT", 
+                    "Histone Demethylase", "HMT", "DNMT", 
+                    "HIF", "JAK", "PIM",
+                    "Aurora Kinase", "PARP")
+annotation_colors_scr$target <- annotation_colors_scr$target[ordered_marks2]
+
+
+# Heatmap
+eff.data.heatmap <- indel.data %>%
+  filter(sample == "drug", replicate == "E1504") %>%
+  distinct(conc_char, drug, IPR, MMEJ_zscore)
+
+
+
+eff.data.heatmap2 <- eff.data.heatmap %>%
+  mutate(mod = Mod(MMEJ_zscore)) %>%
+  mutate(max = ave(mod, drug, conc_char, FUN = max)) %>%
+  dplyr::select(-mod) %>%
+  spread(IPR, MMEJ_zscore) %>%
+  group_by(conc_char) %>%
+  top_n(15, max) %>%
+  ungroup() %>%
+  dplyr::select(-max)
+
+
+breaks <- seq(-10, 10, 0.2)
+
+
+
+for (i in unique(eff.data.heatmap2$conc_char)) {
+  pheatmap(as.matrix(eff.data.heatmap2[eff.data.heatmap2$conc_char == i,] %>%
+                       column_to_rownames('drug') %>%
+                       dplyr::select(contains('IPR')) %>%
+                       t()),
+           border_color = "white",
+           cellwidth = 12,
+           cellheight = 12,
+           cluster_rows = F,
+           breaks = breaks,
+           main = paste('MMEJ z-score, concentration =', i),
+           annotation_col = target,
+           annotation_row = chromatin,
+           color = colorRampPalette(rev(brewer.pal(n = 7, name = "RdBu")))(100),
+           annotation_colors = annotation_colors_scr, annotation_legend = T)
+}
+
+
+# Alternative: only HDACs:
+eff.data.heatmap <- indel.data %>%
+  filter(target == "HDAC") %>%
+  distinct(conc_char, drug, IPR, MMEJ_zscore_comb) %>%
+  mutate(mod = Mod(MMEJ_zscore_comb)) %>%
+  mutate(max = ave(mod, drug, conc_char, FUN = max)) %>%
+  filter(max > 3 | max < -3) %>%
+  dplyr::select(-max, -mod) %>%
+  spread(IPR, MMEJ_zscore_comb) %>%
+  mutate(drug = paste(drug, conc_char, sep = ""))
+
+breaks <- seq(-10, 10, 0.2)
+
+
+pheatmap(as.matrix(eff.data.heatmap %>%
+                       column_to_rownames('drug') %>%
+                       dplyr::select(contains('IPR')) %>%
+                       t()),
+           border_color = "white",
+           cellwidth = 12,
+           cellheight = 12,
+           breaks = breaks,
+           main = paste('MMEJ z_score'),
+           annotation_row = chromatin,
+           color = colorRampPalette(rev(brewer.pal(n = 7, name = "RdBu")))(100),
+           annotation_colors = annotation_colors_scr, annotation_legend = T)
+```
+*Figure 3B: Heatmap of MMEJ z-score per IPR for 15 most potent compounds per concentration.*
+
+Conclusion: At all three concentrations, the 15 most potent drugs reduce the MMEJ score. IPR10 is very sensitive to MMEJ score reduction, especially by HDACs. 
 
 
 
