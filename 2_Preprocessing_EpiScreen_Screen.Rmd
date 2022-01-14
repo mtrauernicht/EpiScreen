@@ -68,6 +68,7 @@ library(cowplot)
 library(report)
 library(corrr)
 library(PerformanceAnalytics)
+library(ggbeeswarm)
 ```
 
 ## Custom functions
@@ -370,7 +371,7 @@ These two tables are empty, that means that all the samples we have here are all
 
 ## Pooling large indels for indel spectrum plotting
 
-```{r}
+```{r large indel pooling for indel plots}
 # c("barcode", "ID", "mutation", "norm", "count", "exp",  "type", "count",  "norm_split", "freq_split", "sum_bc_reads_split", "ratio_indels_split", "reads", "replicate",  "plate", "concentration", "tech", "drug_plate", "well", "seq_barcode", "seq_index", "file", "PCR_type",  "index_length", "drug_no",  "drug_well", "drug", "target",  "r_written_pct", "viability", "viab_norm", "conc_char", "viab_norm_pooled", "norm_pooled", "freq_pooled", "sum_pooled_bc_reads", "ratio_indels_pooled")
 
 # Fix large deletions for every deletion above 25 (we do not sequence deletions larger than 130 bp)
@@ -460,7 +461,7 @@ dim(screen.indel.dt)
 [1] 2060574      40
 
 ## R cleanup
-```{r}
+```{r cleanup}
 rm(list = ls()[grep("^mutations", ls())])
 rm(list = ls()[grep("list$", ls())])
 rm(list = ls()[grep("large.indels.dt", ls())])
@@ -503,11 +504,45 @@ dim(screen.indel.dt)
 
 ## Calculating the z-scores
 
+### Checking DMSO data distribution
+
+Before calculating the z-scores we need to check the DMSO data distribution if it's normal or not.
+First the general distribution in a bee swarm plot per barcode.
+
+```{r}
+for (i in barcodes.clone5) {
+  norm_pooled = screen.indel.dt %>%
+    filter(drug == "DMSO", barcode == i) %>%
+    distinct(ID, barcode, freqCut, MMEJscore, replicate, tech)
+  plt1 = ggplot(norm_pooled, aes(replicate, freqCut, color = as.character(tech))) + 
+    geom_quasirandom() +
+    stat_summary(fun=mean, aes(shape="mean", color = "mean"), geom="point") +
+    stat_summary(fun=median, aes(shape="median", color = "median"), geom="point") +
+    scale_shape_manual(values=c("mean"= 15, "median" = 16)) +
+    scale_color_manual(values=c("1"= "gray80", "2"= "gray50", "3"= "gray20", "mean"= "red", "median" = "blue"))+
+    ylim(0.3, 1) +
+    theme_bw() +
+    ggtitle(paste0("freqCut Barcode: ", i))
+  plt2 = ggplot(norm_pooled, aes(replicate, MMEJscore, color = as.character(tech))) + 
+    geom_quasirandom() +
+    stat_summary(fun=mean, aes(shape="mean", color = "mean"), geom="point") +
+    stat_summary(fun=median, aes(shape="median", color = "median"), geom="point") +
+    scale_shape_manual(values=c("mean"= 15, "median" = 16)) +
+    scale_color_manual(values=c("1"= "gray80", "2"= "gray50", "3"= "gray20", "mean"= "red", "median" = "blue"))+
+    ylim(0, 0.6) +
+    theme_bw() +
+    ggtitle(paste0("MMEJscore Barcode: ", i))
+  print(plot_grid(plt1, plt2))
+}
+```
+
+
 ### Checking for data normality
 
-```{r calculating z-scores}
-# First check if the DMSO data is normally distributed for MMEJscore and freqCut
-# Split only (pooled were removed)
+Check if the DMSO data is normally distributed for MMEJscore and freqCut with qqplots. 
+
+```{r check for normal distribution}
+
 for (i in barcodes.clone5) {
   norm_pooled = screen.indel.dt %>%
     filter(drug == "DMSO", barcode == i) %>%
@@ -518,9 +553,11 @@ for (i in barcodes.clone5) {
   plt2 = qplot(sample = MMEJscore, data = norm_pooled, color=replicate) +
     theme_bw() +
     ggtitle(paste0("pooled MMEJscore Barcode: ", i))
-  plot_grid(plt1, plt2)
+  print(plot_grid(plt1, plt2))
 }
 ```
+
+Some samples have clear outlyers, others aren't prefectly normally distributed but in general it's rather good.
 
 ## Calculating the z-scores and normalised efficiencies
 
@@ -705,7 +742,7 @@ screen_indel_tib = screen.indel.dt %>%
                 -plate, -exp, -seq_barcode, 
                 -seq_index, -file, -mutation, 
                 -mut_type, -type, -color, 
-                -tech, -norm, -count) %>%
+                -tech) %>%
   unique() %>%
   as_tibble()
 ```
