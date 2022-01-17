@@ -1,0 +1,166 @@
+---
+title: "Scratch Code"
+author: "Ruben Schep"
+date: "1/17/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+Scratch chunks
+```{r distribution of the MMEJ score in the controls}
+mmejscore_DMSO_matrix_list = screen_indel_split_tib %>%  
+  filter(drug == "DMSO") %>%
+  mutate(ID = gsub("^E.*_.*_([12]_...)$", "\\1\\2", ID)) %>% 
+  distinct(ID, MMEJscore_split, replicate, tech, concentration, barcode) %>%
+  pivot_wider(names_from = c("replicate", "tech", "concentration"), 
+              values_from = "MMEJscore_split") %>%
+  group_split(barcode, .keep = FALSE)
+
+mmejscore_DMSO_matrix_list_new = lapply(mmejscore_DMSO_matrix_list, '[', -1)
+
+# MMEJscoreDMSOvar = mmejscore_DMSO_matrix %>%
+#   rownames_to_column(var = "ID") %>%
+#   pivot_longer(cols = starts_with("E"), names_to = "rep") %>%
+#   group_by(rep)
+
+sep_conc = screen_indel_split_tib %>%  
+  filter(drug == "DMSO") %>%
+  mutate(ID = gsub("^E.*_(.*_.*)_[12]_...$", "\\1", exp),
+         plates = paste(replicate, tech, concentration, sep = "_")) %>% 
+  distinct(ID,plates, freqCut_split, MMEJscore_split, replicate, tech, concentration, barcode)
+
+for (i in unique(sep_conc$barcode)) {
+  btest = bartlett.test(MMEJscore_split ~ plates, data = filter(sep_conc, barcode == i))
+  print(btest)
+}
+
+sep_conc %>% 
+  filter(barcode == "ACCCCTAAAGGCGCTG") %>% 
+  ggplot(., aes(plates, MMEJscore_split)) + geom_jitter()
+
+sep_conc %>% 
+  filter(barcode == "ACCCCTAAAGGCGCTG") %>% 
+  ggplot(., aes(plates, freqCut_split)) + geom_jitter()
+
+sep_conc %>%  
+  ggplot(., aes(plates, freqCut_split, color = barcode)) + geom_jitter()
+
+sep_conc %>%  
+  ggplot(., aes(plates, MMEJscore_split, color = barcode)) + geom_jitter()
+
+comb_conc = screen_indel_split_tib %>%  
+  filter(drug == "DMSO") %>%
+  mutate(ID = gsub("^E.*_(.*_.*)_[12]_...$", "\\1", exp),
+         plates = paste(replicate, tech, sep = "_")) %>% 
+  distinct(ID,plates, freqCut_split, MMEJscore_split, replicate, tech, barcode)
+
+for (i in unique(comb_conc$barcode)) {
+  btest = bartlett.test(MMEJscore_split ~ plates, data = filter(comb_conc, barcode == i))
+  print(btest)
+  }
+  
+comb_conc %>% 
+  filter(barcode == "ACCCCTAAAGGCGCTG") %>% 
+  ggplot(., aes(plates, MMEJscore_split)) + geom_jitter()
+
+comb_conc %>%  
+  ggplot(., aes(plates, freqCut_split, color = barcode)) + geom_jitter()
+
+comb_conc %>%  
+  ggplot(., aes(plates, MMEJscore_split, color = barcode)) + geom_jitter()
+
+mmejscore_DMSO_tib = screen_indel_split_tib %>%  
+  filter(drug == "DMSO") %>%
+  mutate(ID = gsub("^E.*_(.*_.*)_[12]_...$", "\\1", exp)) %>%
+  distinct(ID, MMEJscore_split, replicate, tech, concentration, drug, barcode)
+
+mmejscore_DMSO_tib %>% 
+  ggplot(., aes(ID, MMEJscore_split)) + 
+  geom_jitter() + 
+  facet_grid(barcode ~ replicate, scales = "free_y")
+```
+
+
+```{r}
+# For MMEJ z-score
+mmejzscore_matrix = screen_indel_split_tib %>%  
+  filter(sample == "drug") %>%
+  mutate(ID = paste(gsub("^E.*_(.*_[12]_...)$", "\\1\\2", ID), barcode, sep = "_")) %>% 
+  distinct(ID, MMEJ_zscore_split, replicate, tech) %>%
+  pivot_wider(., names_from = c("replicate", "tech"), values_from = "MMEJ_zscore_split") %>%
+  column_to_rownames(., var = "ID")
+# 
+chart.Correlation(mmejzscore_matrix, histogram=TRUE, pch=19)
+
+# For standard MMEJ score
+mmejscore_matrix = screen_indel_split_tib %>%  
+  filter(sample == "drug") %>%
+  mutate(ID = paste(gsub("^E.*_(.*_[12]_...)$", "\\1\\2", ID), barcode, sep = "_")) %>% 
+  distinct(ID, MMEJscore_split, replicate, tech) %>%
+  pivot_wider(., names_from = c("replicate", "tech"), values_from = "MMEJscore_split") %>%
+  column_to_rownames(., var = "ID")
+# 
+chart.Correlation(mmejscore_matrix, histogram=TRUE, pch=19)
+
+MMEJscorevar = mmejscore_matrix %>%
+  rownames_to_column(var = "ID") %>%
+  pivot_longer(.,cols = starts_with("E"), names_to = "rep") %>%
+  group_by(rep)
+
+MMEJscorevar %>%
+  summarise(
+    count = n(),
+    mean = mean(value, na.rm = TRUE),
+    sd = sd(value, na.rm = TRUE))
+  
+
+screen.indel.dt %>% 
+  filter(sample == "drug" & replicate == "E1504") %>% 
+  distinct(barcode, tech, ID, freqCut_norm_split) %>% 
+  mutate(bc_ID = paste(ID, barcode, sep = "_")) %>% select(-barcode, -ID) %>% 
+  pivot_wider(., names_from = tech, values_from = freqCut_norm_split) %>%
+  column_to_rownames(., var = "bc_ID") %>% 
+  chart.Correlation(., histogram=TRUE, pch=19)
+
+screen.indel.dt %>% 
+  filter(sample == "drug" & replicate == "E177") %>% 
+  distinct(barcode, tech, ID, freqCut_norm_split) %>% 
+  mutate(bc_ID = paste(ID, barcode, sep = "_")) %>% select(-barcode, -ID) %>% 
+  pivot_wider(., names_from = tech, values_from = freqCut_norm_split) %>%
+  column_to_rownames(., var = "bc_ID") %>% 
+  chart.Correlation(., histogram=TRUE, pch=19)
+
+screen.indel.dt %>% 
+  filter(sample == "drug" & replicate == "E177") %>% 
+  distinct(barcode, tech, ID, freqCut) %>% 
+  mutate(bc_ID = paste(ID, barcode, sep = "_")) %>% select(-barcode, -ID) %>% 
+  pivot_wider(., names_from = tech, values_from = freqCut) %>%
+  column_to_rownames(., var = "bc_ID") %>% 
+  chart.Correlation(., histogram=TRUE, pch=19)
+
+
+# Compute the analysis of variance
+res.aov <- aov(value ~ rep, data = MMEJscorevar)
+# Summary of the analysis
+summary(res.aov)
+
+# Compute the analysis of variance
+res.aov <- aov(value ~ rep, data = filter(MMEJscorevar, grepl("E177", rep)))
+# Summary of the analysis
+summary(res.aov)
+
+# Compute the analysis of variance
+res.aov <- aov(value ~ rep, data = filter(MMEJscorevar, grepl("E1504", rep)))
+# Summary of the analysis
+summary(res.aov)
+
+fligner.test(value ~ rep, data = MMEJscorevar)
+fligner.test(value ~ rep, data = filter(MMEJscorevar, grepl("E177", rep)))
+fligner.test(value ~ rep, data = filter(MMEJscorevar, !grepl("E177", rep))) 
+
+```
