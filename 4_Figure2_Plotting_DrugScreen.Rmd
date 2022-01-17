@@ -356,10 +356,11 @@ Are there any drugs (per concentration) that significantly change the cutting ef
 ```{r}
 # A: Cutting efficiency per drug - vulcano plot
 eff.data <- indel.data %>%
-  filter(replicate == "E1504") %>%
-                dplyr::distinct(drug, freqCut_norm_mean_drug, freqCut_norm_split, conc_char, sample, target,
+  filter(sample == "drug" | drug == "DMSO", replicate == "E1504") %>%
+                dplyr::distinct(drug, freqCut_norm_split, conc_char, sample, target,
                                 tech, replicate) %>%
-  mutate(freqCut_norm_split = ave(freqCut_norm_split, drug, conc_char, replicate, tech, FUN = mean)) %>%
+  mutate(freqCut_norm_split = ave(freqCut_norm_split, drug, conc_char, replicate, tech, FUN = mean),
+         freqCut_norm_mean_drug = ave(freqCut_norm_split, drug, conc_char, replicate, FUN = mean)) %>%
   unique()
 
 for (i in unique(eff.data$drug)) {
@@ -380,6 +381,7 @@ ggplot_custom(eff.data %>%
                 unique(),
               aes(x = log2(freqCut_norm_mean_drug), y = -log10(pval), color = ifelse(pval < 0.05, "red", "black"))) +
   geom_quasirandom() +
+  geom_vline(linetype = "dashed", xintercept = 0) +
   facet_wrap(~conc_char)
 ```
 *Figure 2A: Compound-induced change in cutting efficiency of all tested compounds. Mean per drug & concentration vs. p-value from t-test.*
@@ -393,15 +395,15 @@ Are there any target groups that are prone to changes in cutting efficiency?
 ```{r}
 # B: Cutting efficiency change per target group, all concentrations together
 eff.data.2 <- eff.data %>%
-                filter(sample != "DNA-PKi (NHEJ control)", sample != "Mirin (MMEJ control)", sample != "DMSO (neg control)", conc_char == "100 nM", replicate == "E1504") %>%
+                filter(sample == "drug", conc_char == "100 nM") %>%
                   dplyr::select(freqCut_norm_mean_drug, pval, sample, drug, conc_char, target) %>%
                   unique() %>%
-                mutate(mean_eff_target = ave(freqCut_norm_mean_drug, target, FUN = mean),
+                mutate(mean_eff_target = ave(freqCut_norm_mean_drug, target, FUN = median),
                        pval = -log10(pval),
                        freqCut_norm_mean_drug = log2(freqCut_norm_mean_drug))
 
 ggplot_custom(data = eff.data.2, 
-              aes(y = freqCut_norm_mean_drug, x = reorder(target, -mean_eff_target))) + 
+              aes(y = freqCut_norm_mean_drug, x = reorder(target, -mean_eff_target, FUN = median))) + 
     geom_boxplot(position = position_dodge(0.75), alpha = 0.4, outlier.shape = NA) +
   geom_quasirandom(aes(color = ifelse(pval > 1.3, "red", "black"))) +
     xlab("") + ylab("log2(cutting efficiency)") +
