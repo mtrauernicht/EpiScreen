@@ -97,7 +97,7 @@ CallTrueBarcodes <- function(df) {
 viab_limit = 0.45
 
 # Read count limit of +1 & -7 combined
-reac_count_limit = 30
+read_count_limit = 30
 ```
 
 
@@ -272,7 +272,7 @@ E1504_pre = sum(grepl("E1504", unique(complete.mutations.dt$exp)))
 # Filter with 30 min reads per barcode like Xabi did.
 filtered.indelreads.dt = 
   unique(complete.mutations.dt[!is.na(complete.mutations.dt$mut.counts) & 
-                                 mut.counts >= reac_count_limit, 
+                                 mut.counts >= read_count_limit, 
                                c("exp", "barcode", "mut.counts")])
 E177_post = sum(grepl("E177", unique(filtered.indelreads.dt$exp)))
 E1504_post = sum(grepl("E1504", unique(filtered.indelreads.dt$exp)))
@@ -445,19 +445,21 @@ dim(screen.indel.dt)
 # Finally remove all the count = 0 now that the ratios have been calculated
 ```
 
-dim(screen.indel.dt)
-[1] 1956008      37
-dim(large.indels.dt)
-[1] 104566     37
-dim(screen.indel.dt)
-[1] 2060574      40
-
 ## R cleanup
 ```{r cleanup}
 rm(list = ls()[grep("^mutations", ls())])
 rm(list = ls()[grep("list$", ls())])
 rm(list = ls()[grep("large.indels.dt", ls())])
 rm(list = ls()[grep("mutations.dt", ls())])
+```
+
+## Calculate mean indel frequencies
+```{r}
+screen.indel.dt %<>%
+    mutate(freq_mean_rep = ave(freq_split, barcode, mutation, replicate, drug, conc_char, FUN = mean),
+           freq_mean = ave(freq_split, barcode, mutation, drug, conc_char, FUN = mean),
+           freq_sd_rep = ave(freq_split, barcode, mutation, replicate, drug, conc_char, FUN = sd),
+           freq_sd = ave(freq_split, barcode, mutation, drug, conc_char, FUN = sd)) 
 ```
 
 
@@ -476,7 +478,7 @@ ratios_tib <- screen.indel.dt %>%
          NHEJMMEJratio = freqMMEJ / freqNHEJ,
          MMEJscore = freqMMEJ / (freqMMEJ + freqNHEJ),
          NHEJscore = freqNHEJ / (freqNHEJ+ freqMMEJ)) %>%
-  distinct(exp, barcode, MMEJscore) 
+  distinct(exp, barcode, MMEJscore, freqMMEJ, freqNHEJ, NHEJMMEJratio, NHEJscore) 
 
 
 freqs_ratios_tib <- screen.indel.dt %>%
@@ -725,6 +727,10 @@ indel.cols = c("replicate",
          "count_split",
          "norm_split",
          "freq_split",
+         "freq_mean_rep",
+         "freq_mean",
+         "freq_sd_rep",
+         "freq_sd",
          "sum_bc_reads_split",
          "ratio_indels_split",
          "ID",
@@ -762,7 +768,8 @@ ratio.cols = c("replicate",
          "MMEJ_score_mean_global",
          "MMEJ_zscore_global",
          "MMEJ_zscore_comb" ,
-         "MMEJ_zscore_global_comb")
+         "MMEJ_zscore_global_comb"
+         )
 
 
 screen_indels_tib = screen.indel.chrom.dt %>% 
