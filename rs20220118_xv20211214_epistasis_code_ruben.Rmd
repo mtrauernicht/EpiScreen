@@ -1,0 +1,187 @@
+---
+title: "xv20211214_epistasis_code"
+output: html_document
+---
+
+
+# Libraries
+```{r libraries}
+# libraries:
+library(tidyverse)
+library(data.table)
+library(parallel)
+library(gtools)
+library(pheatmap)
+library(ggbeeswarm)
+library(reshape2)
+library(gridExtra)
+library(broom)
+library(ggrepel)
+library(dendextend)
+library(Hmisc)
+```
+
+# Load libraries (Just need a data table with all the data and )
+```{r}
+#Chromatin data (it needs a barcode column)
+screen_ratios_tib <- readRDS("/DATA/projects/DSBrepair/data/R/rs20220118_episcreen/rs20220118_episcreen_ratios.RDS")
+clone5_chrom_tib <- readRDS("/DATA/projects/DSBrepair/data/R/rs20200519_clone5_newdoms_chromatin.RDS")
+
+```
+
+#Example with three genes (POLL, FANCM, POLQ) & I will use "H3K4me1" as example
+1st step = Compare POLL, FANCM, POLQ and WT data points vs. H3K4me1 (in lin or log space)
+
+step 1 = plot 
+
+```{r}
+# Data table and compute log2MMEJ (This line needs to be adjusted)
+# log2.MMEJ.screen.detail <- screen_ratios_tib %>% 
+#   distinct(replicate, MMEJ_score_mean, drug, conc_char, target, barcode) %>% 
+#   mutate(log2MMEJ = log2(MMEJ_score_mean))
+
+log2.MMEJ.screen.detail <- screen_ratios_tib %>% 
+  select(replicate, tech, conc_char, barcode, drug, target, ) %>% 
+  distinct() %>%
+  mutate(log2MMEJ = log2(MMEJscore))
+
+# DMSO data table set. (This lin of code needs to be adjusted)
+# DMSO.set <- filter(screen_ratios_tib, drug == "DMSO") %>% 
+#   select(replicate, MMEJ_score_mean, drug, conc_char, target, barcode) %>% 
+#   mutate(log2MMEJ = log2(MMEJ_score_mean)) %>% 
+#   dplyr::group_by(barcode, replicate) %>% 
+#   dplyr::summarise(DMSO.log2MMEJ = mean(log2MMEJ, na.rm = T), 
+#                    DMSO.MMEJ = mean(MMEJ_score_mean, na.rm = T))
+DMSO.set <- filter(screen_ratios_tib, drug == "DMSO") %>% 
+  select(replicate, tech, conc_char, barcode, drug, target, MMEJscore) %>% 
+  mutate(log2MMEJ = log2(MMEJscore)) %>% 
+  dplyr::group_by(barcode, replicate, tech) %>% 
+  dplyr::summarise(DMSO.log2MMEJ = mean(log2MMEJ, na.rm = T), 
+                   DMSO.MMEJ = mean(MMEJscore, na.rm = T),
+                   conc_char = conc_char) %>% 
+  distinct()
+
+# Plot differences
+data.for.plotting <- DMSO.set %>% 
+  mutate(drug = "DMSO", target = "Negative Control") %>% 
+  select(replicate, tech, conc_char, barcode, drug, target, MMEJscore = DMSO.MMEJ, 
+         log2MMEJ = DMSO.log2MMEJ) %>% 
+  bind_rows(log2.MMEJ.screen.detail) %>% 
+  mutate(rep_tech = paste(replicate, tech, sep = "_")) %>% 
+  dplyr::group_by(drug, barcode, conc_char) %>% 
+  dplyr::summarise(m.log2MMEJ = mean(log2MMEJ, na.rm = T), 
+                   m.MMEJ = mean(MMEJscore, na.rm = T),
+                   conc_char = conc_char,
+                   replicate = replicate) %>% 
+  left_join(clone5_chrom_tib)
+
+# Plot in log2 space
+ggplot(data.for.plotting %>% filter(drug %in% c("DNA-PKi","PJ34","GSK J4 HCl","DMSO"), conc_char == "1 µM"), aes(H3K27me3,m.log2MMEJ, color = drug)) +
+  geom_point() +
+  geom_smooth(method = "lm") +
+  stat_cor(method = "spearman") +
+  theme_bw()
+
+# Plot in log2 space
+ggplot(data.for.plotting %>% filter(gene %in% c("POLL","POLQ","FANCM","WT")), aes(H3K4me1,m.MMEJ, color = gene)) +
+  geom_point() +
+  geom_smooth(method = "lm") +
+  stat_cor(method = "spearman") +
+  theme_bw()
+```
+
+
+# 2nd step check compute distances and plot them
+```{r}
+# Each replicate has a different value (compute differences by replicate)
+log2.distance.mmej <- log2.MMEJ.screen.detail %>% 
+  left_join(DMSO.set) %>% 
+  mutate(log2.dist = sqrt((log2MMEJ - DMSO.log2MMEJ)^2), 
+         lin.dist = sqrt((MMEJscore - DMSO.MMEJ)^2)) 
+
+mean.log2.distance.mmej <- log2.distance.mmej %>% 
+  dplyr::group_by(barcode, drug, conc_char) %>% 
+  dplyr::summarise(m.log2.dist = mean(log2.dist, na.rm = T), 
+                   m.lin.dist = mean(lin.dist, na.rm = T)) %>% 
+  left_join(clone5_chrom_tib)
+
+#Plot slopes
+ggplot(mean.log2.distance.mmej %>% 
+         filter(drug %in% c("DMSO","DNA-PKi","PJ34","GSK J4 HCl", "GSK J4", "Vorinostat (SAHA, MK0683)")),
+       aes(H3K27me3,m.log2.dist, color = drug)) + 
+  geom_point() + 
+  stat_cor(method = "spearman") + 
+  geom_smooth(method = "lm") + 
+  theme_bw() +
+  facet_wrap(. ~ conc_char)
+
+
+```
+
+
+
+# Extract slopes for all genes
+```{r}
+# Perform analysis across all features for three test genes
+chromatin.features <- colnames(mean.log2.distance.mmej)[21:44]
+mean.log2.distance.mmej %<>% mutate(drug_conc = paste(drug, conc_char, sep = " "))
+
+
+slope.protein.features <- tibble(drug_conc = NA, feature = NA, slope.log2 = NA, term = NA, slope.lin = NA)
+
+for (i in unique(mean.log2.distance.mmej$drug_conc)) {
+  for (j in colnames(mean.log2.distance.mmej)[21:44]) {
+    model.dt <- mean.log2.distance.mmej %>% filter(drug_conc == i & m.log2.dist != Inf) 
+    
+    model.epistasis.log2 <- lm(formula = m.log2.dist ~ unlist(model.dt[j]), 
+                               data = model.dt) %>% 
+      tidy()
+    
+    # model.epistasis.lin <- lm(formula = m.lin.dist ~ unlist(model.dt[j]), 
+    #                           data = model.dt) %>% 
+    #   tidy()
+    
+    slope.protein.features <- slope.protein.features %>% 
+      add_row(drug_conc = i, 
+              feature = j, 
+              slope.log2 = model.epistasis.log2 %>% 
+                pull(estimate), 
+              term = model.epistasis.log2 %>%
+                pull(term),
+              p.value = model.epistasis.log2 %>% 
+                pull(p.value))
+  }
+}
+
+# Plot matrix without scaling
+# log2 space
+ggplot(slope.protein.features %>% 
+         filter(term != "(Intercept)" & 
+                  complete.cases(.) & 
+                  grepl("100 nM", drug_conc))) + 
+  geom_tile(aes(drug_conc,feature, fill = slope.log2)) + 
+  scale_fill_gradient2() + 
+  theme_bw() + 
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust =0.5))
+
+ggplot(slope.protein.features %>% 
+         filter(term != "(Intercept)" & 
+                  complete.cases(.) & 
+                  grepl("1 µM", drug_conc))) + 
+  geom_tile(aes(drug_conc,feature, fill = slope.log2)) + 
+  scale_fill_gradient2() + 
+  theme_bw() + 
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust =0.5))
+
+ggplot(slope.protein.features %>% 
+         filter(term != "(Intercept)" & 
+                  complete.cases(.) & 
+                  grepl("10 µM", drug_conc))) + 
+  geom_tile(aes(drug_conc,feature, fill = slope.log2)) + 
+  scale_fill_gradient2() + 
+  theme_bw() + 
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust =0.5))
+
+slope.prot.features.scale.dcast <- slope.protein.features  %>% filter(term == "unlist(model.dt[j])") %>% reshape2::dcast(gene ~ feature, value.var = "slope.log2") %>% column_to_rownames(var = "gene")
+
+```

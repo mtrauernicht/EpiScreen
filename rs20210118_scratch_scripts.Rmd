@@ -164,3 +164,18 @@ fligner.test(value ~ rep, data = filter(MMEJscorevar, grepl("E177", rep)))
 fligner.test(value ~ rep, data = filter(MMEJscorevar, !grepl("E177", rep))) 
 
 ```
+
+
+```{r}
+screen_indels_tib %>% 
+  filter(drug == "Barasertib (AZD1152-HQPA)", conc_char == "1 µM", type %in% c("core", "grouped_indel")) %>% 
+  ggplot(., aes(mutation, freq_split , color = color)) +
+    geom_quasirandom() +
+    theme_bw(base_size = 18) +
+    ylim(0, 1) +
+    theme(legend.position = c(0.1, 0.8)) +
+    scale_y_continuous(name="frequency") +
+    scale_x_discrete(name="indel size") + 
+  facet_grid(tech ~ replicate)
+```
+

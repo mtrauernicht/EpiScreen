@@ -1,0 +1,105 @@
+---
+title: "xv20211214_epistasis_code"
+output: html_document
+---
+
+```{r}
+# Libraries
+```{r libraries}
+# libraries:
+library(tidyverse)
+library(data.table)
+library(parallel)
+library(gtools)
+library(pheatmap)
+library(ggbeeswarm)
+library(reshape2)
+library(gridExtra)
+library(broom)
+library(ggrepel)
+library(dendextend)
+library(Hmisc)
+```
+
+# Load libraries (Just need a data table with all the data and )
+```{r}
+#Chromatin data (it needs a barcode column)
+clone5_chrom_tib <- readRDS('/DATA/projects/DSBrepair/data/R/cl20201026_ChIP_zscore_selection.RDS')
+
+#Screening data (it needs a MMEJscore column, and variables describing replicates, drugs, concentrations...)
+
+```
+
+#Example with three genes (POLL, FANCM, POLQ) & I will use "H3K4me1" as example
+1st step = Compare POLL, FANCM, POLQ and WT data points vs. H3K4me1 (in lin or log space)
+
+step 1 = plot 
+
+```{r}
+# Data table and compute log2MMEJ (This line needs to be adjusted)
+log2.MMEJ.screen.detail <- both.screen.detail %>% filter(ID_gene %in% per_4chrhits) %>% select(t.rep, MMEJscore,library, gene,barcode) %>% mutate(log2MMEJ = log2(MMEJscore))
+
+# WT data table set. (This lin of code needs to be adjusted)
+wt.set <- filter(both.screen.controls, gene == "WT") %>% select(t.rep, MMEJscore,library, gene,barcode) %>% mutate(log2MMEJ = log2(MMEJscore)) %>% dplyr::group_by(barcode, t.rep,library) %>% dplyr::summarise(wt.log2MMEJ = mean(log2MMEJ, na.rm = T), wt.MMEJ = mean(MMEJscore, na.rm = T))
+
+# Plot differences
+data.for.plotting <- wt.set %>% mutate(gene = "WT") %>% select(t.rep, MMEJscore = wt.MMEJ, library, gene, barcode,log2MMEJ = wt.log2MMEJ) %>% bind_rows(log2.MMEJ.screen.detail) %>% mutate(rep_lib = paste(t.rep,library, sep = "_")) %>% dplyr::group_by(gene,barcode) %>% dplyr::summarise(m.log2MMEJ = mean(log2MMEJ, na.rm = T), m.MMEJ = mean(MMEJscore,na.rm = T)) %>% left_join(clone5_chrom_tib)
+
+# Plot in log2 space
+ggplot(data.for.plotting %>% filter(gene %in% c("POLL","POLQ","FANCM","WT")), aes(H3K4me1,m.log2MMEJ, color = gene)) +
+  geom_point() +
+  geom_smooth(method = "lm") +
+  stat_cor(method = "spearman") +
+  theme_bw()
+
+# Plot in log2 space
+ggplot(data.for.plotting %>% filter(gene %in% c("POLL","POLQ","FANCM","WT")), aes(H3K4me1,m.MMEJ, color = gene)) +
+  geom_point() +
+  geom_smooth(method = "lm") +
+  stat_cor(method = "spearman") +
+  theme_bw()
+```
+
+
+# 2nd step check compute distances and plot them
+```{r}
+# Each replicate has a different value (compute differences by replicate)
+log2.distance.mmej <- log2.MMEJ.screen.detail %>% left_join(wt.set) %>% mutate(log2.dist = sqrt((log2MMEJ - wt.log2MMEJ)^2), lin.dist = sqrt((MMEJscore - wt.MMEJ)^2)) 
+mean.log2.distance.mmej <- log2.distance.mmej %>% dplyr::group_by(barcode,gene) %>% dplyr::summarise(m.log2.dist = mean(log2.dist, na.rm = T), m.lin.dist = mean(lin.dist, na.rm = T)) %>% left_join(clone5_chrom_tib)
+
+#Plot slopes
+ggplot(mean.log2.distance.mmej %>% 
+         filter(gene %in% c("POLL","POLQ","FANCM")),
+       aes(H3K4me1,m.log2.dist, color = gene)) + 
+  geom_point() + 
+  stat_cor(method = "spearman") + 
+  geom_smooth(method = "lm") + 
+  theme_bw()
+
+```
+
+
+
+# Extract slopes for all genes
+```{r}
+# Perform analysis across all features for three test genes
+chromatin.features <- colnames(mean.log2.distance.mmej)[8:32]
+
+slope.protein.features <- tibble(gene = NA, feature = NA, slope.log2 = NA, term = NA, slope.lin = NA)
+
+for (i in unique(mean.log2.distance.mmej$gene)) {
+  for (j in colnames(mean.log2.distance.mmej)[8:32]) {
+    model.dt <- mean.log2.distance.mmej %>% filter(gene == i)
+    model.epistasis.log2 <- lm(formula = m.log2.dist ~ unlist(model.dt[j]), data = model.dt) %>% tidy()
+    model.epistasis.lin <- lm(formula = m.lin.dist ~ unlist(model.dt[j]), data = model.dt) %>% tidy()
+    slope.protein.features <- slope.protein.features %>% add_row(gene = i, feature = j, slope.log2 = model.epistasis.log2 %>% pull(estimate), term = model.epistasis %>% pull(term), slope.lin = model.epistasis.lin %>% pull(estimate))
+  }
+}
+
+# Plot matrix without scaling
+# log2 space
+ggplot(slope.protein.features %>% filter(term != "(Intercept)" & complete.cases(.))) + geom_tile(aes(gene,feature, fill = slope.log2)) + scale_fill_gradient2() + theme_bw() +theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust =0.5))
+
+slope.prot.features.scale.dcast <- slope.protein.features  %>% filter(term == "unlist(model.dt[j])") %>% reshape2::dcast(gene ~ feature, value.var = "slope.log2") %>% column_to_rownames(var = "gene")
+
+```

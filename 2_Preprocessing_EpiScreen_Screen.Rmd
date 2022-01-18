@@ -90,6 +90,17 @@ CallTrueBarcodes <- function(df) {
 }
 ```
 
+
+## Parameters
+```{r}
+# Viability (% of DMSO)
+viab_limit = 0.45
+
+# Read count limit of +1 & -7 combined
+reac_count_limit = 30
+```
+
+
 # Data import
 
 Data import from mapping, files were generated on 21.01.2019.
@@ -261,7 +272,7 @@ E1504_pre = sum(grepl("E1504", unique(complete.mutations.dt$exp)))
 # Filter with 30 min reads per barcode like Xabi did.
 filtered.indelreads.dt = 
   unique(complete.mutations.dt[!is.na(complete.mutations.dt$mut.counts) & 
-                                 mut.counts >= 30, 
+                                 mut.counts >= reac_count_limit, 
                                c("exp", "barcode", "mut.counts")])
 E177_post = sum(grepl("E177", unique(filtered.indelreads.dt$exp)))
 E1504_post = sum(grepl("E1504", unique(filtered.indelreads.dt$exp)))
@@ -298,7 +309,7 @@ mutations.stat.dt = merge(mutations.dt, indel.statistics.dt)
 # Filter the low viability reads
 # This filters out all drugs at a certain concentration were at least 2/3 technical replicates were below 0.45 in at least one biological replicate 
 remove_drugs <- mutations.stat.dt %>%
-  filter(viab_norm_split < 0.45) %>%
+  filter(viab_norm_split < viab_limit) %>%
   dplyr::select(conc_char, drug, tech, replicate) %>%
   distinct() %>%
   mutate(conc_char_drug = paste(conc_char, drug, sep = " "),
@@ -453,7 +464,6 @@ rm(list = ls()[grep("mutations.dt", ls())])
 ## Add identifiers and compute indel ratios
 
 ```{r calculate_ratios}
-screen.indel.dt2 = copy(screen.indel.dt)
 # Calculate NHEJ/MMEJ ratios and efficiences
 ratios_tib <- screen.indel.dt %>%
   filter(mutation %in% c("1", "-7")) %>%
@@ -578,7 +588,6 @@ Some samples have clear outlyers, others aren't prefectly normally distributed b
 # Plate normalization for cutting/repair efficiency - 
 # calculate efficiency relative to mean DMSO efficiency per concentration, barcode and replicate
 # First a table with DMSO efficiency per barcode, per technical replicate. 
-screen.indel.dt2 = copy(screen.indel.dt)
 
 dmso.efficiency <- screen.indel.dt %>%
   filter(drug == "DMSO") %>%
@@ -765,6 +774,8 @@ screen_ratios_tib =  screen.indel.chrom.dt %>%
   distinct()
 
 screen_all_tib = screen.indel.chrom.dt
+rm(screen.indel.chrom.dt)
+rm(screen.indel.dt)
 ```
 
 
