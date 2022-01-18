@@ -346,7 +346,8 @@ ggplot_custom <- function(...) ggplot2::ggplot(...) +
 
 ```{r data import, echo = FALSE, warning = FALSE}
 # Import data from preprocessing script
-indel.data <- readRDS("/DATA/usr/m.trauernicht/projects/EpiScreen/files_scripts/mt20220105_episcreen.RDS")
+#indel.data <- readRDS("/DATA/usr/m.trauernicht/projects/EpiScreen/files_scripts/mt20220105_episcreen.RDS")
+indel.data <- readRDS("/DATA/projects/DSBrepair/data/R/rs20220117_episcreen/rs20220117_episcreen_ratios.RDS")
 
 # Complete data without exlcluding wells <0.45 viability (I need this for plotting)
 viability.data = as.data.table(readRDS("/DATA/projects/DSBrepair/git/EpiScreen/files_scripts/rs20211221_Episcreen_Reads_Viab_Metadata.RDS")) %>%
@@ -448,8 +449,8 @@ indel.data2$IPR <- factor(indel.data2$IPR, levels = ipr_order)
 
 ggplot(indel.data2 %>%
          filter(sample != "DNA-PKi (NHEJ control)", sample != "Mirin (MMEJ control)") %>%
-         dplyr::distinct(freqCut, IPR, tech, plate, conc_char, drug, sample) %>%
-           mutate(freqCut = ave(freqCut, IPR, tech, plate, conc_char, drug, FUN = mean)),
+         dplyr::distinct(freqCut, IPR, tech, conc_char, drug, sample) %>%
+           mutate(freqCut = ave(freqCut, IPR, tech, conc_char, drug, FUN = mean)),
        aes(x = IPR, y = freqCut)) +
   geom_violin(aes(fill = sample), position = position_dodge(0.75), draw_quantiles = 0.5, width = 3) +
   scale_fill_manual(values = c(colors_drugs[2], colors_drugs[6], colors_drugs[7], colors_drugs[4]))+
@@ -458,8 +459,8 @@ ggplot(indel.data2 %>%
 
 ggplot(indel.data2 %>%
          filter(sample != "DNA-PKi (NHEJ control)", sample != "Mirin (MMEJ control)", replicate == "E1504") %>%
-         dplyr::distinct(freqCut, IPR, tech, plate, conc_char, drug, sample) %>%
-           mutate(freqCut = ave(freqCut, IPR, tech, plate, conc_char, drug, FUN = mean)),
+         dplyr::distinct(freqCut, IPR, tech, conc_char, drug, sample) %>%
+           mutate(freqCut = ave(freqCut, IPR, tech, conc_char, drug, FUN = mean)),
        aes(x = IPR, y = freqCut)) +
   geom_quasirandom_rast(aes(color = sample), dodge.width = 0.75, raster.dpi = 600) +
   scale_color_manual(values = c(colors_drugs[2], colors_drugs[7], colors_drugs[4], "#000000")) +
@@ -478,23 +479,13 @@ How do the drugs impact MMEJ score in general? Does the genomic location & conce
 # E: MMEJ score per IPR
 ggplot(indel.data2 %>%
          filter(sample != "DNA-PKi (NHEJ control)", sample != "Mirin (MMEJ control)") %>%
-         dplyr::distinct(MMEJscore, IPR, tech, plate, conc_char, drug, sample) %>%
-           mutate(MMEJscore = ave(MMEJscore, IPR, tech, plate, conc_char, drug, FUN = mean)),
-       aes(x = IPR, y = MMEJscore)) +
-  geom_violin(aes(fill = sample), position = position_dodge(0.75), draw_quantiles = 0.5, width = 1.5) +
-  scale_fill_manual(values = c(colors_drugs[2], colors_drugs[6], colors_drugs[7], colors_drugs[4])) +
-  coord_polar()+
-  ylim(-0.2,0.55)
-
-ggplot(indel.data2 %>%
-         filter(sample != "DNA-PKi (NHEJ control)", sample != "Mirin (MMEJ control)") %>%
-         dplyr::distinct(MMEJscore, IPR, tech, plate, conc_char, drug, sample) %>%
-           mutate(MMEJscore = ave(MMEJscore, IPR, tech, plate, conc_char, drug, FUN = mean)),
+         dplyr::distinct(MMEJscore, IPR, tech, conc_char, drug, sample) %>%
+           mutate(MMEJscore = ave(MMEJscore, IPR, tech, conc_char, drug, FUN = mean)),
        aes(x = IPR, y = MMEJscore)) +
   geom_quasirandom_rast(aes(color = sample), dodge.width = 0.75, raster.dpi = 600) +
   scale_color_manual(values = c(colors_drugs[2], colors_drugs[7], colors_drugs[4], "#000000")) +
   coord_polar() +
-  ylim(-0.4,0.4)
+  ylim(-0.4,0.6)
 ```
 *Figure 1E: Compound-induced changes in MMEJ score on the 19 genomic locations. The three probed concentrations are plotted next to each other.*
 
