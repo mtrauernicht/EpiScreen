@@ -12,6 +12,78 @@ knitr::opts_chunk$set(echo = TRUE)
 ## R Markdown
 
 Scratch chunks
+```{r correlation fig S1}
+# C: Correlation between technical replicates efficiency
+techn_repl <- screen_ratios_tib %>%
+  filter(sample %in% c("drug", "Negative Control") & conc_char == "1 µM") %>%
+  dplyr::distinct(freqCut_norm, drug, tech, replicate, conc_char, sample, IPR) %>%
+  mutate(freqCut_norm = log2(ave(freqCut_norm, drug, tech, replicate, conc_char, IPR, FUN = mean))) %>%
+  unique() %>%
+  mutate(rep = paste(replicate, tech, sep = "_")) %>%
+  filter(!between(freqCut_norm, -0.05, 0.05)) %>%
+  dplyr::select(-replicate, -tech) %>%
+  spread(rep, freqCut_norm) %>%
+  na.omit()
+
+ggpairs(techn_repl %>% 
+       # filter(IPR == "IPR14") %>% 
+       # filter(drug %in% c("Vorinostat (SAHA, MK0683)", "Scriptaid",   "Decitabine" , "(+)-JQ1" ,  "PCI-24781 (Abexinostat)")) %>%
+          dplyr::select(contains("E1")),
+               upper = list(continuous = corColor),
+               lower = list(continuous = function(data, mapping, ...) {
+                   ggally_points(data = data, mapping = mapping, alpha = 0.6, size = 0.5) +
+                   geom_abline(slope = 1, lty = "dashed", col = "red")}),
+               diag = list(continuous = function(data, mapping, ...) {
+                   ggally_densityDiag(data = data, mapping = mapping, alpha = 0.3, fill = "red")})) +
+  # xlim(.4, .7) + 
+  xlab("Cutting efficiency") +
+  ylab("Cutting efficiency")
+```
+
+```{r heatmaps Fig2}
+# Generate heatmap: select top 15 drugs (highest change at any IPR) per concentration
+eff.data.heatmap <- screen_ratios_tib %>%
+  filter(sample == "drug" | drug == "DMSO") %>%
+  distinct(conc_char, replicate,drug, IPR, freqCut_norm_mean, freqCut_norm)
+
+
+eff.data.heatmap2 <- eff.data.heatmap %>%
+  dplyr::select(-freqCut_norm_mean) %>%
+  mutate(freqCut_norm = ave(freqCut_norm, conc_char, drug, replicate, IPR, FUN = mean)) %>%
+  distinct() %>%
+  mutate(freqCut_norm = log2(freqCut_norm)) %>%
+  mutate(mod = Mod(freqCut_norm)) %>%
+  mutate(max = ave(mod, drug, conc_char, replicate, FUN = max)) %>%
+  dplyr::select(-mod) %>%
+  spread(IPR, freqCut_norm) %>%
+  mutate(conc_rep = paste(conc_char, replicate, sep = " ")) %>%
+  group_by(conc_rep) %>%
+  top_n(25, max) %>%
+  ungroup() %>%
+  dplyr::select(-max)
+
+breaks <- seq(-0.2, 0.2, 0.004)
+
+# eff.data.heatmap2 %<>% mutate(conc_rep = paste(conc_char, replicate, sep = " "))
+
+for (i in unique(eff.data.heatmap2$conc_rep)) {
+  pheatmap(as.matrix(eff.data.heatmap2[eff.data.heatmap2$conc_rep == i,] %>%
+                       column_to_rownames('drug') %>%
+                       dplyr::select(contains('IPR')) %>%
+                       t()),
+           border_color = "white",
+           cellwidth = 12,
+           cellheight = 12,
+           breaks = breaks,
+           cluster_rows = F,
+           main = paste('efficiency change, concentration =', i),
+           annotation_col = target,
+           annotation_row = chromatin,
+           color = colorRampPalette(rev(brewer.pal(n = 7, name = "RdBu")))(100),
+           annotation_colors = annotation_colors_scr, annotation_legend = T)
+}
+```
+
 ```{r distribution of the MMEJ score in the controls}
 mmejscore_DMSO_matrix_list = screen_indel_split_tib %>%  
   filter(drug == "DMSO") %>%
