@@ -356,11 +356,11 @@ Are there any drugs (per concentration) that significantly change the cutting ef
 ```{r}
 # A: Cutting efficiency per drug - vulcano plot
 eff.data <- indel.data %>%
-  filter(sample == "drug" | drug == "DMSO", replicate == "E1504") %>%
+  filter(sample == "drug" | drug == "DMSO") %>%
                 dplyr::distinct(drug, freqCut_norm_split, conc_char, sample, target,
                                 tech, replicate) %>%
   mutate(freqCut_norm_split = ave(freqCut_norm_split, drug, conc_char, replicate, tech, FUN = mean),
-         freqCut_norm_mean_drug = ave(freqCut_norm_split, drug, conc_char, replicate, FUN = mean)) %>%
+         freqCut_norm_mean_drug = ave(freqCut_norm_split, drug, conc_char, FUN = mean)) %>%
   unique()
 
 for (i in unique(eff.data$drug)) {
@@ -420,7 +420,7 @@ Are there any target groups that are prone to changes in cutting efficiency?
 ```{r}
 # C: Bar plot
 eff.data.2 <- eff.data %>%
-  filter(sample != "DNA-PKi (NHEJ control)", sample != "Mirin (MMEJ control)", sample != "DMSO (neg control)", conc_char == "100 nM", replicate == "E1504") %>%
+  filter(sample == "drug", conc_char == "100 nM") %>%
   distinct(drug, conc_char, target, pval) 
 
 eff.data.2$sign <- "Yes"
@@ -453,6 +453,10 @@ target <- indel.data %>%
   filter(!target %in% c("Negative Control", "MRN", "DNA-PK")) %>% 
   distinct(drug, target) %>% 
   column_to_rownames(var="drug")
+
+file_list = list.files("/DATA/projects/DSBrepair/data/R/rs20210813_episcreen_2", full.names = TRUE)
+file_list
+episcreen_ratios = readRDS(file_list[[3]])
 
 chromatin <- readRDS(
   "/DATA/usr/x.vergara/XV_ChIPIndels/XV20200902_DDR_RS_revision/XV20200902_DDR_RS_revision/data/xv20200915_DDR_data_CHIP.rds") %>% 
@@ -499,7 +503,7 @@ annotation_colors_scr$target <- annotation_colors_scr$target[ordered_marks2]
 
 # Generate heatmap: select top 15 drugs (highest change at any IPR) per concentration
 eff.data.heatmap <- indel.data %>%
-  filter(sample == "drug" | drug == "DMSO", replicate == "E1504") %>%
+  filter(sample == "drug" | drug == "DMSO", replicate == "E177") %>%
   distinct(conc_char, drug, IPR, freqCut_norm_mean, freqCut_norm_split)
 
 
@@ -541,12 +545,13 @@ for (i in unique(eff.data.heatmap2$conc_char)) {
 # Alternative: only HDACs:
 eff.data.heatmap <- indel.data %>%
   filter(target == "HDAC" & replicate == "E1504") %>%
-  distinct(conc_char, drug, IPR, freqCut_norm_mean)%>%
+  distinct(conc_char, drug, IPR, freqCut_norm)%>%
+  mutate(freqCut_norm_mean = ave(freqCut_norm, drug, conc_char, IPR, FUN = mean)) %>%
   mutate(freqCut_norm_mean = log2(freqCut_norm_mean)) %>%
   mutate(mod = Mod(freqCut_norm_mean)) %>%
   mutate(max = ave(mod, drug, conc_char, FUN = max)) %>%
   filter(max > 0.15 | max < -0.15) %>%
-  dplyr::select(-max, -mod) %>%
+  dplyr::select(-max, -mod, -freqCut_norm) %>%
   spread(IPR, freqCut_norm_mean) %>%
   mutate(drug = paste(drug, conc_char, sep = ""))
 
