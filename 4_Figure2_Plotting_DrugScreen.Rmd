@@ -151,10 +151,11 @@ SetFileName <- function(filename, initials) {
 
 # From Fede:
 # ggpairs custom functions
+boundaries <- c(0.7,0.75,0.8,0.85)
 corColor <- function(data, mapping, color = I("black"), sizeRange = c(1, 3), ...) {
 
-  x   <- eval_data_col(data, mapping$x)
-  y   <- eval_data_col(data, mapping$y)
+  x   <- eval_data_col(techn_repl %>% filter(large_effect == "0_yes") %>% dplyr::select(contains("E1")), mapping$x)
+  y   <- eval_data_col(techn_repl %>% filter(large_effect == "0_yes") %>% dplyr::select(contains("E1")), mapping$y)
   r   <- cor(x, y)
   rt  <- format(r, digits = 3)
   tt  <- as.character(rt)
@@ -346,78 +347,83 @@ ggplot_custom <- function(...) ggplot2::ggplot(...) +
 
 ```{r data import, echo = FALSE, warning = FALSE}
 # Import data from preprocessing script
-indel.data <- readRDS("/DATA/usr/m.trauernicht/projects/EpiScreen/files_scripts/mt20220105_episcreen.RDS")
+indel.data <- readRDS("/DATA/projects/DSBrepair/data/R/rs20220118_episcreen/rs20220118_episcreen_ratios.RDS")
 ```
 
 ---
 
 ## A: Cutting efficiency change per drug
 Are there any drugs (per concentration) that significantly change the cutting efficiency?
-```{r}
+```{r warning = FALSE}
 # A: Cutting efficiency per drug - vulcano plot
 eff.data <- indel.data %>%
+  mutate(well = gsub("E1.*([A-Z]{1}[0-9]{2}$)", "\\1", exp)) %>%
   filter(sample == "drug" | drug == "DMSO") %>%
-                dplyr::distinct(drug, freqCut_norm_split, conc_char, sample, target,
-                                tech, replicate) %>%
-  mutate(freqCut_norm_split = ave(freqCut_norm_split, drug, conc_char, replicate, tech, FUN = mean),
-         freqCut_norm_mean_drug = ave(freqCut_norm_split, drug, conc_char, FUN = mean)) %>%
-  unique()
+                dplyr::distinct(drug, freqCut_norm, conc_char, sample, target,
+                                tech, replicate, IPR, well) %>%
+  mutate(freqCut_norm = ave(freqCut_norm, drug, conc_char, replicate, well, tech, IPR, FUN = mean)) %>%
+  distinct() %>%
+  mutate(conc_drug = paste(conc_char, drug, sep = "_"))
 
-for (i in unique(eff.data$drug)) {
-  for (j in unique(eff.data$conc_char)) {
-    if (nrow(eff.data[eff.data$drug == i & eff.data$conc_char == j]) >= 2) {
-    eff.data$pval[eff.data$drug == i & eff.data$conc_char == j] <- 
-      t.test(eff.data$freqCut_norm_split[eff.data$drug == i & eff.data$conc_char == j], 
-                            eff.data$freqCut_norm_split[eff.data$drug == "DMSO"])$p.value
+for (i in unique(eff.data$conc_drug)) {
+  for (j in unique(eff.data$IPR)) {
+    if (nrow(eff.data[eff.data$conc_drug == i & eff.data$IPR == j,]) >= 2) {
+    eff.data$pval[eff.data$conc_drug == i & eff.data$IPR == j] <- 
+      t.test(eff.data$freqCut_norm[eff.data$conc_drug == i & eff.data$IPR == j], 
+                            eff.data$freqCut_norm[eff.data$drug == "DMSO" & eff.data$IPR == j])$p.value
     }
   }
 }
-#eff.data$pval <- p.adjust(eff.data$pval, method = "fdr")
+eff.data$pval_adj <- p.adjust(eff.data$pval, method = "fdr")
 
 
 ggplot_custom(eff.data %>%
                 filter(sample == "drug") %>%
-                dplyr::select(-freqCut_norm_split) %>%
-                unique(),
-              aes(x = log2(freqCut_norm_mean_drug), y = -log10(pval), color = ifelse(pval < 0.05, "red", "black"))) +
-  geom_quasirandom() +
+                mutate(freqCut_norm = ave(freqCut_norm, drug, conc_char, IPR, FUN = mean)) %>%
+                dplyr::select(-tech, -replicate) %>%
+                distinct(),
+              aes(x = log2(freqCut_norm), y = -log10(pval_adj), color = ifelse(pval_adj < 0.05, "red", "black"))) +
+  geom_point() +
   geom_vline(linetype = "dashed", xintercept = 0) +
   facet_wrap(~conc_char)
 ```
+
 *Figure 2A: Compound-induced change in cutting efficiency of all tested compounds. Mean per drug & concentration vs. p-value from t-test.*
 
-Conclusion: Yes, some drugs do alter cutting efficiency significantly. Changes go in both directions, at lower concentration the efficiency is mostly increased (at higher concentrations the decrease might be due to toxicity)
+**Conclusion: Yes, some drugs do alter cutting efficiency significantly. Changes go in both directions, at lower concentration the efficiency is mostly increased (at higher concentrations the decrease might be due to toxicity)**
 
 ---
 
 ## B: Cutting efficiency change per target group
 Are there any target groups that are prone to changes in cutting efficiency?
-```{r}
+```{r warning = FALSE}
 # B: Cutting efficiency change per target group, all concentrations together
 eff.data.2 <- eff.data %>%
-                filter(sample == "drug", conc_char == "100 nM") %>%
-                  dplyr::select(freqCut_norm_mean_drug, pval, sample, drug, conc_char, target) %>%
-                  unique() %>%
-                mutate(mean_eff_target = ave(freqCut_norm_mean_drug, target, FUN = median),
-                       pval = -log10(pval),
-                       freqCut_norm_mean_drug = log2(freqCut_norm_mean_drug))
+  filter(sample == "drug", conc_char == "100 nM", IPR == "IPR14") %>%
+  dplyr::select(freqCut_norm, pval, sample, drug, conc_char, target) %>%
+  mutate(freqCut_norm = ave(freqCut_norm, drug, conc_char, FUN = mean)) %>%
+  unique() %>%
+  mutate(mean_eff_target = ave(freqCut_norm, target, FUN = median),
+         pval = -log10(pval),
+         freqCut_norm = log2(freqCut_norm))
 
 ggplot_custom(data = eff.data.2, 
-              aes(y = freqCut_norm_mean_drug, x = reorder(target, -mean_eff_target, FUN = median))) + 
+              aes(y = freqCut_norm, x = reorder(target, -mean_eff_target, FUN = median))) + 
     geom_boxplot(position = position_dodge(0.75), alpha = 0.4, outlier.shape = NA) +
   geom_quasirandom(aes(color = ifelse(pval > 1.3, "red", "black"))) +
     xlab("") + ylab("log2(cutting efficiency)") +
       theme_classic_lines_90()
 ```
+
 *Figure 2B: Compound-induced change in cutting efficiency per compound target groups.*
 
-Conclusion: Yes, specifically HDACs seem to increase cutting efficiency. Some other interesting observations can also be made from this plot.
+**Conclusion: Yes, specifically HDACs seem to increase cutting efficiency. Some other interesting observations can also be made from this plot.**
 
 ---
 
 ## C: Cutting efficiency change per target group
 Are there any target groups that are prone to changes in cutting efficiency?
-```{r}
+```{r warning = FALSE}
 # C: Bar plot
 eff.data.2 <- eff.data %>%
   filter(sample == "drug", conc_char == "100 nM") %>%
@@ -438,15 +444,16 @@ ggplot_custom(eff.data.2 ,
               aes(y = reorder(target, fraction), x = number, fill = sign)) +
   geom_bar(stat = "identity")
 ```
+
 *Figure 2C: Number of compounds with significant changes in cutting efficiency per target group.*
 
-Conclusion: Same as B)
+**Conclusion: Same as B)**
 
 ---
 
 ## D: Efficiency heatmap
 Are the effects on cutting efficiency global or local? Can we plot all interesting effects in one heatmap per concentration?
-```{r}
+```{r warning = FALSE}
 # Set annotation for heatmap
 # Row annotation: annotate drugs with the target group
 target <- indel.data %>% 
@@ -503,21 +510,22 @@ annotation_colors_scr$target <- annotation_colors_scr$target[ordered_marks2]
 
 # Generate heatmap: select top 15 drugs (highest change at any IPR) per concentration
 eff.data.heatmap <- indel.data %>%
-  filter(sample == "drug" | drug == "DMSO", replicate == "E177") %>%
-  distinct(conc_char, drug, IPR, freqCut_norm_mean, freqCut_norm_split)
+  filter(sample == "drug" | drug == "DMSO") %>%
+  distinct(conc_char, replicate,drug, IPR, freqCut_norm_mean, freqCut_norm)
 
 
 eff.data.heatmap2 <- eff.data.heatmap %>%
   dplyr::select(-freqCut_norm_mean) %>%
-  mutate(freqCut_norm_split = ave(freqCut_norm_split, conc_char, drug, IPR, FUN = mean)) %>%
-  unique() %>%
-  mutate(freqCut_norm_split = log2(freqCut_norm_split)) %>%
-  mutate(mod = Mod(freqCut_norm_split)) %>%
-  mutate(max = ave(mod, drug, conc_char, FUN = max)) %>%
+  mutate(freqCut_norm = ave(freqCut_norm, conc_char, drug, replicate, IPR, FUN = mean)) %>%
+  distinct() %>%
+  mutate(freqCut_norm = log2(freqCut_norm)) %>%
+  mutate(mod = Mod(freqCut_norm)) %>%
+  mutate(max = ave(mod, drug, conc_char, replicate, FUN = max)) %>%
   dplyr::select(-mod) %>%
-  spread(IPR, freqCut_norm_split) %>%
-  group_by(conc_char) %>%
-  top_n(15, max) %>%
+  spread(IPR, freqCut_norm) %>%
+  mutate(conc_rep = paste(conc_char, replicate, sep = " ")) %>%
+  group_by(conc_rep) %>%
+  top_n(25, max) %>%
   ungroup() %>%
   dplyr::select(-max)
 
@@ -525,8 +533,8 @@ breaks <- seq(-0.2, 0.2, 0.004)
 
 
 
-for (i in unique(eff.data.heatmap2$conc_char)) {
-  pheatmap(as.matrix(eff.data.heatmap2[eff.data.heatmap2$conc_char == i,] %>%
+for (i in unique(eff.data.heatmap2$conc_rep)) {
+  pheatmap(as.matrix(eff.data.heatmap2[eff.data.heatmap2$conc_rep == i,] %>%
                        column_to_rownames('drug') %>%
                        dplyr::select(contains('IPR')) %>%
                        t()),
@@ -542,43 +550,89 @@ for (i in unique(eff.data.heatmap2$conc_char)) {
            annotation_colors = annotation_colors_scr, annotation_legend = T)
 }
 
-# Alternative: only HDACs:
-eff.data.heatmap <- indel.data %>%
-  filter(target == "HDAC" & replicate == "E1504") %>%
-  distinct(conc_char, drug, IPR, freqCut_norm)%>%
-  mutate(freqCut_norm_mean = ave(freqCut_norm, drug, conc_char, IPR, FUN = mean)) %>%
-  mutate(freqCut_norm_mean = log2(freqCut_norm_mean)) %>%
-  mutate(mod = Mod(freqCut_norm_mean)) %>%
-  mutate(max = ave(mod, drug, conc_char, FUN = max)) %>%
-  filter(max > 0.15 | max < -0.15) %>%
-  dplyr::select(-max, -mod, -freqCut_norm) %>%
-  spread(IPR, freqCut_norm_mean) %>%
-  mutate(drug = paste(drug, conc_char, sep = ""))
-
-
-pheatmap(as.matrix(eff.data.heatmap %>%
-                       column_to_rownames('drug') %>%
-                       dplyr::select(contains('IPR')) %>%
-                       t()),
-           border_color = "white",
-           cellwidth = 12,
-           cellheight = 12,
-           breaks = breaks,
-           main = paste('efficiency change'),
-           annotation_row = chromatin,
-           color = colorRampPalette(rev(brewer.pal(n = 7, name = "RdBu")))(100),
-           annotation_colors = annotation_colors_scr, annotation_legend = T)
+# # Alternative: only HDACs:
+# eff.data.heatmap <- indel.data %>%
+#   filter(target == "HDAC" & replicate == "E1504") %>%
+#   distinct(conc_char, drug, IPR, freqCut_norm)%>%
+#   mutate(freqCut_norm_mean = ave(freqCut_norm, drug, conc_char, IPR, FUN = mean)) %>%
+#   mutate(freqCut_norm_mean = log2(freqCut_norm_mean)) %>%
+#   mutate(mod = Mod(freqCut_norm_mean)) %>%
+#   mutate(max = ave(mod, drug, conc_char, FUN = max)) %>%
+#   filter(max > 0.15 | max < -0.15) %>%
+#   dplyr::select(-max, -mod, -freqCut_norm) %>%
+#   spread(IPR, freqCut_norm_mean) %>%
+#   mutate(drug = paste(drug, conc_char, sep = ""))
+# 
+# 
+# pheatmap(as.matrix(eff.data.heatmap %>%
+#                        column_to_rownames('drug') %>%
+#                        dplyr::select(contains('IPR')) %>%
+#                        t()),
+#            border_color = "white",
+#            cellwidth = 12,
+#            cellheight = 12,
+#            breaks = breaks,
+#            main = paste('efficiency change'),
+#            annotation_row = chromatin,
+#            color = colorRampPalette(rev(brewer.pal(n = 7, name = "RdBu")))(100),
+#            annotation_colors = annotation_colors_scr, annotation_legend = T)
 
 ```
+
 *Figure 2D: Heatmap of cutting efficiency change induced by HDAC inhibitors at 19 genomic locations.*
 
-Conclusion: Many different HDAC inhibitors can change cutting efficiency locally. As expected, heterochromatin is more prone to an increase in cutting efficiency. 
+**Conclusion: Many different HDAC inhibitors can change cutting efficiency locally. As expected, heterochromatin is more prone to an increase in cutting efficiency.**
 
-```{r export}
-setwd("/DATA/usr/m.trauernicht/projects/EpiScreen/files_scripts/")
-filename <- SetFileName("_indel.data", "mt")
-save(indel.data, file = filename)
+
+
+## SA: Correlation of cutting efficiency between replicates of significant hits
+We know that the cutting efficiency does not correlate well if all data is taken. However, because of the high noise level and the low effect size of the efficiency changes, it makes more sense to only investigate whether significant hits are robust throughout all replicates. 
+```{r warning = FALSE}
+# SA: Correlation between technical replicates efficiency: only significant hits
+# significant_hits_efficiency <- eff.data %>%
+#   filter(pval_adj < 0.05) %>%
+#   distinct(drug, conc_char, IPR) %>%
+#   mutate(drug_conc = paste(drug, conc_char, IPR, paste = "_"))
+
+techn_repl <- indel.data %>%
+  mutate(drug_conc = paste(drug, conc_char, IPR, paste = "_")) %>%
+  #filter(drug_conc %in% significant_hits_efficiency$drug_conc) %>%
+  dplyr::distinct(freqCut_norm, drug, tech, replicate, conc_char, sample, IPR) %>%
+  mutate(freqCut_norm = log2(ave(freqCut_norm, drug, tech, replicate, conc_char, IPR, FUN = mean))) %>%
+  unique() %>%
+  mutate(rep = paste(replicate, tech, sep = "_")) %>%
+  dplyr::select(-replicate, -tech) %>%
+  mutate(max = ave(freqCut_norm, drug, conc_char, IPR, FUN = max),
+         min = ave(freqCut_norm, drug, conc_char, IPR, FUN = min)) %>%
+  distinct() %>%
+  spread(rep, freqCut_norm) %>%
+  na.omit() 
+  
+techn_repl$large_effect <- "1_no"
+techn_repl$large_effect[techn_repl$max > 0.3 | techn_repl$min < -0.3] <- "0_yes"
+
+ggpairs(techn_repl %>% 
+       #filter(conc_char == "1 µM") %>% #1 µM
+       # filter(drug %in% c("Vorinostat (SAHA, MK0683)", "Scriptaid",   "Decitabine" , "(+)-JQ1" ,  "PCI-24781 (Abexinostat)")) %>%
+          dplyr::select(contains("E1")),
+       mapping = aes(color = techn_repl$large_effect),
+               upper = list(continuous = corColor),
+               lower = list(continuous = function(data, mapping, ...) {
+                   ggally_points(data = data, mapping = mapping, alpha = 0.5, size = 0.2) +
+                   geom_abline(slope = 1, lty = "dashed", col = "red")}),
+               diag = list(continuous = function(data, mapping, ...) {
+                   ggally_densityDiag(data = data, mapping = mapping, alpha = 0.3, fill = "red")})) +
+  # xlim(.4, .7) + 
+  xlab("Cutting efficiency") +
+  ylab("Cutting efficiency") +
+  scale_color_manual(values = colors_diverse)
 ```
+
+*Figure S2A: Correlation between cutting efficiency of significant hits.*
+
+**Conclusion: The correlation between 'strong' changers of efficiency is OK, not very good, but OK.**
+
+
 
 # Session Info
 ```{r}

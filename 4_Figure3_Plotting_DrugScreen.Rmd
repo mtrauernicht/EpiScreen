@@ -354,7 +354,7 @@ indel.data <- readRDS("/DATA/usr/m.trauernicht/projects/EpiScreen/files_scripts/
 
 ## A: MMEJ-z-score per drug
 Are the compounds (per concentration) that significantly alter the MMEJ score?
-```{r}
+```{r warning = FALSE}
 # A: MMEJ-z-score per drug
 eff.data <- indel.data %>%
   filter(replicate == "E1504", sample == "drug" | drug == "DMSO") %>%
@@ -379,7 +379,7 @@ eff.data <- eff.data %>%
 
 for (i in unique(eff.data$drug)) {
   for (j in unique(eff.data$conc_char)) {
-    if (nrow(eff.data[eff.data$drug == i & eff.data$conc_char == j]) >= 2) {
+    if (nrow(eff.data[eff.data$drug == i & eff.data$conc_char == j,]) >= 2) {
     eff.data$pval[eff.data$drug == i & eff.data$conc_char == j] <- 
       t.test(eff.data$MMEJscore[eff.data$drug == i & eff.data$conc_char == j], 
                             eff.data$MMEJscore[eff.data$drug == "DMSO"])$p.value
@@ -396,21 +396,26 @@ ggplot_custom(eff.data %>%
   geom_quasirandom() +
   facet_wrap(~conc_char)
 ```
+
 *Figure 3A: Compound-induced change in MMEJ score of all tested compounds. Mean MMEJ z-score per drug & concentration vs. p-value from t-test.* 
 
-Conclusion: Yes, there are a lot of interesting hits at all tested concentrations. 
+**Conclusion: Yes, there are a lot of interesting hits at all tested concentrations.**
 
 ---
 
 ## B: MMEJ z-score heatmap: drug vs genomic location
 Which drugs are changing MMEJ score? Do they act globally or locally? 
-```{r}
+```{r warning = FALSE}
 # Set annotation for heatmap
 # Row annotation: annotate drugs with the target group
 target <- indel.data %>% 
   filter(!target %in% c("Negative Control", "MRN", "DNA-PK")) %>% 
   distinct(drug, target) %>% 
   column_to_rownames(var="drug")
+
+file_list = list.files("/DATA/projects/DSBrepair/data/R/rs20210813_episcreen_2", full.names = TRUE)
+file_list
+episcreen_ratios = readRDS(file_list[[3]])
 
 chromatin <- readRDS(
   "/DATA/usr/x.vergara/XV_ChIPIndels/XV20200902_DDR_RS_revision/XV20200902_DDR_RS_revision/data/xv20200915_DDR_data_CHIP.rds") %>% 
@@ -457,18 +462,18 @@ annotation_colors_scr$target <- annotation_colors_scr$target[ordered_marks2]
 
 # Heatmap
 eff.data.heatmap <- indel.data %>%
-  filter(sample == "drug", replicate == "E1504") %>%
-  distinct(conc_char, drug, IPR, MMEJ_zscore)
+  filter(sample == "drug") %>%
+  distinct(conc_char, drug, IPR, MMEJ_zscore_comb)
 
 
 
 eff.data.heatmap2 <- eff.data.heatmap %>%
-  mutate(mod = Mod(MMEJ_zscore)) %>%
+  mutate(mod = Mod(MMEJ_zscore_comb)) %>%
   mutate(max = ave(mod, drug, conc_char, FUN = max)) %>%
   dplyr::select(-mod) %>%
-  spread(IPR, MMEJ_zscore) %>%
+  spread(IPR, MMEJ_zscore_comb) %>%
   group_by(conc_char) %>%
-  top_n(15, max) %>%
+  top_n(25, max) %>%
   ungroup() %>%
   dplyr::select(-max)
 
@@ -522,9 +527,10 @@ pheatmap(as.matrix(eff.data.heatmap %>%
            color = colorRampPalette(rev(brewer.pal(n = 7, name = "RdBu")))(100),
            annotation_colors = annotation_colors_scr, annotation_legend = T)
 ```
+
 *Figure 3B: Heatmap of MMEJ z-score per IPR for 15 most potent compounds per concentration.*
 
-Conclusion: At all three concentrations, the 15 most potent drugs reduce the MMEJ score. IPR10 is very sensitive to MMEJ score reduction, especially by HDACs. 
+**Conclusion: At all three concentrations, the 15 most potent drugs reduce the MMEJ score. IPR10 is very sensitive to MMEJ score reduction, especially by HDACs.**
 
 
 

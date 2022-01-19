@@ -346,8 +346,7 @@ ggplot_custom <- function(...) ggplot2::ggplot(...) +
 
 ```{r data import, echo = FALSE, warning = FALSE}
 # Import data from preprocessing script
-#indel.data <- readRDS("/DATA/usr/m.trauernicht/projects/EpiScreen/files_scripts/mt20220105_episcreen.RDS")
-indel.data <- readRDS("/DATA/projects/DSBrepair/data/R/rs20220117_episcreen/rs20220117_episcreen_ratios.RDS")
+indel.data <- readRDS("/DATA/projects/DSBrepair/data/R/rs20220118_episcreen/rs20220118_episcreen_ratios.RDS")
 
 # Complete data without exlcluding wells <0.45 viability (I need this for plotting)
 viability.data = as.data.table(readRDS("/DATA/projects/DSBrepair/git/EpiScreen/files_scripts/rs20211221_Episcreen_Reads_Viab_Metadata.RDS")) %>%
@@ -358,7 +357,7 @@ viability.data = as.data.table(readRDS("/DATA/projects/DSBrepair/git/EpiScreen/f
 
 ## B: Drugs per target group
 Which drugs did we use for the screen and which targets do they have?
-```{r}
+```{r warning = FALSE}
 # B: Drugs per target group
 ## Plot from viability data table (because there all drugs are included)
 targets <- viability.data %>% 
@@ -372,15 +371,16 @@ ggplot_custom(targets, aes(y = reorder(target, +number), x = number)) +
   geom_bar(stat = "identity")  + 
   ylab("")
 ```
+
 *Figure 1B: Number of probed compounds per target group.*
 
-Conclusion: Most drugs are HDACs, a lot of compounds do not really target chromatin directly.  
+**Conclusion: Most drugs are HDACs, a lot of compounds do not really target chromatin directly.**
 
 ---
 
 ## C: Viability filtering
 How many drugs are filtered out because they are too toxic?
-```{r}
+```{r warning = FALSE}
 # C: Viability filtering
 ## Calculate normalized viability (same as in script 1)
 viability.data$ID <- gsub("^E[0-9]{3,4}_", "", viability.data$ID)
@@ -424,15 +424,16 @@ ggplot_custom(viability.data %>%
   geom_quasirandom() +
   scale_color_manual(values = c(colors_diverse[1], colors_diverse[4]))
 ```
+
 *Figure 1C: Filtering of toxic compounds. Compounds that decreased viability by >55% in more than one technical replicate in one or both biological replicate were removed (marked in yellow).*
 
-Conclusion: The higher the concentration, the more toxic the compounds are to the cells.  
+**Conclusion: The higher the concentration, the more toxic the compounds are to the cells.**
 
 ---
 
 ## D: Cutting efficiency per IPR
 How do the drugs impact cutting efficiency in general? Does the genomic location & concentration of the drugs matter?
-```{r}
+```{r warning = FALSE}
 # D: Cutting efficiency per IPR
 indel.data2 <- indel.data
 
@@ -446,56 +447,48 @@ indel.data2 <- indel.data2 %>%
 ipr_order <- c("1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19")
 indel.data2$IPR <- factor(indel.data2$IPR, levels = ipr_order)
 
-
 ggplot(indel.data2 %>%
          filter(sample != "DNA-PKi (NHEJ control)", sample != "Mirin (MMEJ control)") %>%
-         dplyr::distinct(freqCut, IPR, tech, conc_char, drug, sample) %>%
-           mutate(freqCut = ave(freqCut, IPR, tech, conc_char, drug, FUN = mean)),
-       aes(x = IPR, y = freqCut)) +
-  geom_violin(aes(fill = sample), position = position_dodge(0.75), draw_quantiles = 0.5, width = 3) +
-  scale_fill_manual(values = c(colors_drugs[2], colors_drugs[6], colors_drugs[7], colors_drugs[4]))+
-  coord_polar()+
-  ylim(0,1)
-
-ggplot(indel.data2 %>%
-         filter(sample != "DNA-PKi (NHEJ control)", sample != "Mirin (MMEJ control)", replicate == "E1504") %>%
-         dplyr::distinct(freqCut, IPR, tech, conc_char, drug, sample) %>%
-           mutate(freqCut = ave(freqCut, IPR, tech, conc_char, drug, FUN = mean)),
+         dplyr::distinct(freqCut, IPR, drug, conc_char, tech, sample, replicate) %>%
+         mutate(freqCut = ave(freqCut, IPR, drug, conc_char, tech, replicate)) %>%
+         distinct(),
        aes(x = IPR, y = freqCut)) +
   geom_quasirandom_rast(aes(color = sample), dodge.width = 0.75, raster.dpi = 600) +
-  scale_color_manual(values = c(colors_drugs[2], colors_drugs[7], colors_drugs[4], "#000000")) +
-  coord_polar()+
-  ylim(0,1)
+  scale_color_manual(values = c(colors_drugs[2], colors_drugs[7], colors_drugs[4], "#000000"))#+
+  # coord_polar()+
+  # ylim(0,1)
 ```
+
 *Figure 1D: Compound-induced changes in cutting efficiency on the 19 genomic locations. The three probed concentrations are plotted next to each other.*
 
-Conclusion: Cutting efficiency changes can go both directions, either up or down. The concentration of the compounds does not matter that much. 
+**Conclusion: Cutting efficiency changes can go both directions, either up or down. The concentration of the compounds does not matter that much.**
 
 ---
 
 ## E: MMEJ score per IPR
 How do the drugs impact MMEJ score in general? Does the genomic location & concentration of the drugs matter?
-```{r}
+```{r warning = FALSE}
 # E: MMEJ score per IPR
 ggplot(indel.data2 %>%
          filter(sample != "DNA-PKi (NHEJ control)", sample != "Mirin (MMEJ control)") %>%
-         dplyr::distinct(MMEJscore, IPR, tech, conc_char, drug, sample) %>%
-           mutate(MMEJscore = ave(MMEJscore, IPR, tech, conc_char, drug, FUN = mean)),
+         dplyr::distinct(MMEJscore, IPR, drug, conc_char, tech, sample, replicate) %>%
+         mutate(freqCut = ave(MMEJscore, IPR, drug, conc_char, tech, replicate)),
        aes(x = IPR, y = MMEJscore)) +
   geom_quasirandom_rast(aes(color = sample), dodge.width = 0.75, raster.dpi = 600) +
-  scale_color_manual(values = c(colors_drugs[2], colors_drugs[7], colors_drugs[4], "#000000")) +
-  coord_polar() +
-  ylim(-0.4,0.6)
+  scale_color_manual(values = c(colors_drugs[2], colors_drugs[7], colors_drugs[4], "#000000")) #+
+  # coord_polar() +
+  # ylim(-0.4,0.6)
 ```
+
 *Figure 1E: Compound-induced changes in MMEJ score on the 19 genomic locations. The three probed concentrations are plotted next to each other.*
 
-Conclusion: MMEJ score is mostly reduced and not increased. Increasing the concentration amplifies this phenotype. IPRs with a high MMEJ score to begin with have a higher reduction of MMEJ score in general. 
+**Conclusion: MMEJ score is mostly reduced and not increased. Increasing the concentration amplifies this phenotype. IPRs with a high MMEJ score to begin with have a higher reduction of MMEJ score in general.**
 
 ---
 
 ## S_A: Correlate viability data from the 2 replicates
 How well does the viability data correlate between the two biological replicates? Did the drugs become less potent after 3 years in the freezer?
-```{r}
+```{r warning = FALSE}
 # A: Correlate viability data from the 2 replicates
 ggplot_custom(viability.data %>%
                 filter(group == "drug"), aes(x = E177, y = E1504)) +
@@ -506,15 +499,36 @@ ggplot_custom(viability.data %>%
   scale_color_manual(values = c(colors_diverse[1], colors_diverse[4])) +
   facet_wrap(~conc_char)
 ```
+
 *Figure S1A: Correlation of the cell viability between the two biological replicates. Marked in yellow are the compounds that were removed from the analysis.*
 
-Conclusion: Most drugs that were toxic in rep 1 were also toxic in rep 2, so the trends are similar. However, some drugs were especially more toxic in rep 2. These drugs were removed from the analysis. 
+**Conclusion: Most drugs that were toxic in rep 1 were also toxic in rep 2, so the trends are similar. However, some drugs were especially more toxic in rep 2. These drugs were removed from the analysis.**
 
 ---
 
+## S_#: Comparison between replicates of efficiency in DMSO
+How bad is E177 compared to E1504?
+```{r warning = FALSE}
+ggplot(indel.data2 %>%
+         filter(drug == "DMSO") %>%
+         dplyr::distinct(freqCut, IPR, exp, replicate),
+       aes(x = IPR, y = freqCut)) +
+  geom_quasirandom_rast(aes(color = replicate), dodge.width = 0.75, raster.dpi = 600) +
+  scale_color_manual(values = c(colors_drugs[2], colors_drugs[7]))
+
+ggplot(indel.data2 %>%
+         filter(drug == "DMSO") %>%
+         dplyr::distinct(MMEJscore, IPR, exp, replicate),
+       aes(x = IPR, y = MMEJscore)) +
+  geom_quasirandom_rast(aes(color = replicate), dodge.width = 0.75, raster.dpi = 600) +
+  scale_color_manual(values = c(colors_drugs[2], colors_drugs[7]))
+```
+
+
+
 ## S_B: Correlation between technical replicates MMEJ score
 How well does the MMEJ score correlate between the six technical replicates?
-```{r}
+```{r warning = FALSE}
 # B: Correlation between technical replicates MMEJ score
 techn_repl <- indel.data %>%
   filter(sample == "drug") %>%
@@ -537,15 +551,16 @@ ggpairs(techn_repl %>% dplyr::select(contains("E1")),
   xlab("MMEJ score") +
   ylab("MMEJ score")
 ```
+
 *Figure S1B: Correlation of the MMEJ score between all technical replicates.*
 
-Conclusion: The MMEJ scores correlate relatively well, especially within biological replicates. Even the correlation between biological replicates is good.
+**Conclusion: The MMEJ scores correlate relatively well, especially within biological replicates. Even the correlation between biological replicates is good.**
 
 ---
 
 ## S_C: Correlation between technical replicates efficiency
 How well does the cutting efficiency correlate between the six technical replicates
-```{r}
+```{r warning = FALSE}
 # C: Correlation between technical replicates efficiency
 techn_repl <- indel.data %>%
   filter(sample == "drug" | drug == "DMSO") %>%
@@ -567,39 +582,43 @@ ggpairs(techn_repl %>% dplyr::select(contains("E1")),
   xlab("Cutting efficiency") +
   ylab("Cutting efficiency")
 ```
+
 *Figure S1C: Correlation of the cutting efficiency between all technical replicates.*
 
-Conclusion: Only for replicate two the cutting efficiency correlates well. We need to further investigate why replicate 1 does not correlate well.
+**Conclusion: Only for replicate two the cutting efficiency correlates well. We need to further investigate why replicate 1 does not correlate well.**
 
 ---
 
 ## S_D: Correlation in MMEJ z-score between biological replicates
 How well does the MMEJ z-score correlate between the biologcial replicates before combining them?
-```{r}
+```{r warning = FALSE}
 # D: Correlation between biological replicates MMEJ score
 biol_repl <- indel.data %>%
   filter(sample == "drug") %>%
-  dplyr::distinct(MMEJ_zscore_drug, drug, replicate, conc_char, sample) %>%
-  spread(replicate, MMEJ_zscore_drug) %>%
+  dplyr::distinct(MMEJ_zscore_global, drug, replicate, conc_char, sample) %>%
+  spread(replicate, MMEJ_zscore_global) %>%
   na.omit()
 
 ggpairs(biol_repl %>% dplyr::select(contains("E1")),
                upper = list(continuous = corColor),
                lower = list(continuous = function(data, mapping, ...) {
-                   ggally_points(data = data[n, ], mapping = mapping, alpha = 0.6, size = 0.5) +
+                   ggally_points(data = data, mapping = mapping, alpha = 0.6, size = 0.5) +
                    geom_abline(slope = 1, lty = "dashed", col = "red")}),
                diag = list(continuous = function(data, mapping, ...) {
                    ggally_densityDiag(data = data, mapping = mapping, alpha = 0.3, fill = "red")})) +
   xlab("MMEJ score") +
   ylab("MMEJ score")
 ```
+
 *Figure S1D: Correlation of the MMEJ z-scores between the two biological replicates.*
 
 Conclusion: MMEJ z-scores correlate well.
 
+---
+
 ## S_E: Correlation in cutting efficiencies between biological replicates
 How well does the cutting efficiency correlate between the biologcial replicates?
-```{r}
+```{r warning = FALSE}
 # E: Correlation between biological replicates efficiency
 biol_repl <- indel.data %>%
   filter(sample == "drug") %>%
@@ -612,16 +631,17 @@ biol_repl <- indel.data %>%
 ggpairs(biol_repl %>% dplyr::select(contains("E1")),
                upper = list(continuous = corColor),
                lower = list(continuous = function(data, mapping, ...) {
-                   ggally_points(data = data[n, ], mapping = mapping, alpha = 0.6, size = 0.5) +
+                   ggally_points(data = data, mapping = mapping, alpha = 0.6, size = 0.5) +
                    geom_abline(slope = 1, lty = "dashed", col = "red")}),
                diag = list(continuous = function(data, mapping, ...) {
                    ggally_densityDiag(data = data, mapping = mapping, alpha = 0.3, fill = "red")})) +
   xlab("Cutting efficiency") +
   ylab("Cutting efficiency")
 ```
+
 *Figure S1E: Correlation of the cutting efficiencies between the two biological replicates.*
 
-Conclusion: Cutting efficiencies do not correlate well.
+**Conclusion: Cutting efficiencies do not correlate well.**
 
 
 ```{r export}
