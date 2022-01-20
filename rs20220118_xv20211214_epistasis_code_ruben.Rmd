@@ -25,7 +25,7 @@ library(Hmisc)
 ```{r}
 #Chromatin data (it needs a barcode column)
 screen_ratios_tib <- readRDS("/DATA/projects/DSBrepair/data/R/rs20220118_episcreen/rs20220118_episcreen_ratios.RDS")
-clone5_chrom_tib <- readRDS("/DATA/projects/DSBrepair/data/R/rs20200519_clone5_newdoms_chromatin.RDS")
+clone5_chrom_tib <- readRDS('/DATA/projects/DSBrepair/data/R/cl20201026_ChIP_zscore_selection.RDS')
 
 ```
 
@@ -35,48 +35,49 @@ clone5_chrom_tib <- readRDS("/DATA/projects/DSBrepair/data/R/rs20200519_clone5_n
 step 1 = plot 
 
 ```{r}
-# Data table and compute log2MMEJ (This line needs to be adjusted)
+# Data table and compute log2_ratio (This line needs to be adjusted)
 # log2.MMEJ.screen.detail <- screen_ratios_tib %>% 
 #   distinct(replicate, MMEJ_score_mean, drug, conc_char, target, barcode) %>% 
-#   mutate(log2MMEJ = log2(MMEJ_score_mean))
+#   mutate(log2_ratio = log2(MMEJ_score_mean))
 
 log2.MMEJ.screen.detail <- screen_ratios_tib %>% 
-  select(replicate, tech, conc_char, barcode, drug, target, ) %>% 
+  select(replicate, tech, conc_char, barcode, drug, target, NHEJratio) %>% 
   distinct() %>%
-  mutate(log2MMEJ = log2(MMEJscore))
+  mutate(log2_ratio = log2(NHEJratio))
 
 # DMSO data table set. (This lin of code needs to be adjusted)
 # DMSO.set <- filter(screen_ratios_tib, drug == "DMSO") %>% 
 #   select(replicate, MMEJ_score_mean, drug, conc_char, target, barcode) %>% 
-#   mutate(log2MMEJ = log2(MMEJ_score_mean)) %>% 
+#   mutate(log2_ratio = log2(MMEJ_score_mean)) %>% 
 #   dplyr::group_by(barcode, replicate) %>% 
-#   dplyr::summarise(DMSO.log2MMEJ = mean(log2MMEJ, na.rm = T), 
-#                    DMSO.MMEJ = mean(MMEJ_score_mean, na.rm = T))
+#   dplyr::summarise(DMSO.log2_ratio = mean(log2_ratio, na.rm = T), 
+#                    DMSO.ratio = mean(MMEJ_score_mean, na.rm = T))
 DMSO.set <- filter(screen_ratios_tib, drug == "DMSO") %>% 
-  select(replicate, tech, conc_char, barcode, drug, target, MMEJscore) %>% 
-  mutate(log2MMEJ = log2(MMEJscore)) %>% 
+  select(replicate, tech, conc_char, barcode, drug, target, NHEJratio ) %>% 
+  mutate(log2_ratio = log2(NHEJratio )) %>% 
   dplyr::group_by(barcode, replicate, tech) %>% 
-  dplyr::summarise(DMSO.log2MMEJ = mean(log2MMEJ, na.rm = T), 
-                   DMSO.MMEJ = mean(MMEJscore, na.rm = T),
+  dplyr::summarise(DMSO.log2_ratio = mean(log2_ratio, na.rm = T), 
+                   DMSO.ratio = mean(NHEJratio , na.rm = T),
                    conc_char = conc_char) %>% 
   distinct()
 
 # Plot differences
 data.for.plotting <- DMSO.set %>% 
   mutate(drug = "DMSO", target = "Negative Control") %>% 
-  select(replicate, tech, conc_char, barcode, drug, target, MMEJscore = DMSO.MMEJ, 
-         log2MMEJ = DMSO.log2MMEJ) %>% 
+  select(replicate, tech, conc_char, barcode, drug, target, NHEJratio = DMSO.ratio, 
+         log2_ratio = DMSO.log2_ratio) %>% 
   bind_rows(log2.MMEJ.screen.detail) %>% 
   mutate(rep_tech = paste(replicate, tech, sep = "_")) %>% 
   dplyr::group_by(drug, barcode, conc_char) %>% 
-  dplyr::summarise(m.log2MMEJ = mean(log2MMEJ, na.rm = T), 
-                   m.MMEJ = mean(MMEJscore, na.rm = T),
+  dplyr::summarise(m.log2_ratio = mean(log2_ratio, na.rm = T), 
+                   m.ratio = mean(NHEJratio, na.rm = T),
                    conc_char = conc_char,
                    replicate = replicate) %>% 
-  left_join(clone5_chrom_tib)
+  left_join(clone5_chrom_tib) %>%
+  distinct()
 
 # Plot in log2 space
-ggplot(data.for.plotting %>% filter(drug %in% c("DNA-PKi","PJ34","GSK J4 HCl","DMSO"), conc_char == "1 µM"), aes(H3K27me3,m.log2MMEJ, color = drug)) +
+ggplot(data.for.plotting %>% filter(drug %in% c("DNA-PKi","PJ34","GSK J4 HCl","DMSO"), conc_char == "1 µM"), aes(H3K27me3.zscore,m.log2_ratio, color = drug)) +
   geom_point() +
   geom_smooth(method = "lm") +
   stat_cor(method = "spearman") +
@@ -96,8 +97,8 @@ ggplot(data.for.plotting %>% filter(gene %in% c("POLL","POLQ","FANCM","WT")), ae
 # Each replicate has a different value (compute differences by replicate)
 log2.distance.mmej <- log2.MMEJ.screen.detail %>% 
   left_join(DMSO.set) %>% 
-  mutate(log2.dist = sqrt((log2MMEJ - DMSO.log2MMEJ)^2), 
-         lin.dist = sqrt((MMEJscore - DMSO.MMEJ)^2)) 
+  mutate(log2.dist = sqrt((log2_ratio - DMSO.log2_ratio)^2), 
+         lin.dist = sqrt((NHEJratio - DMSO.ratio)^2)) 
 
 mean.log2.distance.mmej <- log2.distance.mmej %>% 
   dplyr::group_by(barcode, drug, conc_char) %>% 
@@ -108,7 +109,7 @@ mean.log2.distance.mmej <- log2.distance.mmej %>%
 #Plot slopes
 ggplot(mean.log2.distance.mmej %>% 
          filter(drug %in% c("DMSO","DNA-PKi","PJ34","GSK J4 HCl", "GSK J4", "Vorinostat (SAHA, MK0683)")),
-       aes(H3K27me3,m.log2.dist, color = drug)) + 
+       aes(H3K27me3.zscore,m.log2.dist, color = drug)) + 
   geom_point() + 
   stat_cor(method = "spearman") + 
   geom_smooth(method = "lm") + 
@@ -123,11 +124,11 @@ ggplot(mean.log2.distance.mmej %>%
 # Extract slopes for all genes
 ```{r}
 # Perform analysis across all features for three test genes
-chromatin.features <- colnames(mean.log2.distance.mmej)[21:44]
+chromatin.features <- colnames(mean.log2.distance.mmej)[grepl("zscore", colnames(mean.log2.distance.mmej))]
 mean.log2.distance.mmej %<>% mutate(drug_conc = paste(drug, conc_char, sep = " "))
 
 
-slope.protein.features <- tibble(drug_conc = NA, feature = NA, slope.log2 = NA, term = NA, slope.lin = NA)
+slope.protein.features <- tibble(drug_conc = NA, feature = NA, slope.log2 = NA, term = NA, p.value = NA)
 
 for (i in unique(mean.log2.distance.mmej$drug_conc)) {
   for (j in colnames(mean.log2.distance.mmej)[21:44]) {
@@ -136,10 +137,6 @@ for (i in unique(mean.log2.distance.mmej$drug_conc)) {
     model.epistasis.log2 <- lm(formula = m.log2.dist ~ unlist(model.dt[j]), 
                                data = model.dt) %>% 
       tidy()
-    
-    # model.epistasis.lin <- lm(formula = m.lin.dist ~ unlist(model.dt[j]), 
-    #                           data = model.dt) %>% 
-    #   tidy()
     
     slope.protein.features <- slope.protein.features %>% 
       add_row(drug_conc = i, 
@@ -185,3 +182,62 @@ ggplot(slope.protein.features %>%
 slope.prot.features.scale.dcast <- slope.protein.features  %>% filter(term == "unlist(model.dt[j])") %>% reshape2::dcast(gene ~ feature, value.var = "slope.log2") %>% column_to_rownames(var = "gene")
 
 ```
+
+
+
+# Figure 4B: Matrix for hits
+```{r heatmap}
+#genes to select
+tmp.gene.hits <- filter(test.log2.dist, p.adj < 0.0001) %>% pull(gene)
+
+hit.genes <- filter(hits.both.screens, pathway != "NA") %>% separate(ID_gene, into = "gene") %>% pull(gene) %>% unique()
+
+# dcaast with selected
+slope.prot.features.dcast.hits <- slope.protein.features.all %>% filter(gene %in% tmp.gene.hits) %>% reshape2::dcast(gene ~ feature, value.var = "slope") %>% column_to_rownames(var = "gene")
+
+
+#Heatmap
+heatmap.slope.diff.hits <- pheatmap(slope.prot.features.dcast.hits, silent = F)
+
+heatmap.gene.order.slope.diff.hits <- rownames(slope.prot.features.dcast.hits[heatmap.slope.diff.hits$tree_row[["order"]],])
+heatmap.chromatin.order.slope.diff.hits <- colnames(slope.prot.features.dcast.hits[,heatmap.slope.diff.hits$tree_col[["order"]]])
+
+# heatmap
+ggplot(slope.protein.features.all %>% filter(gene %in% tmp.gene.hits & abs(slope) > 0.05)) + 
+  geom_tile(aes(fct_relevel(gene,heatmap.gene.order.slope.diff.hits),fct_relevel(feature, heatmap.chromatin.order.slope.diff.hits), fill = slope)) +
+  scale_fill_gradient2( low = "#8c510a",mid = "#f5f5f5", high = "#01665e")  + theme_bw() + theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5), axis.title = element_blank(), legend.position = "top") + coord_fixed(expand = F,ratio = 1)
+
+# Dendrogram
+ggdendrogram(heatmap.slope.diff.hits$tree_row)
+
+# Relative slope
+tmp.rel.slope <- slope.protein.features.all %>% filter(gene %in% tmp.gene.hits) %>% mutate(rel.epistasis = slope*6/mean.fc)
+```
+
+# Figure 4C: Epistasis per library
+```{r}
+slope.library <- slope.protein.features.all %>% left_join(hits.both.screens %>% separate(ID_gene, into = "gene", remove = T) %>% select(gene,library,pathway) %>% distinct()) %>% filter(library %in% c("Chromatin","DNA_repair"))
+
+# Plot per library(all)
+ggplot(slope.library) + geom_quasirandom(aes(library,abs(epistasis), color = library)) + theme_bw() + scale_color_manual(values = levels(as_factor(library.colors$color))) + theme(legend.position = "top")
+
+#test
+chromatin.genes.slope <- slope.library %>% filter(library == "Chromatin") %>% pull(epistasis) %>% abs()
+dna_repair.genes.slope <- slope.library %>% filter(library == "DNA_repair") %>% pull(epistasis) %>% abs()
+
+ks.test.library <- ks.test(chromatin.genes.slope,dna_repair.genes.slope)
+```
+
+#Figure 4D: Epistasis per pathway
+```{r}
+# Plot per library 
+ggplot(slope.library %>% filter(pathway != "NA")) + geom_quasirandom(aes(pathway, abs(epistasis), color = pathway)) + theme_bw() + scale_color_manual(values = c("#EB2030","#2E358F")) + theme(legend.position = "top")
+
+#test
+NHEJ.genes.slope <- slope.library %>% filter(pathway == "NHEJ") %>% pull(epistasis) %>% abs()
+MMEJ.genes.slope <- slope.library %>% filter(pathway == "MMEJ") %>% pull(epistasis) %>% abs()
+
+ks.test.pathway <- ks.test(NHEJ.genes.slope,MMEJ.genes.slope)
+```
+
+
