@@ -785,8 +785,8 @@ screen.ratio.dt <- left_join(screen.ratio.dt,
 dmso.mmej.score <- screen.ratio.dt %>%
   filter(drug == "DMSO") %>%
   ungroup() %>%
-  distinct(barcode, replicate, tech, drug, well, MMEJscore) %>%
-  dplyr::select('DMSO' = MMEJscore, barcode, replicate) %>%
+  distinct(barcode, replicate, tech, drug, well, plate, MMEJratio) %>%
+  dplyr::select('DMSO' = MMEJratio, barcode, replicate) %>%
   mutate(mean_DMSO = ave(DMSO, barcode, replicate, FUN = mean), 
          sd_DMSO = ave(DMSO, barcode, replicate, FUN = sd)) %>%
   dplyr::select(-DMSO) %>%
@@ -797,18 +797,19 @@ screen.ratio.dt <- left_join(screen.ratio.dt, dmso.mmej.score, by = c("barcode",
 
 screen.ratio.dt <- screen.ratio.dt %>%
   # Then calculate the mean over the technical replicates
-  mutate(MMEJ_score_mean = ave(MMEJscore, drug, concentration, barcode, replicate, FUN = mean)) %>%
+  mutate(MMEJ_ratio_mean = ave(MMEJratio, drug, concentration, barcode, replicate, FUN = mean)) %>%
   # And calculate the z-scores
-  mutate(MMEJ_zscore = (MMEJ_score_mean - mean_DMSO)/ sd_DMSO) %>%
+  mutate(MMEJ_zscore = (MMEJ_ratio_mean - mean_DMSO)/ sd_DMSO) %>%
   dplyr::select(-mean_DMSO, -sd_DMSO)
 
 
 # Mean values independent of IPR (mean effect of the drug)
 dmso.mmej.score <- screen.ratio.dt %>%
   ungroup() %>%
-  distinct(barcode, replicate, tech, drug, well, MMEJscore) %>%
+  distinct(replicate, tech, drug, well, plate, MMEJratio) %>%
   filter(drug == "DMSO") %>%
-  dplyr::select('DMSO' = MMEJscore, replicate) %>%
+  mutate(MMEJratio = ave(MMEJratio, tech, drug, well, plate, FUN = mean)) %>%
+  dplyr::select('DMSO' = MMEJratio, replicate) %>%
   mutate(mean_DMSO = ave(DMSO, replicate, FUN = mean), 
          sd_DMSO = ave(DMSO, replicate, FUN = sd)) %>%
   dplyr::select(-DMSO) %>%
@@ -817,8 +818,8 @@ dmso.mmej.score <- screen.ratio.dt %>%
 screen.ratio.dt <- left_join(screen.ratio.dt, dmso.mmej.score, by = "replicate")
 
 screen.ratio.dt <- screen.ratio.dt %>%
-  mutate(MMEJ_score_mean_global = ave(MMEJscore, drug, concentration, replicate, FUN = mean)) %>%
-  mutate(MMEJ_zscore_global = (MMEJ_score_mean_global - mean_DMSO)/ sd_DMSO) %>%
+  mutate(MMEJ_ratio_mean_global = ave(MMEJratio, drug, concentration, replicate, FUN = mean)) %>%
+  mutate(MMEJ_zscore_global = (MMEJ_ratio_mean_global - mean_DMSO)/ sd_DMSO) %>%
   dplyr::select(-mean_DMSO, -sd_DMSO)
 ```
 
@@ -909,9 +910,9 @@ ratio.cols = c("replicate",
          "eff_zscore_global",
          "eff_zscore_pooled_global",
          "eff_zscore_pooled_global_comb",
-         "MMEJ_score_mean",
+         "MMEJ_ratio_mean",
          "MMEJ_zscore",
-         "MMEJ_score_mean_global",
+         "MMEJ_ratio_mean_global",
          "MMEJ_zscore_global",
          "MMEJ_zscore_comb" ,
          "MMEJ_zscore_global_comb")
