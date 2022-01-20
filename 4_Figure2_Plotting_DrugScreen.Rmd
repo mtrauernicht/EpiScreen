@@ -347,7 +347,8 @@ ggplot_custom <- function(...) ggplot2::ggplot(...) +
 
 ```{r data import, echo = FALSE, warning = FALSE}
 # Import data from preprocessing script
-indel.data <- readRDS("/DATA/projects/DSBrepair/data/R/rs20220120_episcreen2/rs20220120_episcreen_ratios.RDS")
+#indel.data <- readRDS("/DATA/projects/DSBrepair/data/R/rs20220120_episcreen2/rs20220120_episcreen_ratios.RDS")
+indel.data <- readRDS("/DATA/usr/m.trauernicht/projects/EpiScreen/files_scripts/mt20220120_episcreen.RDS")
 ```
 
 ---
@@ -397,16 +398,16 @@ Are there any target groups that are prone to changes in cutting efficiency?
 ```{r warning = FALSE}
 # C: Bar plot
 eff.data <- indel.data %>%
-  filter(sample == "drug") %>%
-  distinct(eff_zscore_pooled_global_comb, drug, conc_char, target)
+  filter(sample == "drug", conc_char == "100 nM") %>%
+  distinct(eff_zscore_pooled_global_comb, drug, target)
 
 eff.data$sign <- "Yes"
 eff.data$sign[Mod(eff.data$eff_zscore_pooled_global_comb) < 1.645] <- "No"
 
 eff.data <- eff.data %>%
-  mutate(number = ave(target, target, conc_char, sign, FUN = length)) %>%
+  mutate(number = ave(target, target, sign, FUN = length)) %>%
   mutate(number = as.numeric(number)) %>%
-  distinct(conc_char, target, sign, number) %>%
+  distinct(target, sign, number) %>%
   spread(sign, number, fill = 0) %>%
   mutate(fraction = Yes / (No + Yes)) %>%
   pivot_longer(Yes:No, names_to = "sign", values_to = "number")
