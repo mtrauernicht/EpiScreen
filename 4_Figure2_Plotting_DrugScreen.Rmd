@@ -360,10 +360,10 @@ Are there any drugs (per concentration) that significantly change the cutting ef
 ggplot_custom(indel.data %>%
                 filter(sample == "drug") %>%
                 distinct(eff_zscore_pooled_global_comb, drug, conc_char),
-              aes(x = conc_char, y = eff_zscore_pooled_global_comb, color = ifelse(Mod(eff_zscore_pooled_global_comb) > 1.645, "red", "black"))) +
+              aes(x = conc_char, y = eff_zscore_pooled_global_comb, color = ifelse(Mod(eff_zscore_pooled_global_comb) > 1.96, "red", "black"))) +
   geom_quasirandom() +
-  geom_hline(linetype = "dashed", yintercept = 1.645) +
-  geom_hline(linetype = "dashed", yintercept = -1.645)
+  geom_hline(linetype = "dashed", yintercept = 1.96) +
+  geom_hline(linetype = "dashed", yintercept = -1.96)
 ```
 
 *Figure 2A: Compound-induced change in cutting efficiency of all tested compounds. Mean per drug & concentration vs. p-value from t-test.*
@@ -377,14 +377,16 @@ Are there any target groups that are prone to changes in cutting efficiency?
 ```{r warning = FALSE}
 # B: Cutting efficiency change per target group, all concentrations together
 ggplot_custom(indel.data %>%
+                filter(conc_char == "100 nM") %>%
                 filter(sample == "drug") %>%
                 distinct(eff_zscore_pooled_global_comb, drug, conc_char, target) %>%
                 mutate(mean_eff_target = ave(eff_zscore_pooled_global_comb, target, conc_char, FUN = mean)), 
               aes(y = eff_zscore_pooled_global_comb, x = reorder(target, -mean_eff_target, FUN = median))) + 
     geom_boxplot(position = position_dodge(0.75), alpha = 0.4, outlier.shape = NA) +
-  geom_quasirandom(aes(color = ifelse(Mod(eff_zscore_pooled_global_comb) > 1.645, "red", "black"))) +
-  theme_classic_lines_90() +
-  facet_wrap(~conc_char)
+  geom_quasirandom(aes(color = ifelse(Mod(eff_zscore_pooled_global_comb) > 1.96, "red", "black"))) +
+  geom_hline(linetype = "dashed", yintercept = 1.96) +
+  geom_hline(linetype = "dashed", yintercept = -1.96) +
+  theme_classic_lines_90()
 ```
 
 *Figure 2B: Compound-induced change in cutting efficiency per compound target groups.*
@@ -398,23 +400,24 @@ Are there any target groups that are prone to changes in cutting efficiency?
 ```{r warning = FALSE}
 # C: Bar plot
 eff.data <- indel.data %>%
-  filter(sample == "drug", conc_char == "100 nM") %>%
-  distinct(eff_zscore_pooled_global_comb, drug, target)
+  filter(sample == "drug") %>%
+  distinct(eff_zscore_pooled_global_comb, drug, target, conc_char)
 
 eff.data$sign <- "Yes"
-eff.data$sign[Mod(eff.data$eff_zscore_pooled_global_comb) < 1.645] <- "No"
+eff.data$sign[Mod(eff.data$eff_zscore_pooled_global_comb) < 1.96] <- "No"
 
 eff.data <- eff.data %>%
-  mutate(number = ave(target, target, sign, FUN = length)) %>%
+  mutate(number = ave(target, target, sign, conc_char, FUN = length)) %>%
   mutate(number = as.numeric(number)) %>%
-  distinct(target, sign, number) %>%
+  distinct(conc_char, target, sign, number) %>%
   spread(sign, number, fill = 0) %>%
   mutate(fraction = Yes / (No + Yes)) %>%
   pivot_longer(Yes:No, names_to = "sign", values_to = "number")
 
 ggplot_custom(eff.data ,
-              aes(y = reorder(target, fraction), x = number, fill = sign)) +
-  geom_bar(stat = "identity")
+              aes(y = reorder(target, -number), x = number, fill = sign)) +
+  geom_bar(stat = "identity") +
+  facet_wrap(~conc_char)
 ```
 
 *Figure 2C: Number of compounds with significant changes in cutting efficiency per target group.*
@@ -482,21 +485,20 @@ annotation_colors_scr$target <- annotation_colors_scr$target[ordered_marks2]
 
 # Generate heatmap: select top 15 drugs (highest change at any IPR) per concentration
 eff.data.heatmap <- indel.data %>%
-  filter(target != "Aurora Kinase") %>%
+  #filter(target != "Aurora Kinase") %>%
   filter(sample == "drug" | drug == "DMSO") %>%
+  #filter(Mod(eff_zscore_pooled_global_comb) >= 1.645) %>%  # we could also choose to display all drugs that have significant global hits
   distinct(conc_char,drug, IPR, eff_zscore_pooled_comb)
 
-
+## Select drugs that have a large effect size in at least one location (some drugs might have a small global effect size, but large local)
 eff.data.heatmap2 <- eff.data.heatmap %>%
   mutate(mod = Mod(eff_zscore_pooled_comb)) %>%
   mutate(max = ave(mod, drug, conc_char, FUN = max)) %>%
-  filter(max > 2.9) %>%
+  filter(max > 2.58) %>% # p < 0.01
   dplyr::select(-mod, -max) %>%
   spread(IPR, eff_zscore_pooled_comb)
 
 breaks <- seq(-5, 5, 0.1)
-
-
 
 for (i in unique(eff.data.heatmap2$conc_char)) {
   pheatmap(as.matrix(eff.data.heatmap2[eff.data.heatmap2$conc_char == i,] %>%
