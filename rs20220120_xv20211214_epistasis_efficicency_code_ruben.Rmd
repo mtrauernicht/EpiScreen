@@ -45,9 +45,9 @@ step 1 = plot
 #   mutate(log2_ratio = log2(MMEJ_score_mean))
 
 log2.MMEJ.screen.detail <- screen_ratios_tib %>% 
-  select(replicate, tech, conc_char, barcode, drug, target, NHEJratio) %>% 
+  select(replicate, tech, conc_char, barcode, drug, target, freqCut) %>% 
   distinct() %>%
-  mutate(log2_ratio = log2(NHEJratio))
+  mutate(log2_ratio = log2(freqCut))
 
 # DMSO data table set. (This lin of code needs to be adjusted)
 # DMSO.set <- filter(screen_ratios_tib, drug == "DMSO") %>% 
@@ -57,24 +57,24 @@ log2.MMEJ.screen.detail <- screen_ratios_tib %>%
 #   dplyr::summarise(DMSO.log2_ratio = mean(log2_ratio, na.rm = T), 
 #                    DMSO.ratio = mean(MMEJ_score_mean, na.rm = T))
 DMSO.set <- filter(screen_ratios_tib, drug == "DMSO") %>% 
-  select(replicate, tech, conc_char, barcode, drug, target, NHEJratio ) %>% 
-  mutate(log2_ratio = log2(NHEJratio )) %>% 
+  select(replicate, tech, conc_char, barcode, drug, target, freqCut) %>% 
+  mutate(log2_ratio = log2(freqCut )) %>% 
   dplyr::group_by(barcode, replicate, tech) %>% 
   dplyr::summarise(DMSO.log2_ratio = mean(log2_ratio, na.rm = T), 
-                   DMSO.ratio = mean(NHEJratio , na.rm = T),
+                   DMSO.ratio = mean(freqCut , na.rm = T),
                    conc_char = conc_char) %>% 
   distinct()
 
 # Plot differences
 data.for.plotting <- DMSO.set %>% 
   mutate(drug = "DMSO", target = "Negative Control") %>% 
-  select(replicate, tech, conc_char, barcode, drug, target, NHEJratio = DMSO.ratio, 
+  select(replicate, tech, conc_char, barcode, drug, target, freqCut = DMSO.ratio, 
          log2_ratio = DMSO.log2_ratio) %>% 
   bind_rows(log2.MMEJ.screen.detail) %>% 
   mutate(rep_tech = paste(replicate, tech, sep = "_")) %>% 
   dplyr::group_by(drug, barcode, conc_char) %>% 
   dplyr::summarise(m.log2_ratio = mean(log2_ratio, na.rm = T), 
-                   m.ratio = mean(NHEJratio, na.rm = T),
+                   m.ratio = mean(freqCut, na.rm = T),
                    conc_char = conc_char,
                    replicate = replicate) %>% 
   left_join(chrom_data) %>%
@@ -95,7 +95,7 @@ ggplot(data.for.plotting %>% filter(drug %in% c("DNA-PKi","PJ34","GSK J4 HCl","D
 log2.distance.mmej <- log2.MMEJ.screen.detail %>% 
   left_join(DMSO.set) %>% 
   mutate(log2.dist = sqrt((log2_ratio - DMSO.log2_ratio)^2), 
-         lin.dist = sqrt((NHEJratio - DMSO.ratio)^2)) 
+         lin.dist = sqrt((freqCut - DMSO.ratio)^2)) 
 
 mean.log2.distance.mmej <- log2.distance.mmej %>% 
   dplyr::group_by(barcode, drug, conc_char) %>% 
@@ -122,7 +122,7 @@ ggplot(mean.log2.distance.mmej %>%
 ```{r}
 # Perform analysis across all features for three test genes
 
-mean.log2.distance.mmej %<>% mutate(drug_conc = paste(drug, conc_char, sep = "_")) %>% pivot_longer()
+mean.log2.distance.mmej %<>% mutate(drug_conc = paste(drug, conc_char, sep = "_"))
 
 
 slope.protein.features <- tibble(drug_conc = NA, feature = NA, slope.log2 = NA, term = NA, p.value = NA)
@@ -181,7 +181,7 @@ slope.protein.features2 = slope.protein.features
 
 hits2 = slope.protein.features %>% filter(term == "unlist(model.dt[j])" & p.value < 0.001) %>% pull(drug_conc) %>% unique()
 
-hits = slope.protein.features %>% filter(term == "unlist(model.dt[j])" & abs(slope.log2) > 0.15) %>% pull(drug_conc) %>% unique()
+hits = slope.protein.features %>% filter(term == "unlist(model.dt[j])" & abs(slope.log2) > 0.05) %>% pull(drug_conc) %>% unique()
 
 slope.prot.features.scale.dcast.list <- slope.protein.features %>% 
   filter(term == "unlist(model.dt[j])" & drug_conc %in% hits) %>% 
