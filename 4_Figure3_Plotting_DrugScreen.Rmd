@@ -346,7 +346,7 @@ ggplot_custom <- function(...) ggplot2::ggplot(...) +
 
 ```{r data import, echo = FALSE, warning = FALSE}
 # Import data from preprocessing script
-indel.data <- readRDS("/DATA/usr/m.trauernicht/projects/EpiScreen/files_scripts/mt20220105_episcreen.RDS")
+indel.data <- readRDS("/DATA/usr/m.trauernicht/projects/EpiScreen/files_scripts/mt20220120_episcreen.RDS")
 ```
 
 
@@ -356,54 +356,53 @@ indel.data <- readRDS("/DATA/usr/m.trauernicht/projects/EpiScreen/files_scripts/
 Are the compounds (per concentration) that significantly alter the MMEJ score?
 ```{r warning = FALSE}
 # A: MMEJ-z-score per drug
-eff.data <- indel.data %>%
-  filter(replicate == "E1504", sample == "drug" | drug == "DMSO") %>%
-                dplyr::distinct(drug, conc_char, MMEJscore, sample,
-                                tech, replicate, target) 
-
-dmso.mmej.score <- indel.data %>%
-  filter(drug == "DMSO") %>%
-  dplyr::select('DMSO' = MMEJscore, replicate) %>%
-  mutate(mean_DMSO = ave(DMSO, replicate, FUN = mean), 
-         sd_DMSO = ave(DMSO, replicate, FUN = sd)) %>%
-  dplyr::select(-DMSO) %>%
-  unique()
-
-eff.data <- merge(eff.data, dmso.mmej.score)
-
-eff.data <- eff.data %>%
-  mutate(MMEJ_score_mean = ave(MMEJscore, drug, conc_char, FUN = mean),
-         MMEJscore = ave(MMEJscore, drug, conc_char, tech, replicate, FUN = mean)) %>%
-  unique()
-
-
-for (i in unique(eff.data$drug)) {
-  for (j in unique(eff.data$conc_char)) {
-    if (nrow(eff.data[eff.data$drug == i & eff.data$conc_char == j,]) >= 2) {
-    eff.data$pval[eff.data$drug == i & eff.data$conc_char == j] <- 
-      t.test(eff.data$MMEJscore[eff.data$drug == i & eff.data$conc_char == j], 
-                            eff.data$MMEJscore[eff.data$drug == "DMSO"])$p.value
-    }
-  }
-}
-
-
-ggplot_custom(eff.data %>%
+ggplot_custom(indel.data %>%
                 filter(sample == "drug") %>%
-                dplyr::select(-MMEJscore) %>%
-                unique(),
-              aes(x = MMEJ_score_mean, y = -log10(pval), color = ifelse(pval < 0.05, "red", "black"))) +
+                distinct(MMEJ_zscore_global_comb, drug, conc_char),
+              aes(x = conc_char, y = MMEJ_zscore_global_comb, color = ifelse(Mod(MMEJ_zscore_global_comb) > 1.96, "red", "black"))) +
   geom_quasirandom() +
-  facet_wrap(~conc_char)
+  geom_hline(linetype = "dashed", yintercept = 1.96) +
+  geom_hline(linetype = "dashed", yintercept = -1.96)
 ```
 
-*Figure 3A: Compound-induced change in MMEJ score of all tested compounds. Mean MMEJ z-score per drug & concentration vs. p-value from t-test.* 
+*Figure 3A: Compound-induced change in MMEJ ratio of all tested compounds. Mean MMEJ z-score per drug & concentration.* 
 
 **Conclusion: Yes, there are a lot of interesting hits at all tested concentrations.**
 
 ---
 
-## B: MMEJ z-score heatmap: drug vs genomic location
+## B: MMEJ ratio change per target group
+Are there any target groups that are prone to changes in MMEJ ratio?
+```{r warning = FALSE}
+# C: Bar plot
+eff.data <- indel.data %>%
+  filter(sample == "drug") %>%
+  distinct(MMEJ_zscore_global_comb, drug, target, conc_char)
+
+eff.data$sign <- "Yes"
+eff.data$sign[Mod(eff.data$MMEJ_zscore_global_comb) < 1.96] <- "No"
+
+eff.data <- eff.data %>%
+  mutate(number = ave(target, target, sign, conc_char, FUN = length)) %>%
+  mutate(number = as.numeric(number)) %>%
+  distinct(conc_char, target, sign, number) %>%
+  spread(sign, number, fill = 0) %>%
+  mutate(fraction = Yes / (No + Yes)) %>%
+  pivot_longer(Yes:No, names_to = "sign", values_to = "number")
+
+ggplot_custom(eff.data ,
+              aes(y = reorder(target, -number), x = number, fill = sign)) +
+  geom_bar(stat = "identity") +
+  facet_wrap(~conc_char)
+```
+
+*Figure 2B: Number of compounds with significant changes in MMEJ ratio per target group.*
+
+**Conclusion: Some target groups have more changes. But there are no groups significantly sticking out.**
+
+---
+
+## C: MMEJ z-score heatmap: drug vs genomic location
 Which drugs are changing MMEJ score? Do they act globally or locally? 
 ```{r warning = FALSE}
 # Set annotation for heatmap
@@ -460,22 +459,20 @@ ordered_marks2 <- c("DNA-PK","Epigenetic Reader Domain", "HDAC",  "Sirtuin", "HA
 annotation_colors_scr$target <- annotation_colors_scr$target[ordered_marks2]
 
 
-# Heatmap
+# Generate heatmap: select top 15 drugs (highest change at any IPR) per concentration
 eff.data.heatmap <- indel.data %>%
-  filter(sample == "drug") %>%
-  distinct(conc_char, drug, IPR, MMEJ_zscore_comb)
+  filter(target != "Aurora Kinase") %>%
+  filter(sample == "drug" | drug == "DMSO") %>%
+  #filter(Mod(eff_zscore_pooled_global_comb) >= 1.645) %>%  # we could also choose to display all drugs that have significant global hits
+  distinct(conc_char,drug, IPR, MMEJ_zscore_comb)
 
-
-
+## Select drugs that have a large effect size in at least one location (some drugs might have a small global effect size, but large local)
 eff.data.heatmap2 <- eff.data.heatmap %>%
   mutate(mod = Mod(MMEJ_zscore_comb)) %>%
   mutate(max = ave(mod, drug, conc_char, FUN = max)) %>%
-  dplyr::select(-mod) %>%
-  spread(IPR, MMEJ_zscore_comb) %>%
-  group_by(conc_char) %>%
-  top_n(25, max) %>%
-  ungroup() %>%
-  dplyr::select(-max)
+  filter(max > 2*2.58) %>% # p < 0.005
+  dplyr::select(-mod, -max) %>%
+  spread(IPR, MMEJ_zscore_comb)
 
 
 breaks <- seq(-10, 10, 0.2)
@@ -498,37 +495,9 @@ for (i in unique(eff.data.heatmap2$conc_char)) {
            color = colorRampPalette(rev(brewer.pal(n = 7, name = "RdBu")))(100),
            annotation_colors = annotation_colors_scr, annotation_legend = T)
 }
-
-
-# Alternative: only HDACs:
-eff.data.heatmap <- indel.data %>%
-  filter(target == "Epigenetic Reader Domain", replicate == "E1504") %>%
-  distinct(conc_char, drug, IPR, MMEJ_zscore) %>%
-  mutate(mod = Mod(MMEJ_zscore)) %>%
-  mutate(max = ave(mod, drug, conc_char, FUN = max)) %>%
-  filter(max > 3 | max < -3) %>%
-  dplyr::select(-max, -mod) %>%
-  spread(IPR, MMEJ_zscore) %>%
-  mutate(drug = paste(drug, conc_char, sep = ""))
-
-breaks <- seq(-10, 10, 0.2)
-
-
-pheatmap(as.matrix(eff.data.heatmap %>%
-                       column_to_rownames('drug') %>%
-                       dplyr::select(contains('IPR')) %>%
-                       t()),
-           border_color = "white",
-           cellwidth = 12,
-           cellheight = 12,
-           breaks = breaks,
-           main = paste('MMEJ z_score'),
-           annotation_row = chromatin,
-           color = colorRampPalette(rev(brewer.pal(n = 7, name = "RdBu")))(100),
-           annotation_colors = annotation_colors_scr, annotation_legend = T)
 ```
 
-*Figure 3B: Heatmap of MMEJ z-score per IPR for 15 most potent compounds per concentration.*
+*Figure 3C: Heatmap of MMEJ z-score per IPR for 15 most potent compounds per concentration.*
 
 **Conclusion: At all three concentrations, the 15 most potent drugs reduce the MMEJ score. IPR10 is very sensitive to MMEJ score reduction, especially by HDACs.**
 
