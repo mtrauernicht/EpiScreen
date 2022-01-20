@@ -347,45 +347,22 @@ ggplot_custom <- function(...) ggplot2::ggplot(...) +
 
 ```{r data import, echo = FALSE, warning = FALSE}
 # Import data from preprocessing script
-indel.data <- readRDS("/DATA/projects/DSBrepair/data/R/rs20220118_episcreen/rs20220118_episcreen_ratios.RDS")
+indel.data <- readRDS("/DATA/projects/DSBrepair/data/R/rs20220120_episcreen2/rs20220120_episcreen_ratios.RDS")
 ```
 
 ---
 
 ## A: Cutting efficiency change per drug
-Are there any drugs (per concentration) that significantly change the cutting efficiency?
+Are there any drugs (per concentration) that significantly change the cutting efficiency significantly across all IPRs?
 ```{r warning = FALSE}
-# A: Cutting efficiency per drug - vulcano plot
-eff.data <- indel.data %>%
-  mutate(well = gsub("E1.*([A-Z]{1}[0-9]{2}$)", "\\1", exp)) %>%
-  filter(sample == "drug" | drug == "DMSO") %>%
-                dplyr::distinct(drug, freqCut_norm, conc_char, sample, target,
-                                tech, replicate, IPR, well) %>%
-  mutate(freqCut_norm = ave(freqCut_norm, drug, conc_char, replicate, well, tech, IPR, FUN = mean)) %>%
-  distinct() %>%
-  mutate(conc_drug = paste(conc_char, drug, sep = "_"))
-
-for (i in unique(eff.data$conc_drug)) {
-  for (j in unique(eff.data$IPR)) {
-    if (nrow(eff.data[eff.data$conc_drug == i & eff.data$IPR == j,]) >= 2) {
-    eff.data$pval[eff.data$conc_drug == i & eff.data$IPR == j] <- 
-      t.test(eff.data$freqCut_norm[eff.data$conc_drug == i & eff.data$IPR == j], 
-                            eff.data$freqCut_norm[eff.data$drug == "DMSO" & eff.data$IPR == j])$p.value
-    }
-  }
-}
-eff.data$pval_adj <- p.adjust(eff.data$pval, method = "fdr")
-
-
-ggplot_custom(eff.data %>%
+# A: Cutting efficiency per drug - beeswarm plot
+ggplot_custom(indel.data %>%
                 filter(sample == "drug") %>%
-                mutate(freqCut_norm = ave(freqCut_norm, drug, conc_char, IPR, FUN = mean)) %>%
-                dplyr::select(-tech, -replicate) %>%
-                distinct(),
-              aes(x = log2(freqCut_norm), y = -log10(pval_adj), color = ifelse(pval_adj < 0.05, "red", "black"))) +
-  geom_point() +
-  geom_vline(linetype = "dashed", xintercept = 0) +
-  facet_wrap(~conc_char)
+                distinct(eff_zscore_pooled_global_comb, drug, conc_char),
+              aes(x = conc_char, y = eff_zscore_pooled_global_comb, color = ifelse(Mod(eff_zscore_pooled_global_comb) > 1.645, "red", "black"))) +
+  geom_quasirandom() +
+  geom_hline(linetype = "dashed", yintercept = 1.645) +
+  geom_hline(linetype = "dashed", yintercept = -1.645)
 ```
 
 *Figure 2A: Compound-induced change in cutting efficiency of all tested compounds. Mean per drug & concentration vs. p-value from t-test.*
@@ -398,21 +375,15 @@ ggplot_custom(eff.data %>%
 Are there any target groups that are prone to changes in cutting efficiency?
 ```{r warning = FALSE}
 # B: Cutting efficiency change per target group, all concentrations together
-eff.data.2 <- eff.data %>%
-  filter(sample == "drug", conc_char == "100 nM", IPR == "IPR14") %>%
-  dplyr::select(freqCut_norm, pval, sample, drug, conc_char, target) %>%
-  mutate(freqCut_norm = ave(freqCut_norm, drug, conc_char, FUN = mean)) %>%
-  unique() %>%
-  mutate(mean_eff_target = ave(freqCut_norm, target, FUN = median),
-         pval = -log10(pval),
-         freqCut_norm = log2(freqCut_norm))
-
-ggplot_custom(data = eff.data.2, 
-              aes(y = freqCut_norm, x = reorder(target, -mean_eff_target, FUN = median))) + 
+ggplot_custom(indel.data %>%
+                filter(sample == "drug") %>%
+                distinct(eff_zscore_pooled_global_comb, drug, conc_char, target) %>%
+                mutate(mean_eff_target = ave(eff_zscore_pooled_global_comb, target, conc_char, FUN = mean)), 
+              aes(y = eff_zscore_pooled_global_comb, x = reorder(target, -mean_eff_target, FUN = median))) + 
     geom_boxplot(position = position_dodge(0.75), alpha = 0.4, outlier.shape = NA) +
-  geom_quasirandom(aes(color = ifelse(pval > 1.3, "red", "black"))) +
-    xlab("") + ylab("log2(cutting efficiency)") +
-      theme_classic_lines_90()
+  geom_quasirandom(aes(color = ifelse(Mod(eff_zscore_pooled_global_comb) > 1.645, "red", "black"))) +
+  theme_classic_lines_90() +
+  facet_wrap(~conc_char)
 ```
 
 *Figure 2B: Compound-induced change in cutting efficiency per compound target groups.*
@@ -425,14 +396,14 @@ ggplot_custom(data = eff.data.2,
 Are there any target groups that are prone to changes in cutting efficiency?
 ```{r warning = FALSE}
 # C: Bar plot
-eff.data.2 <- eff.data %>%
-  filter(sample == "drug", conc_char == "100 nM") %>%
-  distinct(drug, conc_char, target, pval) 
+eff.data <- indel.data %>%
+  filter(sample == "drug") %>%
+  distinct(eff_zscore_pooled_global_comb, drug, conc_char, target)
 
-eff.data.2$sign <- "Yes"
-eff.data.2$sign[eff.data.2$pval >= 0.05] <- "No"
+eff.data$sign <- "Yes"
+eff.data$sign[Mod(eff.data$eff_zscore_pooled_global_comb) < 1.645] <- "No"
 
-eff.data.2 <- eff.data.2 %>%
+eff.data <- eff.data %>%
   mutate(number = ave(target, target, conc_char, sign, FUN = length)) %>%
   mutate(number = as.numeric(number)) %>%
   distinct(conc_char, target, sign, number) %>%
@@ -440,7 +411,7 @@ eff.data.2 <- eff.data.2 %>%
   mutate(fraction = Yes / (No + Yes)) %>%
   pivot_longer(Yes:No, names_to = "sign", values_to = "number")
 
-ggplot_custom(eff.data.2 ,
+ggplot_custom(eff.data ,
               aes(y = reorder(target, fraction), x = number, fill = sign)) +
   geom_bar(stat = "identity")
 ```
@@ -510,31 +481,24 @@ annotation_colors_scr$target <- annotation_colors_scr$target[ordered_marks2]
 
 # Generate heatmap: select top 15 drugs (highest change at any IPR) per concentration
 eff.data.heatmap <- indel.data %>%
+  filter(target != "Aurora Kinase") %>%
   filter(sample == "drug" | drug == "DMSO") %>%
-  distinct(conc_char, replicate,drug, IPR, freqCut_norm_mean, freqCut_norm)
+  distinct(conc_char,drug, IPR, eff_zscore_pooled_comb)
 
 
 eff.data.heatmap2 <- eff.data.heatmap %>%
-  dplyr::select(-freqCut_norm_mean) %>%
-  mutate(freqCut_norm = ave(freqCut_norm, conc_char, drug, replicate, IPR, FUN = mean)) %>%
-  distinct() %>%
-  mutate(freqCut_norm = log2(freqCut_norm)) %>%
-  mutate(mod = Mod(freqCut_norm)) %>%
-  mutate(max = ave(mod, drug, conc_char, replicate, FUN = max)) %>%
-  dplyr::select(-mod) %>%
-  spread(IPR, freqCut_norm) %>%
-  mutate(conc_rep = paste(conc_char, replicate, sep = " ")) %>%
-  group_by(conc_rep) %>%
-  top_n(25, max) %>%
-  ungroup() %>%
-  dplyr::select(-max)
+  mutate(mod = Mod(eff_zscore_pooled_comb)) %>%
+  mutate(max = ave(mod, drug, conc_char, FUN = max)) %>%
+  filter(max > 2.9) %>%
+  dplyr::select(-mod, -max) %>%
+  spread(IPR, eff_zscore_pooled_comb)
 
-breaks <- seq(-0.2, 0.2, 0.004)
+breaks <- seq(-5, 5, 0.1)
 
 
 
-for (i in unique(eff.data.heatmap2$conc_rep)) {
-  pheatmap(as.matrix(eff.data.heatmap2[eff.data.heatmap2$conc_rep == i,] %>%
+for (i in unique(eff.data.heatmap2$conc_char)) {
+  pheatmap(as.matrix(eff.data.heatmap2[eff.data.heatmap2$conc_char == i,] %>%
                        column_to_rownames('drug') %>%
                        dplyr::select(contains('IPR')) %>%
                        t()),
@@ -549,34 +513,6 @@ for (i in unique(eff.data.heatmap2$conc_rep)) {
            color = colorRampPalette(rev(brewer.pal(n = 7, name = "RdBu")))(100),
            annotation_colors = annotation_colors_scr, annotation_legend = T)
 }
-
-# # Alternative: only HDACs:
-# eff.data.heatmap <- indel.data %>%
-#   filter(target == "HDAC" & replicate == "E1504") %>%
-#   distinct(conc_char, drug, IPR, freqCut_norm)%>%
-#   mutate(freqCut_norm_mean = ave(freqCut_norm, drug, conc_char, IPR, FUN = mean)) %>%
-#   mutate(freqCut_norm_mean = log2(freqCut_norm_mean)) %>%
-#   mutate(mod = Mod(freqCut_norm_mean)) %>%
-#   mutate(max = ave(mod, drug, conc_char, FUN = max)) %>%
-#   filter(max > 0.15 | max < -0.15) %>%
-#   dplyr::select(-max, -mod, -freqCut_norm) %>%
-#   spread(IPR, freqCut_norm_mean) %>%
-#   mutate(drug = paste(drug, conc_char, sep = ""))
-# 
-# 
-# pheatmap(as.matrix(eff.data.heatmap %>%
-#                        column_to_rownames('drug') %>%
-#                        dplyr::select(contains('IPR')) %>%
-#                        t()),
-#            border_color = "white",
-#            cellwidth = 12,
-#            cellheight = 12,
-#            breaks = breaks,
-#            main = paste('efficiency change'),
-#            annotation_row = chromatin,
-#            color = colorRampPalette(rev(brewer.pal(n = 7, name = "RdBu")))(100),
-#            annotation_colors = annotation_colors_scr, annotation_legend = T)
-
 ```
 
 *Figure 2D: Heatmap of cutting efficiency change induced by HDAC inhibitors at 19 genomic locations.*

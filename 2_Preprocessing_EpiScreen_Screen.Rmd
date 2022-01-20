@@ -610,7 +610,6 @@ screen.indel.dt <- screen.indel.dt %>%
   dplyr::select(-DMSO)
 
 dim(screen.indel.dt)
-
 ```
 
 dim(screen.indel.dt)
