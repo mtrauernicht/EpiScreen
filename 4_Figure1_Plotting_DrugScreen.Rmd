@@ -346,7 +346,8 @@ ggplot_custom <- function(...) ggplot2::ggplot(...) +
 
 ```{r data import, echo = FALSE, warning = FALSE}
 # Import data from preprocessing script
-indel.data <- readRDS("/DATA/projects/DSBrepair/data/R/rs20220118_episcreen/rs20220118_episcreen_ratios.RDS")
+#indel.data <- readRDS("/DATA/projects/DSBrepair/data/R/rs20220118_episcreen/rs20220118_episcreen_ratios.RDS")
+indel.data <- readRDS("/DATA/usr/m.trauernicht/projects/EpiScreen/files_scripts/mt20220120_episcreen.RDS")
 
 # Complete data without exlcluding wells <0.45 viability (I need this for plotting)
 viability.data = as.data.table(readRDS("/DATA/projects/DSBrepair/git/EpiScreen/files_scripts/rs20211221_Episcreen_Reads_Viab_Metadata.RDS")) %>%
@@ -471,9 +472,9 @@ How do the drugs impact MMEJ score in general? Does the genomic location & conce
 # E: MMEJ score per IPR
 ggplot(indel.data2 %>%
          filter(sample != "DNA-PKi (NHEJ control)", sample != "Mirin (MMEJ control)") %>%
-         dplyr::distinct(MMEJscore, IPR, drug, conc_char, tech, sample, replicate) %>%
-         mutate(freqCut = ave(MMEJscore, IPR, drug, conc_char, tech, replicate)),
-       aes(x = IPR, y = MMEJscore)) +
+         dplyr::distinct(MMEJratio, IPR, drug, conc_char, tech, sample, replicate) %>%
+         mutate(MMEJratio = ave(MMEJratio, IPR, drug, conc_char, tech, replicate)),
+       aes(x = IPR, y = MMEJratio)) +
   geom_quasirandom_rast(aes(color = sample), dodge.width = 0.75, raster.dpi = 600) +
   scale_color_manual(values = c(colors_drugs[2], colors_drugs[7], colors_drugs[4], "#000000")) #+
   # coord_polar() +
@@ -532,12 +533,12 @@ How well does the MMEJ score correlate between the six technical replicates?
 # B: Correlation between technical replicates MMEJ score
 techn_repl <- indel.data %>%
   filter(sample == "drug") %>%
-  dplyr::distinct(MMEJscore, drug, tech, replicate, conc_char, sample) %>%
-  mutate(MMEJscore = ave(MMEJscore, drug, tech, replicate, conc_char, FUN = mean)) %>%
+  dplyr::distinct(MMEJratio, drug, tech, replicate, conc_char, sample) %>%
+  mutate(MMEJratio = ave(MMEJratio, drug, tech, replicate, conc_char, FUN = mean)) %>%
   unique() %>%
   mutate(rep = paste(replicate, tech, sep = "_")) %>%
   dplyr::select(-replicate, -tech) %>%
-  spread(rep, MMEJscore) %>%
+  spread(rep, MMEJratio) %>%
   na.omit()
 
 boundaries <- c(0.7,0.75,0.8,0.85)
@@ -548,8 +549,8 @@ ggpairs(techn_repl %>% dplyr::select(contains("E1")),
                    geom_abline(slope = 1, lty = "dashed", col = "red")}),
                diag = list(continuous = function(data, mapping, ...) {
                    ggally_densityDiag(data = data, mapping = mapping, alpha = 0.3, fill = "red")})) +
-  xlab("MMEJ score") +
-  ylab("MMEJ score")
+  xlab("MMEJ ratio") +
+  ylab("MMEJ ratio")
 ```
 
 *Figure S1B: Correlation of the MMEJ score between all technical replicates.*
