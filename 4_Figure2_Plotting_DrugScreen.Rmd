@@ -363,7 +363,8 @@ ggplot_custom(indel.data %>%
               aes(x = conc_char, y = mean_eff_zscore_global_comb, color = ifelse(Mod(mean_eff_zscore_global_comb) > 1.96, "red", "black"))) +
   geom_quasirandom() +
   geom_hline(linetype = "dashed", yintercept = 1.96) +
-  geom_hline(linetype = "dashed", yintercept = -1.96)
+  geom_hline(linetype = "dashed", yintercept = -1.96) +
+  ggtitle("first z-score per tech. rep., then mean of z-scores")
 ```
 
 *Figure 2A: Compound-induced change in cutting efficiency of all tested compounds. Mean per drug & concentration vs. p-value from t-test.*
@@ -488,15 +489,15 @@ eff.data.heatmap <- indel.data %>%
   #filter(target != "Aurora Kinase") %>%
   filter(sample == "drug" | drug == "DMSO") %>%
   #filter(Mod(eff_zscore_pooled_global_comb) >= 1.645) %>%  # we could also choose to display all drugs that have significant global hits
-  distinct(conc_char,drug, IPR, eff_zscore_pooled_comb)
+  distinct(conc_char,drug, IPR, mean_eff_zscore_comb)
 
 ## Select drugs that have a large effect size in at least one location (some drugs might have a small global effect size, but large local)
 eff.data.heatmap2 <- eff.data.heatmap %>%
-  mutate(mod = Mod(eff_zscore_pooled_comb)) %>%
+  mutate(mod = Mod(mean_eff_zscore_comb)) %>%
   mutate(max = ave(mod, drug, conc_char, FUN = max)) %>%
   filter(max > 2.58) %>% # p < 0.01
   dplyr::select(-mod, -max) %>%
-  spread(IPR, eff_zscore_pooled_comb)
+  spread(IPR, mean_eff_zscore_comb)
 
 breaks <- quantile(unlist(eff.data.heatmap2 %>% dplyr::select(contains('IPR'))), c(.05,.95)) # change these numbers according to where you want to set the cutoff
 palette_length <- 100
