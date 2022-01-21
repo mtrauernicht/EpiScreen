@@ -348,7 +348,7 @@ ggplot_custom <- function(...) ggplot2::ggplot(...) +
 ```{r data import, echo = FALSE, warning = FALSE}
 # Import data from preprocessing script
 #indel.data <- readRDS("/DATA/projects/DSBrepair/data/R/rs20220120_episcreen2/rs20220120_episcreen_ratios.RDS")
-indel.data <- readRDS("/DATA/usr/m.trauernicht/projects/EpiScreen/files_scripts/mt20220120_episcreen.RDS")
+indel.data <- readRDS("/DATA/usr/m.trauernicht/projects/EpiScreen/files_scripts/mt20220121_episcreen.RDS")
 ```
 
 ---
@@ -359,8 +359,8 @@ Are there any drugs (per concentration) that significantly change the cutting ef
 # A: Cutting efficiency per drug - beeswarm plot
 ggplot_custom(indel.data %>%
                 filter(sample == "drug") %>%
-                distinct(eff_zscore_pooled_global_comb, drug, conc_char),
-              aes(x = conc_char, y = eff_zscore_pooled_global_comb, color = ifelse(Mod(eff_zscore_pooled_global_comb) > 1.96, "red", "black"))) +
+                distinct(mean_eff_zscore_global_comb, drug, conc_char),
+              aes(x = conc_char, y = mean_eff_zscore_global_comb, color = ifelse(Mod(mean_eff_zscore_global_comb) > 1.96, "red", "black"))) +
   geom_quasirandom() +
   geom_hline(linetype = "dashed", yintercept = 1.96) +
   geom_hline(linetype = "dashed", yintercept = -1.96)
@@ -379,11 +379,11 @@ Are there any target groups that are prone to changes in cutting efficiency?
 ggplot_custom(indel.data %>%
                 filter(conc_char == "100 nM") %>%
                 filter(sample == "drug") %>%
-                distinct(eff_zscore_pooled_global_comb, drug, conc_char, target) %>%
-                mutate(mean_eff_target = ave(eff_zscore_pooled_global_comb, target, conc_char, FUN = mean)), 
-              aes(y = eff_zscore_pooled_global_comb, x = reorder(target, -mean_eff_target, FUN = median))) + 
+                distinct(mean_eff_zscore_global_comb, drug, conc_char, target) %>%
+                mutate(mean_eff_target = ave(mean_eff_zscore_global_comb, target, conc_char, FUN = mean)), 
+              aes(y = mean_eff_zscore_global_comb, x = reorder(target, -mean_eff_target, FUN = median))) + 
     geom_boxplot(position = position_dodge(0.75), alpha = 0.4, outlier.shape = NA) +
-  geom_quasirandom(aes(color = ifelse(Mod(eff_zscore_pooled_global_comb) > 1.96, "red", "black"))) +
+  geom_quasirandom(aes(color = ifelse(Mod(mean_eff_zscore_global_comb) > 1.96, "red", "black"))) +
   geom_hline(linetype = "dashed", yintercept = 1.96) +
   geom_hline(linetype = "dashed", yintercept = -1.96) +
   theme_classic_lines_90()
@@ -401,10 +401,10 @@ Are there any target groups that are prone to changes in cutting efficiency?
 # C: Bar plot
 eff.data <- indel.data %>%
   filter(sample == "drug") %>%
-  distinct(eff_zscore_pooled_global_comb, drug, target, conc_char)
+  distinct(mean_eff_zscore_global_comb, drug, target, conc_char)
 
 eff.data$sign <- "Yes"
-eff.data$sign[Mod(eff.data$eff_zscore_pooled_global_comb) < 1.96] <- "No"
+eff.data$sign[Mod(eff.data$mean_eff_zscore_global_comb) < 1.96] <- "No"
 
 eff.data <- eff.data %>%
   mutate(number = ave(target, target, sign, conc_char, FUN = length)) %>%
@@ -498,7 +498,11 @@ eff.data.heatmap2 <- eff.data.heatmap %>%
   dplyr::select(-mod, -max) %>%
   spread(IPR, eff_zscore_pooled_comb)
 
-breaks <- seq(-5, 5, 0.1)
+breaks <- quantile(unlist(eff.data.heatmap2 %>% dplyr::select(contains('IPR'))), c(.05,.95)) # change these numbers according to where you want to set the cutoff
+palette_length <- 100
+
+myBreaks <- c(seq(breaks[1], -2, length.out=ceiling(palette_length/2) + 1), 
+              seq(2, breaks[2], length.out=floor(palette_length/2)))
 
 for (i in unique(eff.data.heatmap2$conc_char)) {
   pheatmap(as.matrix(eff.data.heatmap2[eff.data.heatmap2$conc_char == i,] %>%
@@ -508,12 +512,12 @@ for (i in unique(eff.data.heatmap2$conc_char)) {
            border_color = "white",
            cellwidth = 12,
            cellheight = 12,
-           breaks = breaks,
+           breaks = myBreaks,
            cluster_rows = F,
            main = paste('efficiency change, concentration =', i),
            annotation_col = target,
            annotation_row = chromatin,
-           color = colorRampPalette(rev(brewer.pal(n = 7, name = "RdBu")))(100),
+           color = colorRampPalette(c("#e07a5f", "#e5e5e5", "#3d405b"))(palette_length),
            annotation_colors = annotation_colors_scr, annotation_legend = T)
 }
 ```
@@ -533,38 +537,38 @@ We know that the cutting efficiency does not correlate well if all data is taken
 #   distinct(drug, conc_char, IPR) %>%
 #   mutate(drug_conc = paste(drug, conc_char, IPR, paste = "_"))
 
-techn_repl <- indel.data %>%
-  mutate(drug_conc = paste(drug, conc_char, IPR, paste = "_")) %>%
-  #filter(drug_conc %in% significant_hits_efficiency$drug_conc) %>%
-  dplyr::distinct(freqCut_norm, drug, tech, replicate, conc_char, sample, IPR) %>%
-  mutate(freqCut_norm = log2(ave(freqCut_norm, drug, tech, replicate, conc_char, IPR, FUN = mean))) %>%
-  unique() %>%
-  mutate(rep = paste(replicate, tech, sep = "_")) %>%
-  dplyr::select(-replicate, -tech) %>%
-  mutate(max = ave(freqCut_norm, drug, conc_char, IPR, FUN = max),
-         min = ave(freqCut_norm, drug, conc_char, IPR, FUN = min)) %>%
-  distinct() %>%
-  spread(rep, freqCut_norm) %>%
-  na.omit() 
-  
-techn_repl$large_effect <- "1_no"
-techn_repl$large_effect[techn_repl$max > 0.3 | techn_repl$min < -0.3] <- "0_yes"
-
-ggpairs(techn_repl %>% 
-       #filter(conc_char == "1 µM") %>% #1 µM
-       # filter(drug %in% c("Vorinostat (SAHA, MK0683)", "Scriptaid",   "Decitabine" , "(+)-JQ1" ,  "PCI-24781 (Abexinostat)")) %>%
-          dplyr::select(contains("E1")),
-       mapping = aes(color = techn_repl$large_effect),
-               upper = list(continuous = corColor),
-               lower = list(continuous = function(data, mapping, ...) {
-                   ggally_points(data = data, mapping = mapping, alpha = 0.5, size = 0.2) +
-                   geom_abline(slope = 1, lty = "dashed", col = "red")}),
-               diag = list(continuous = function(data, mapping, ...) {
-                   ggally_densityDiag(data = data, mapping = mapping, alpha = 0.3, fill = "red")})) +
-  # xlim(.4, .7) + 
-  xlab("Cutting efficiency") +
-  ylab("Cutting efficiency") +
-  scale_color_manual(values = colors_diverse)
+# techn_repl <- indel.data %>%
+#   mutate(drug_conc = paste(drug, conc_char, IPR, paste = "_")) %>%
+#   #filter(drug_conc %in% significant_hits_efficiency$drug_conc) %>%
+#   dplyr::distinct(freqCut_norm, drug, tech, replicate, conc_char, sample, IPR) %>%
+#   mutate(freqCut_norm = log2(ave(freqCut_norm, drug, tech, replicate, conc_char, IPR, FUN = mean))) %>%
+#   unique() %>%
+#   mutate(rep = paste(replicate, tech, sep = "_")) %>%
+#   dplyr::select(-replicate, -tech) %>%
+#   mutate(max = ave(freqCut_norm, drug, conc_char, IPR, FUN = max),
+#          min = ave(freqCut_norm, drug, conc_char, IPR, FUN = min)) %>%
+#   distinct() %>%
+#   spread(rep, freqCut_norm) %>%
+#   na.omit() 
+#   
+# techn_repl$large_effect <- "1_no"
+# techn_repl$large_effect[techn_repl$max > 0.3 | techn_repl$min < -0.3] <- "0_yes"
+# 
+# ggpairs(techn_repl %>% 
+#        #filter(conc_char == "1 µM") %>% #1 µM
+#        # filter(drug %in% c("Vorinostat (SAHA, MK0683)", "Scriptaid",   "Decitabine" , "(+)-JQ1" ,  "PCI-24781 (Abexinostat)")) %>%
+#           dplyr::select(contains("E1")),
+#        mapping = aes(color = techn_repl$large_effect),
+#                upper = list(continuous = corColor),
+#                lower = list(continuous = function(data, mapping, ...) {
+#                    ggally_points(data = data, mapping = mapping, alpha = 0.5, size = 0.2) +
+#                    geom_abline(slope = 1, lty = "dashed", col = "red")}),
+#                diag = list(continuous = function(data, mapping, ...) {
+#                    ggally_densityDiag(data = data, mapping = mapping, alpha = 0.3, fill = "red")})) +
+#   # xlim(.4, .7) + 
+#   xlab("Cutting efficiency") +
+#   ylab("Cutting efficiency") +
+#   scale_color_manual(values = colors_diverse)
 ```
 
 *Figure S2A: Correlation between cutting efficiency of significant hits.*

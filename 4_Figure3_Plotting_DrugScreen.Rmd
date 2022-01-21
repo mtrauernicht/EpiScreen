@@ -470,12 +470,16 @@ eff.data.heatmap <- indel.data %>%
 eff.data.heatmap2 <- eff.data.heatmap %>%
   mutate(mod = Mod(MMEJ_zscore_comb)) %>%
   mutate(max = ave(mod, drug, conc_char, FUN = max)) %>%
-  filter(max > 2*2.58) %>% # p < 0.005
+  filter(max > 4.4) %>% # p < 0,00001
   dplyr::select(-mod, -max) %>%
   spread(IPR, MMEJ_zscore_comb)
 
 
-breaks <- seq(-10, 10, 0.2)
+breaks <- quantile(unlist(eff.data.heatmap2 %>% dplyr::select(contains('IPR'))), c(.02,.99)) # change these numbers according to where you want to set the cutoff
+palette_length <- 100
+
+myBreaks <- c(seq(breaks[1], -2, length.out=ceiling(palette_length/2) + 1), 
+              seq(2, breaks[2], length.out=floor(palette_length/2)))
 
 
 
@@ -488,11 +492,11 @@ for (i in unique(eff.data.heatmap2$conc_char)) {
            cellwidth = 12,
            cellheight = 12,
            cluster_rows = F,
-           breaks = breaks,
+           breaks = myBreaks,
            main = paste('MMEJ z-score, concentration =', i),
            annotation_col = target,
            annotation_row = chromatin,
-           color = colorRampPalette(rev(brewer.pal(n = 7, name = "RdBu")))(100),
+           color = colorRampPalette(c("#e07a5f", "#e5e5e5", "#3d405b"))(palette_length),
            annotation_colors = annotation_colors_scr, annotation_legend = T)
 }
 ```
