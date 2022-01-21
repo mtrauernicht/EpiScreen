@@ -742,11 +742,14 @@ eff.zscore.global = screen.ratio.dt %>%
   # And calculate the z-scores
   mutate(eff_zscore_global = (freqCut_global - mean_DMSO_global)/ sd_DMSO_global,
          eff_zscore_pooled_global = (eff_score_global_mean - 
-                                       mean_DMSO_global_pooled) / sd_DMSO_global_pooled)
+                                       mean_DMSO_global_pooled) / sd_DMSO_global_pooled) %>%
+  mutate(mean_eff_zscore_global = ave(eff_zscore_global, drug, conc_char, replicate, FUN = mean))
 # Combine the global z-scores
 eff.zscore.pooled.global.comb = eff.zscore.global %>% 
-  distinct(drug, conc_char, replicate, eff_zscore_pooled_global) %>%
+  distinct(drug, conc_char, replicate, eff_zscore_pooled_global, mean_eff_zscore_global) %>%
          mutate(eff_zscore_pooled_global_comb = ave(eff_zscore_pooled_global, drug, conc_char, 
+                                FUN = function(x) sum(x)/sqrt(length(x)))) %>%
+         mutate(mean_eff_zscore_global_comb = ave(mean_eff_zscore_global, drug, conc_char, 
                                 FUN = function(x) sum(x)/sqrt(length(x))))
 
 eff.zscore.global %<>% left_join(eff.zscore.pooled.global.comb)
@@ -906,6 +909,8 @@ ratio.cols = c("replicate",
          "eff_zscore_comb",
          "eff_zscore_pooled_comb",
          "mean_eff_zscore_comb",
+         "mean_eff_zscore_global_comb",
+         "mean_eff_zscore_global",
          "eff_score_global_mean",
          "eff_zscore_global",
          "eff_zscore_pooled_global",
