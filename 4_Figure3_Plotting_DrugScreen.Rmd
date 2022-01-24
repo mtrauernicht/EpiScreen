@@ -519,29 +519,51 @@ for (i in unique(eff.data.heatmap2$conc_char)) {
 Do the changes in MMEJ-ratio change correlate with changes in efficiency? Can MMEJ changes be explained by opened up/closed chromatin?
 
 ```{r warning = F}
-ggplot(indel.data %>%
-         filter(sample == "drug") %>%
-         filter(Mod(mean_eff_zscore_global_comb) > 2.58) %>%
-         distinct(mean_eff_zscore_comb, MMEJ_zscore_comb, drug, conc_char, target, IPR),
+for (i in unique(indel.data$target)) {
+  
+  x <- indel.data %>%
+    filter(sample == "drug") %>%
+    filter(target == i) %>%
+    mutate(mean_eff_pval_global_comb = 2*pnorm(q = abs(mean_eff_zscore_global_comb), lower.tail = F)) %>%
+    mutate(mean_eff_pval_adj_global_comb = p.adjust(mean_eff_pval_global_comb, method = 'fdr')) %>%
+    filter(mean_eff_pval_adj_global_comb < 0.01) %>%
+    distinct(mean_eff_zscore_comb, MMEJ_zscore_comb, drug, conc_char, target, IPR) %>%
+    mutate(drug_conc = paste(drug, conc_char, sep = "_"))
+  
+  if (length(unique(x$drug_conc)) > 1) {
+  p<- ggplot(x ,
        aes(x = MMEJ_zscore_comb, y = mean_eff_zscore_comb)) +
   geom_point() +
   geom_smooth(method = "lm") +
-  facet_wrap(~target) +
+  facet_wrap(~drug_conc) +
+  stat_cor(method = "spearman") +
+  ggtitle(paste("efficiency vs. mmej-ratio per target group", i))
+  
+  print(p)
+  }
+}
+
+ggplot_custom(indel.data %>%
+    filter(sample == "drug") %>%
+    filter(target == "HDAC") %>%
+    mutate(mean_eff_pval_global_comb = 2*pnorm(q = abs(mean_eff_zscore_global_comb), lower.tail = F)) %>%
+    mutate(mean_eff_pval_adj_global_comb = p.adjust(mean_eff_pval_global_comb, method = 'fdr')) %>%
+    filter(mean_eff_pval_adj_global_comb < 0.01) %>%
+    distinct(mean_eff_zscore_comb, MMEJ_zscore_comb, drug, conc_char, target, IPR) %>%
+    mutate(drug_conc = paste(drug, conc_char, sep = "_")),
+    aes(x = MMEJ_zscore_comb, y = mean_eff_zscore_comb, color = drug_conc)) +
+  geom_point() +
+  geom_smooth(method = "lm") +
+  stat_cor(method = "spearman") +
   ggtitle("efficiency vs. mmej-ratio per target group")
 
-ggplot(indel.data %>%
-         filter(target == "HDAC") %>%
-         filter(Mod(mean_eff_zscore_global_comb) > 2.58) %>%
-         distinct(mean_eff_zscore_comb, MMEJ_zscore_comb, drug, conc_char, IPR),
-       aes(x = MMEJ_zscore_comb, y = mean_eff_zscore_comb)) +
-  geom_point() +
-  geom_smooth(method = "lm") +
-  facet_wrap(~drug) +
-  ggtitle("efficiency vs. mmej-ratio for HDAC inhibitors per IPR")
 
 eff_mmej_corr <- indel.data %>%
-  filter(Mod(mean_eff_zscore_global_comb) > 2.58) %>% 
-  distinct(mean_eff_zscore_comb, MMEJ_zscore_comb, target, drug, conc_char, IPR) %>%
+  filter(sample == "drug") %>%
+  mutate(mean_eff_pval_global_comb = 2*pnorm(q = abs(mean_eff_zscore_global_comb), lower.tail = F)) %>%
+  mutate(mean_eff_pval_adj_global_comb = p.adjust(mean_eff_pval_global_comb, method = 'fdr')) %>%
+  filter(mean_eff_pval_adj_global_comb < 0.01) %>%
+  distinct(mean_eff_zscore_comb, MMEJ_zscore_comb, drug, conc_char, target, IPR, mean_eff_pval_global_comb, MMEJ_zscore_global_comb) %>%
   mutate(drug_conc = paste(drug, conc_char, sep = "_")) %>%
   mutate(slope = NA, term = NA, p.value = NA)
 
@@ -563,40 +585,19 @@ for (i in unique(eff_mmej_corr$drug_conc)) {
 
 eff_mmej_corr_heatmap <- eff_mmej_corr %>%
   filter(term != "(Intercept)") %>%
+  mutate(p.value = p.adjust(p.value, method = "fdr")) %>%
   #filter(p.value < 0.05) %>%
-  dplyr::select(-mean_eff_zscore_comb, -MMEJ_zscore_comb, -term) %>%
-  distinct() %>%
-  spread(IPR, slope)
-
-eff_mmej_corr_heatmap <- eff_mmej_corr_heatmap[,c("drug_conc", chromatin_ord$IPR)]
-
-palette_length <- 100
-
-myBreaks <- c(seq(-1,1,0.02))
-
-pheatmap(eff_mmej_corr_heatmap %>%
-           column_to_rownames("drug_conc") %>%
-           t(),
-         border_color = "white",
-         cellwidth = 12,
-         cellheight = 12,
-         na_col = "white",
-         breaks = myBreaks,
-         cluster_rows = F,
-         cluster_cols = F,
-         main = paste('correlation: efficiency vs. mmej-score'),
-         annotation_row = chromatin,
-         color = colorRampPalette(c("#e07a5f", "#e5e5e5", "#3d405b"))(palette_length),
-         annotation_colors = annotation_colors_scr, 
-         annotation_legend = T)
+  dplyr::select(-term, -IPR, -mean_eff_zscore_comb, -MMEJ_zscore_comb) %>%
+  distinct()
 
 ggplot_custom(eff_mmej_corr_heatmap %>%
-                distinct(target, drug_conc, slope, p.value) %>%
-                filter(p.value < 0.05),
-              aes(x = target, y = slope, color = -log10(p.value))) +
-  geom_quasirandom() +
-  theme_classic_lines_90() +
-  scale_color_viridis_c()
+                mutate(mean_slope = ave(slope, target, FUN = mean)),
+              aes(x = reorder(target, slope), y = slope)) +
+  geom_boxplot(alpha = 0.4, outlier.shape = NA) +
+  geom_quasirandom(aes(color = ifelse(p.value < 0.05, "green", "black"))) +
+  theme_classic_lines_90()
+
+
 
 
 ```
