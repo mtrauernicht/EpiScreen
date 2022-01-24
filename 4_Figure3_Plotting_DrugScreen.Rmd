@@ -70,6 +70,7 @@ library(tibble)
 library(pheatmap)
 library(RColorBrewer)
 library(ggrastr)
+library(broom)
 ```
 
 ### Functions
@@ -346,7 +347,7 @@ ggplot_custom <- function(...) ggplot2::ggplot(...) +
 
 ```{r data import, echo = FALSE, warning = FALSE}
 # Import data from preprocessing script
-indel.data <- readRDS("/DATA/usr/m.trauernicht/projects/EpiScreen/files_scripts/mt20220120_episcreen.RDS")
+indel.data <- readRDS("/DATA/usr/m.trauernicht/projects/EpiScreen/files_scripts/mt20220121_episcreen.RDS")
 ```
 
 
@@ -425,10 +426,10 @@ chromatin <- readRDS(
   column_to_rownames(var="IPR")
 
 # Change colors of annotations
-chrom_colors = c("Euchromatin" = "#264653",
-                  "other-heterochromatin" = "#e9c46a",  
-                     "H3K27me3" = "#e76f51", 
-                  "Triple Heterochromatin" = "#f4a261")
+chrom_colors = c("Euchromatin" = "#EAEEE8",
+                  "other-heterochromatin" = "#CAD6C2",  
+                     "H3K27me3" = "#a5a58d", 
+                  "Triple Heterochromatin" = "#6b705c")
 
 # colors <- brewer.pal(length(unique(barcode.annotation$cluster)), "Pastel2")
 # names(colors) <- unique(barcode.annotation$cluster)
@@ -461,7 +462,7 @@ annotation_colors_scr$target <- annotation_colors_scr$target[ordered_marks2]
 
 # Generate heatmap: select top 15 drugs (highest change at any IPR) per concentration
 eff.data.heatmap <- indel.data %>%
-  filter(target != "Aurora Kinase") %>%
+  #filter(target != "Aurora Kinase") %>%
   filter(sample == "drug" | drug == "DMSO") %>%
   #filter(Mod(eff_zscore_pooled_global_comb) >= 1.645) %>%  # we could also choose to display all drugs that have significant global hits
   distinct(conc_char,drug, IPR, MMEJ_zscore_comb)
@@ -470,16 +471,25 @@ eff.data.heatmap <- indel.data %>%
 eff.data.heatmap2 <- eff.data.heatmap %>%
   mutate(mod = Mod(MMEJ_zscore_comb)) %>%
   mutate(max = ave(mod, drug, conc_char, FUN = max)) %>%
-  filter(max > 4.4) %>% # p < 0,00001
+  filter(max > 6) %>% # 4.4 = p < 0,00001
   dplyr::select(-mod, -max) %>%
   spread(IPR, MMEJ_zscore_comb)
 
+chromatin_ord <- chromatin %>% 
+  rownames_to_column('IPR') %>%
+  mutate(chromatin = gsub("Euc", "0_Euc", chromatin)) %>%
+  mutate(chromatin = gsub("other-heterochromatin", "1_other-heterochromatin", chromatin)) %>%
+  mutate(chromatin = gsub("H3K27me3", "2_H3K27me3", chromatin)) %>%
+  mutate(chromatin = gsub("Triple Heterochromatin", "3_Triple Heterochromatin", chromatin)) %>%
+  arrange(chromatin)
+
+eff.data.heatmap2 <- eff.data.heatmap2[,c("drug","conc_char", chromatin_ord$IPR)]
 
 breaks <- quantile(unlist(eff.data.heatmap2 %>% dplyr::select(contains('IPR'))), c(.02,.99)) # change these numbers according to where you want to set the cutoff
 palette_length <- 100
 
-myBreaks <- c(seq(breaks[1], -2, length.out=ceiling(palette_length/2) + 1), 
-              seq(2, breaks[2], length.out=floor(palette_length/2)))
+myBreaks <- c(seq(breaks[1], -2.58, length.out=ceiling(palette_length/2) + 1), 
+              seq(2.58, breaks[2], length.out=floor(palette_length/2)))
 
 
 
@@ -504,6 +514,92 @@ for (i in unique(eff.data.heatmap2$conc_char)) {
 *Figure 3C: Heatmap of MMEJ z-score per IPR for 15 most potent compounds per concentration.*
 
 **Conclusion: At all three concentrations, the 15 most potent drugs reduce the MMEJ score. IPR10 is very sensitive to MMEJ score reduction, especially by HDACs.**
+
+## D: Correlation of MMEJ-ratio z-score with Efficiency z-score
+Do the changes in MMEJ-ratio change correlate with changes in efficiency? Can MMEJ changes be explained by opened up/closed chromatin?
+
+```{r warning = F}
+ggplot(indel.data %>%
+         filter(sample == "drug") %>%
+         filter(Mod(mean_eff_zscore_global_comb) > 2.58) %>%
+         distinct(mean_eff_zscore_comb, MMEJ_zscore_comb, drug, conc_char, target, IPR),
+       aes(x = MMEJ_zscore_comb, y = mean_eff_zscore_comb)) +
+  geom_point() +
+  geom_smooth(method = "lm") +
+  facet_wrap(~target) +
+  ggtitle("efficiency vs. mmej-ratio per target group")
+
+ggplot(indel.data %>%
+         filter(target == "HDAC") %>%
+         filter(Mod(mean_eff_zscore_global_comb) > 2.58) %>%
+         distinct(mean_eff_zscore_comb, MMEJ_zscore_comb, drug, conc_char, IPR),
+       aes(x = MMEJ_zscore_comb, y = mean_eff_zscore_comb)) +
+  geom_point() +
+  geom_smooth(method = "lm") +
+  facet_wrap(~drug) +
+  ggtitle("efficiency vs. mmej-ratio for HDAC inhibitors per IPR")
+
+eff_mmej_corr <- indel.data %>%
+  filter(Mod(mean_eff_zscore_global_comb) > 2.58) %>% 
+  distinct(mean_eff_zscore_comb, MMEJ_zscore_comb, target, drug, conc_char, IPR) %>%
+  mutate(drug_conc = paste(drug, conc_char, sep = "_")) %>%
+  mutate(slope = NA, term = NA, p.value = NA)
+
+for (i in unique(eff_mmej_corr$drug_conc)) {
+    model.correlation <- lm(formula = mean_eff_zscore_comb ~ MMEJ_zscore_comb, 
+                               data = eff_mmej_corr[eff_mmej_corr$drug_conc == i,]) %>% 
+      tidy()
+    
+    eff_mmej_corr$slope[eff_mmej_corr$drug_conc == i] <- 
+      model.correlation$estimate
+    
+    eff_mmej_corr$term[eff_mmej_corr$drug_conc == i] <- 
+      model.correlation$term
+    
+    eff_mmej_corr$p.value[eff_mmej_corr$drug_conc == i] <- 
+      model.correlation$p.value
+}
+
+
+eff_mmej_corr_heatmap <- eff_mmej_corr %>%
+  filter(term != "(Intercept)") %>%
+  #filter(p.value < 0.05) %>%
+  dplyr::select(-mean_eff_zscore_comb, -MMEJ_zscore_comb, -term) %>%
+  distinct() %>%
+  spread(IPR, slope)
+
+eff_mmej_corr_heatmap <- eff_mmej_corr_heatmap[,c("drug_conc", chromatin_ord$IPR)]
+
+palette_length <- 100
+
+myBreaks <- c(seq(-1,1,0.02))
+
+pheatmap(eff_mmej_corr_heatmap %>%
+           column_to_rownames("drug_conc") %>%
+           t(),
+         border_color = "white",
+         cellwidth = 12,
+         cellheight = 12,
+         na_col = "white",
+         breaks = myBreaks,
+         cluster_rows = F,
+         cluster_cols = F,
+         main = paste('correlation: efficiency vs. mmej-score'),
+         annotation_row = chromatin,
+         color = colorRampPalette(c("#e07a5f", "#e5e5e5", "#3d405b"))(palette_length),
+         annotation_colors = annotation_colors_scr, 
+         annotation_legend = T)
+
+ggplot_custom(eff_mmej_corr_heatmap %>%
+                distinct(target, drug_conc, slope, p.value) %>%
+                filter(p.value < 0.05),
+              aes(x = target, y = slope, color = -log10(p.value))) +
+  geom_quasirandom() +
+  theme_classic_lines_90() +
+  scale_color_viridis_c()
+
+
+```
 
 
 
