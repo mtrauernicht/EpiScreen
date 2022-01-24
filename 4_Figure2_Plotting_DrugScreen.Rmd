@@ -359,11 +359,14 @@ Are there any drugs (per concentration) that significantly change the cutting ef
 # A: Cutting efficiency per drug - beeswarm plot
 ggplot_custom(indel.data %>%
                 filter(sample == "drug") %>%
-                distinct(mean_eff_zscore_global_comb, drug, conc_char),
-              aes(x = conc_char, y = mean_eff_zscore_global_comb, color = ifelse(Mod(mean_eff_zscore_global_comb) > 2.58, "red", "black"))) +
+                distinct(mean_eff_zscore_global_comb, drug, conc_char) %>%
+                mutate(mean_eff_pval_global_comb = 2*pnorm(q = abs(mean_eff_zscore_global_comb), lower.tail = F)) %>%
+                mutate(mean_eff_pval_adj_global_comb = p.adjust(mean_eff_pval_global_comb, method = 'fdr')),
+              aes(x = conc_char, y = mean_eff_zscore_global_comb, 
+                  color = ifelse(mean_eff_pval_adj_global_comb < 0.05, "red", "black"))) +
   geom_quasirandom() +
-  geom_hline(linetype = "dashed", yintercept = 2.58) +
-  geom_hline(linetype = "dashed", yintercept = -2.58) +
+  geom_hline(linetype = "dashed", yintercept = 1.96) +
+  geom_hline(linetype = "dashed", yintercept = -1.96) +
   ggtitle("first z-score per tech. rep., then mean of z-scores")
 ```
 
