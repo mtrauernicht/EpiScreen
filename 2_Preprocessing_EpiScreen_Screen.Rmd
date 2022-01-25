@@ -648,14 +648,9 @@ dmso.efficiency <- screen.ratio.dt %>%
   distinct('DMSO' = freqCut, 'DMSO_global' = freqCut_global, barcode, replicate,
          tech, well, drug_plate) %>%
   mutate(DMSO = ave(DMSO, barcode, replicate, tech, FUN = mean)) %>% # mean per technical replicate
-  distinct()
-
-dmso.efficiency <- dmso.efficiency %>%
-  distinct(DMSO_global, replicate, tech, well, drug_plate) %>%
   mutate(DMSO_global = ave(DMSO_global, replicate, tech, FUN = mean)) %>%
-  distinct() %>%
-  right_join(dmso.efficiency) %>%
-  dplyr::select(-drug_plate, -well)
+  dplyr::select(-drug_plate, -well) %>%
+  distinct()
 
 screen.ratio.dt <- left_join(screen.ratio.dt, dmso.efficiency)
 
