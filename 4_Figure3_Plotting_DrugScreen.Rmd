@@ -526,7 +526,7 @@ for (i in unique(indel.data$target)) {
     filter(target == i) %>%
     mutate(mean_eff_pval_global_comb = 2*pnorm(q = abs(mean_eff_zscore_global_comb), lower.tail = F)) %>%
     mutate(mean_eff_pval_adj_global_comb = p.adjust(mean_eff_pval_global_comb, method = 'fdr')) %>%
-    filter(mean_eff_pval_adj_global_comb < 0.01) %>%
+    filter(mean_eff_pval_adj_global_comb < 0.001) %>%
     distinct(mean_eff_zscore_comb, MMEJ_zscore_comb, drug, conc_char, target, IPR) %>%
     mutate(drug_conc = paste(drug, conc_char, sep = "_"))
   
@@ -545,13 +545,13 @@ for (i in unique(indel.data$target)) {
 
 ggplot_custom(indel.data %>%
     filter(sample == "drug") %>%
-    filter(target == "HDAC") %>%
+    filter(drug == "AR-42", conc_char == "100 nM") %>%
     mutate(mean_eff_pval_global_comb = 2*pnorm(q = abs(mean_eff_zscore_global_comb), lower.tail = F)) %>%
     mutate(mean_eff_pval_adj_global_comb = p.adjust(mean_eff_pval_global_comb, method = 'fdr')) %>%
-    filter(mean_eff_pval_adj_global_comb < 0.01) %>%
+    filter(mean_eff_pval_adj_global_comb < 0.001) %>%
     distinct(mean_eff_zscore_comb, MMEJ_zscore_comb, drug, conc_char, target, IPR) %>%
     mutate(drug_conc = paste(drug, conc_char, sep = "_")),
-    aes(x = MMEJ_zscore_comb, y = mean_eff_zscore_comb, color = drug_conc)) +
+    aes(x = MMEJ_zscore_comb, y = mean_eff_zscore_comb)) +
   geom_point() +
   geom_smooth(method = "lm") +
   stat_cor(method = "spearman") +
@@ -562,7 +562,7 @@ eff_mmej_corr <- indel.data %>%
   filter(sample == "drug") %>%
   mutate(mean_eff_pval_global_comb = 2*pnorm(q = abs(mean_eff_zscore_global_comb), lower.tail = F)) %>%
   mutate(mean_eff_pval_adj_global_comb = p.adjust(mean_eff_pval_global_comb, method = 'fdr')) %>%
-  filter(mean_eff_pval_adj_global_comb < 0.01) %>%
+  filter(mean_eff_pval_adj_global_comb < 0.001) %>%
   distinct(mean_eff_zscore_comb, MMEJ_zscore_comb, drug, conc_char, target, IPR, mean_eff_pval_global_comb, MMEJ_zscore_global_comb) %>%
   mutate(drug_conc = paste(drug, conc_char, sep = "_")) %>%
   mutate(slope = NA, term = NA, p.value = NA)
