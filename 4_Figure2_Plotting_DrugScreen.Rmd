@@ -415,23 +415,23 @@ eff.data <- indel.data %>%
   mutate(mean_eff_pval_global_comb = 2*pnorm(q = abs(mean_eff_zscore_global_comb), lower.tail = F)) %>%
   mutate(mean_eff_pval_adj_global_comb = p.adjust(mean_eff_pval_global_comb, method = 'fdr'))
 
-eff.data$sign <- "No"
-eff.data$sign[eff.data$mean_eff_pval_adj_global_comb < -1 & eff.data$mean_eff_pval_adj_global_comb < 0.05] <- "Up"
-eff.data$sign[eff.data$mean_eff_pval_adj_global_comb > 1 & eff.data$mean_eff_pval_adj_global_comb < 0.05] <- "Down"
+eff.data$sign <- "0_No"
+eff.data$sign[eff.data$mean_eff_zscore_global_comb > 1 & eff.data$mean_eff_pval_adj_global_comb < 0.05] <- "1_Up"
+eff.data$sign[eff.data$mean_eff_zscore_global_comb < -1 & eff.data$mean_eff_pval_adj_global_comb < 0.05] <- "2_Down"
 
 eff.data <- eff.data %>%
   mutate(number = ave(target, target, sign, conc_char, FUN = length)) %>%
   mutate(number = as.numeric(number)) %>%
   distinct(conc_char, target, sign, number) %>%
   spread(sign, number, fill = 0) %>%
-  mutate(fraction = (Up + Down) / (No + (Up + Down))) %>%
-  pivot_longer(Yes:No, names_to = "sign", values_to = "number")
+  mutate(fraction = (`1_Up` + `2_Down`) / (`0_No` + (`1_Up` + `2_Down`))) %>%
+  pivot_longer(`0_No`:`2_Down`, names_to = "sign", values_to = "number")
 
 ggplot_custom(eff.data ,
               aes(y = reorder(target, -number), x = number, fill = sign)) +
   geom_bar(stat = "identity") +
   facet_wrap(~conc_char)+
-  scale_color_manual(values = c(colors_diverse[1],colors_diverse[2], colors_diverse[4]))
+  scale_fill_manual(values = c(colors_diverse[1],colors_diverse[2], colors_diverse[4]))
 ```
 
 *Figure 2C: Number of compounds with significant changes in cutting efficiency per target group.*
