@@ -251,3 +251,200 @@ screen_indels_tib %>%
   facet_grid(tech ~ replicate)
 ```
 
+
+## Plotting for B4 meeting
+Data loaded from Figure 1 script
+
+```{r}
+cols = c("100 nM  < 0.05 p.val" = "gray40", 
+         "100 nM N.S." =  "gray90",
+         "1 µM  < 0.05 p.val" = "gray20", 
+         "1 µM N.S." =   "gray80",
+         "10 µM  < 0.05 p.val" = "black", 
+         "10 µM N.S." = "gray70")
+
+indel.data %>%
+  filter(sample == "drug") %>%
+  distinct(mean_eff_zscore_comb , IPR, drug, conc_char, sample) %>%
+  mutate(signif = ifelse(Mod(mean_eff_zscore_comb) > 1.96, " < 0.05 p.val", "N.S."),
+         signif_col = paste(conc_char, signif),
+          IPR = factor(gsub("IPR", "", IPR), levels = c("1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19")),
+         conc_char = factor(conc_char, levels = c("100nM", "1 µM", "10 µM"))) %>%
+  ggplot(.,
+       aes(x = IPR, y = mean_eff_zscore_comb, 
+           color = signif_col, 
+           group = conc_char)) +
+  geom_quasirandom(dodge.width = 0.75) +
+  geom_hline(linetype = "dashed", yintercept = 1.96) +
+  geom_hline(linetype = "dashed", yintercept = -1.96) +
+  scale_color_manual(values = cols) +
+  theme_bw(base_size = 16)
+```
+
+```{r}
+indel.data %>%
+  filter(sample == "drug") %>%
+  distinct(MMEJ_zscore_comb , IPR, drug, conc_char, sample) %>%
+  mutate(signif = ifelse(Mod(MMEJ_zscore_comb) > 1.96, " < 0.05 p.val", "N.S."),
+         signif_col = factor(paste(conc_char, signif), 
+                             levels = c("100 nM  < 0.05 p.val", 
+                                        "1 µM  < 0.05 p.val", 
+                                        "10 µM  < 0.05 p.val", 
+                                        "100 nM N.S.",
+                                        "1 µM N.S.",
+                                        "10 µM N.S.")),
+         IPR = factor(gsub("IPR", "", IPR), levels = c("1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19")),
+         conc_char = factor(conc_char, levels = c("100nM", "1 µM",  "10 µM"))) %>%
+  arrange(conc_char) %>%
+  ggplot(.,
+         aes(x = IPR, y = MMEJ_zscore_comb, 
+             color = signif_col, 
+             group = conc_char)) +
+  geom_quasirandom(dodge.width = 0.75) +
+  geom_hline(linetype = "dashed", yintercept = 1.96) +
+  geom_hline(linetype = "dashed", yintercept = -1.96) +
+  scale_color_manual(values = cols) +
+  theme_bw(base_size = 16)
+
+signif_col
+```
+
+
+```{r}
+# Generate heatmap: select top 15 drugs (highest change at any IPR) per concentration
+eff.data.heatmap <- indel.data %>%
+  #filter(target != "Aurora Kinase") %>%
+  filter(sample == "drug" | drug %in% c("DMSO")) %>%
+  #filter(Mod(eff_zscore_pooled_global_comb) >= 1.645) %>%  # we could also choose to display all drugs that have significant global hits
+  distinct(conc_char,drug, IPR, MMEJ_zscore_comb  )
+
+## Select drugs that have a large effect size in at least one location (some drugs might have a small global effect size, but large local)
+eff.data.heatmap2 <- eff.data.heatmap %>%
+  mutate(mod = Mod(MMEJ_zscore_comb  )) %>%
+  mutate(max = ave(mod, drug, conc_char, FUN = max)) %>%
+  filter(max > 2.58) %>% # p < 0.05
+  dplyr::select(-mod, -max) %>%
+  spread(IPR, MMEJ_zscore_comb)
+
+breaks <- seq(-15, 15, 0.01)
+scale_colors = colorRampPalette(rev(brewer.pal(n = 7, name = "RdBu")))(length(breaks))
+scale_colors[between(breaks, -1.96, 1.96)] <- "gray80"
+
+for (i in unique(eff.data.heatmap2$conc_char)) {
+  pheatmap(as.matrix(eff.data.heatmap2[eff.data.heatmap2$conc_char == i,] %>%
+                       column_to_rownames('drug') %>%
+                       dplyr::select(contains('IPR')) %>%
+                       t()),
+           border_color = "white",
+           cellwidth = 12,
+           cellheight = 12,
+           breaks = breaks,
+           cluster_rows = F,
+           main = paste('MMEJ ratio change, concentration =', i),
+           annotation_col = target,
+           annotation_row = chromatin,
+           color = scale_colors,
+           annotation_colors = annotation_colors_scr, annotation_legend = T)
+}
+```
+
+
+```{r}
+# Generate heatmap: select top 15 drugs (highest change at any IPR) per concentration
+eff.data.heatmap <- indel.data %>%
+  #filter(target != "Aurora Kinase") %>%
+  filter(sample == "drug" | drug %in% c("DMSO", "DNA-PKi")) %>%
+  #filter(Mod(eff_zscore_pooled_global_comb) >= 1.645) %>%  # we could also choose to display all drugs that have significant global hits
+  distinct(conc_char,drug, IPR, mean_eff_zscore_comb )
+
+## Select drugs that have a large effect size in at least one location (some drugs might have a small global effect size, but large local)
+eff.data.heatmap2 <- eff.data.heatmap %>%
+  mutate(mod = Mod(mean_eff_zscore_comb   )) %>%
+  mutate(max = ave(mod, drug, conc_char, FUN = max)) %>%
+  filter(max > 2.58) %>% # p < 0.05
+  dplyr::select(-mod, -max) %>%
+  spread(IPR, mean_eff_zscore_comb  )
+
+breaks <- seq(-10, 10, 0.01)
+
+for (i in unique(eff.data.heatmap2$conc_char)) {
+  pheatmap(as.matrix(eff.data.heatmap2[eff.data.heatmap2$conc_char == i,] %>%
+                       column_to_rownames('drug') %>%
+                       dplyr::select(contains('IPR')) %>%
+                       t()),
+           border_color = "white",
+           cellwidth = 12,
+           cellheight = 12,
+           breaks = breaks,
+           cluster_rows = F,
+           main = paste('Indel rate z-score, concentration =', i),
+           annotation_col = target,
+           annotation_row = chromatin,
+           color = colorRampPalette(rev(brewer.pal(n = 7, name = "RdBu")))(length(breaks)),
+           annotation_colors = annotation_colors_scr, annotation_legend = T)
+}
+```
+
+
+```{r}
+mut.data = readRDS("/DATA/projects/DSBrepair/data/R/rs20220122_episcreen/rs20220122_episcreen_mutations.RDS") 
+
+mut.data.filt = mut.data %>% 
+  filter(drug %in% c("Vorinostat (SAHA, MK0683)", "PCI-24781 (Abexinostat)","DMSO") & conc_char == "100 nM" & type %in% c("core", "grouped_indel"), IPR %in% c("IPR16", "IPR10")) %>% 
+  distinct(IPR, mutation, color, type, drug, freq_mean, freq_sd)
+
+colores <- c("wt" = "#808184", "other" = "black", "NHEJ" = "#e1251b", "MMEJ" = "#26419a", "SSTR" = "#007A4C")
+
+
+p <- ggplot(mut.data.filt, 
+            aes(mutation, freq_mean)) + 
+  geom_bar(stat = "identity", aes(fill = color)) + 
+  scale_fill_manual("legend", values = colores) + 
+  theme_bw() +
+  scale_y_continuous(name="frequency") +
+  scale_x_discrete(name="indel size", breaks = c("<-14", -7, 0, 1, ">2")) +
+  geom_errorbar(aes(ymin=freq_mean-freq_sd, ymax=freq_mean+freq_sd), width=.2,
+                position=position_dodge(.9)) 
+p + facet_grid(IPR ~ drug)
+
+mut.data.filt = mut.data %>% 
+  filter(drug %in% c("Vorinostat (SAHA, MK0683)", "PCI-24781 (Abexinostat)","DMSO") & conc_char == "100 nM" & type %in% c("core", "grouped_indel"), IPR %in% c("IPR16", "IPR10")) %>% 
+  distinct(IPR, mutation, color, type, drug, freq_mean_rep, freq_sd_rep, replicate)
+
+colores <- c("wt" = "#808184", "other" = "black", "NHEJ" = "#e1251b", "MMEJ" = "#26419a", "SSTR" = "#007A4C")
+
+
+p <- ggplot(mut.data.filt, 
+            aes(mutation, freq_mean_rep)) + 
+  geom_bar(stat = "identity", aes(fill = color)) + 
+  scale_fill_manual("legend", values = colores) + 
+  theme_bw() +
+  scale_y_continuous(name="frequency") +
+  scale_x_discrete(name="indel size", breaks = c("<-14", -7, 0, 1, ">2")) +
+  geom_errorbar(aes(ymin=freq_mean_rep-freq_sd_rep, ymax=freq_mean_rep+freq_sd_rep), width=.2,
+                position=position_dodge(.9)) 
+p + facet_grid(IPR + replicate ~ drug)
+
+mut.data %>% pull(drug) %>% unique() %>% .[grepl("Bara", .)]
+
+
+mut.data.filt = mut.data %>% 
+  filter(drug %in% c("Barasertib (AZD1152-HQPA)", "2-Methoxyestradiol (2-MeOE2)","DMSO") & conc_char == "100 nM" & type %in% c("core", "grouped_indel"), IPR %in% c("IPR16")) %>% 
+  distinct(IPR, mutation, color, type, drug, freq_mean_rep, freq_sd_rep, replicate)
+
+colores <- c("wt" = "#808184", "other" = "black", "NHEJ" = "#e1251b", "MMEJ" = "#26419a", "SSTR" = "#007A4C")
+
+
+p <- ggplot(mut.data.filt, 
+            aes(mutation, freq_mean_rep)) + 
+  geom_bar(stat = "identity", aes(fill = color)) + 
+  scale_fill_manual("legend", values = colores) + 
+  theme_bw() +
+  scale_y_continuous(name="frequency") +
+  scale_x_discrete(name="indel size", breaks = c("<-14", -7, 0, 1, ">2")) +
+  geom_errorbar(aes(ymin=freq_mean_rep-freq_sd_rep, ymax=freq_mean_rep+freq_sd_rep), width=.2,
+                position=position_dodge(.9)) 
+p + facet_grid(IPR + replicate ~ drug)
+
+```
+
