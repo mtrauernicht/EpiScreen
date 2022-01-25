@@ -808,6 +808,7 @@ screen.ratio.dt <- screen.ratio.dt %>%
   # Then calculate the mean over the technical replicates
   #mutate(MMEJ_ratio_mean = ave(MMEJratio, drug, concentration, barcode, replicate, FUN = mean)) %>%
   # And calculate the z-scores
+  mutate(MMEJ_ratio_norm = MMEJratio / mean_DMSO) %>%
   mutate(MMEJ_zscore = (MMEJratio - mean_DMSO)/ sd_DMSO) %>%
   mutate(MMEJ_zscore_mean = ave(MMEJ_zscore, drug, conc_char, replicate, barcode, FUN = mean)) %>%
   dplyr::select(-mean_DMSO, -sd_DMSO)
@@ -905,6 +906,7 @@ ratio.cols = c("replicate",
          "freqMMEJ", 
          "freqNHEJ",
          "MMEJratio",
+         "MMEJ_ratio_norm",
          "NHEJratio",
          "MMEJscore",
          "NHEJscore",
