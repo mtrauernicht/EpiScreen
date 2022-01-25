@@ -347,7 +347,7 @@ ggplot_custom <- function(...) ggplot2::ggplot(...) +
 
 ```{r data import, echo = FALSE, warning = FALSE}
 # Import data from preprocessing script
-indel.data <- readRDS("/DATA/usr/m.trauernicht/projects/EpiScreen/files_scripts/mt20220121_episcreen.RDS")
+indel.data <- readRDS("/DATA/usr/m.trauernicht/projects/EpiScreen/files_scripts/mt20220125_episcreen.RDS")
 ```
 
 
@@ -357,13 +357,23 @@ indel.data <- readRDS("/DATA/usr/m.trauernicht/projects/EpiScreen/files_scripts/
 Are the compounds (per concentration) that significantly alter the MMEJ score?
 ```{r warning = FALSE}
 # A: MMEJ-z-score per drug
-ggplot_custom(indel.data %>%
+ggplot(indel.data %>%
                 filter(sample == "drug") %>%
-                distinct(MMEJ_zscore_global_comb, drug, conc_char),
-              aes(x = conc_char, y = MMEJ_zscore_global_comb, color = ifelse(Mod(MMEJ_zscore_global_comb) > 1.96, "red", "black"))) +
-  geom_quasirandom() +
-  geom_hline(linetype = "dashed", yintercept = 1.96) +
-  geom_hline(linetype = "dashed", yintercept = -1.96)
+                distinct(MMEJ_ratio_norm, drug, conc_char, MMEJ_zscore_global_comb) %>%
+                mutate(MMEJ_ratio_norm = ave(MMEJ_ratio_norm, drug, conc_char, FUN = mean)) %>%
+                distinct() %>%
+                mutate(MMEJ_pval_global_comb = 2*pnorm(q = abs(MMEJ_zscore_global_comb), lower.tail = F)) %>%
+                mutate(MMEJ_pval_adj_global_comb = p.adjust(MMEJ_pval_global_comb, method = 'fdr')),
+              aes(y = -log10(MMEJ_pval_adj_global_comb), x = log2(MMEJ_ratio_norm), 
+                  color = ifelse(MMEJ_pval_adj_global_comb < 0.01 & MMEJ_ratio_norm > 1.05, "green", 
+                               ifelse(MMEJ_pval_adj_global_comb < 0.01 & MMEJ_ratio_norm < 0.95, "yellow","blue")))) +
+  geom_quasirandom_rast() +
+  geom_hline(linetype = "dashed", yintercept = -log10(0.01)) +
+  geom_vline(linetype = "dashed", xintercept = log2(1.05)) +
+  geom_vline(linetype = "dashed", xintercept = log2(0.95)) +
+  ggtitle("first z-score per tech. rep., then mean of z-scores") +
+  scale_color_manual(values = c("#C2C2C2", "#3d405b", "#e07a5f")) +
+  facet_wrap(~conc_char, scales = "free")
 ```
 
 *Figure 3A: Compound-induced change in MMEJ ratio of all tested compounds. Mean MMEJ z-score per drug & concentration.* 
@@ -378,23 +388,28 @@ Are there any target groups that are prone to changes in MMEJ ratio?
 # C: Bar plot
 eff.data <- indel.data %>%
   filter(sample == "drug") %>%
-  distinct(MMEJ_zscore_global_comb, drug, target, conc_char)
+  distinct(MMEJ_zscore_global_comb, drug, target, conc_char) %>%
+  mutate(MMEJ_pval_global_comb = 2*pnorm(q = abs(MMEJ_zscore_global_comb), lower.tail = F)) %>%
+  mutate(MMEJ_pval_adj_global_comb = p.adjust(MMEJ_pval_global_comb, method = 'fdr'))
 
-eff.data$sign <- "Yes"
-eff.data$sign[Mod(eff.data$MMEJ_zscore_global_comb) < 1.96] <- "No"
+eff.data$sign <- "0_No"
+eff.data$sign[eff.data$MMEJ_zscore_global_comb > 1 & eff.data$MMEJ_pval_adj_global_comb < 0.05] <- "1_Up"
+eff.data$sign[eff.data$MMEJ_zscore_global_comb < -1 & eff.data$MMEJ_pval_adj_global_comb < 0.05] <- "2_Down"
 
 eff.data <- eff.data %>%
   mutate(number = ave(target, target, sign, conc_char, FUN = length)) %>%
   mutate(number = as.numeric(number)) %>%
   distinct(conc_char, target, sign, number) %>%
   spread(sign, number, fill = 0) %>%
-  mutate(fraction = Yes / (No + Yes)) %>%
-  pivot_longer(Yes:No, names_to = "sign", values_to = "number")
+  mutate(fraction = (`1_Up` + `2_Down`) / (`0_No` + (`1_Up` + `2_Down`))) %>%
+  pivot_longer(`0_No`:`2_Down`, names_to = "sign", values_to = "number")
+
 
 ggplot_custom(eff.data ,
               aes(y = reorder(target, -number), x = number, fill = sign)) +
   geom_bar(stat = "identity") +
-  facet_wrap(~conc_char)
+  facet_wrap(~conc_char)+
+  scale_fill_manual(values = c(colors_diverse[1],colors_diverse[2], colors_diverse[4]))
 ```
 
 *Figure 2B: Number of compounds with significant changes in MMEJ ratio per target group.*
@@ -463,17 +478,23 @@ annotation_colors_scr$target <- annotation_colors_scr$target[ordered_marks2]
 # Generate heatmap: select top 15 drugs (highest change at any IPR) per concentration
 eff.data.heatmap <- indel.data %>%
   #filter(target != "Aurora Kinase") %>%
-  filter(sample == "drug" | drug == "DMSO") %>%
+  filter(sample == "drug") %>%
   #filter(Mod(eff_zscore_pooled_global_comb) >= 1.645) %>%  # we could also choose to display all drugs that have significant global hits
-  distinct(conc_char,drug, IPR, MMEJ_zscore_comb)
+  distinct(conc_char, drug, target, IPR, MMEJ_zscore_comb, MMEJratio) %>%
+  mutate(MMEJratio = log2(ave(MMEJratio, drug, conc_char, IPR, FUN = mean))) %>%
+  distinct()
 
 ## Select drugs that have a large effect size in at least one location (some drugs might have a small global effect size, but large local)
 eff.data.heatmap2 <- eff.data.heatmap %>%
-  mutate(mod = Mod(MMEJ_zscore_comb)) %>%
-  mutate(max = ave(mod, drug, conc_char, FUN = max)) %>%
-  filter(max > 6) %>% # 4.4 = p < 0,00001
-  dplyr::select(-mod, -max) %>%
-  spread(IPR, MMEJ_zscore_comb)
+  mutate(MMEJ_zscore_comb = 2*pnorm(q = abs(MMEJ_zscore_comb), lower.tail = F)) %>%
+  mutate(MMEJ_zscore_comb = p.adjust(MMEJ_zscore_comb, method = 'fdr')) %>%
+  mutate(min = ave(MMEJ_zscore_comb, drug, conc_char, FUN = min)) %>%
+  filter(min < 0.0000000000001)
+
+#eff.data.heatmap2$MMEJratio[eff.data.heatmap2$MMEJ_zscore_comb > 0.001] <- NA
+eff.data.heatmap2 <- eff.data.heatmap2 %>%
+  dplyr::select(-min, -MMEJ_zscore_comb) %>%
+  spread(IPR, MMEJratio)
 
 chromatin_ord <- chromatin %>% 
   rownames_to_column('IPR') %>%
@@ -483,18 +504,18 @@ chromatin_ord <- chromatin %>%
   mutate(chromatin = gsub("Triple Heterochromatin", "3_Triple Heterochromatin", chromatin)) %>%
   arrange(chromatin)
 
-eff.data.heatmap2 <- eff.data.heatmap2[,c("drug","conc_char", chromatin_ord$IPR)]
+eff.data.heatmap2 <- eff.data.heatmap2[,c("drug", "target", "conc_char", chromatin_ord$IPR)]
 
-breaks <- quantile(unlist(eff.data.heatmap2 %>% dplyr::select(contains('IPR'))), c(.02,.99)) # change these numbers according to where you want to set the cutoff
+breaks <- quantile(unlist(eff.data.heatmap2 %>% dplyr::select(contains('IPR'))), c(.05,.95), na.rm = T) # change these numbers according to where you want to set the cutoff
 palette_length <- 100
 
-myBreaks <- c(seq(breaks[1], -2.58, length.out=ceiling(palette_length/2) + 1), 
-              seq(2.58, breaks[2], length.out=floor(palette_length/2)))
+myBreaks <- c(seq(breaks[1], 0, length.out=palette_length))
 
 
 
 for (i in unique(eff.data.heatmap2$conc_char)) {
   pheatmap(as.matrix(eff.data.heatmap2[eff.data.heatmap2$conc_char == i,] %>%
+                       arrange(target) %>%
                        column_to_rownames('drug') %>%
                        dplyr::select(contains('IPR')) %>%
                        t()),
@@ -502,11 +523,13 @@ for (i in unique(eff.data.heatmap2$conc_char)) {
            cellwidth = 12,
            cellheight = 12,
            cluster_rows = F,
+           cluster_cols = F,
+           na_col = "white",
            breaks = myBreaks,
-           main = paste('MMEJ z-score, concentration =', i),
+           main = paste('MMEJ ratio, concentration =', i),
            annotation_col = target,
            annotation_row = chromatin,
-           color = colorRampPalette(c("#e07a5f", "#e5e5e5", "#3d405b"))(palette_length),
+           color = colorRampPalette(c(colors_diverse[2], "white"))(palette_length),
            annotation_colors = annotation_colors_scr, annotation_legend = T)
 }
 ```
