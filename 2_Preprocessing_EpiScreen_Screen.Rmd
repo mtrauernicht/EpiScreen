@@ -665,11 +665,16 @@ Some samples have clear outlyers, others aren't prefectly normally distributed b
 dmso.efficiency <- screen.ratio.dt %>%
   filter(drug == "DMSO") %>%
   distinct('DMSO' = freqCut, 'DMSO_global' = freqCut_global, barcode, replicate,
-         tech, well, drug_plate) %>%
+         tech, well, plate) %>%
   mutate(DMSO = ave(DMSO, barcode, replicate, tech, FUN = mean)) %>% # mean per technical replicate
-  mutate(DMSO_global = ave(DMSO_global, replicate, tech, FUN = mean)) %>%
-  dplyr::select(-drug_plate, -well) %>%
   distinct()
+
+dmso.efficiency <- dmso.efficiency %>%
+  distinct(DMSO_global, replicate, tech, well, plate) %>%
+  mutate(DMSO_global = ave(DMSO_global, replicate, tech, FUN = mean)) %>%
+  distinct() %>%
+  right_join(dmso.efficiency) %>%
+  distinct(replicate, barcode, tech, DMSO, DMSO_global)
 
 screen.ratio.dt <- left_join(screen.ratio.dt, dmso.efficiency)
 
