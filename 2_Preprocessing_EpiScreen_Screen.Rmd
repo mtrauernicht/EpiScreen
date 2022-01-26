@@ -665,21 +665,17 @@ Some samples have clear outlyers, others aren't prefectly normally distributed b
 dmso.efficiency <- screen.ratio.dt %>%
   filter(drug == "DMSO") %>%
   distinct('DMSO' = freqCut, 'DMSO_global' = freqCut_global, barcode, replicate,
-         tech, well, plate) #%>%
-  #mutate(DMSO = ave(DMSO, barcode, replicate, tech, FUN = mean)) %>% # mean per technical replicate
-  #distinct()
-
-dmso.efficiency <- dmso.efficiency %>%
-  distinct(DMSO_global, replicate, tech, well, plate) %>%
+         tech, well, drug_plate) %>%
+  mutate(DMSO = ave(DMSO, barcode, replicate, tech, FUN = mean)) %>% # mean per technical replicate
   mutate(DMSO_global = ave(DMSO_global, replicate, tech, FUN = mean)) %>%
-  distinct() %>%
-  right_join(dmso.efficiency)
+  dplyr::select(-drug_plate, -well) %>%
+  distinct()
 
 screen.ratio.dt <- left_join(screen.ratio.dt, dmso.efficiency)
 
 screen.ratio.dt <- screen.ratio.dt %>%
   mutate(freqCut_norm = freqCut / DMSO,
-         freqCut_norm_global = freqCut_global / DMSO_global,) %>%
+         freqCut_norm_global = freqCut_global / DMSO_global) %>%
   group_by(barcode, ID) %>% # group by ID and barcode for mean efficiency per well and barcode (remove technical replicates)
   mutate(freqCut_norm_mean = mean(freqCut_norm),
          freqCut_norm_global_mean = mean(freqCut_norm_global)) %>%
@@ -829,6 +825,7 @@ screen.ratio.dt <- screen.ratio.dt %>%
   # Then calculate the mean over the technical replicates
   #mutate(MMEJ_ratio_mean = ave(MMEJratio, drug, concentration, barcode, replicate, FUN = mean)) %>%
   # And calculate the z-scores
+  mutate(MMEJ_ratio_norm = MMEJratio / mean_DMSO) %>%
   mutate(MMEJ_zscore = (MMEJratio - mean_DMSO)/ sd_DMSO) %>%
   mutate(MMEJ_zscore_mean = ave(MMEJ_zscore, drug, conc_char, replicate, barcode, FUN = mean)) %>%
   dplyr::select(-mean_DMSO, -sd_DMSO)
@@ -924,6 +921,7 @@ ratio.cols = c("replicate",
          "freqMMEJ", 
          "freqNHEJ",
          "MMEJratio",
+         "MMEJ_ratio_norm",
          "NHEJratio",
          "MMEJscore",
          "NHEJscore",
