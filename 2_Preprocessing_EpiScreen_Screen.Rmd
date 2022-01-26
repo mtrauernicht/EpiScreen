@@ -93,11 +93,14 @@ CallTrueBarcodes <- function(df) {
 
 ## Parameters
 ```{r}
+# initials (for file export)
+initials = "rs"
+
 # Viability (% of DMSO)
 viab_limit = 0.45
 
 # Read count limit of +1 & -7 combined
-read_count_limit = 30
+read_count_limit = 40
 ```
 
 
@@ -241,7 +244,7 @@ complete.mutations.dt[!mutation%in%c(0,NA),
              ratio_indels_split := norm_split/sum(norm_split, na.rm = TRUE), 
              by=c("barcode","exp")]
 
-complete.mutations.dt[mutation%in%c(1, -7), 
+complete.mutations.dt[mutation%in%c(1, -7, 0), 
              mut.counts := sum(count_split, na.rm = TRUE), 
              by=c("barcode","exp")]
 
@@ -250,7 +253,7 @@ length(unique(complete.mutations.dt$exp))
 length(unique(complete.mutations.dt[sum_bc_reads_split < 100]$exp))
 
 # Filter on minimal 30 reads per +1/-7 reads
-length(unique(complete.mutations.dt[mut.counts < 30]$exp))
+length(unique(complete.mutations.dt[mut.counts < 40]$exp))
 
 E177_pre = sum(grepl("E177", unique(complete.mutations.dt$exp)))
 E1504_pre = sum(grepl("E1504", unique(complete.mutations.dt$exp)))
@@ -274,6 +277,13 @@ filtered.indelreads.dt =
   unique(complete.mutations.dt[!is.na(complete.mutations.dt$mut.counts) & 
                                  mut.counts >= read_count_limit, 
                                c("exp", "barcode", "mut.counts")])
+
+# List all exp names in previous table
+exps = unique(filtered.indelreads.dt$exp)
+
+# List all the exps that still contain all the barcodes after count filtering 
+filtered.indelreads.exp = exps[table(filtered.indelreads.dt$exp) == 19]
+
 E177_post = sum(grepl("E177", unique(filtered.indelreads.dt$exp)))
 E1504_post = sum(grepl("E1504", unique(filtered.indelreads.dt$exp)))
 
@@ -285,8 +295,7 @@ E177_pre - E177_post
 E1504_pre - E1504_post
 
 mutations.dt = complete.mutations.dt %>% 
-  semi_join(select(filtered.indelreads.dt, c("exp", "barcode")), 
-            by = c("exp", "barcode")) # This remove the samples that have less than 30 reads.
+  filter(exp %in% filtered.indelreads.exp)
 
 # check if lowest mut.count is 30
 mutations.dt %>% 
@@ -296,7 +305,6 @@ mutations.dt %>%
 
 dim(complete.mutations.dt)
 dim(mutations.dt)
-
 
 # Add an ID column that removes the technical replicates information 
 mutations.dt[, ID := gsub("^(E1504|E177)_[0-9][0-9]_(1|10|100)_[123]_([12]_...$)", 
@@ -308,22 +316,37 @@ mutations.stat.dt = merge(mutations.dt, indel.statistics.dt)
 
 # Filter the low viability reads
 # This filters out all drugs at a certain concentration were at least 2/3 technical replicates were below 0.45 in at least one biological replicate 
-remove_drugs <- mutations.stat.dt %>%
-  filter(viab_norm_split < viab_limit) %>%
-  dplyr::select(conc_char, drug, tech, replicate) %>%
-  distinct() %>%
+keep_drugs <- mutations.stat.dt %>%
+  distinct(plate, drug, conc_char, well, tech, replicate, viab_norm_split) %>%
+  # filter for samples with higher viab than the limit
+  filter(viab_norm_split > viab_limit) %>%
+  distinct(conc_char, drug, tech, replicate) %>%
   mutate(conc_char_drug = paste(conc_char, drug, sep = " "),
-         tech_n = ave(conc_char_drug, conc_char_drug, replicate, FUN = length)) %>%
-  filter(tech_n > 1) %>%
-  dplyr::select(-tech_n, -tech, -replicate) %>%
-  distinct()
+         tech_n = ave(conc_char_drug, conc_char_drug, replicate, FUN = length),
+         conc_char_drug_rep = paste(conc_char, drug, replicate, sep = " ")) %>%
+  # These conditions need to be present in at least 2 (out of 3) technical replicates per bio replicate
+  filter(tech_n > 1) %>% 
+  distinct(replicate, conc_char_drug, conc_char_drug_rep) %>%
+  mutate(rep_n = ave(conc_char_drug,conc_char_drug, FUN = length)) %>%
+  # And in both bio replicates
+  filter(rep_n > 1) %>% 
+  pull(conc_char_drug_rep) %>%
+  unique()
 
-mutations.stat.dt <- mutations.stat.dt %>%
-  mutate(conc_char_drug = paste(conc_char, drug, sep = " ")) %>%
-  filter(!conc_char_drug %in% remove_drugs$conc_char_drug) %>%
-  dplyr::select(-conc_char_drug, -mut.counts)
+dim(mutations.stat.dt)
+# Filter for the 
+mutations.screen.dt <- mutations.stat.dt %>%
+  filter(viab_norm_split > viab_limit) %>%
+  # make filter for the conditions for which we do not have at least 2 technical replicates
+  mutate(conc_char_drug_rep = paste(conc_char, drug, replicate, sep = " ")) %>%
+  # apply filter
+  filter(conc_char_drug_rep %in% keep_drugs) %>%
+  # remove these colums
+  dplyr::select(-conc_char_drug_rep, -mut.counts) %>%
+  # Calculate new mean
+  mutate(viab_mean = ave(viab_norm_split, drug, conc_char, replicate, FUN = mean))
 
-mutations.screen.dt = copy(mutations.stat.dt)
+dim(mutations.screen.dt)
 
 # Quick random check of the data for a specific barcode and drug: 
 mutations.screen.dt[barcode == "ACTGTCGAGTTGTCCG" & drug == "Zebularine" & mutation == -7, 
@@ -331,10 +354,6 @@ mutations.screen.dt[barcode == "ACTGTCGAGTTGTCCG" & drug == "Zebularine" & mutat
                    "barcode", "mutation", "index_length", "drug_no", "drug_well")]
 
 mutations.screen.dt[is.na(mutation), ]
-
-dim(mutations.screen.dt)
-dim(distinct(mutations.screen.dt))
-table(duplicated(mutations.screen.dt[1:200, ]))
 ```
 
 ## We will also remove samples that not least in 2 technical replicates (out of 3) and are present in at least both biological replicates. 
@@ -557,7 +576,7 @@ screen.indels.dt[,
 Before calculating the z-scores we need to check the DMSO data distribution if it's normal or not.
 First the general distribution in a bee swarm plot per barcode.
 
-```{r plotting the balance and efficiency per barcode}
+```{r plotting the balance and efficiency per barcode, eval = FALSE, echo = FALSE}
 for (i in barcodes.clone5) {
   norm_pooled = screen.ratio.dt %>%
     filter(drug == "DMSO", barcode == i) %>%
@@ -619,7 +638,7 @@ We can observe some outliers but in general the data is quite reproducible. Some
 
 Check if the DMSO data is normally distributed for MMEJscore and freqCut with qqplots. 
 
-```{r check for normal distribution}
+```{r check for normal distribution, eval = FALSE, echo = FALSE}
 for (i in barcodes.clone5) {
   norm_pooled = screen.ratio.dt %>%
     filter(drug == "DMSO", barcode == i) %>%
@@ -668,7 +687,6 @@ screen.ratio.dt <- screen.ratio.dt %>%
 
 
 dim(screen.indel.dt)
-
 dim(screen.ratio.dt)
 ```
 
@@ -706,7 +724,6 @@ dmso.eff.score <- screen.ratio.dt %>%
 
 screen.ratio.dt = left_join(screen.ratio.dt, dmso.eff.score)
 ```
-
 
 
 ```{r calculate efficiency z-scores}
@@ -856,8 +873,6 @@ screen.ratio.dt <- left_join(screen.ratio.dt, zscores_comb)
 screen.ratio.dt <- left_join(screen.ratio.dt, zscores_comb_global)
 
 ```
-
-
 # Data export
 
 ## Add chromatin data
@@ -939,15 +954,15 @@ rm(screen.indel.chrom.dt)
 ## Processed data export The files will be saved in the processed data folder.
 ```{r export}
 # The mutations list that can be loaded for the indel spectra plots.
-filename <- SetFileName("_episcreen_mutations.RDS", "rs")
+filename <- SetFileName("_episcreen_mutations.RDS", initials = initials)
 saveRDS(screen.indels.chrom.dt, file = filename)
 
 # The ratios list of the split technical replicates
-filename <- SetFileName("_episcreen_ratios.RDS", "rs")
+filename <- SetFileName("_episcreen_ratios.RDS", initials = initials)
 saveRDS(screen_ratios_tib, file = filename)
 
 # # The ratios list of the merged technical replicates
-# filename <- SetFileName("_episcreen_all.RDS", "rs")
+# filename <- SetFileName("_episcreen_all.RDS", initials = initials)
 # saveRDS(screen_all_tib, file = filename)
 ```
 
