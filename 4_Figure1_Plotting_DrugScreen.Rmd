@@ -312,20 +312,20 @@ corColor <- function(data, mapping, color = I("black"), sizeRange = c(1, 3), ...
 theme_classic_lines <- function() {
   theme_pubr(border = F, legend = "top") +
             theme(panel.grid.major = element_line(colour = "#adb5bd", size = 0.25),
-                  strip.background = element_rect(fill = "#ced4da")
+                  strip.background = element_rect(fill = "white", color = "white")
             )
 }
 theme_classic_lines_45 <- function() {
   theme_pubr(border = T, legend = "top", x.text.angle = 45) +
             theme(panel.grid.major = element_line(colour = "#adb5bd", size = 0.25),
-                  strip.background = element_rect(fill = "#ced4da")
+                  strip.background = element_rect(fill = "white", color = "white")
             )
 }
 
 theme_classic_lines_90 <- function() {
   theme_pubr(border = T, legend = "top", x.text.angle = 90) +
             theme(panel.grid.major = element_line(colour = "#adb5bd", size = 0.25),
-                  strip.background = element_rect(fill = "#ced4da")
+                  strip.background = element_rect(fill = "white", color = "white")
             )
 }
 

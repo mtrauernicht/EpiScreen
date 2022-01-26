@@ -313,20 +313,20 @@ corColor <- function(data, mapping, color = I("black"), sizeRange = c(1, 3), ...
 theme_classic_lines <- function() {
   theme_pubr(border = F, legend = "top") +
             theme(panel.grid.major = element_line(colour = "#adb5bd", size = 0.25),
-                  strip.background = element_rect(fill = "#ced4da")
+                  strip.background = element_rect(fill = "white", color = "white")
             )
 }
 theme_classic_lines_45 <- function() {
   theme_pubr(border = T, legend = "top", x.text.angle = 45) +
             theme(panel.grid.major = element_line(colour = "#adb5bd", size = 0.25),
-                  strip.background = element_rect(fill = "#ced4da")
+                  strip.background = element_rect(fill = "white", color = "white")
             )
 }
 
 theme_classic_lines_90 <- function() {
   theme_pubr(border = T, legend = "top", x.text.angle = 90) +
             theme(panel.grid.major = element_line(colour = "#adb5bd", size = 0.25),
-                  strip.background = element_rect(fill = "#ced4da")
+                  strip.background = element_rect(fill = "white", color = "white")
             )
 }
 
@@ -367,7 +367,7 @@ ggplot(indel.data %>%
               aes(y = -log10(MMEJ_pval_adj_global_comb), x = log2(MMEJ_ratio_norm), 
                   color = ifelse(MMEJ_pval_adj_global_comb < 0.01 & MMEJ_ratio_norm > 1.05, "green", 
                                ifelse(MMEJ_pval_adj_global_comb < 0.01 & MMEJ_ratio_norm < 0.95, "yellow","blue")))) +
-  geom_quasirandom_rast() +
+  geom_point() +
   geom_hline(linetype = "dashed", yintercept = -log10(0.01)) +
   geom_vline(linetype = "dashed", xintercept = log2(1.05)) +
   geom_vline(linetype = "dashed", xintercept = log2(0.95)) +
@@ -388,28 +388,30 @@ Are there any target groups that are prone to changes in MMEJ ratio?
 # C: Bar plot
 eff.data <- indel.data %>%
   filter(sample == "drug") %>%
-  distinct(MMEJ_zscore_global_comb, drug, target, conc_char) %>%
+  distinct(MMEJ_zscore_global_comb, drug, target, conc_char, MMEJ_ratio_norm) %>%
+  mutate(MMEJ_ratio_norm = ave(MMEJ_ratio_norm, drug, conc_char, FUN = mean)) %>%
+  distinct() %>%
   mutate(MMEJ_pval_global_comb = 2*pnorm(q = abs(MMEJ_zscore_global_comb), lower.tail = F)) %>%
   mutate(MMEJ_pval_adj_global_comb = p.adjust(MMEJ_pval_global_comb, method = 'fdr'))
 
-eff.data$sign <- "0_No"
-eff.data$sign[eff.data$MMEJ_zscore_global_comb > 1 & eff.data$MMEJ_pval_adj_global_comb < 0.05] <- "1_Up"
-eff.data$sign[eff.data$MMEJ_zscore_global_comb < -1 & eff.data$MMEJ_pval_adj_global_comb < 0.05] <- "2_Down"
+eff.data$sign <- "2_No"
+eff.data$sign[eff.data$MMEJ_ratio_norm > 1.05 & eff.data$MMEJ_pval_adj_global_comb < 0.05] <- "1_Up"
+eff.data$sign[eff.data$MMEJ_ratio_norm < 0.95 & eff.data$MMEJ_pval_adj_global_comb < 0.05] <- "0_Down"
 
 eff.data <- eff.data %>%
   mutate(number = ave(target, target, sign, conc_char, FUN = length)) %>%
   mutate(number = as.numeric(number)) %>%
   distinct(conc_char, target, sign, number) %>%
   spread(sign, number, fill = 0) %>%
-  mutate(fraction = (`1_Up` + `2_Down`) / (`0_No` + (`1_Up` + `2_Down`))) %>%
-  pivot_longer(`0_No`:`2_Down`, names_to = "sign", values_to = "number")
+  mutate(fraction = (`1_Up` + `0_Down`) / (`2_No` + (`1_Up` + `0_Down`))) %>%
+  pivot_longer(`0_Down`:`2_No`, names_to = "sign", values_to = "number")
 
 
-ggplot_custom(eff.data ,
-              aes(y = reorder(target, -number), x = number, fill = sign)) +
+ggplot_custom(eff.data,
+              aes(y = reorder(target, -number), x = number, fill = sign, color = "black")) +
   geom_bar(stat = "identity") +
   facet_wrap(~conc_char)+
-  scale_fill_manual(values = c(colors_diverse[1],colors_diverse[2], colors_diverse[4]))
+  scale_fill_manual(values = c("#e07a5f", "#3d405b", "#C2C2C2"))
 ```
 
 *Figure 2B: Number of compounds with significant changes in MMEJ ratio per target group.*
@@ -468,20 +470,14 @@ ordered_marks <- c("Euchromatin",
 
 annotation_colors_scr$chromatin <- annotation_colors_scr$chromatin[ordered_marks]
 
-ordered_marks2 <- c("DNA-PK","Epigenetic Reader Domain", "HDAC",  "Sirtuin", "HAT", 
-                    "Histone Demethylase", "HMT", "DNMT", 
-                    "HIF", "JAK", "PIM",
-                    "Aurora Kinase", "PARP")
-annotation_colors_scr$target <- annotation_colors_scr$target[ordered_marks2]
-
 
 # Generate heatmap: select top 15 drugs (highest change at any IPR) per concentration
 eff.data.heatmap <- indel.data %>%
   #filter(target != "Aurora Kinase") %>%
   filter(sample == "drug") %>%
   #filter(Mod(eff_zscore_pooled_global_comb) >= 1.645) %>%  # we could also choose to display all drugs that have significant global hits
-  distinct(conc_char, drug, target, IPR, MMEJ_zscore_comb, MMEJratio) %>%
-  mutate(MMEJratio = log2(ave(MMEJratio, drug, conc_char, IPR, FUN = mean))) %>%
+  distinct(conc_char, drug, target, IPR, MMEJ_zscore_comb, MMEJ_ratio_norm) %>%
+  mutate(MMEJ_ratio_norm = log2(ave(MMEJ_ratio_norm, drug, conc_char, IPR, FUN = mean))) %>%
   distinct()
 
 ## Select drugs that have a large effect size in at least one location (some drugs might have a small global effect size, but large local)
@@ -489,12 +485,12 @@ eff.data.heatmap2 <- eff.data.heatmap %>%
   mutate(MMEJ_zscore_comb = 2*pnorm(q = abs(MMEJ_zscore_comb), lower.tail = F)) %>%
   mutate(MMEJ_zscore_comb = p.adjust(MMEJ_zscore_comb, method = 'fdr')) %>%
   mutate(min = ave(MMEJ_zscore_comb, drug, conc_char, FUN = min)) %>%
-  filter(min < 0.0000000000001)
+  filter(min < 0.00000000001)
 
-#eff.data.heatmap2$MMEJratio[eff.data.heatmap2$MMEJ_zscore_comb > 0.001] <- NA
+eff.data.heatmap2$MMEJ_ratio_norm[eff.data.heatmap2$MMEJ_zscore_comb > 0.01] <- NA
 eff.data.heatmap2 <- eff.data.heatmap2 %>%
   dplyr::select(-min, -MMEJ_zscore_comb) %>%
-  spread(IPR, MMEJratio)
+  spread(IPR, MMEJ_ratio_norm)
 
 chromatin_ord <- chromatin %>% 
   rownames_to_column('IPR') %>%
@@ -506,10 +502,20 @@ chromatin_ord <- chromatin %>%
 
 eff.data.heatmap2 <- eff.data.heatmap2[,c("drug", "target", "conc_char", chromatin_ord$IPR)]
 
-breaks <- quantile(unlist(eff.data.heatmap2 %>% dplyr::select(contains('IPR'))), c(.05,.95), na.rm = T) # change these numbers according to where you want to set the cutoff
+breaks <- quantile(unlist(eff.data.heatmap2 %>% dplyr::select(contains('IPR'))), c(.1,.99), na.rm = T) # change these numbers according to where you want to set the cutoff
 palette_length <- 100
 
-myBreaks <- c(seq(breaks[1], 0, length.out=palette_length))
+myBreaks <- c(seq(breaks[1], 0, length.out=ceiling(palette_length/2) + 1), 
+              seq(breaks[2]/palette_length, breaks[2], length.out=floor(palette_length/2)))
+
+ordered_marks2 <- eff.data.heatmap2 %>% 
+  dplyr::select(target) %>%
+  distinct() %>%
+  arrange(target)
+
+ordered_marks2 <- ordered_marks2$target
+
+annotation_colors_scr$target <- annotation_colors_scr$target[ordered_marks2]
 
 
 
@@ -519,7 +525,7 @@ for (i in unique(eff.data.heatmap2$conc_char)) {
                        column_to_rownames('drug') %>%
                        dplyr::select(contains('IPR')) %>%
                        t()),
-           border_color = "white",
+           border_color = F,
            cellwidth = 12,
            cellheight = 12,
            cluster_rows = F,
@@ -529,7 +535,7 @@ for (i in unique(eff.data.heatmap2$conc_char)) {
            main = paste('MMEJ ratio, concentration =', i),
            annotation_col = target,
            annotation_row = chromatin,
-           color = colorRampPalette(c(colors_diverse[2], "white"))(palette_length),
+           color = colorRampPalette(c("#e07a5f", "#e5e5e5", "#3d405b"))(palette_length),
            annotation_colors = annotation_colors_scr, annotation_legend = T)
 }
 ```
@@ -550,12 +556,15 @@ for (i in unique(indel.data$target)) {
     mutate(mean_eff_pval_global_comb = 2*pnorm(q = abs(mean_eff_zscore_global_comb), lower.tail = F)) %>%
     mutate(mean_eff_pval_adj_global_comb = p.adjust(mean_eff_pval_global_comb, method = 'fdr')) %>%
     filter(mean_eff_pval_adj_global_comb < 0.001) %>%
-    distinct(mean_eff_zscore_comb, MMEJ_zscore_comb, drug, conc_char, target, IPR) %>%
+    distinct(MMEJ_ratio_norm, freqCut_norm_mean, drug, conc_char, target, IPR) %>%
+    mutate(MMEJ_ratio_norm = log2(ave(MMEJ_ratio_norm, drug, conc_char, IPR, FUN = mean))) %>%
+    mutate(freqCut_norm_mean = log2(ave(freqCut_norm_mean, drug, conc_char, IPR, FUN = mean))) %>%
+    distinct() %>%
     mutate(drug_conc = paste(drug, conc_char, sep = "_"))
   
   if (length(unique(x$drug_conc)) > 1) {
   p<- ggplot(x ,
-       aes(x = MMEJ_zscore_comb, y = mean_eff_zscore_comb)) +
+       aes(x = MMEJ_ratio_norm, y = freqCut_norm_mean)) +
   geom_point() +
   geom_smooth(method = "lm") +
   facet_wrap(~drug_conc) +
@@ -572,9 +581,11 @@ ggplot_custom(indel.data %>%
     mutate(mean_eff_pval_global_comb = 2*pnorm(q = abs(mean_eff_zscore_global_comb), lower.tail = F)) %>%
     mutate(mean_eff_pval_adj_global_comb = p.adjust(mean_eff_pval_global_comb, method = 'fdr')) %>%
     filter(mean_eff_pval_adj_global_comb < 0.001) %>%
-    distinct(mean_eff_zscore_comb, MMEJ_zscore_comb, drug, conc_char, target, IPR) %>%
+    distinct(MMEJ_ratio_norm, freqCut_norm_mean, drug, conc_char, target, IPR) %>%
+    mutate(MMEJ_ratio_norm = log2(ave(MMEJ_ratio_norm, drug, conc_char, IPR, FUN = mean))) %>%
+    mutate(freqCut_norm_mean = log2(ave(freqCut_norm_mean, drug, conc_char, IPR, FUN = mean))) %>%
     mutate(drug_conc = paste(drug, conc_char, sep = "_")),
-    aes(x = MMEJ_zscore_comb, y = mean_eff_zscore_comb)) +
+    aes(x = MMEJ_ratio_norm, y = freqCut_norm_mean)) +
   geom_point() +
   geom_smooth(method = "lm") +
   stat_cor(method = "spearman") +
@@ -583,15 +594,15 @@ ggplot_custom(indel.data %>%
 
 eff_mmej_corr <- indel.data %>%
   filter(sample == "drug") %>%
-  mutate(mean_eff_pval_global_comb = 2*pnorm(q = abs(mean_eff_zscore_global_comb), lower.tail = F)) %>%
-  mutate(mean_eff_pval_adj_global_comb = p.adjust(mean_eff_pval_global_comb, method = 'fdr')) %>%
-  filter(mean_eff_pval_adj_global_comb < 0.001) %>%
-  distinct(mean_eff_zscore_comb, MMEJ_zscore_comb, drug, conc_char, target, IPR, mean_eff_pval_global_comb, MMEJ_zscore_global_comb) %>%
+  filter(abs(mean_eff_zscore_global_comb) > 4) %>%
+  filter(abs(MMEJ_zscore_global_comb) > 4) %>%
+  distinct(MMEJ_ratio_norm, freqCut_norm_mean, drug, conc_char, target, IPR) %>%
+  mutate(MMEJ_ratio_norm = log2(ave(MMEJ_ratio_norm, drug, conc_char, IPR, FUN = mean))) %>%
+  mutate(freqCut_norm_mean = log2(ave(freqCut_norm_mean, drug, conc_char, IPR, FUN = mean))) %>%
   mutate(drug_conc = paste(drug, conc_char, sep = "_")) %>%
   mutate(slope = NA, term = NA, p.value = NA)
-
 for (i in unique(eff_mmej_corr$drug_conc)) {
-    model.correlation <- lm(formula = mean_eff_zscore_comb ~ MMEJ_zscore_comb, 
+    model.correlation <- lm(formula = MMEJ_ratio_norm ~ freqCut_norm_mean, 
                                data = eff_mmej_corr[eff_mmej_corr$drug_conc == i,]) %>% 
       tidy()
     
@@ -610,7 +621,7 @@ eff_mmej_corr_heatmap <- eff_mmej_corr %>%
   filter(term != "(Intercept)") %>%
   mutate(p.value = p.adjust(p.value, method = "fdr")) %>%
   #filter(p.value < 0.05) %>%
-  dplyr::select(-term, -IPR, -mean_eff_zscore_comb, -MMEJ_zscore_comb) %>%
+  dplyr::select(-term, -IPR, -freqCut_norm_mean, -MMEJ_ratio_norm) %>%
   distinct()
 
 ggplot_custom(eff_mmej_corr_heatmap %>%
@@ -620,9 +631,34 @@ ggplot_custom(eff_mmej_corr_heatmap %>%
   geom_quasirandom(aes(color = ifelse(p.value < 0.05, "green", "black"))) +
   theme_classic_lines_90()
 
+eff_mmej_corr_heatmap_plot <- indel.data %>%
+  mutate(drug_conc = paste(drug, conc_char, sep = "_")) %>%
+  filter(drug_conc %in% eff_mmej_corr_heatmap$drug_conc) %>%
+  distinct(MMEJ_ratio_norm, freqCut_norm_mean, drug_conc, conc_char, target, IPR) %>%
+  mutate(MMEJ_ratio_norm = log2(ave(MMEJ_ratio_norm, drug_conc, IPR, FUN = mean))) %>%
+  mutate(freqCut_norm_mean = log2(ave(freqCut_norm_mean, drug_conc, IPR, FUN = mean))) %>%
+  distinct()
 
+pval <- eff_mmej_corr_heatmap %>%
+  distinct(drug_conc, p.value, slope)
 
+eff_mmej_corr_heatmap_plot <- merge(eff_mmej_corr_heatmap_plot, pval)
 
+eff_mmej_corr_heatmap_plot <- eff_mmej_corr_heatmap_plot %>%
+         filter(target %in% c("HDAC", "Aurora Kinase", "Epigenetic Reader Domain"))
+
+ggplot(eff_mmej_corr_heatmap_plot,
+       aes(x = MMEJ_ratio_norm, y = freqCut_norm_mean, group = drug_conc)) +
+  geom_abline(linetype = "twodash") +
+  geom_vline(xintercept = 0) +
+  geom_hline(yintercept = 0) +
+  geom_point(alpha = 0.1, aes(color = ifelse(p.value < 0.05 & slope < -0.1, "green", 
+                                                       ifelse(p.value < 0.05 & slope > 0.1, "yellow","blue")))) +
+  geom_smooth(method = "lm", se = F, aes(color = ifelse(p.value < 0.05 & slope < -0.1, "green", 
+                                                       ifelse(p.value < 0.05 & slope > 0.1, "yellow","blue")))) +
+  facet_wrap(~target, nrow = 3) +
+  ggtitle("efficiency vs. mmej-ratio per target group") +
+  scale_color_manual(values = c("#C2C2C2", "#3d405b", "#e07a5f")) 
 ```
 
 
