@@ -311,7 +311,7 @@ corColor <- function(data, mapping, color = I("black"), sizeRange = c(1, 3), ...
 # )
 
 theme_classic_lines <- function() {
-  theme_pubr(border = F, legend = "top") +
+  theme_pubr(border = T, legend = "top") +
             theme(panel.grid.major = element_line(colour = "#adb5bd", size = 0.25),
                   strip.background = element_rect(fill = "white", color = "white")
             )
@@ -347,7 +347,7 @@ ggplot_custom <- function(...) ggplot2::ggplot(...) +
 
 ```{r data import, echo = FALSE, warning = FALSE}
 # Import data from preprocessing script
-indel.data <- readRDS("/DATA/usr/m.trauernicht/projects/EpiScreen/files_scripts/mt20220125_episcreen.RDS")
+indel.data <- readRDS("/DATA/usr/m.trauernicht/projects/EpiScreen/files_scripts/mt20220126_2_episcreen.RDS")
 ```
 
 
@@ -365,15 +365,17 @@ ggplot(indel.data %>%
                 mutate(MMEJ_pval_global_comb = 2*pnorm(q = abs(MMEJ_zscore_global_comb), lower.tail = F)) %>%
                 mutate(MMEJ_pval_adj_global_comb = p.adjust(MMEJ_pval_global_comb, method = 'fdr')),
               aes(y = -log10(MMEJ_pval_adj_global_comb), x = log2(MMEJ_ratio_norm), 
-                  color = ifelse(MMEJ_pval_adj_global_comb < 0.01 & MMEJ_ratio_norm > 1.05, "green", 
-                               ifelse(MMEJ_pval_adj_global_comb < 0.01 & MMEJ_ratio_norm < 0.95, "yellow","blue")))) +
+                  color = ifelse(MMEJ_pval_adj_global_comb < 0.05 & MMEJ_ratio_norm > 1.05, "green", 
+                               ifelse(MMEJ_pval_adj_global_comb < 0.05 & MMEJ_ratio_norm < 0.95, "yellow","blue")))) +
   geom_point() +
-  geom_hline(linetype = "dashed", yintercept = -log10(0.01)) +
+  geom_hline(linetype = "dashed", yintercept = -log10(0.05)) +
   geom_vline(linetype = "dashed", xintercept = log2(1.05)) +
   geom_vline(linetype = "dashed", xintercept = log2(0.95)) +
   ggtitle("first z-score per tech. rep., then mean of z-scores") +
   scale_color_manual(values = c("#C2C2C2", "#3d405b", "#e07a5f")) +
-  facet_wrap(~conc_char, scales = "free")
+  facet_wrap(~conc_char, scales = "free") +
+  annotate("rect",xmin=log2(1.05),xmax=log2(0.95),ymin=-Inf,ymax=Inf, alpha=0.1, fill="black") +
+  annotate("rect",xmin=-Inf,xmax=Inf,ymin=-Inf,ymax=-log10(0.05), alpha=0.1, fill="black")
 ```
 
 *Figure 3A: Compound-induced change in MMEJ ratio of all tested compounds. Mean MMEJ z-score per drug & concentration.* 
@@ -485,9 +487,9 @@ eff.data.heatmap2 <- eff.data.heatmap %>%
   mutate(MMEJ_zscore_comb = 2*pnorm(q = abs(MMEJ_zscore_comb), lower.tail = F)) %>%
   mutate(MMEJ_zscore_comb = p.adjust(MMEJ_zscore_comb, method = 'fdr')) %>%
   mutate(min = ave(MMEJ_zscore_comb, drug, conc_char, FUN = min)) %>%
-  filter(min < 0.00000000001)
+  filter(min < 0.01)
 
-eff.data.heatmap2$MMEJ_ratio_norm[eff.data.heatmap2$MMEJ_zscore_comb > 0.01] <- NA
+eff.data.heatmap2$MMEJ_ratio_norm[eff.data.heatmap2$MMEJ_zscore_comb > 0.05] <- NA
 eff.data.heatmap2 <- eff.data.heatmap2 %>%
   dplyr::select(-min, -MMEJ_zscore_comb) %>%
   spread(IPR, MMEJ_ratio_norm)
@@ -536,7 +538,8 @@ for (i in unique(eff.data.heatmap2$conc_char)) {
            annotation_col = target,
            annotation_row = chromatin,
            color = colorRampPalette(c("#e07a5f", "#e5e5e5", "#3d405b"))(palette_length),
-           annotation_colors = annotation_colors_scr, annotation_legend = T)
+           annotation_colors = annotation_colors_scr, 
+           annotation_legend = T)
 }
 ```
 
@@ -555,7 +558,7 @@ for (i in unique(indel.data$target)) {
     filter(target == i) %>%
     mutate(mean_eff_pval_global_comb = 2*pnorm(q = abs(mean_eff_zscore_global_comb), lower.tail = F)) %>%
     mutate(mean_eff_pval_adj_global_comb = p.adjust(mean_eff_pval_global_comb, method = 'fdr')) %>%
-    filter(mean_eff_pval_adj_global_comb < 0.001) %>%
+    filter(mean_eff_pval_adj_global_comb < 0.01) %>%
     distinct(MMEJ_ratio_norm, freqCut_norm_mean, drug, conc_char, target, IPR) %>%
     mutate(MMEJ_ratio_norm = log2(ave(MMEJ_ratio_norm, drug, conc_char, IPR, FUN = mean))) %>%
     mutate(freqCut_norm_mean = log2(ave(freqCut_norm_mean, drug, conc_char, IPR, FUN = mean))) %>%
@@ -577,7 +580,7 @@ for (i in unique(indel.data$target)) {
 
 ggplot_custom(indel.data %>%
     filter(sample == "drug") %>%
-    filter(drug == "AR-42", conc_char == "100 nM") %>%
+    filter(drug == "PCI-24781 (Abexinostat)", conc_char == "100 nM") %>%
     mutate(mean_eff_pval_global_comb = 2*pnorm(q = abs(mean_eff_zscore_global_comb), lower.tail = F)) %>%
     mutate(mean_eff_pval_adj_global_comb = p.adjust(mean_eff_pval_global_comb, method = 'fdr')) %>%
     filter(mean_eff_pval_adj_global_comb < 0.001) %>%
@@ -601,6 +604,7 @@ eff_mmej_corr <- indel.data %>%
   mutate(freqCut_norm_mean = log2(ave(freqCut_norm_mean, drug, conc_char, IPR, FUN = mean))) %>%
   mutate(drug_conc = paste(drug, conc_char, sep = "_")) %>%
   mutate(slope = NA, term = NA, p.value = NA)
+
 for (i in unique(eff_mmej_corr$drug_conc)) {
     model.correlation <- lm(formula = MMEJ_ratio_norm ~ freqCut_norm_mean, 
                                data = eff_mmej_corr[eff_mmej_corr$drug_conc == i,]) %>% 

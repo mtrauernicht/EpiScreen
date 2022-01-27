@@ -97,7 +97,7 @@ CallTrueBarcodes <- function(df) {
 initials = "rs"
 
 # Viability (% of DMSO)
-viab_limit = 0.45
+viab_limit = 0.75
 
 # Read count limit of +1 & -7 combined
 read_count_limit = 40
@@ -142,15 +142,17 @@ setnames(indel.statistics.dt,
            "r_written_pct_split", "reads_split"))
 
 # Import RSTP2 clone 5 barcode list (in total 18 barcodes) - "ACCCCTAAAGGCGCTG" (19) + "CTCTTAATCGCTGCC" (20)
-# 19 is very lowly abundant in the sequencing replicate 1 (E177) and therefore omitted - #### KEPT FOR NOW #####
+# 19 is very lowly abundant in the sequencing replicate 1 (E177) and therefore omitted
 barcodes.clone5 <- c("AGGGCGTAAAATATTT", "TATGGCTGTCGGGTAG", "TGTCCCTTAGTACTTT", 
                    "AGAAAATAATATGACG","CGGCCTGAAGGTCAGG","TTGAACGCGGGCTCGG",
                    "GCTAACATCACGAATC", "GCGCACCCTTTAATTG","ACTGTCGAGTTGTCCG",
                    "CCGGGGACGTATGCAC","TCTTTTGAGGAGCTGA","ATATCGTTGCTGGAGA",
                    "CATCCACCACACTTCA","ATACTATATTTAACGG",
                    "CATTTCTGATCAATAA","GAGCGCGTCACCGGGT",
-                   "GTACCTCTCGATAGTG","TGGCCAATATTTGTCT",
-                   "ACCCCTAAAGGCGCTG")
+                   "GTACCTCTCGATAGTG","TGGCCAATATTTGTCT"
+                   #,
+                   #"ACCCCTAAAGGCGCTG"
+                   )
 ```
 
 ## Reading the indel data tables
@@ -282,7 +284,7 @@ filtered.indelreads.dt =
 exps = unique(filtered.indelreads.dt$exp)
 
 # List all the exps that still contain all the barcodes after count filtering 
-filtered.indelreads.exp = exps[table(filtered.indelreads.dt$exp) == 19]
+filtered.indelreads.exp = exps[table(filtered.indelreads.dt$exp) == length(barcodes.clone5)]
 
 E177_post = sum(grepl("E177", unique(filtered.indelreads.dt$exp)))
 E1504_post = sum(grepl("E1504", unique(filtered.indelreads.dt$exp)))
@@ -315,7 +317,7 @@ mutations.dt[, ID := gsub("^(E1504|E177)_[0-9][0-9]_(1|10|100)_[123]_([12]_...$)
 mutations.stat.dt = merge(mutations.dt, indel.statistics.dt)
 
 # Filter the low viability reads
-# This filters out all drugs at a certain concentration were at least 2/3 technical replicates were below 0.45 in at least one biological replicate 
+# This filters out all drugs at a certain concentration were at least 2/3 technical replicates were below 0.75 in at least one biological replicate 
 keep_drugs <- mutations.stat.dt %>%
   distinct(plate, drug, conc_char, well, tech, replicate, viab_norm_split) %>%
   # filter for samples with higher viab than the limit
@@ -334,8 +336,9 @@ keep_drugs <- mutations.stat.dt %>%
   unique()
 
 dim(mutations.stat.dt)
-# Filter for the 
+# Filter for the viability
 mutations.screen.dt <- mutations.stat.dt %>%
+  # filter out technical replicates below the viability cutoff
   filter(viab_norm_split > viab_limit) %>%
   # make filter for the conditions for which we do not have at least 2 technical replicates
   mutate(conc_char_drug_rep = paste(conc_char, drug, replicate, sep = " ")) %>%
@@ -356,7 +359,7 @@ mutations.screen.dt[barcode == "ACTGTCGAGTTGTCCG" & drug == "Zebularine" & mutat
 mutations.screen.dt[is.na(mutation), ]
 ```
 
-## We will also remove samples that not least in 2 technical replicates (out of 3) and are present in at least both biological replicates. 
+## We will also remove samples that are not in at least in 2 technical replicates (out of 3) and are present both biological replicates. 
 
 ```{r filter for reproducibility}
 mutations.screen.dt %>% 
@@ -890,7 +893,10 @@ clone5_z.score_chrom_tib <- readRDS('/DATA/projects/DSBrepair/data/R/cl20201026_
 
 
 clone5_chrom_tib <- readRDS("/DATA/projects/DSBrepair/data/R/rs20200519_clone5_newdoms_chromatin.RDS") %>%
+  filter(IPR != "IPR1") %>%
   left_join(clone5_z.score_chrom_tib)
+
+
 
 chrom_colnames = names(clone5_chrom_tib)
 
@@ -950,7 +956,7 @@ ratio.cols = c("replicate",
 screen_ratios_tib =  screen.ratios.chrom.dt %>% 
   select(all_of(c(ratio.cols, chrom_colnames)))
 
-rm(screen.indel.chrom.dt)
+#rm(screen.indel.chrom.dt)
 ```
 
 

@@ -36,79 +36,59 @@ chromatin.features <- colnames(screen_ratios_tib)[grepl("[.]zscore", colnames(sc
 chrom_data = screen_ratios_tib %>% select(barcode, all_of(chromatin.features)) %>% distinct()
 ```
 
-#Example with three genes (POLL, FANCM, POLQ) & I will use "H3K4me1" as example
-1st step = Compare POLL, FANCM, POLQ and WT data points vs. H3K4me1 (in lin or log space)
-
-step 1 = plot 
+## Prepare data
 
 ```{r}
 # Data table and compute log2_ratio (This line needs to be adjusted)
-log2.eff.screen.detail <- screen_ratios_tib %>%
-  distinct(replicate, MMEJratio, drug, conc_char, target, barcode) %>%
-  mutate(log2_ratio = log2(MMEJratio))
+ratios_tib <- screen_ratios_tib %>%
+  filter(abs(mean_eff_zscore_global_comb) > 2.58 | abs(MMEJ_zscore_global_comb) > 2.58 | drug == "DMSO") %>%
+  distinct(MMEJratio, freqCut, drug, conc_char, target, barcode) %>%
+  mutate(MMEJratio = ave(MMEJratio, drug, conc_char, barcode, FUN = mean)) %>%
+  mutate(MMEJratio.log2 = log2(MMEJratio)) %>%
+  mutate(freqCut = (ave(freqCut, drug, conc_char, barcode, FUN = mean))) %>%
+  mutate(freqCut.log2 = log2(freqCut)) %>%
+  distinct()
 
-log2.eff.screen.dmso <- screen_ratios_tib %>%
+dmso_ratios_tib <- screen_ratios_tib %>%
   filter(drug == "DMSO") %>%
-  distinct(MMEJratio, barcode) %>%
+  distinct(MMEJratio, freqCut, barcode) %>%
   mutate(DMSO.ratio = ave(MMEJratio, barcode, FUN = mean)) %>%
-  mutate(DMSO.log2_ratio = log2(DMSO.ratio)) %>%
-  dplyr::select(-MMEJratio) %>%
+  mutate(DMSO.ratio.log2 = log2(DMSO.ratio)) %>%
+  mutate(DMSO.freqCut = ave(freqCut, barcode, FUN = mean)) %>%
+  mutate(DMSO.freqCut.log2 = log2(DMSO.freqCut)) %>%
+  dplyr::select(-MMEJratio, -freqCut) %>%
   distinct()
   
-
-log2.eff.screen.detail <- merge(log2.eff.screen.detail, log2.eff.screen.dmso)
-
-
-
-#####
-
-eff.screen.detail <- screen_ratios_tib %>% 
-  select(replicate, tech, conc_char, barcode, drug, target, eff_zscore) %>% 
-  distinct()
-
-# DMSO data table set. (This lin of code needs to be adjusted)
-DMSO.set <- filter(screen_ratios_tib, drug == "DMSO") %>%
-  select(replicate, MMEJ_ratio_norm, drug, conc_char, target, barcode) %>%
-  mutate(log2_ratio = log2(MMEJ_ratio_norm)) %>%
-  dplyr::group_by(barcode, replicate) %>%
-  dplyr::summarise(DMSO.log2_ratio = mean(log2_ratio, na.rm = T),
-                   DMSO.ratio = mean(MMEJ_ratio_norm, na.rm = T))
-
-DMSO.set <- filter(screen_ratios_tib, drug == "DMSO") %>% 
-  distinct(replicate, tech, conc_char, barcode, drug, target, eff_zscore, mean_eff_zscore)
-
-# Plot in log2 space
-ggplot(data.for.plotting %>% filter(drug %in% c("DNA-PKi","Decitabine","GSK J4 HCl","DMSO"), conc_char == "10 µM"), aes(H3K4me1.zscore,m.log2_ratio, color = drug)) +
-  geom_point() +
-  geom_smooth(method = "lm") +
-  stat_cor(method = "spearman") +
-  theme_bw()
-
-ggplot(data.for.plotting %>% filter(drug %in% c("DNA-PKi","Decitabine","GSK J4 HCl","DMSO"), conc_char == "10 µM"), aes(LMNB1.zscore,m.log2_ratio, color = drug)) +
-  geom_point() +
-  geom_smooth(method = "lm") +
-  stat_cor(method = "spearman") +
-  theme_bw()
+ratios_tib <- merge(ratios_tib, dmso_ratios_tib)
 ```
 
 
 # 2nd step check compute distances and plot them
 ```{r}
 # Each replicate has a different value (compute differences by replicate)
-log2.distance.eff <- log2.eff.screen.detail %>% 
-  mutate(log2.dist = sqrt((log2_ratio - DMSO.log2_ratio)^2), 
-         lin.dist = sqrt((MMEJratio - DMSO.ratio)^2)) 
+ratios_tib <- ratios_tib %>% 
+  mutate(log2.dist.ratio = sqrt((MMEJratio.log2 - DMSO.ratio.log2)^2), 
+         lin.dist.ratio = sqrt((MMEJratio - DMSO.ratio)^2)) %>%
+  mutate(log2.dist.freqCut = sqrt((freqCut.log2 - DMSO.freqCut.log2)^2), 
+         lin.dist.freqCut = sqrt((freqCut - DMSO.freqCut)^2)) 
 
-mean.log2.distance.eff <- log2.distance.eff %>% 
+ratios_tib <- ratios_tib %>% 
   dplyr::group_by(barcode, drug, conc_char) %>% 
-  dplyr::summarise(m.log2.dist = mean(log2.dist, na.rm = T), 
-                   m.lin.dist = mean(lin.dist, na.rm = T)) %>% 
   left_join(chrom_data)
 
 #Plot slopes
-ggplot(mean.log2.distance.eff %>% 
-         filter(drug %in% c("DMSO","DNA-PKi","3-Deazaneplanocin A (DZNeP)")),
-       aes(H3K27me3.zscore,m.log2.dist, color = drug)) + 
+ggplot(ratios_tib %>% 
+         filter(drug %in% c("DMSO","DNA-PKi","PCI-24781 (Abexinostat)")),
+       aes(H3K27me3.zscore,log2.dist.ratio, color = drug)) + 
+  geom_point() + 
+  stat_cor(method = "spearman") + 
+  geom_smooth(method = "lm") + 
+  theme_bw() +
+  facet_wrap(. ~ conc_char)
+
+ggplot(ratios_tib %>% 
+         filter(drug %in% c("DMSO","DNA-PKi","PCI-24781 (Abexinostat)")),
+       aes(HDAC1,log2.dist.freqCut, color = drug)) + 
   geom_point() + 
   stat_cor(method = "spearman") + 
   geom_smooth(method = "lm") + 
@@ -124,16 +104,16 @@ ggplot(mean.log2.distance.eff %>%
 ```{r}
 # Perform analysis across all features for three test genes
 
-mean.log2.distance.eff %<>% mutate(drug_conc = paste(drug, conc_char, sep = "_"))
+ratios_tib %<>% mutate(drug_conc = paste(drug, conc_char, sep = "_"))
 
 
 slope.protein.features <- tibble(drug_conc = NA, feature = NA, slope.log2 = NA, term = NA, p.value = NA)
 
-for (i in unique(mean.log2.distance.eff$drug_conc)) {
+for (i in unique(ratios_tib$drug_conc)) {
   for (j in chromatin.features) {
-    model.dt <- mean.log2.distance.eff %>% filter(drug_conc == i & m.log2.dist != Inf) 
+    model.dt <- ratios_tib %>% filter(drug_conc == i & log2.dist.freqCut != Inf) 
     
-    model.epistasis.log2 <- lm(formula = m.log2.dist ~ unlist(model.dt[j]), 
+    model.epistasis.log2 <- lm(formula = log2.dist.freqCut ~ unlist(model.dt[j]), 
                                data = model.dt) %>% 
       tidy()
     
@@ -148,6 +128,8 @@ for (i in unique(mean.log2.distance.eff$drug_conc)) {
                 pull(p.value))
   }
 }
+
+
 
 # Plot matrix without scaling
 # log2 space
@@ -178,10 +160,10 @@ ggplot(slope.protein.features %>%
   theme_bw() + 
   theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust =0.5))
 
-slope.protein.features2 = slope.protein.features 
+slope.protein.features2 = slope.protein.features
 
 
-hits2 = slope.protein.features %>% filter(term == "unlist(model.dt[j])" & p.value < 0.001) %>% pull(drug_conc) %>% unique()
+hits2 = slope.protein.features %>% filter(term == "unlist(model.dt[j])" & p.value < 0.01) %>% pull(drug_conc) %>% unique()
 
 hits = slope.protein.features %>% filter(term == "unlist(model.dt[j])" & abs(slope.log2) > 0.05) %>% pull(drug_conc) %>% unique()
 
@@ -205,11 +187,6 @@ slope.prot.features.scale.dcast.100nm = slope.prot.features.scale.dcast.list[[3]
   reshape2::dcast(drug ~ feature, value.var = "slope.log2") %>% 
   column_to_rownames(var = "drug")
  
-```
-
-
-
-```{r}
 # Set annotation for heatmap
 # Row annotation: annotate drugs with the target group
 target <- screen_ratios_tib %>% 
@@ -234,28 +211,10 @@ ordered_marks2 <- c("Negative Control", "MRN", "DNA-PK","Epigenetic Reader Domai
 
 annotation_colors_scr$target <- annotation_colors_scr$target[ordered_marks2]
 
-# 
-# for (i in unique(eff.data.heatmap2$conc_rep)) {
-#   pheatmap(as.matrix(eff.data.heatmap2[eff.data.heatmap2$conc_rep == i,] %>%
-#                        column_to_rownames('drug') %>%
-#                        dplyr::select(contains('IPR')) %>%
-#                        t()),
-#            border_color = "white",
-#            cellwidth = 12,
-#            cellheight = 12,
-#            breaks = breaks,
-#            cluster_rows = F,
-#            main = paste('efficiency change, concentration =', i),
-#            annotation_col = target,
-#            color = colorRampPalette(rev(brewer.pal(n = 7, name = "RdBu")))(100),
-#            annotation_colors = annotation_colors_scr, annotation_legend = T)
-# }
-# 
-
 breaks <- seq(-0.1, 0.1, 0.001)
 
 pheatmap(t(slope.prot.features.scale.dcast.100nm),
-         border_color = "white",
+         border_color = F,
          cellwidth = 12,
          cellheight = 12,
          breaks = breaks,
@@ -267,7 +226,7 @@ pheatmap(t(slope.prot.features.scale.dcast.100nm),
 breaks <- seq(-0.1, 0.1, 0.001)
 
 pheatmap(t(slope.prot.features.scale.dcast.1um),
-         border_color = "white",
+         border_color = F,
          cellwidth = 12,
          cellheight = 12,
          breaks = breaks,
@@ -279,7 +238,7 @@ pheatmap(t(slope.prot.features.scale.dcast.1um),
 breaks <- seq(-0.2, 0.2, 0.001)
 
 pheatmap(t(slope.prot.features.scale.dcast.10um),
-         border_color = "white",
+         border_color = F,
          cellwidth = 12,
          cellheight = 12,
          breaks = breaks,
@@ -287,6 +246,133 @@ pheatmap(t(slope.prot.features.scale.dcast.10um),
          main = "10 uM",
          color = colorRampPalette(rev(brewer.pal(n = 7, name = "RdBu")))(length(breaks)),
          annotation_colors = annotation_colors_scr, annotation_legend = T)
+
+
+```
+
+
+
+```{r}
+slope.protein.features <- tibble(drug_conc = NA, feature = NA, slope.log2 = NA, term = NA, p.value = NA)
+
+for (i in unique(ratios_tib$drug_conc)) {
+  for (j in chromatin.features) {
+    model.dt <- ratios_tib %>% filter(drug_conc == i & log2.dist.ratio != Inf) 
+    
+    model.epistasis.log2 <- lm(formula = log2.dist.ratio ~ unlist(model.dt[j]), 
+                               data = model.dt) %>% 
+      tidy()
+    
+    slope.protein.features <- slope.protein.features %>% 
+      add_row(drug_conc = i, 
+              feature = j, 
+              slope.log2 = model.epistasis.log2 %>% 
+                pull(estimate), 
+              term = model.epistasis.log2 %>%
+                pull(term),
+              p.value = model.epistasis.log2 %>% 
+                pull(p.value))
+  }
+}
+
+
+
+# Plot matrix without scaling
+# log2 space
+ggplot(slope.protein.features %>% 
+         filter(term != "(Intercept)" & 
+                  complete.cases(.) & 
+                  grepl("100 nM", drug_conc))) + 
+  geom_tile(aes(drug_conc,feature, fill = slope.log2)) + 
+  scale_fill_gradient2() + 
+  theme_bw() + 
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust =0.5))
+
+ggplot(slope.protein.features %>% 
+         filter(term != "(Intercept)" & 
+                  complete.cases(.) & 
+                  grepl("1 µM", drug_conc))) + 
+  geom_tile(aes(drug_conc,feature, fill = slope.log2)) + 
+  scale_fill_gradient2() + 
+  theme_bw() + 
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust =0.5))
+
+ggplot(slope.protein.features %>% 
+         filter(term != "(Intercept)" & 
+                  complete.cases(.) & 
+                  grepl("10 µM", drug_conc))) + 
+  geom_tile(aes(drug_conc,feature, fill = slope.log2)) + 
+  scale_fill_gradient2() + 
+  theme_bw() + 
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust =0.5))
+
+slope.protein.features2 = slope.protein.features
+
+
+hits2 = slope.protein.features %>% filter(term == "unlist(model.dt[j])" & p.value < 0.01) %>% pull(drug_conc) %>% unique()
+
+hits = slope.protein.features %>% filter(term == "unlist(model.dt[j])" & abs(slope.log2) > 0.05) %>% pull(drug_conc) %>% unique()
+
+slope.prot.features.scale.dcast.list <- slope.protein.features %>% 
+  filter(term == "unlist(model.dt[j])" & drug_conc %in% hits) %>% 
+  separate(drug_conc, into = c("drug", "conc"), sep = "_") %>% 
+  group_by(conc) %>%
+  group_split(.keep = FALSE) 
+
+slope.prot.features.scale.dcast.1um = slope.prot.features.scale.dcast.list[[1]] %>%
+  reshape2::dcast(drug ~ feature, value.var = "slope.log2") %>% 
+  column_to_rownames(var = "drug")
+
+
+slope.prot.features.scale.dcast.10um = slope.prot.features.scale.dcast.list[[2]] %>%
+  reshape2::dcast(drug ~ feature, value.var = "slope.log2") %>% 
+  column_to_rownames(var = "drug")
+
+
+slope.prot.features.scale.dcast.100nm = slope.prot.features.scale.dcast.list[[3]] %>%
+  reshape2::dcast(drug ~ feature, value.var = "slope.log2") %>% 
+  column_to_rownames(var = "drug")
+ 
+
+
+annotation_colors_scr$target <- annotation_colors_scr$target[ordered_marks2]
+
+breaks <- seq(-0.1, 0.1, 0.001)
+
+pheatmap(t(slope.prot.features.scale.dcast.100nm),
+         border_color = F,
+         cellwidth = 12,
+         cellheight = 12,
+         breaks = breaks,
+         annotation_col = target,
+         main = "100 nM",
+         color = colorRampPalette(rev(brewer.pal(n = 7, name = "RdBu")))(length(breaks)),
+         annotation_colors = annotation_colors_scr, annotation_legend = T)
+
+breaks <- seq(-0.1, 0.1, 0.001)
+
+pheatmap(t(slope.prot.features.scale.dcast.1um),
+         border_color = F,
+         cellwidth = 12,
+         cellheight = 12,
+         breaks = breaks,
+         annotation_col = target,
+         main = "1 uM",
+         color = colorRampPalette(rev(brewer.pal(n = 7, name = "RdBu")))(length(breaks)),
+         annotation_colors = annotation_colors_scr, annotation_legend = T)
+
+breaks <- seq(-0.2, 0.2, 0.001)
+
+pheatmap(t(slope.prot.features.scale.dcast.10um),
+         border_color = F,
+         cellwidth = 12,
+         cellheight = 12,
+         breaks = breaks,
+         annotation_col = target,
+         main = "10 uM",
+         color = colorRampPalette(rev(brewer.pal(n = 7, name = "RdBu")))(length(breaks)),
+         annotation_colors = annotation_colors_scr, annotation_legend = T)
+
 
 ```
 

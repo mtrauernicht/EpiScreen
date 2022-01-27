@@ -311,7 +311,7 @@ corColor <- function(data, mapping, color = I("black"), sizeRange = c(1, 3), ...
 # )
 
 theme_classic_lines <- function() {
-  theme_pubr(border = F, legend = "top") +
+  theme_pubr(border = T, legend = "top") +
             theme(panel.grid.major = element_line(colour = "#adb5bd", size = 0.25),
                   strip.background = element_rect(fill = "white", color = "white")
             )
@@ -347,8 +347,7 @@ ggplot_custom <- function(...) ggplot2::ggplot(...) +
 
 ```{r data import, echo = FALSE, warning = FALSE}
 # Import data from preprocessing script
-#indel.data <- readRDS("/DATA/projects/DSBrepair/data/R/rs20220120_episcreen2/rs20220120_episcreen_ratios.RDS")
-indel.data <- readRDS("/DATA/usr/m.trauernicht/projects/EpiScreen/files_scripts/mt20220125_episcreen.RDS")
+indel.data <- readRDS("/DATA/usr/m.trauernicht/projects/EpiScreen/files_scripts/mt20220126_2_episcreen.RDS")
 ```
 
 ---
@@ -365,15 +364,17 @@ ggplot(indel.data %>%
                 mutate(mean_eff_pval_global_comb = 2*pnorm(q = abs(mean_eff_zscore_global_comb), lower.tail = F)) %>%
                 mutate(mean_eff_pval_adj_global_comb = p.adjust(mean_eff_pval_global_comb, method = 'fdr')),
               aes(y = -log10(mean_eff_pval_adj_global_comb), x = log2(freqCut_norm_global_mean), 
-                  color = ifelse(mean_eff_pval_adj_global_comb < 0.01 & freqCut_norm_global_mean > 1.03, "green", 
-                               ifelse(mean_eff_pval_adj_global_comb < 0.01 & freqCut_norm_global_mean < 0.97, "yellow","blue")))) +
+                  color = ifelse(mean_eff_pval_adj_global_comb < 0.05 & freqCut_norm_global_mean > 1.025, "green", 
+                               ifelse(mean_eff_pval_adj_global_comb < 0.05 & freqCut_norm_global_mean < 0.975, "yellow","blue")))) +
   geom_point() +
-  geom_hline(linetype = "dashed", yintercept = -log10(0.01)) +
-  geom_vline(linetype = "dashed", xintercept = log2(1.03)) +
-  geom_vline(linetype = "dashed", xintercept = log2(0.97)) +
+  geom_hline(linetype = "dashed", yintercept = -log10(0.05)) +
+  geom_vline(linetype = "dashed", xintercept = log2(1.025)) +
+  geom_vline(linetype = "dashed", xintercept = log2(0.975)) +
   ggtitle("first z-score per tech. rep., then mean of z-scores") +
   scale_color_manual(values = c("#C2C2C2", "#3d405b", "#e07a5f")) +
-  facet_wrap(~conc_char, scales = "free")
+  facet_wrap(~conc_char, scales = "free") +
+  annotate("rect",xmin=log2(1.025),xmax=log2(0.975),ymin=-Inf,ymax=Inf, alpha=0.1, fill="black") +
+  annotate("rect",xmin=-Inf,xmax=Inf,ymin=-Inf,ymax=-log10(0.05), alpha=0.1, fill="black")
 ```
 
 *Figure 2A: Compound-induced change in cutting efficiency of all tested compounds. Mean per drug & concentration vs. p-value from t-test.*
@@ -396,8 +397,8 @@ eff.data <- indel.data %>%
   mutate(mean_eff_pval_adj_global_comb = p.adjust(mean_eff_pval_global_comb, method = 'fdr'))
 
 eff.data$sign <- "2_No"
-eff.data$sign[eff.data$freqCut_norm_global_mean > 1.03 & eff.data$mean_eff_pval_adj_global_comb < 0.01] <- "1_Up"
-eff.data$sign[eff.data$freqCut_norm_global_mean < 0.97 & eff.data$mean_eff_pval_adj_global_comb < 0.01] <- "0_Down"
+eff.data$sign[eff.data$freqCut_norm_global_mean > 1.025 & eff.data$mean_eff_pval_adj_global_comb < 0.05] <- "1_Up"
+eff.data$sign[eff.data$freqCut_norm_global_mean < 0.975 & eff.data$mean_eff_pval_adj_global_comb < 0.05] <- "0_Down"
 
 eff.data <- eff.data %>%
   mutate(number = ave(target, target, sign, conc_char, FUN = length)) %>%
@@ -437,7 +438,9 @@ episcreen_ratios = readRDS(file_list[[3]])
 chromatin <- readRDS(
   "/DATA/usr/x.vergara/XV_ChIPIndels/XV20200902_DDR_RS_revision/XV20200902_DDR_RS_revision/data/xv20200915_DDR_data_CHIP.rds") %>% 
   distinct(barcode, chromatin) %>%
-  left_join(distinct(episcreen_ratios, barcode, IPR)) %>%
+  left_join(distinct(episcreen_ratios, barcode, IPR)) 
+chromatin$IPR[is.na(chromatin$IPR)] <- "IPR1"
+chromatin <- chromatin %>%
   filter(IPR != "<NA>") %>% 
   select(-barcode) %>%
   column_to_rownames(var="IPR")
@@ -484,9 +487,9 @@ eff.data.heatmap2 <- eff.data.heatmap %>%
   mutate(mean_eff_zscore_comb = 2*pnorm(q = abs(mean_eff_zscore_comb), lower.tail = F)) %>%
   mutate(mean_eff_zscore_comb = p.adjust(mean_eff_zscore_comb, method = 'fdr')) %>%
   mutate(min = ave(mean_eff_zscore_comb, drug, conc_char, FUN = min)) %>%
-  filter(min < 0.000001)
+  filter(min < 0.01)
 
-eff.data.heatmap2$freqCut_norm_mean[eff.data.heatmap2$mean_eff_zscore_comb > 0.01] <- NA
+eff.data.heatmap2$freqCut_norm_mean[eff.data.heatmap2$mean_eff_zscore_comb > 0.05] <- NA
 eff.data.heatmap2 <- eff.data.heatmap2 %>%
   dplyr::select(-min, -mean_eff_zscore_comb) %>%
   spread(IPR, freqCut_norm_mean)
@@ -533,7 +536,8 @@ for (i in unique(eff.data.heatmap2$conc_char)) {
            annotation_col = target,
            annotation_row = chromatin,
            color = colorRampPalette(c("#e07a5f", "#e5e5e5", "#3d405b"))(palette_length),
-           annotation_colors = annotation_colors_scr, annotation_legend = T)
+           annotation_colors = annotation_colors_scr, 
+           annotation_legend = T)
 }
 ```
 
