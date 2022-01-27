@@ -97,7 +97,7 @@ CallTrueBarcodes <- function(df) {
 initials = "rs"
 
 # Viability (% of DMSO)
-viab_limit = 0.45
+viab_limit = 0.75
 
 # Read count limit of +1 & -7 combined
 read_count_limit = 40
@@ -315,7 +315,7 @@ mutations.dt[, ID := gsub("^(E1504|E177)_[0-9][0-9]_(1|10|100)_[123]_([12]_...$)
 mutations.stat.dt = merge(mutations.dt, indel.statistics.dt)
 
 # Filter the low viability reads
-# This filters out all drugs at a certain concentration were at least 2/3 technical replicates were below 0.45 in at least one biological replicate 
+# This filters out all drugs at a certain concentration were at least 2/3 technical replicates were below 0.75 in at least one biological replicate 
 keep_drugs <- mutations.stat.dt %>%
   distinct(plate, drug, conc_char, well, tech, replicate, viab_norm_split) %>%
   # filter for samples with higher viab than the limit
@@ -334,8 +334,9 @@ keep_drugs <- mutations.stat.dt %>%
   unique()
 
 dim(mutations.stat.dt)
-# Filter for the 
+# Filter for the viability
 mutations.screen.dt <- mutations.stat.dt %>%
+  # filter out technical replicates below the viability cutoff
   filter(viab_norm_split > viab_limit) %>%
   # make filter for the conditions for which we do not have at least 2 technical replicates
   mutate(conc_char_drug_rep = paste(conc_char, drug, replicate, sep = " ")) %>%
