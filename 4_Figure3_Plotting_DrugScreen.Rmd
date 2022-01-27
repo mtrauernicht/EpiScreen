@@ -604,6 +604,7 @@ eff_mmej_corr <- indel.data %>%
   mutate(freqCut_norm_mean = log2(ave(freqCut_norm_mean, drug, conc_char, IPR, FUN = mean))) %>%
   mutate(drug_conc = paste(drug, conc_char, sep = "_")) %>%
   mutate(slope = NA, term = NA, p.value = NA)
+
 for (i in unique(eff_mmej_corr$drug_conc)) {
     model.correlation <- lm(formula = MMEJ_ratio_norm ~ freqCut_norm_mean, 
                                data = eff_mmej_corr[eff_mmej_corr$drug_conc == i,]) %>% 

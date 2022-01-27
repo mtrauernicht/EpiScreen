@@ -397,8 +397,8 @@ eff.data <- indel.data %>%
   mutate(mean_eff_pval_adj_global_comb = p.adjust(mean_eff_pval_global_comb, method = 'fdr'))
 
 eff.data$sign <- "2_No"
-eff.data$sign[eff.data$freqCut_norm_global_mean > 1.025 & eff.data$mean_eff_pval_adj_global_comb < 0.01] <- "1_Up"
-eff.data$sign[eff.data$freqCut_norm_global_mean < 0.975 & eff.data$mean_eff_pval_adj_global_comb < 0.01] <- "0_Down"
+eff.data$sign[eff.data$freqCut_norm_global_mean > 1.025 & eff.data$mean_eff_pval_adj_global_comb < 0.05] <- "1_Up"
+eff.data$sign[eff.data$freqCut_norm_global_mean < 0.975 & eff.data$mean_eff_pval_adj_global_comb < 0.05] <- "0_Down"
 
 eff.data <- eff.data %>%
   mutate(number = ave(target, target, sign, conc_char, FUN = length)) %>%

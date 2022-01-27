@@ -346,10 +346,9 @@ ggplot_custom <- function(...) ggplot2::ggplot(...) +
 
 ```{r data import, echo = FALSE, warning = FALSE}
 # Import data from preprocessing script
-indel.data <- readRDS("/DATA/projects/DSBrepair/data/R/rs20220126_episcreen/initials20220126_episcreen_ratios.RDS")
-indel.data <- readRDS("/DATA/usr/m.trauernicht/projects/EpiScreen/files_scripts/mt20220126_2_episcreen.RDS")
+indel.data <- readRDS("/DATA/projects/DSBrepair/data/R/rs20220127_episcreen/initials20220127_episcreen_ratios.RDS")
 
-# Complete data without exlcluding wells <0.45 viability (I need this for plotting)
+# Complete data without exlcluding wells <0.75 viability (I need this for plotting)
 viability.data = as.data.table(readRDS("/DATA/projects/DSBrepair/git/EpiScreen/files_scripts/rs20211221_Episcreen_Reads_Viab_Metadata.RDS")) %>%
   dplyr::select(ID, drug, target, replicate, viability, conc_char, tech)
 ```
@@ -390,23 +389,33 @@ viability.data <- viability.data %>%
   mutate(viability = viability - min(viability)) %>%
   mutate(ctrl_mean = mean(viability[drug == "DMSO"]),
          viab_norm = viability / ctrl_mean) %>%
+  ungroup() %>%
   dplyr::select(-viability, -ctrl_mean) %>%
   unique() 
 
-remove_drugs <- viability.data %>%
-  filter(viab_norm < 0.45) %>%
-  dplyr::distinct(conc_char, drug, tech, replicate) %>%
-  mutate(conc_char_drug = paste(conc_char, drug, sep = " "),
-         tech_n = ave(conc_char_drug, conc_char_drug, replicate, FUN = length)) %>%
-  filter(tech_n > 1) %>%
-  ungroup() %>%
-  dplyr::select(-tech_n, -tech, -replicate) %>%
-  unique() %>%
-  mutate(removed = "removed") %>%
-  dplyr::select(-conc_char_drug)
+keep_drugs <- viability.data %>%
+  # filter for samples with higher viab than the limit
+  filter(viab_norm > 0.75) %>%
+  distinct(conc_char, drug, tech, replicate) %>%
+  mutate(conc_char_drug = paste(conc_char, drug, sep = "_"),
+         tech_n = ave(conc_char_drug, conc_char_drug, replicate, FUN = length),
+         conc_char_drug_rep = paste(conc_char, drug, replicate, sep = "_")) %>%
+  # These conditions need to be present in at least 2 (out of 3) technical replicates per bio replicate
+  filter(tech_n > 1) %>% 
+  distinct(replicate, conc_char_drug, conc_char_drug_rep) %>%
+  mutate(rep_n = ave(conc_char_drug, conc_char_drug, FUN = length)) %>%
+  # And in both bio replicates
+  filter(rep_n > 1) %>% 
+  mutate(removed = "kept") %>%
+  distinct(conc_char_drug_rep, removed)
 
-viability.data <- merge(viability.data, remove_drugs, all = T)
-viability.data$removed[is.na(viability.data$removed)] <- "kept"
+viability.data <- viability.data %>%
+  mutate(conc_char_drug_rep = paste(conc_char, drug, replicate, sep = "_"))
+
+viability.data <- merge(viability.data, keep_drugs, all = T) %>%
+  dplyr::select(-conc_char_drug_rep) %>%
+  distinct()
+viability.data$removed[is.na(viability.data$removed)] <- "removed"
 
 viability.data <- viability.data %>%
   spread(key = replicate, value = viab_norm) %>%
