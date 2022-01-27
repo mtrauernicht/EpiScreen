@@ -27,12 +27,11 @@ library(ggpubr)
 # Load libraries (Just need a data table with all the data and )
 ```{r}
 #Chromatin data (it needs a barcode column)
-#screen_ratios_tib <- readRDS("/DATA/projects/DSBrepair/data/R/rs20220119_episcreen2/rs20220119_episcreen_ratios.RDS")
-screen_ratios_tib <- readRDS("/DATA/usr/m.trauernicht/projects/EpiScreen/files_scripts/mt20220126_2_episcreen.RDS")
+indel.data <- readRDS("/DATA/projects/DSBrepair/data/R/rs20220127_episcreen/initials20220127_episcreen_ratios.RDS")
 clone5_chrom_tib <- readRDS('/DATA/projects/DSBrepair/data/R/cl20201026_ChIP_zscore_selection.RDS')
 
 
-chromatin.features <- colnames(screen_ratios_tib)[grepl("[.]zscore", colnames(screen_ratios_tib))]
+chromatin.features <- colnames(indel.data)[grepl("[.]zscore", colnames(indel.data))]
 chrom_data = screen_ratios_tib %>% select(barcode, all_of(chromatin.features)) %>% distinct()
 ```
 
@@ -40,7 +39,7 @@ chrom_data = screen_ratios_tib %>% select(barcode, all_of(chromatin.features)) %
 
 ```{r}
 # Data table and compute log2_ratio (This line needs to be adjusted)
-ratios_tib <- screen_ratios_tib %>%
+ratios_tib <- indel.data %>%
   filter(abs(mean_eff_zscore_global_comb) > 2.58 | abs(MMEJ_zscore_global_comb) > 2.58 | drug == "DMSO") %>%
   distinct(MMEJratio, freqCut, drug, conc_char, target, barcode) %>%
   mutate(MMEJratio = ave(MMEJratio, drug, conc_char, barcode, FUN = mean)) %>%
@@ -88,14 +87,12 @@ ggplot(ratios_tib %>%
 
 ggplot(ratios_tib %>% 
          filter(drug %in% c("DMSO","DNA-PKi","PCI-24781 (Abexinostat)")),
-       aes(HDAC1,log2.dist.freqCut, color = drug)) + 
-  geom_point() + 
+       aes(HDAC1.zscore,log2.dist.freqCut, color = drug)) + 
+  geom_point() +
   stat_cor(method = "spearman") + 
   geom_smooth(method = "lm") + 
   theme_bw() +
   facet_wrap(. ~ conc_char)
-
-
 ```
 
 
