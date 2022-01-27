@@ -186,7 +186,7 @@ slope.prot.features.scale.dcast.100nm = slope.prot.features.scale.dcast.list[[3]
  
 # Set annotation for heatmap
 # Row annotation: annotate drugs with the target group
-target <- screen_ratios_tib %>% 
+target <- indel.data %>% 
   distinct(drug, target) %>% 
   column_to_rownames(var="drug")
 
