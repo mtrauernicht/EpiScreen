@@ -142,15 +142,17 @@ setnames(indel.statistics.dt,
            "r_written_pct_split", "reads_split"))
 
 # Import RSTP2 clone 5 barcode list (in total 18 barcodes) - "ACCCCTAAAGGCGCTG" (19) + "CTCTTAATCGCTGCC" (20)
-# 19 is very lowly abundant in the sequencing replicate 1 (E177) and therefore omitted - #### KEPT FOR NOW #####
+# 19 is very lowly abundant in the sequencing replicate 1 (E177) and therefore omitted
 barcodes.clone5 <- c("AGGGCGTAAAATATTT", "TATGGCTGTCGGGTAG", "TGTCCCTTAGTACTTT", 
                    "AGAAAATAATATGACG","CGGCCTGAAGGTCAGG","TTGAACGCGGGCTCGG",
                    "GCTAACATCACGAATC", "GCGCACCCTTTAATTG","ACTGTCGAGTTGTCCG",
                    "CCGGGGACGTATGCAC","TCTTTTGAGGAGCTGA","ATATCGTTGCTGGAGA",
                    "CATCCACCACACTTCA","ATACTATATTTAACGG",
                    "CATTTCTGATCAATAA","GAGCGCGTCACCGGGT",
-                   "GTACCTCTCGATAGTG","TGGCCAATATTTGTCT",
-                   "ACCCCTAAAGGCGCTG")
+                   "GTACCTCTCGATAGTG","TGGCCAATATTTGTCT"
+                   #,
+                   #"ACCCCTAAAGGCGCTG"
+                   )
 ```
 
 ## Reading the indel data tables
@@ -282,7 +284,7 @@ filtered.indelreads.dt =
 exps = unique(filtered.indelreads.dt$exp)
 
 # List all the exps that still contain all the barcodes after count filtering 
-filtered.indelreads.exp = exps[table(filtered.indelreads.dt$exp) == 19]
+filtered.indelreads.exp = exps[table(filtered.indelreads.dt$exp) == length(barcodes.clone5)]
 
 E177_post = sum(grepl("E177", unique(filtered.indelreads.dt$exp)))
 E1504_post = sum(grepl("E1504", unique(filtered.indelreads.dt$exp)))
@@ -357,7 +359,7 @@ mutations.screen.dt[barcode == "ACTGTCGAGTTGTCCG" & drug == "Zebularine" & mutat
 mutations.screen.dt[is.na(mutation), ]
 ```
 
-## We will also remove samples that not least in 2 technical replicates (out of 3) and are present in at least both biological replicates. 
+## We will also remove samples that are not in at least in 2 technical replicates (out of 3) and are present both biological replicates. 
 
 ```{r filter for reproducibility}
 mutations.screen.dt %>% 
@@ -886,7 +888,10 @@ clone5_z.score_chrom_tib <- readRDS('/DATA/projects/DSBrepair/data/R/cl20201026_
 
 
 clone5_chrom_tib <- readRDS("/DATA/projects/DSBrepair/data/R/rs20200519_clone5_newdoms_chromatin.RDS") %>%
+  filter(IPR != "IPR1") %>%
   left_join(clone5_z.score_chrom_tib)
+
+
 
 chrom_colnames = names(clone5_chrom_tib)
 
@@ -946,7 +951,7 @@ ratio.cols = c("replicate",
 screen_ratios_tib =  screen.ratios.chrom.dt %>% 
   select(all_of(c(ratio.cols, chrom_colnames)))
 
-rm(screen.indel.chrom.dt)
+#rm(screen.indel.chrom.dt)
 ```
 
 
