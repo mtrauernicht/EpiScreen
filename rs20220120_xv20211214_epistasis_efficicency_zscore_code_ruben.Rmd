@@ -21,12 +21,14 @@ library(dendextend)
 library(Hmisc)
 library(RColorBrewer)
 library(magrittr)
+library(ggpubr)
 ```
 
 # Load libraries (Just need a data table with all the data and )
 ```{r}
 #Chromatin data (it needs a barcode column)
-screen_ratios_tib <- readRDS("/DATA/projects/DSBrepair/data/R/rs20220119_episcreen2/rs20220119_episcreen_ratios.RDS")
+#screen_ratios_tib <- readRDS("/DATA/projects/DSBrepair/data/R/rs20220119_episcreen2/rs20220119_episcreen_ratios.RDS")
+screen_ratios_tib <- readRDS("/DATA/usr/m.trauernicht/projects/EpiScreen/files_scripts/mt20220126_2_episcreen.RDS")
 clone5_chrom_tib <- readRDS('/DATA/projects/DSBrepair/data/R/cl20201026_ChIP_zscore_selection.RDS')
 
 
@@ -41,21 +43,37 @@ step 1 = plot
 
 ```{r}
 # Data table and compute log2_ratio (This line needs to be adjusted)
-# log2.eff.screen.detail <- screen_ratios_tib %>% 
-#   distinct(replicate, eff_score_mean, drug, conc_char, target, barcode) %>% 
-#   mutate(log2_ratio = log2(eff_score_mean))
+log2.eff.screen.detail <- screen_ratios_tib %>%
+  distinct(replicate, MMEJratio, drug, conc_char, target, barcode) %>%
+  mutate(log2_ratio = log2(MMEJratio))
+
+log2.eff.screen.dmso <- screen_ratios_tib %>%
+  filter(drug == "DMSO") %>%
+  distinct(MMEJratio, barcode) %>%
+  mutate(DMSO.ratio = ave(MMEJratio, barcode, FUN = mean)) %>%
+  mutate(DMSO.log2_ratio = log2(DMSO.ratio)) %>%
+  dplyr::select(-MMEJratio) %>%
+  distinct()
+  
+
+log2.eff.screen.detail <- merge(log2.eff.screen.detail, log2.eff.screen.dmso)
+
+
+
+#####
 
 eff.screen.detail <- screen_ratios_tib %>% 
   select(replicate, tech, conc_char, barcode, drug, target, eff_zscore) %>% 
   distinct()
 
 # DMSO data table set. (This lin of code needs to be adjusted)
-# DMSO.set <- filter(screen_ratios_tib, drug == "DMSO") %>% 
-#   select(replicate, eff_score_mean, drug, conc_char, target, barcode) %>% 
-#   mutate(log2_ratio = log2(eff_score_mean)) %>% 
-#   dplyr::group_by(barcode, replicate) %>% 
-#   dplyr::summarise(DMSO.log2_ratio = mean(log2_ratio, na.rm = T), 
-#                    DMSO.ratio = mean(eff_score_mean, na.rm = T))
+DMSO.set <- filter(screen_ratios_tib, drug == "DMSO") %>%
+  select(replicate, MMEJ_ratio_norm, drug, conc_char, target, barcode) %>%
+  mutate(log2_ratio = log2(MMEJ_ratio_norm)) %>%
+  dplyr::group_by(barcode, replicate) %>%
+  dplyr::summarise(DMSO.log2_ratio = mean(log2_ratio, na.rm = T),
+                   DMSO.ratio = mean(MMEJ_ratio_norm, na.rm = T))
+
 DMSO.set <- filter(screen_ratios_tib, drug == "DMSO") %>% 
   distinct(replicate, tech, conc_char, barcode, drug, target, eff_zscore, mean_eff_zscore)
 
@@ -78,9 +96,8 @@ ggplot(data.for.plotting %>% filter(drug %in% c("DNA-PKi","Decitabine","GSK J4 H
 ```{r}
 # Each replicate has a different value (compute differences by replicate)
 log2.distance.eff <- log2.eff.screen.detail %>% 
-  left_join(DMSO.set) %>% 
   mutate(log2.dist = sqrt((log2_ratio - DMSO.log2_ratio)^2), 
-         lin.dist = sqrt((freqCut - DMSO.ratio)^2)) 
+         lin.dist = sqrt((MMEJratio - DMSO.ratio)^2)) 
 
 mean.log2.distance.eff <- log2.distance.eff %>% 
   dplyr::group_by(barcode, drug, conc_char) %>% 
@@ -90,7 +107,7 @@ mean.log2.distance.eff <- log2.distance.eff %>%
 
 #Plot slopes
 ggplot(mean.log2.distance.eff %>% 
-         filter(drug %in% c("DMSO","DNA-PKi","Decitabine")),
+         filter(drug %in% c("DMSO","DNA-PKi","3-Deazaneplanocin A (DZNeP)")),
        aes(H3K27me3.zscore,m.log2.dist, color = drug)) + 
   geom_point() + 
   stat_cor(method = "spearman") + 
