@@ -27,7 +27,7 @@ library(ggpubr)
 # Load libraries (Just need a data table with all the data and )
 ```{r}
 #Chromatin data (it needs a barcode column)
-indel.data <- readRDS("/DATA/projects/DSBrepair/data/R/rs20220127_episcreen/initials20220127_episcreen_ratios.RDS")
+indel.data <- readRDS("/DATA/projects/DSBrepair/data/R/rs20220128_episcreen/rs20220128_episcreen_ratios.RDS")
 clone5_chrom_tib <- readRDS('/DATA/projects/DSBrepair/data/R/cl20201026_ChIP_zscore_selection.RDS')
 
 
@@ -61,18 +61,16 @@ dmso_ratios_tib <- indel.data %>%
 ratios_tib <- merge(ratios_tib, dmso_ratios_tib)
 ```
 
+The log2 distance ratio in our case is positive if it promotes MMEJ and negative if it promotes NHEJ
+
 
 # 2nd step check compute distances and plot them
 ```{r}
 # Each replicate has a different value (compute differences by replicate)
 ratios_tib <- ratios_tib %>% 
-  mutate(log2.dist.ratio = sqrt((MMEJratio.log2 - DMSO.ratio.log2)^2), 
-         lin.dist.ratio = sqrt((MMEJratio - DMSO.ratio)^2)) %>%
-  mutate(log2.dist.freqCut = sqrt((freqCut.log2 - DMSO.freqCut.log2)^2), 
-         lin.dist.freqCut = sqrt((freqCut - DMSO.freqCut)^2)) 
-
-ratios_tib <- ratios_tib %>% 
   dplyr::group_by(barcode, drug, conc_char) %>% 
+  mutate(log2.dist.ratio = MMEJratio.log2 - DMSO.ratio.log2, 
+         log2.dist.freqCut = freqCut.log2 - DMSO.freqCut.log2) %>%
   left_join(chrom_data)
 
 #Plot slopes
@@ -93,6 +91,17 @@ ggplot(ratios_tib %>%
   geom_smooth(method = "lm") + 
   theme_bw() +
   facet_wrap(. ~ conc_char)
+
+ggplot(ratios_tib %>% 
+         filter(drug %in% c("Resveratrol 10 µM", "Belinostat (PXD101)")),
+       aes(late_replicating.zscore
+           ,log2.dist.ratio, color = drug)) + 
+  geom_point() +
+  stat_cor(method = "spearman") + 
+  geom_smooth(method = "lm") + 
+  theme_bw() +
+  facet_wrap(. ~ conc_char)
+
 ```
 
 
@@ -100,33 +109,118 @@ ggplot(ratios_tib %>%
 # Extract slopes for all genes
 ```{r}
 # Perform analysis across all features for three test genes
+ratios_tib %<>% mutate(drug_conc = paste(drug, conc_char, sep = " "))
 
-ratios_tib %<>% mutate(drug_conc = paste(drug, conc_char, sep = "_"))
 
+test.log2.dist <- ratios_tib %>% 
+  dplyr::group_by(drug_conc) %>% 
+  t_test(log2.dist.ratio ~ 0) %>% 
+  mutate(p.adj = p.adjust(p, method = "fdr")) %>% 
+  left_join(ratios_tib, by = "drug_conc")
 
-slope.protein.features <- tibble(drug_conc = NA, feature = NA, slope.log2 = NA, term = NA, p.value = NA)
+slope.protein.features <- tibble(drug_conc = NA, feature = NA,  term = NA, 
+                                 indelrate = NA, p.value.indelrate = NA, 
+                                 ratio = NA, p.value.ratio = NA)
 
 for (i in unique(ratios_tib$drug_conc)) {
   for (j in chromatin.features) {
-    model.dt <- ratios_tib %>% filter(drug_conc == i & log2.dist.freqCut != Inf) 
+    model_tib <- ratios_tib %>% filter(drug_conc == i & log2.dist.freqCut != Inf)
+    # Indel rates
+    model.indelrate.log2 <- lm(formula = log2.dist.freqCut ~ unlist(model_tib[j]), 
+                               data = model_tib) %>% 
+      tidy()
     
-    model.epistasis.log2 <- lm(formula = log2.dist.freqCut ~ unlist(model.dt[j]), 
-                               data = model.dt) %>% 
+    # Pathway balance
+    model.ratio.log2 <- lm(formula = log2.dist.ratio ~ unlist(model_tib[j]), 
+                               data = model_tib) %>% 
       tidy()
     
     slope.protein.features <- slope.protein.features %>% 
       add_row(drug_conc = i, 
               feature = j, 
-              slope.log2 = model.epistasis.log2 %>% 
-                pull(estimate), 
-              term = model.epistasis.log2 %>%
+              term = model.indelrate.log2 %>%
                 pull(term),
-              p.value = model.epistasis.log2 %>% 
+              indelrate = model.indelrate.log2 %>% 
+                pull(estimate), 
+              p.value.indelrate = model.indelrate.log2 %>% 
+                pull(p.value),
+              ratio = model.ratio.log2 %>% 
+                pull(estimate), 
+              p.value.ratio = model.ratio.log2 %>% 
                 pull(p.value))
   }
 }
+# Remove the 1st NA column
+slope.protein.features %<>% 
+  filter(is.na(.)) %>%
+  mutate(term = ifelse(term == "(Intercept)", "intercept", "slope"))
+
+# Calculate postition where the linear model crosses y = 0, we do this by -intercept / slope
+epistasis_tib = slope.protein.features %>% 
+  distinct(drug_conc, term, feature, indelrate, ratio) %>% 
+  pivot_wider(., names_from = term, values_from = c(indelrate, ratio)) %>%
+  mutate(x_intercept_indelrate = -indelrate_intercept / indelrate_slope,
+       x_intercept_ratio = -ratio_intercept / ratio_slope)
+
+effect_compounts = ratios_tib %>%
+  group_by(drug_conc)  %>% 
+  mutate(indelrate_pos = sum(log2.dist.freqCut > 0),
+         indelrate_effect = ifelse(indelrate_pos >= 17, "indel_rate_increase", 
+                         ifelse(indelrate_pos <= 1, "indel_rate_decrease", "mixed")),
+         ratio_pos = sum(log2.dist.ratio > 0),
+         ratio_effect = ifelse(ratio_pos >= 17, "MMEJ_increase", 
+                         ifelse(ratio_pos <= 1, "NHEJ_increase", "mixed"))) %>%
+  distinct(drug_conc, indelrate_effect, ratio_effect)
+
+p.vals = slope.protein.features %>% filter(term == "slope") %>% select(-term, -indelrate , -ratio) %>% distinct()
+
+epistasis_tib %<>% left_join(effect_compounts)  %>% 
+  left_join(p.vals) %>%
+  mutate(x_intercept_indelrate = ifelse(indelrate_effect == "mixed" & p.value.indelrate < 0.05, 
+                                        x_intercept_indelrate, NA),
+         x_intercept_ratio = ifelse(ratio_effect == "mixed" & p.value.ratio < 0.05, 
+                                    x_intercept_ratio, NA),
+         orientation_indelrate = ifelse(indelrate_slope < 0 & indelrate_effect == "indel_rate_decrease" | 
+                                         indelrate_slope > 0 & indelrate_effect == "indel_rate_increase", "divergent", 
+                                        ifelse(indelrate_slope < 0 & indelrate_effect == "indel_rate_increase" | 
+                                         indelrate_slope > 0 & indelrate_effect == "indel_rate_decrease", "convergent",
+                                         "complex")),
+         indelrate_slope_plot = ifelse(orientation_indelrate == "divergent", indelrate_slope, NA),
+         orientation_ratio = ifelse(ratio_slope < 0 & ratio_effect == "NHEJ_increase" | 
+                                         ratio_slope > 0 & ratio_effect == "MMEJ_increase", "divergent", 
+                                        ifelse(ratio_slope < 0 & ratio_effect == "MMEJ_increase" | 
+                                         ratio_slope > 0 & ratio_effect == "NHEJ_increase", "convergent",
+                                         "complex")),
+         ratio_slope_plot = ifelse(orientation_ratio == "divergent", ratio_slope, NA))  
 
 
+###WIP###
+
+epistasis_tib %>% distinct( drug_conc, indelrate_effect, ratio_effect, orientation_indelrate) %>% pivot_longer(., cols = c(indelrate_effect, ratio_effect, orientation_indelrate), names_to = "measure", values_to = "effect") %>% ggplot(., aes(measure)) + geom_bar(aes(fill = effect))
+
+ggplot(ratios_tib %>% 
+         filter(drug %in% c("DNA-PKi 10 µM", "Nexturastat A")),
+       aes(H3K27me3.zscore
+           ,log2.dist.ratio, color = drug)) + 
+  geom_point() +
+  stat_cor(method = "spearman") + 
+  geom_smooth(method = "lm") + 
+  theme_bw() +
+  facet_wrap(. ~ conc_char)
+
+epistasis_tib %>% 
+  distinct(drug_conc, feature, indelrate_slope_plot) %>%
+         filter(grepl("100 nM", drug_conc) & complete.cases(.)) %>%
+ggplot() + 
+  geom_tile(aes(drug_conc,feature, fill = indelrate_slope_plot)) + 
+  scale_fill_gradient2() + 
+  theme_bw() + 
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust =0.5))
+
+
+mixed_indel_rate = effect_compounts %>% filter(indelrate_effect == "mixed")
+
+mixed_ratio
 
 # Plot matrix without scaling
 # log2 space
@@ -159,10 +253,6 @@ ggplot(slope.protein.features %>%
 
 slope.protein.features2 = slope.protein.features
 
-
-hits2 = slope.protein.features %>% filter(term == "unlist(model.dt[j])" & p.value < 0.01) %>% pull(drug_conc) %>% unique()
-
-hits = slope.protein.features %>% filter(term == "unlist(model.dt[j])" & abs(slope.log2) > 0.05) %>% pull(drug_conc) %>% unique()
 
 slope.prot.features.scale.dcast.list <- slope.protein.features %>% 
   filter(term == "unlist(model.dt[j])" & drug_conc %in% hits) %>% 
@@ -272,7 +362,11 @@ for (i in unique(ratios_tib$drug_conc)) {
   }
 }
 
-
+# grouping the samples
+ratios_tib %>% distinct(barcode, drug_conc, log2.dist.freqCut) %>% 
+  group_by(drug_conc)  %>% 
+  mutate(pos = sum(log2.dist.freqCut > 0),
+         effect = ifelse(pos == 18, "MMEJ_increase", ifelse(pos == 0, "NHEJ_increase", "mixed")))
 
 # Plot matrix without scaling
 # log2 space
