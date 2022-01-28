@@ -76,11 +76,22 @@ library(ggbeeswarm)
 Functions used include all functions that have been used previously by Ruben (some of them might not be needed anymore, but are kept anyway). Functions 'CallTrueBarcodes' has been added by Max.
 
 ```{r functions}
-SetFileName <- function(filename, initials) {
+serialNext = function(prefix, extension){
+  file_name = paste(prefix, extension, sep = ".")
+  if(!file.exists(file_name)){return(paste(prefix, extension, sep = "."))}
+    i=1
+    repeat {
+       f = paste(prefix, i , extension, sep=".")
+       if(!file.exists(f)){return(f)}
+       i=i+1
+     }
+  }
+
+SetFileName <- function(filename, initials, extension) {
   # Set filename with extension and initials to make filename with date integrated.
   filename <- substitute(filename)
-  initials <- substitute(initials)
   filename <- paste0(out.dir, initials, substr(gsub("-","",Sys.time()),1,8), filename)
+  filename <- serialNext(filename, extension)
   filename
 }
 
@@ -665,21 +676,19 @@ Some samples have clear outlyers, others aren't prefectly normally distributed b
 # calculate efficiency relative to mean DMSO efficiency per concentration, barcode and replicate
 # First a table with DMSO efficiency per barcode, per technical replicate. 
 
-dmso.efficiency <- screen.ratio.dt %>%
+dmso.eff<- screen.ratio.dt %>%
   filter(drug == "DMSO") %>%
   distinct('DMSO' = freqCut, 'DMSO_global' = freqCut_global, barcode, replicate,
          tech, well, plate) %>%
   mutate(DMSO = ave(DMSO, barcode, replicate, tech, FUN = mean)) %>% # mean per technical replicate
   distinct()
 
-dmso.efficiency <- dmso.efficiency %>%
+dmso.global <- dmso.eff %>%
   distinct(DMSO_global, replicate, tech, well, plate) %>%
   mutate(DMSO_global = ave(DMSO_global, replicate, tech, FUN = mean)) %>%
-  distinct() %>%
-  right_join(dmso.efficiency) %>%
-  distinct(replicate, barcode, tech, DMSO, DMSO_global)
+  distinct(DMSO_global, replicate, tech)
 
-screen.ratio.dt <- left_join(screen.ratio.dt, dmso.efficiency)
+screen.ratio.dt = left_join(screen.ratio.dt, dmso.eff) %>% left_join(dmso.global)
 
 screen.ratio.dt <- screen.ratio.dt %>%
   mutate(freqCut_norm = freqCut / DMSO,
@@ -954,7 +963,8 @@ ratio.cols = c("replicate",
          "MMEJ_zscore_global_comb")
 
 screen_ratios_tib =  screen.ratios.chrom.dt %>% 
-  select(all_of(c(ratio.cols, chrom_colnames)))
+  select(all_of(c(ratio.cols, chrom_colnames))) %>%
+  dplyr::distinct()
 
 #rm(screen.indel.chrom.dt)
 ```
@@ -963,11 +973,11 @@ screen_ratios_tib =  screen.ratios.chrom.dt %>%
 ## Processed data export The files will be saved in the processed data folder.
 ```{r export}
 # The mutations list that can be loaded for the indel spectra plots.
-filename <- SetFileName("_episcreen_mutations.RDS", initials = initials)
+filename <- SetFileName("_episcreen_mutations", initials = initials, extension = "RDS")
 saveRDS(screen.indels.chrom.dt, file = filename)
 
 # The ratios list of the split technical replicates
-filename <- SetFileName("_episcreen_ratios.RDS", initials = initials)
+filename <- SetFileName("_episcreen_ratios", initials = initials, extension = "RDS")
 saveRDS(screen_ratios_tib, file = filename)
 
 # # The ratios list of the merged technical replicates
