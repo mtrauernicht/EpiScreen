@@ -265,7 +265,7 @@ complete.mutations.dt[mutation%in%c(1, -7, 0),
 length(unique(complete.mutations.dt$exp))
 length(unique(complete.mutations.dt[sum_bc_reads_split < 100]$exp))
 
-# Filter on minimal 30 reads per +1/-7 reads
+# Filter on minimal 40 reads per +1/-7 reads
 length(unique(complete.mutations.dt[mut.counts < 40]$exp))
 
 E177_pre = sum(grepl("E177", unique(complete.mutations.dt$exp)))
@@ -285,7 +285,7 @@ E1504_pre = sum(grepl("E1504", unique(complete.mutations.dt$exp)))
 # # Number of wells with removed IPRs
 # E1504_pre - E1504_post
 
-# Filter with 30 min reads per barcode like Xabi did.
+# Filter with 40 min reads per barcode like Xabi did.
 filtered.indelreads.dt = 
   unique(complete.mutations.dt[!is.na(complete.mutations.dt$mut.counts) & 
                                  mut.counts >= read_count_limit, 
@@ -929,6 +929,7 @@ ratio.cols = c("replicate",
          "exp",
          "well",
          "plate",
+         "drug_plate",
          "ID",
          "concentration",
          "drug",

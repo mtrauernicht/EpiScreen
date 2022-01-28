@@ -516,8 +516,8 @@ ggplot_custom(viability.data %>%
                 filter(group == "drug"), aes(x = E177, y = E1504)) +
   geom_point(aes(color = removed), size = 1) +
   geom_smooth(method = "lm", color = colors_diverse[1]) +
-  geom_segment(x = 0.5, xend = 0.5, y = 0.5, yend = 1.2, linetype = "dashed") +
-  geom_segment(x = 0.5, xend = 1.2, y = 0.5, yend = 0.5, linetype = "dashed") +
+  # geom_segment(x = 0.5, xend = 0.5, y = 0.5, yend = 1.2, linetype = "dashed") +
+  # geom_segment(x = 0.5, xend = 1.2, y = 0.5, yend = 0.5, linetype = "dashed") +
   scale_color_manual(values = c(colors_diverse[1], colors_diverse[4])) +
   facet_wrap(~conc_char)
 ```
@@ -541,6 +541,18 @@ ggplot(indel.data %>%
 
 ggplot(indel.data %>%
          filter(drug == "DMSO") %>%
+         dplyr::distinct(freqCut, well, drug_plate, conc_char, tech, replicate) %>%
+         mutate(freqCut = ave(freqCut, well, drug_plate, conc_char, tech, replicate, FUN = mean)) %>%
+         distinct() %>%
+         mutate(rep = paste(replicate, tech, sep = "_")),
+       aes(x = rep, y = freqCut)) +
+  geom_quasirandom_rast(aes(color = replicate), dodge.width = 0.75, raster.dpi = 600) +
+  scale_color_manual(values = c(colors_drugs[2], colors_drugs[7])) +
+  theme_classic_lines_90()
+
+
+ggplot(indel.data %>%
+         filter(drug == "DMSO") %>%
          dplyr::distinct(MMEJscore, IPR, exp, replicate),
        aes(x = IPR, y = MMEJscore)) +
   geom_quasirandom_rast(aes(color = replicate), dodge.width = 0.75, raster.dpi = 600) +
@@ -556,12 +568,12 @@ How well does the MMEJ score correlate between the six technical replicates?
 # B: Correlation between technical replicates MMEJ score
 techn_repl <- indel.data %>%
   filter(sample == "drug") %>%
-  dplyr::distinct(MMEJ_zscore_global, drug, tech, replicate, conc_char, sample) %>%
-  mutate(MMEJ_zscore_global = ave(MMEJ_zscore_global, drug, tech, replicate, conc_char, FUN = mean)) %>%
+  dplyr::distinct(MMEJ_ratio_norm, drug, tech, replicate, conc_char, sample) %>%
+  mutate(MMEJ_ratio_norm = log2(ave(MMEJ_ratio_norm, drug, tech, replicate, conc_char, FUN = mean))) %>%
   unique() %>%
   mutate(rep = paste(replicate, tech, sep = "_")) %>%
   dplyr::select(-replicate, -tech) %>%
-  spread(rep, MMEJ_zscore_global) %>%
+  spread(rep, MMEJ_ratio_norm) %>%
   na.omit()
 
 boundaries <- c(0.7,0.75,0.8,0.85)
@@ -569,12 +581,14 @@ ggpairs(techn_repl %>% dplyr::select(contains("E1")),
                upper = list(continuous = corColor),
                lower = list(continuous = function(data, mapping, ...) {
                    ggally_points(data = data, mapping = mapping, alpha = 0.6, size = 0.5) +
+                   scale_y_continuous(breaks = c(-2, -1, 0), limits = c(-1.9, 0.5)) +
+                   scale_x_continuous(breaks = c(-2, -1, 0), limits = c(-1.9, 0.5)) +
                    geom_abline(slope = 1, lty = "twodash", col = "grey") +
                    geom_smooth(method = "lm", color = "red", lty = "dashed", size = 0.5)}),
                diag = list(continuous = function(data, mapping, ...) {
                    ggally_densityDiag(data = data, mapping = mapping, alpha = 0.3, fill = "red")})) +
-  xlab("MMEJ ratio (z-scores)") +
-  ylab("MMEJ ratio (z-scores)")
+  xlab("MMEJ ratio change (log2)") +
+  ylab("MMEJ ratio change (log2)")
 ```
 
 *Figure S1B: Correlation of the MMEJ score between all technical replicates.*
@@ -588,24 +602,27 @@ How well does the cutting efficiency correlate between the six technical replica
 ```{r warning = FALSE}
 # C: Correlation between technical replicates efficiency
 techn_repl <- indel.data %>%
-  filter(sample == "drug" | drug == "DMSO") %>%
-  mutate(well = gsub(".*([0-9]{1}_[A-Z]{1}[0-9]{2}$)", "\\1", exp)) %>%
-  dplyr::distinct(eff_zscore_global, drug, conc_char, well, replicate, tech) %>%
+  filter(sample == "drug") %>%
+  dplyr::distinct(freqCut_norm, drug, conc_char, replicate, tech) %>%
+  mutate(freqCut_norm = ave(freqCut_norm, drug, conc_char, replicate, tech, FUN = mean)) %>%
+  distinct() %>%
   mutate(rep = paste(replicate, tech, sep = "_")) %>%
   dplyr::select(-replicate, -tech) %>%
-  spread(rep, eff_zscore_global) %>%
+  spread(rep, freqCut_norm) %>%
   na.omit()
 
 ggpairs(techn_repl %>% dplyr::select(contains("E1")),
                upper = list(continuous = corColor),
                lower = list(continuous = function(data, mapping, ...) {
                    ggally_points(data = data, mapping = mapping, alpha = 0.6, size = 0.5) +
+                   scale_y_continuous(breaks = c(0.9, 1, 1.1), limits = c(0.85, 1.15)) +
+                   scale_x_continuous(breaks = c(0.9, 1, 1.1), limits = c(0.85, 1.15)) +
                    geom_abline(slope = 1, lty = "twodash", col = "grey") +
                    geom_smooth(method = "lm", color = "red", lty = "dashed", size = 0.5)}),
                diag = list(continuous = function(data, mapping, ...) {
                    ggally_densityDiag(data = data, mapping = mapping, alpha = 0.3, fill = "red")})) +
-  xlab("Efficiency z-score per technical replicate") +
-  ylab("Efficiency z-score per technical replicate")
+  xlab("Indel rate change") +
+  ylab("Indel rate change")
 ```
 
 *Figure S1C: Correlation of the cutting efficiency between all technical replicates.*

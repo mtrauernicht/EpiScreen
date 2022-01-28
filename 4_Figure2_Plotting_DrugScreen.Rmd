@@ -347,7 +347,7 @@ ggplot_custom <- function(...) ggplot2::ggplot(...) +
 
 ```{r data import, echo = FALSE, warning = FALSE}
 # Import data from preprocessing script
-indel.data <- readRDS("/DATA/usr/m.trauernicht/projects/EpiScreen/files_scripts/mt20220126_2_episcreen.RDS")
+indel.data <- readRDS("/DATA/projects/DSBrepair/data/R/rs20220127_episcreen/initials20220127_episcreen_ratios.RDS")
 ```
 
 ---
@@ -439,7 +439,7 @@ chromatin <- readRDS(
   "/DATA/usr/x.vergara/XV_ChIPIndels/XV20200902_DDR_RS_revision/XV20200902_DDR_RS_revision/data/xv20200915_DDR_data_CHIP.rds") %>% 
   distinct(barcode, chromatin) %>%
   left_join(distinct(episcreen_ratios, barcode, IPR)) 
-chromatin$IPR[is.na(chromatin$IPR)] <- "IPR1"
+# chromatin$IPR[is.na(chromatin$IPR)] <- "IPR1"
 chromatin <- chromatin %>%
   filter(IPR != "<NA>") %>% 
   select(-barcode) %>%
@@ -526,8 +526,8 @@ for (i in unique(eff.data.heatmap2$conc_char)) {
                        dplyr::select(contains('IPR')) %>%
                        t(),
            border_color = F,
-           cellwidth = 12,
-           cellheight = 12,
+           cellwidth = 8,
+           cellheight = 8,
            breaks = myBreaks,
            cluster_rows = F,
            cluster_cols = F,

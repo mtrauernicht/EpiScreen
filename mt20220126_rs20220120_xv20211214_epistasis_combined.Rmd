@@ -27,20 +27,19 @@ library(ggpubr)
 # Load libraries (Just need a data table with all the data and )
 ```{r}
 #Chromatin data (it needs a barcode column)
-#screen_ratios_tib <- readRDS("/DATA/projects/DSBrepair/data/R/rs20220119_episcreen2/rs20220119_episcreen_ratios.RDS")
-screen_ratios_tib <- readRDS("/DATA/usr/m.trauernicht/projects/EpiScreen/files_scripts/mt20220126_2_episcreen.RDS")
+indel.data <- readRDS("/DATA/projects/DSBrepair/data/R/rs20220127_episcreen/initials20220127_episcreen_ratios.RDS")
 clone5_chrom_tib <- readRDS('/DATA/projects/DSBrepair/data/R/cl20201026_ChIP_zscore_selection.RDS')
 
 
-chromatin.features <- colnames(screen_ratios_tib)[grepl("[.]zscore", colnames(screen_ratios_tib))]
-chrom_data = screen_ratios_tib %>% select(barcode, all_of(chromatin.features)) %>% distinct()
+chromatin.features <- colnames(indel.data)[grepl("[.]zscore", colnames(indel.data))]
+chrom_data = indel.data %>% select(barcode, all_of(chromatin.features)) %>% distinct()
 ```
 
 ## Prepare data
 
 ```{r}
 # Data table and compute log2_ratio (This line needs to be adjusted)
-ratios_tib <- screen_ratios_tib %>%
+ratios_tib <- indel.data %>%
   filter(abs(mean_eff_zscore_global_comb) > 2.58 | abs(MMEJ_zscore_global_comb) > 2.58 | drug == "DMSO") %>%
   distinct(MMEJratio, freqCut, drug, conc_char, target, barcode) %>%
   mutate(MMEJratio = ave(MMEJratio, drug, conc_char, barcode, FUN = mean)) %>%
@@ -49,7 +48,7 @@ ratios_tib <- screen_ratios_tib %>%
   mutate(freqCut.log2 = log2(freqCut)) %>%
   distinct()
 
-dmso_ratios_tib <- screen_ratios_tib %>%
+dmso_ratios_tib <- indel.data %>%
   filter(drug == "DMSO") %>%
   distinct(MMEJratio, freqCut, barcode) %>%
   mutate(DMSO.ratio = ave(MMEJratio, barcode, FUN = mean)) %>%
@@ -88,14 +87,12 @@ ggplot(ratios_tib %>%
 
 ggplot(ratios_tib %>% 
          filter(drug %in% c("DMSO","DNA-PKi","PCI-24781 (Abexinostat)")),
-       aes(HDAC1,log2.dist.freqCut, color = drug)) + 
-  geom_point() + 
+       aes(HDAC1.zscore,log2.dist.freqCut, color = drug)) + 
+  geom_point() +
   stat_cor(method = "spearman") + 
   geom_smooth(method = "lm") + 
   theme_bw() +
   facet_wrap(. ~ conc_char)
-
-
 ```
 
 
@@ -189,7 +186,7 @@ slope.prot.features.scale.dcast.100nm = slope.prot.features.scale.dcast.list[[3]
  
 # Set annotation for heatmap
 # Row annotation: annotate drugs with the target group
-target <- screen_ratios_tib %>% 
+target <- indel.data %>% 
   distinct(drug, target) %>% 
   column_to_rownames(var="drug")
 
@@ -215,8 +212,8 @@ breaks <- seq(-0.1, 0.1, 0.001)
 
 pheatmap(t(slope.prot.features.scale.dcast.100nm),
          border_color = F,
-         cellwidth = 12,
-         cellheight = 12,
+         cellwidth = 8,
+         cellheight = 8,
          breaks = breaks,
          annotation_col = target,
          main = "100 nM",
@@ -227,8 +224,8 @@ breaks <- seq(-0.1, 0.1, 0.001)
 
 pheatmap(t(slope.prot.features.scale.dcast.1um),
          border_color = F,
-         cellwidth = 12,
-         cellheight = 12,
+         cellwidth = 8,
+         cellheight = 8,
          breaks = breaks,
          annotation_col = target,
          main = "1 uM",
@@ -239,8 +236,8 @@ breaks <- seq(-0.2, 0.2, 0.001)
 
 pheatmap(t(slope.prot.features.scale.dcast.10um),
          border_color = F,
-         cellwidth = 12,
-         cellheight = 12,
+         cellwidth = 8,
+         cellheight = 8,
          breaks = breaks,
          annotation_col = target,
          main = "10 uM",
@@ -341,8 +338,8 @@ breaks <- seq(-0.1, 0.1, 0.001)
 
 pheatmap(t(slope.prot.features.scale.dcast.100nm),
          border_color = F,
-         cellwidth = 12,
-         cellheight = 12,
+         cellwidth = 8,
+         cellheight = 8,
          breaks = breaks,
          annotation_col = target,
          main = "100 nM",
@@ -353,8 +350,8 @@ breaks <- seq(-0.1, 0.1, 0.001)
 
 pheatmap(t(slope.prot.features.scale.dcast.1um),
          border_color = F,
-         cellwidth = 12,
-         cellheight = 12,
+         cellwidth = 8,
+         cellheight = 8,
          breaks = breaks,
          annotation_col = target,
          main = "1 uM",
@@ -365,8 +362,8 @@ breaks <- seq(-0.2, 0.2, 0.001)
 
 pheatmap(t(slope.prot.features.scale.dcast.10um),
          border_color = F,
-         cellwidth = 12,
-         cellheight = 12,
+         cellwidth = 8,
+         cellheight = 8,
          breaks = breaks,
          annotation_col = target,
          main = "10 uM",
