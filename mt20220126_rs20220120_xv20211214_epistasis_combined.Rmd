@@ -108,9 +108,9 @@ slope.protein.features <- tibble(drug_conc = NA, feature = NA, slope.log2 = NA, 
 
 for (i in unique(ratios_tib$drug_conc)) {
   for (j in chromatin.features) {
-    model.dt <- ratios_tib %>% filter(drug_conc == i & log2.dist.freqCut != Inf) 
+    model.dt <- ratios_tib %>% filter(drug_conc == i & lin.dist.freqCut != Inf) 
     
-    model.epistasis.log2 <- lm(formula = log2.dist.freqCut ~ unlist(model.dt[j]), 
+    model.epistasis.log2 <- lm(formula = lin.dist.freqCut ~ unlist(model.dt[j]), 
                                data = model.dt) %>% 
       tidy()
     
@@ -162,7 +162,7 @@ slope.protein.features2 = slope.protein.features
 
 hits2 = slope.protein.features %>% filter(term == "unlist(model.dt[j])" & p.value < 0.01) %>% pull(drug_conc) %>% unique()
 
-hits = slope.protein.features %>% filter(term == "unlist(model.dt[j])" & abs(slope.log2) > 0.05) %>% pull(drug_conc) %>% unique()
+hits = slope.protein.features %>% filter(term == "unlist(model.dt[j])" & abs(slope.log2) > 0.02) %>% pull(drug_conc) %>% unique()
 
 slope.prot.features.scale.dcast.list <- slope.protein.features %>% 
   filter(term == "unlist(model.dt[j])" & drug_conc %in% hits) %>% 
@@ -379,47 +379,47 @@ pheatmap(t(slope.prot.features.scale.dcast.10um),
 
 # Figure 4B: Matrix for hits
 ```{r heatmap}
-#genes to select
-tmp.hits <- slope.protein.features %>%
-  # filter(p.value < 0.05 & term == "unlist(model.dt[j])") %>% 
-  pull(drug_conc) %>%
-
-# heatmap
-ggplot(slope.protein.features.all %>% filter(gene %in% tmp.gene.hits & abs(slope) > 0.05)) + 
-  geom_tile(aes(fct_relevel(gene,heatmap.gene.order.slope.diff.hits),fct_relevel(feature, heatmap.chromatin.order.slope.diff.hits), fill = slope)) +
-  scale_fill_gradient2( low = "#8c510a",mid = "#f5f5f5", high = "#01665e")  + theme_bw() + theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5), axis.title = element_blank(), legend.position = "top") + coord_fixed(expand = F,ratio = 1)
-
-# Dendrogram
-ggdendrogram(heatmap.slope.diff.hits$tree_row)
-
-# Relative slope
-tmp.rel.slope <- slope.protein.features.all %>% filter(gene %in% tmp.gene.hits) %>% mutate(rel.epistasis = slope*6/mean.fc)
+##genes to select
+# tmp.hits <- slope.protein.features %>%
+#   # filter(p.value < 0.05 & term == "unlist(model.dt[j])") %>% 
+#   pull(drug_conc) %>%
+# 
+# # heatmap
+# ggplot(slope.protein.features.all %>% filter(gene %in% tmp.gene.hits & abs(slope) > 0.05)) + 
+#   geom_tile(aes(fct_relevel(gene,heatmap.gene.order.slope.diff.hits),fct_relevel(feature, heatmap.chromatin.order.slope.diff.hits), fill = slope)) +
+#   scale_fill_gradient2( low = "#8c510a",mid = "#f5f5f5", high = "#01665e")  + theme_bw() + theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5), axis.title = element_blank(), legend.position = "top") + coord_fixed(expand = F,ratio = 1)
+# 
+# # Dendrogram
+# ggdendrogram(heatmap.slope.diff.hits$tree_row)
+# 
+# # Relative slope
+# tmp.rel.slope <- slope.protein.features.all %>% filter(gene %in% tmp.gene.hits) %>% mutate(rel.epistasis = slope*6/mean.fc)
 ```
 
 # Figure 4C: Epistasis per library
 ```{r}
-slope.library <- slope.protein.features.all %>% left_join(hits.both.screens %>% separate(ID_gene, into = "gene", remove = T) %>% select(gene,library,pathway) %>% distinct()) %>% filter(library %in% c("Chromatin","DNA_repair"))
-
-# Plot per library(all)
-ggplot(slope.library) + geom_quasirandom(aes(library,abs(epistasis), color = library)) + theme_bw() + scale_color_manual(values = levels(as_factor(library.colors$color))) + theme(legend.position = "top")
-
-#test
-chromatin.genes.slope <- slope.library %>% filter(library == "Chromatin") %>% pull(epistasis) %>% abs()
-dna_repair.genes.slope <- slope.library %>% filter(library == "DNA_repair") %>% pull(epistasis) %>% abs()
-
-ks.test.library <- ks.test(chromatin.genes.slope,dna_repair.genes.slope)
+# slope.library <- slope.protein.features.all %>% left_join(hits.both.screens %>% separate(ID_gene, into = "gene", remove = T) %>% select(gene,library,pathway) %>% distinct()) %>% filter(library %in% c("Chromatin","DNA_repair"))
+# 
+# # Plot per library(all)
+# ggplot(slope.library) + geom_quasirandom(aes(library,abs(epistasis), color = library)) + theme_bw() + scale_color_manual(values = levels(as_factor(library.colors$color))) + theme(legend.position = "top")
+# 
+# #test
+# chromatin.genes.slope <- slope.library %>% filter(library == "Chromatin") %>% pull(epistasis) %>% abs()
+# dna_repair.genes.slope <- slope.library %>% filter(library == "DNA_repair") %>% pull(epistasis) %>% abs()
+# 
+# ks.test.library <- ks.test(chromatin.genes.slope,dna_repair.genes.slope)
 ```
 
 #Figure 4D: Epistasis per pathway
 ```{r}
-# Plot per library 
-ggplot(slope.library %>% filter(pathway != "NA")) + geom_quasirandom(aes(pathway, abs(epistasis), color = pathway)) + theme_bw() + scale_color_manual(values = c("#EB2030","#2E358F")) + theme(legend.position = "top")
-
-#test
-NHEJ.genes.slope <- slope.library %>% filter(pathway == "NHEJ") %>% pull(epistasis) %>% abs()
-eff.genes.slope <- slope.library %>% filter(pathway == "eff") %>% pull(epistasis) %>% abs()
-
-ks.test.pathway <- ks.test(NHEJ.genes.slope,eff.genes.slope)
+# # Plot per library 
+# ggplot(slope.library %>% filter(pathway != "NA")) + geom_quasirandom(aes(pathway, abs(epistasis), color = pathway)) + theme_bw() + scale_color_manual(values = c("#EB2030","#2E358F")) + theme(legend.position = "top")
+# 
+# #test
+# NHEJ.genes.slope <- slope.library %>% filter(pathway == "NHEJ") %>% pull(epistasis) %>% abs()
+# eff.genes.slope <- slope.library %>% filter(pathway == "eff") %>% pull(epistasis) %>% abs()
+# 
+# ks.test.pathway <- ks.test(NHEJ.genes.slope,eff.genes.slope)
 ```
 
 
