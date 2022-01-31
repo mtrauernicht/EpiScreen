@@ -111,12 +111,12 @@ ggplot(ratios_tib %>%
 # Perform analysis across all features for three test genes
 ratios_tib %<>% mutate(drug_conc = paste(drug, conc_char, sep = "_"))
 
-
-test.log2.dist <- ratios_tib %>% 
-  dplyr::group_by(drug_conc) %>% 
-  t_test(log2.dist.ratio ~ 0) %>% 
-  mutate(p.adj = p.adjust(p, method = "fdr")) %>% 
-  left_join(ratios_tib, by = "drug_conc")
+# 
+# test.log2.dist <- ratios_tib %>% 
+#   dplyr::group_by(drug_conc) %>% 
+#   t_test(log2.dist.ratio ~ 0) %>% 
+#   mutate(p.adj = p.adjust(p, method = "fdr")) %>% 
+#   left_join(ratios_tib, by = "drug_conc")
 
 slope.protein.features <- tibble(drug_conc = NA, feature = NA,  term = NA, 
                                  indelrate = NA, p.value.indelrate = NA, 
@@ -124,7 +124,7 @@ slope.protein.features <- tibble(drug_conc = NA, feature = NA,  term = NA,
 
 for (i in unique(ratios_tib$drug_conc)) {
   for (j in chromatin.features) {
-    model.dt <- ratios_tib %>% filter(drug_conc == i & lin.dist.freqCut != Inf) 
+    model_tib <- ratios_tib %>% filter(drug_conc == i) 
     
     # Indel rates
     model.indelrate.log2 <- lm(formula = log2.dist.freqCut ~ unlist(model_tib[j]), 
@@ -213,6 +213,52 @@ ggplot(ratios_tib %>%
   facet_wrap(. ~ conc_char)
 
 ```
+
+```{r filter checking}
+hits = epistasis_tib %>% 
+  distinct(feature, drug_conc, indelrate_slope_plot) %>% 
+  filter(!is.na(indelrate_slope_plot)) %>% 
+  mutate(drug_conc_feature = paste(drug_conc, feature, sep = "_")) %>% 
+  pull(drug_conc_feature)
+
+ratios_tib %>% 
+  ungroup() %>%
+  select(barcode, drug, conc_char, target, all_of(chromatin.features), log2.dist.freqCut) %>%
+  pivot_longer(cols = all_of(chromatin.features), names_to = "feature", values_to = "zscore") %>%
+  mutate(drug_conc_feature = paste(drug, conc_char, feature, sep = "_")) %>%
+  filter(drug_conc_feature %in% hits) %>%
+  select(-drug_conc_feature) %>%
+  ggplot(., aes(zscore
+                ,log2.dist.freqCut, color = target)) + 
+  geom_point() +
+  stat_cor(method = "spearman") + 
+  geom_smooth(method = "lm") + 
+  theme_bw() +
+  facet_wrap(feature ~ conc_char)
+
+hits = epistasis_tib %>% 
+  distinct(feature, drug_conc, ratio_slope_plot) %>% 
+  filter(!is.na(ratio_slope_plot)) %>% 
+  mutate(drug_conc_feature = paste(drug_conc, feature, sep = "_")) %>% 
+  pull(drug_conc_feature)
+
+ratios_tib %>% 
+  ungroup() %>%
+  select(barcode, drug, conc_char, target, all_of(chromatin.features), log2.dist.ratio) %>%
+  pivot_longer(cols = all_of(chromatin.features), names_to = "feature", values_to = "zscore") %>%
+  mutate(drug_conc_feature = paste(drug, conc_char, feature, sep = "_")) %>%
+  filter(drug_conc_feature %in% hits) %>%
+  select(-drug_conc_feature) %>%
+  ggplot(., aes(zscore
+                ,log2.dist.ratio, color = target)) + 
+  geom_point() +
+  stat_cor(method = "spearman") + 
+  geom_smooth(method = "lm") + 
+  theme_bw() +
+  facet_wrap(feature ~ conc_char)
+
+```
+
 
 ```{r tile plots}
 ## Quick tile plot for indel rate
@@ -324,6 +370,8 @@ slope.indelrate.features.scale.dcast.100nm = slope.rate.features.list[[3]] %>%
   reshape2::dcast(drug ~ feature, value.var = "indelrate_slope_plot") %>% 
   column_to_rownames(var = "drug")
 ```
+
+
 
 ```{r heatmaps}
 # Set annotation for heatmap

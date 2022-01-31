@@ -448,3 +448,13 @@ p + facet_grid(IPR + replicate ~ drug)
 
 ```
 
+
+```{r}
+validation_indels_tib %>% filter(replicate == "mean" & plasmid == "LBR2") %>% distinct(barcode, drug, NHEJ_MMEJ) %>% pivot_wider(names_from = drug, values_from = NHEJ_MMEJ) %>%
+  mutate(log2dist_mmej = log2(Vorinostat)/log2(DMSO)) %>% ggplot(.) + geom_density(aes(log2dist_mmej))
+
+validation_indels_tib %>% filter(replicate == "mean" & plasmid == "LBR2") %>% distinct(barcode, drug, MMEJ_NHEJ) %>% pivot_wider(names_from = drug, values_from = MMEJ_NHEJ) %>%
+  mutate(log2dist_mmej = log2(Vorinostat)/log2(DMSO)) %>% ggplot(.) + geom_density(aes(log2dist_mmej))
+
+```
+
