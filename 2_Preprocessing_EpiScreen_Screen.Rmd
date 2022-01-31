@@ -676,15 +676,15 @@ Some samples have clear outlyers, others aren't prefectly normally distributed b
 # calculate efficiency relative to mean DMSO efficiency per concentration, barcode and replicate
 # First a table with DMSO efficiency per barcode, per technical replicate. 
 
-dmso.eff<- screen.ratio.dt %>%
+dmso.eff <- screen.ratio.dt %>%
   filter(drug == "DMSO") %>%
-  distinct('DMSO' = freqCut, 'DMSO_global' = freqCut_global, barcode, replicate,
-         tech, well, plate) %>%
+  distinct('DMSO' = freqCut, barcode, replicate,
+         tech, well, drug_plate) %>%
   mutate(DMSO = ave(DMSO, barcode, replicate, tech, FUN = mean)) %>% # mean per technical replicate
-  distinct()
+  distinct(DMSO, barcode, replicate, tech)
 
-dmso.global <- dmso.eff %>%
-  distinct(DMSO_global, replicate, tech, well, plate) %>%
+dmso.global <- screen.ratio.dt %>%
+  distinct('DMSO_global' = freqCut_global, replicate, tech) %>%
   mutate(DMSO_global = ave(DMSO_global, replicate, tech, FUN = mean)) %>%
   distinct(DMSO_global, replicate, tech)
 

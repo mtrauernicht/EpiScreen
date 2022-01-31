@@ -27,6 +27,7 @@ library(ggrepel)
 library(dendextend)
 library(Hmisc)
 library(ggpubr)
+library(rstatix)
 ```
 
 # Aesthetic legend for the whole paper
@@ -94,7 +95,7 @@ clone5_chrom_tib <- readRDS("/DATA/projects/DSBrepair/data/R/rs20200519_clone5_n
 clone5_z.score_chrom_tib <- readRDS('/DATA/projects/DSBrepair/data/R/cl20201026_ChIP_zscore_selection.RDS')
 
 # Inhibitor experiment
-inhibitor.data <- readRDS("~/XV_P3_ChromDSBScreen/xv20210716_E1627_ATR_inhibitor/data/xv20210716_E1627_indel_script_ATRi.rds") %>% left_join(inhibitor.table)
+inhibitor.data <- readRDS("/home/x.vergara/XV_P3_ChromDSBScreen/xv20210716_E1627_ATR_inhibitor/data/xv20210716_E1627_indel_script_ATRi.rds") %>% left_join(inhibitor.table)
 
 ```
 
