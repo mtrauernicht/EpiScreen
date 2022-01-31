@@ -1,21 +1,24 @@
 ---
 title: "DSB Episcreen data analysis & plotting"
-author: 
-  - name: "Max Trauernicht"
-    email: "m.trauernicht@nki.nl"
-    affiliation: "Netherlands Cancer Institute"
-date: '`r format(Sys.time(), "%d/%m/%Y")`'
-output: 
+author:
+- name: Max Trauernicht
+  email: m.trauernicht@nki.nl
+  affiliation: Netherlands Cancer Institute
+date: "`r format(Sys.time(), "%d/%m/%Y")`"
+output:
   html_document:
     theme: united
     highlight: pygments
     fig_caption: yes
     code_folding: hide
     df_print: kable
-    toc: true
+    toc: yes
     toc_depth: 4
     toc_float:
-      collapsed: false
+      collapsed: no
+  pdf_document:
+    toc: yes
+    toc_depth: '4'
 ---
 
 *knitr document van Steensel lab*
@@ -347,6 +350,7 @@ ggplot_custom <- function(...) ggplot2::ggplot(...) +
 
 ```{r data import, echo = FALSE, warning = FALSE}
 # Import data from preprocessing script
+indel.data <- readRDS("/DATA/usr/m.trauernicht/projects/EpiScreen/files_scripts/mt20220125_episcreen.RDS")
 indel.data <- readRDS("/DATA/projects/DSBrepair/data/R/rs20220127_episcreen/initials20220127_episcreen_ratios.RDS")
 ```
 
@@ -432,14 +436,10 @@ target <- indel.data %>%
   distinct(drug, target) %>% 
   column_to_rownames(var="drug")
 
-file_list = list.files("/DATA/projects/DSBrepair/data/R/rs20210813_episcreen_2", full.names = TRUE)
-file_list
-episcreen_ratios = readRDS(file_list[[3]])
-
 chromatin <- readRDS(
   "/DATA/usr/x.vergara/XV_ChIPIndels/XV20200902_DDR_RS_revision/XV20200902_DDR_RS_revision/data/xv20200915_DDR_data_CHIP.rds") %>% 
   distinct(barcode, chromatin) %>%
-  left_join(distinct(episcreen_ratios, barcode, IPR)) %>%
+  left_join(distinct(indel.data, barcode, IPR)) %>%
   filter(IPR != "<NA>") %>% 
   select(-barcode) %>%
   column_to_rownames(var="IPR")
@@ -483,14 +483,14 @@ eff.data.heatmap <- indel.data %>%
   distinct()
 
 ## Select drugs that have a large effect size in at least one location (some drugs might have a small global effect size, but large local)
-eff.data.heatmap2 <- eff.data.heatmap %>%
+eff.data.heatmap <- eff.data.heatmap %>%
   mutate(MMEJ_zscore_comb = 2*pnorm(q = abs(MMEJ_zscore_comb), lower.tail = F)) %>%
   mutate(MMEJ_zscore_comb = p.adjust(MMEJ_zscore_comb, method = 'fdr')) %>%
   mutate(min = ave(MMEJ_zscore_comb, drug, conc_char, FUN = min)) %>%
   filter(min < 0.01)
 
-eff.data.heatmap2$MMEJ_ratio_norm[eff.data.heatmap2$MMEJ_zscore_comb > 0.05] <- NA
-eff.data.heatmap2 <- eff.data.heatmap2 %>%
+#eff.data.heatmap2$MMEJ_ratio_norm[eff.data.heatmap2$MMEJ_zscore_comb > 0.05] <- NA
+eff.data.heatmap2 <- eff.data.heatmap %>%
   dplyr::select(-min, -MMEJ_zscore_comb) %>%
   spread(IPR, MMEJ_ratio_norm)
 
@@ -546,6 +546,130 @@ for (i in unique(eff.data.heatmap2$conc_char)) {
 *Figure 3C: Heatmap of MMEJ z-score per IPR for 15 most potent compounds per concentration.*
 
 **Conclusion: At all three concentrations, the 15 most potent drugs reduce the MMEJ score. IPR10 is very sensitive to MMEJ score reduction, especially by HDACs.**
+
+## Correlation of mmej ratio changes with starting mmej ratio
+
+```{r}
+## Correlation with DMSO
+dmso_freq <- indel.data %>%
+  filter(drug == "DMSO") %>%
+  distinct(IPR, MMEJratio) %>%
+  mutate(MMEJratio = ave(MMEJratio, IPR, FUN = mean)) %>%
+  dplyr::select('dmso_eff' = MMEJratio, IPR) %>%
+  distinct()
+
+corr_dmso <- merge(eff.data.heatmap, dmso_freq) %>%
+  mutate(drug_conc = paste(drug, conc_char, sep = "_"))
+
+viab_drugs <- indel.data %>%
+  mutate(drug_conc = paste(drug, conc_char, sep = "_")) %>%
+  filter(drug_conc %in% corr_dmso$drug_conc) %>%
+  distinct(viab_mean, drug_conc) %>%
+  mutate(viab_mean = ave(viab_mean, drug_conc, FUN = mean)) %>%
+  distinct()
+
+corr_dmso <- merge(corr_dmso, viab_drugs)
+
+h3k27me3 <- indel.data %>%
+  distinct(IPR, H3K27me3.zscore, late_replicating.zscore)
+
+corr_dmso <- merge(corr_dmso, h3k27me3)
+
+for (i in unique(corr_dmso$drug_conc)) {
+  corr_dmso$corr[corr_dmso$drug_conc == i] <- cor(corr_dmso$dmso_eff[corr_dmso$drug_conc == i],
+                                                  corr_dmso$MMEJ_ratio_norm[corr_dmso$drug_conc == i])
+}
+
+for (i in unique(corr_dmso$drug_conc)) {
+  corr_dmso$corr_h3k27me3[corr_dmso$drug_conc == i] <- cor(corr_dmso$H3K27me3.zscore[corr_dmso$drug_conc == i],
+                                                  corr_dmso$MMEJ_ratio_norm[corr_dmso$drug_conc == i])
+}
+
+for (i in unique(corr_dmso$drug_conc)) {
+  corr_dmso$corr_repli[corr_dmso$drug_conc == i] <- cor(corr_dmso$late_replicating.zscore[corr_dmso$drug_conc == i],
+                                                  corr_dmso$MMEJ_ratio_norm[corr_dmso$drug_conc == i])
+}
+
+pheatmap(corr_dmso2 %>%
+           #filter(target == "HDAC") %>%
+           distinct(drug_conc, corr, corr_repli, viab_mean) %>%
+           mutate(viab_mean = log2(viab_mean + 0.3)) %>%
+           column_to_rownames("drug_conc") %>%
+           t(),
+         border_color = F,
+         cellwidth = 8,
+         cellheight = 8,
+         annotation_col = target1,
+         annotation_colors = annotation_colors_scr)
+
+target1 <- target %>%
+  rownames_to_column("drug")
+target2 <- expand.grid("conc_char" = unique(corr_dmso$conc_char), "drug" =target1$drug)
+target1 <- merge(target1, target2) %>%
+  mutate(drug_conc = paste(drug, conc_char, sep = "_")) %>%
+  distinct(drug_conc, target) %>%
+  column_to_rownames("drug_conc")
+
+pheatmap(corr_dmso %>%
+#           filter(target == "HDAC") %>%
+           distinct(drug_conc, corr, corr_h3k27me3) %>%
+           mutate(corr = abs(corr),
+                  corr_h3k27me3 = abs(corr_h3k27me3)) %>%
+           column_to_rownames("drug_conc") %>%
+           t(),
+         border_color = F,
+         cellwidth = 8,
+         cellheight = 8,
+         annotation_col = target1)
+  
+
+
+
+ggplot(corr_dmso %>%
+         filter(target == "HDAC"),
+       aes(x = corr, y = corr_h3k27me3)) +
+  geom_point()
+
+
+ggplot(corr_dmso %>% filter(drug_conc == "Trichostatin A (TSA)_100 nM"),
+              aes(x = MMEJ_ratio_norm, y = H3K27me3.zscore)) +
+  geom_point() +
+  geom_abline(lty = "twodash") +
+  geom_smooth(method = "lm", color = "red", lty = "dashed") +
+  stat_cor(method = "pearson")
+
+
+
+ggplot(corr_dmso,
+              aes(x = dmso_eff, y = MMEJ_ratio_norm, color = target)) +
+  geom_point() +
+  facet_wrap(~drug_conc) +
+  geom_abline(lty = "twodash") +
+  geom_smooth(method = "lm", color = "red", lty = "dashed") +
+  stat_cor(method = "pearson") +
+  scale_color_brewer(palette = "Set3")
+
+ggplot(corr_dmso %>% filter(drug_conc == "Fluoro-SAHA_1 µM"),
+              aes(x = dmso_eff, y = MMEJ_ratio_norm)) +
+  geom_point() +
+  geom_abline(lty = "twodash") +
+  geom_smooth(method = "lm", color = "red", lty = "dashed") +
+  stat_cor(method = "pearson")
+
+ggplot(corr_dmso,
+       aes(x = corr, y = viab_mean)) +
+  geom_point()
+
+ggplot(corr_dmso %>%
+         distinct(target, drug, corr),
+              aes(x = target, y = corr)) +
+  geom_quasirandom() +
+  theme_classic_lines_90()
+```
+
+
+
+
 
 ## D: Correlation of MMEJ-ratio z-score with Efficiency z-score
 Do the changes in MMEJ-ratio change correlate with changes in efficiency? Can MMEJ changes be explained by opened up/closed chromatin?
