@@ -654,6 +654,8 @@ names(tib_ratios)[ncol(tib_ratios)] <- "large_ins"
 
 
 tib_ratios = tib_ratios %>% mutate(ins_del = insertions/deletions,
+                                   NHEJ_MMEJ = NHEJ/MMEJ,
+                                   MMEJ_NHEJ = MMEJ/NHEJ,
                                    MMEJ_MMEJNHEJ = MMEJ/(NHEJ+MMEJ),
                                    SSTR_MMEJSSTR = SSTR/(SSTR+MMEJ),
                                    SSTR_NHEJSSTR = SSTR/(SSTR+NHEJ))
