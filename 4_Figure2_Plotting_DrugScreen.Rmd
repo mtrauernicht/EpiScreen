@@ -351,7 +351,7 @@ ggplot_custom <- function(...) ggplot2::ggplot(...) +
 
 ```{r data import, echo = FALSE, warning = FALSE}
 # Import data from preprocessing script
-indel.data <- readRDS("/DATA/projects/DSBrepair/data/R/rs20220131_episcreen/rs20220131_episcreen_ratios.4.RDS")
+indel.data <- readRDS("/DATA/projects/DSBrepair/data/R/rs20220201_episcreen/rs20220201_episcreen_ratios.RDS")
 ```
 
 ---
@@ -540,6 +540,7 @@ for (i in unique(eff.data.heatmap2$conc_char)) {
            breaks = myBreaks,
            cluster_rows = F,
            cluster_cols = T,
+           angle_col = 90,
            na_col = "white",
            main = paste('efficiency change, concentration =', i),
            annotation_col = target,
@@ -565,120 +566,103 @@ dmso_freq <- indel.data %>%
 corr_dmso <- merge(eff.data.heatmap, dmso_freq) %>%
   mutate(drug_conc = paste(drug, conc_char, sep = "_")) %>%
   mutate(mean_effect = ave(freqCut_norm_mean, drug, conc_char, FUN = mean)) %>%
-  mutate(sign = sign(mean_effect)) #%>%
-  #filter(conc_char == "100 nM")
+  mutate(sign = sign(mean_effect)) 
 
-viab_drugs <- indel.data %>%
-  mutate(drug_conc = paste(drug, conc_char, sep = "_")) %>%
-  filter(drug_conc %in% corr_dmso$drug_conc) %>%
-  distinct(viab_mean, drug_conc) %>%
-  mutate(viab_mean = ave(viab_mean, drug_conc, FUN = mean)) %>%
-  distinct()
-
-corr_dmso <- merge(corr_dmso, viab_drugs)
-
+## Correlation with H3K27me3
 h3k27me3 <- indel.data %>%
   distinct(IPR, H3K27me3.zscore, late_replicating.zscore)
 
-corr_dmso <- merge(corr_dmso, h3k27me3)
+
+## Calculate correlations by linear model
+corr_dmso <- merge(corr_dmso, h3k27me3) %>%
+  mutate(slope_dmso = NA, p.value_dmso = NA,
+          slope_h3k27me3 = NA, p.value_h3k27me3 = NA) 
 
 for (i in unique(corr_dmso$drug_conc)) {
-  corr_dmso$corr[corr_dmso$drug_conc == i] <- cor(corr_dmso$freqCut_norm_mean[corr_dmso$drug_conc == i], 
-                                                  corr_dmso$dmso_eff[corr_dmso$drug_conc == i])
+    model.correlation <- lm(formula = freqCut_norm_mean ~ dmso_eff, 
+                               data = corr_dmso[corr_dmso$drug_conc == i,]) %>% 
+      tidy()
+    
+    corr_dmso$slope_dmso[corr_dmso$drug_conc == i] <- 
+      model.correlation$estimate[2]
+    
+    corr_dmso$p.value_dmso[corr_dmso$drug_conc == i] <- 
+      model.correlation$p.value[2]
 }
 
 for (i in unique(corr_dmso$drug_conc)) {
-  corr_dmso$corr_h3k27me3[corr_dmso$drug_conc == i] <- cor(corr_dmso$H3K27me3.zscore[corr_dmso$drug_conc == i],
-                                                  corr_dmso$freqCut_norm_mean[corr_dmso$drug_conc == i])
+    model.correlation <- lm(formula = freqCut_norm_mean ~ H3K27me3.zscore, 
+                               data = corr_dmso[corr_dmso$drug_conc == i,]) %>% 
+      tidy()
+    
+    corr_dmso$slope_h3k27me3[corr_dmso$drug_conc == i] <- 
+      model.correlation$estimate[2]
+    
+    corr_dmso$p.value_h3k27me3[corr_dmso$drug_conc == i] <- 
+      model.correlation$p.value[2]
 }
 
-for (i in unique(corr_dmso$drug_conc)) {
-  corr_dmso$corr_repli[corr_dmso$drug_conc == i] <- cor(corr_dmso$late_replicating.zscore[corr_dmso$drug_conc == i],
-                                                  corr_dmso$freqCut_norm_mean[corr_dmso$drug_conc == i])
-}
 
-target1 <- target %>%
-  rownames_to_column("drug")
-target2 <- expand.grid("conc_char" = unique(corr_dmso$conc_char), "drug" =target1$drug)
-target1 <- merge(target1, target2) %>%
-  mutate(drug_conc = paste(drug, conc_char, sep = "_")) %>%
-  distinct(drug_conc, target) %>%
-  column_to_rownames("drug_conc")
 
-pheatmap(corr_dmso %>%
-           #filter(target == "HDAC") %>%
-           distinct(drug_conc, corr, corr_h3k27me3, corr_repli, viab_mean) %>%
-           mutate(viab_mean = viab_mean - 0.4) %>%
-           column_to_rownames("drug_conc") %>%
-           t(),
-         border_color = F,
-         cellwidth = 8,
-         cellheight = 8,
-         annotation_col = target1,
-         annotation_colors = annotation_colors_scr)
+corr_dmso <- corr_dmso %>%
+  mutate(p.value_dmso = p.adjust(p.value_dmso, method = "fdr")) #%>%
+  # mutate(p.value_h3k27me3 = p.adjust(p.value_h3k27me3, method = "fdr"))
 
-pheatmap(corr_dmso %>%
-#           filter(target == "HDAC") %>%
-           distinct(drug_conc, corr, corr_h3k27me3) %>%
-           mutate(corr = abs(corr),
-                  corr_h3k27me3 = abs(corr_h3k27me3)) %>%
-           column_to_rownames("drug_conc") %>%
-           t(),
-         border_color = F,
-         cellwidth = 8,
-         cellheight = 8,
-         annotation_col = target1,
-         annotation_colors = annotation_colors_scr)
+ggplot(corr_dmso %>%
+         filter(abs(mean_effect) > 0.025) %>%
+         distinct(p.value_dmso, drug_conc, sign, target, conc_char),
+       aes(y = -log10(p.value_dmso), x = target, color = as.character(sign), 
+           shape = ifelse(p.value_dmso < 0.01, "1", "2"))) +
+  geom_quasirandom() +
+  scale_color_manual(values = c("#e07a5f", "#3d405b")) +
+  theme_classic_lines_90() +
+  geom_hline(yintercept = -log10(0.01), lty = "dashed") +
+  facet_wrap(~sign, nrow = 2)
   
+corr_hits <- corr_dmso %>% filter(drug_conc %in% c("PCI-24781 (Abexinostat)_100 nM", "Fluoro-SAHA_1 µM",
+                                             "B2_10 µM", "Aurora A Inhibitor I_100 nM")) 
 
+corr_h3k27me3_hits <- corr_dmso %>% filter(drug %in% c("EPZ-6438"))
 
-
-ggplot(corr_dmso,
-       aes(x = corr, y = corr_h3k27me3)) +
-  geom_point() +
-  facet_wrap(target~sign)
-
-ggplot(corr_dmso %>%
-         filter(abs(mean_effect) > 0.02) %>%
-         #filter(sign == 1) %>%
-         distinct(corr, drug_conc, sign, target, conc_char),
-       aes(y = corr, x = target, color = as.character(sign))) +
-  geom_quasirandom() +
-  coord_flip() +
-  scale_color_manual(values = c("#e07a5f", "#3d405b")) #+
-  #facet_wrap(~conc_char)
-
-
-ggplot(corr_dmso %>% filter(drug_conc %in% c("Givinostat (ITF2357)_100 nM", "Fluoro-SAHA_1 µM")),
-              aes(x = freqCut_norm_mean, y = mean_eff)) +
+ggplot(corr_hits,
+       aes(y = freqCut_norm_mean, x = dmso_eff, color = ifelse(sign == 1, "red", "black"))) +
   geom_point() +
   geom_abline(lty = "twodash") +
-  geom_smooth(method = "lm", color = "red", lty = "dashed") +
+  geom_smooth(method = "lm", lty = "dashed") +
+  scale_color_manual(values = c("#e07a5f", "#3d405b")) +
   stat_cor(method = "pearson") +
-  facet_wrap(~drug_conc, scales = "free_x")
+  facet_wrap(~drug_conc, scales = "free_y")
 
-
-
-
-
-
-ggplot(corr_dmso,
-              aes(x = dmso_eff, y = freqCut_norm_mean, color = target)) +
+ggplot(corr_h3k27me3_hits,
+       aes(y = freqCut_norm_mean, x = H3K27me3.zscore, color = ifelse(sign == 1, "red", "black"))) +
   geom_point() +
-  facet_wrap(~drug_conc) +
-  geom_abline(lty = "twodash") +
-  geom_smooth(method = "lm", color = "red", lty = "dashed") +
+  geom_smooth(method = "lm", lty = "dashed") +
+  scale_color_manual(values = c("#e07a5f", "#3d405b")) +
   stat_cor(method = "pearson") +
-  scale_color_brewer(palette = "Set3")
+  facet_wrap(~conc_char, scales = "free_y")
 
 
-ggplot(corr_dmso %>%
-         distinct(target, drug, corr),
-              aes(x = target, y = abs(corr))) +
+# Drug-induced changes per chromatin type
+chrom_corr <- indel.data %>%
+  distinct(drug, conc_char, freqCut_norm_mean, IPR, target) %>%
+  mutate(drug_conc = paste(drug, conc_char, sep = "_"))
+
+drugs_sel <- corr_dmso %>%
+  filter(abs(mean_effect) > 0.025) %>%
+  filter(sign == 1) %>%
+  distinct(drug_conc, p.value_dmso, p.value_h3k27me3, slope_h3k27me3)
+
+chrom_corr <- merge(chrom_corr, drugs_sel)
+
+chrom_corr$global <- "no"
+chrom_corr$global[abs(chrom_corr$p.value_dmso) < 0.01] <- "yes"
+
+ggplot(chrom_corr %>%
+         distinct(drug_conc, p.value_dmso, slope_h3k27me3, target, global),
+       aes(x = global, y = slope_h3k27me3)) +
+  geom_boxplot(outlier.shape = NA) +
   geom_quasirandom() +
-  theme_classic_lines_90()
-
-
+  facet_wrap(~target)
 ```
 
 *Figure 2C: Heatmap of cutting efficiency change induced by HDAC inhibitors at 19 genomic locations.*

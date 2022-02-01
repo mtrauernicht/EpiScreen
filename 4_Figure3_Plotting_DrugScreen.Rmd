@@ -413,7 +413,7 @@ eff.data <- eff.data %>%
 
 
 ggplot_custom(eff.data,
-              aes(y = reorder(target, -number), x = number, fill = sign, color = "black")) +
+              aes(y = reorder(target, -number), x = number, fill = sign)) +
   geom_bar(stat = "identity") +
   facet_wrap(~conc_char)+
   scale_fill_manual(values = c("#e07a5f", "#3d405b", "#C2C2C2"))
@@ -508,6 +508,7 @@ iprs <- dmso_freq$IPR
 iprs <- as.character(iprs)
 
 eff.data.heatmap2 <- eff.data.heatmap2[,c("drug", "target", "conc_char", iprs)]
+eff.data.heatmap2$drug <- gsub("[(].*[)]", "", eff.data.heatmap2$drug) #shorten name of drug
 
 breaks <- quantile(unlist(eff.data.heatmap2 %>% dplyr::select(contains('IPR'))), c(.15,1), na.rm = T) # change these numbers according to where you want to set the cutoff
 palette_length <- 100
@@ -537,6 +538,7 @@ for (i in unique(eff.data.heatmap2$conc_char)) {
            cellheight = 8,
            cluster_rows = F,
            cluster_cols = T,
+           angle_col = 90,
            na_col = "white",
            breaks = myBreaks,
            main = paste('MMEJ ratio, concentration =', i),
