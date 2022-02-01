@@ -73,7 +73,7 @@ CorrelationPlotMean <- function(data, feature_name, targets, p.value=0.001, alfa
     transform(rowname = factor(rowname, levels = levels(targets)),
               corr = corr,
               pvalue = pvalue) %>%
-    ggplot(aes(x = rowname, y = corr, fill = feature)) +
+    ggplot(aes(x = rowname, y = corr, fill = pvalue < p.value)) +
     geom_bar(stat = "identity", position = "dodge") +
     ylab(paste("Spearman correlation fold change after Vorinostat treatment")) +
     xlab("Chromatin Feature") +
@@ -628,77 +628,90 @@ plot_comb_grid_beeswarm <- function(dt, opt_df, domains, y_name, min_count=0,
 
 
 ```{r}
-validations_ratios = readRDS("/DATA/projects/DSBrepair/data/R/rs20210813_episcreen_2/rs20210813_episcreen_validation_ratios.RDS")
-validations_indels = readRDS("/DATA/projects/DSBrepair/data/R/rs20210813_episcreen_2/rs20210813_episcreen_validation_indels.RDS")
-screen_indels = readRDS("/DATA/projects/DSBrepair/data/R/rs20210813_episcreen_2/rs20210813_episcreen_ratios_split.RDS")
+validations_ratios = readRDS("/DATA/projects/DSBrepair/data/R/rs20220201_episcreen/rs20220201_episcreen_validation_ratios.RDS")
+validations_indels = readRDS("/DATA/projects/DSBrepair/data/R/rs20220201_episcreen/rs20220201_episcreen_validation_indels.RDS")
+screen_indels = readRDS("/DATA/projects/DSBrepair/data/R/rs20220201_episcreen/rs20220201_episcreen_mutations.RDS")
+screen_ratios = readRDS("/DATA/projects/DSBrepair/data/R/rs20220201_episcreen/rs20220201_episcreen_ratios.RDS")
 ```
 
 
 ```{r plotting exploration}
 vorinostat_ratios = validations_ratios %>% 
-  filter(replicate == "mean" & plasmid == "LBR2") %>% 
-  distinct(barcode, drug, MMEJ_MMEJNHEJ, efficiency) %>% 
-  pivot_wider(names_from = drug, values_from = c(efficiency, MMEJ_MMEJNHEJ)) %>%
+  filter(replicate == "mean" & plasmid == "LBR2" & pool == "AB") %>% 
+  distinct(barcode, drug, MMEJ_NHEJ , efficiency) %>% 
+  pivot_wider(names_from = drug, values_from = c(efficiency, MMEJ_NHEJ)) %>%
   mutate(diff_efficiency = efficiency_Vorinostat - efficiency_DMSO,
          ratio_efficiency = efficiency_Vorinostat/efficiency_DMSO,
-         diff_MMEJ_MMEJNHEJ = MMEJ_MMEJNHEJ_Vorinostat - MMEJ_MMEJNHEJ_DMSO,
-         ratio_MMEJ_MMEJNHEJ = MMEJ_MMEJNHEJ_Vorinostat/MMEJ_MMEJNHEJ_DMSO) 
+         logFC_MMEJ_NHEJ = log2(MMEJ_NHEJ_Vorinostat / MMEJ_NHEJ_DMSO)) %>%
+  filter(!is.na(logFC_MMEJ_NHEJ) & !is.na(ratio_efficiency) & !is.infinite(logFC_MMEJ_NHEJ))
   
-vorinostat_ratios %<>% left_join(unique(validations_ratios[, c(1, 40:73)]), by = "barcode") %>% distinct(barcode, .keep_all = TRUE)
+vorinostat_ratios %<>% left_join(unique(validations_ratios[, c(1, 42:75)]), by = "barcode") %>% distinct(barcode, .keep_all = TRUE)
 ```
 
 ```{r ratio MMEJNHEJ vs chrom, fig.height=8, fig.width=9}
-chrom.mods.cols <- seq(grep("ratio_MMEJ_MMEJNHEJ", names(vorinostat_ratios))+1, grep("H3K27me3_domain", names(vorinostat_ratios))-1)
+chrom.mods.cols <- seq(grep("logFC_MMEJ_NHEJ", names(vorinostat_ratios))+1, grep("H3K27me3_domain", names(vorinostat_ratios))-1)
 
-vorinostat.hist.corr <- CorrelationDFMean(vorinostat_ratios, "diff_MMEJ_MMEJNHEJ", targets = chrom.mods.cols) %>%
+vorinostat.hist.corr <- CorrelationDFMean(vorinostat_ratios, "logFC_MMEJ_NHEJ", targets = chrom.mods.cols) %>%
   arrange(corr) %>% pull(rowname) %>% factor(.,levels = .)
 
 lims = 1
 
-CorrelationPlotMean(vorinostat_ratios, "diff_MMEJ_MMEJNHEJ", targets = vorinostat.hist.corr)
-
-
-vorinostat_ratios %>% filter(abs(log(diff_MMEJ_MMEJNHEJ)) > .2) 
+CorrelationPlotMean(vorinostat_ratios, "logFC_MMEJ_NHEJ", targets = vorinostat.hist.corr)
 ```
 
 ```{r ratio efficiency vs chrom, fig.height=8, fig.width=9}
-chrom.mods.cols <- seq(grep("ratio_MMEJ_MMEJNHEJ", names(vorinostat_ratios))+1, grep("H3K27me3_domain", names(vorinostat_ratios))-1)
+chrom.mods.cols <- seq(grep("logFC_MMEJ_NHEJ", names(vorinostat_ratios))+1, grep("H3K27me3_domain", names(vorinostat_ratios))-1)
 
-vorinostat.hist.corr <- CorrelationDFMean(vorinostat_ratios, "ratio_efficiency", targets = chrom.mods.cols) %>%
+vorinostat.hist.corr <- CorrelationDFMean(vorinostat_ratios, "diff_efficiency", targets = chrom.mods.cols) %>%
   arrange(corr) %>% pull(rowname) %>% factor(.,levels = .)
 
 lims = 1
 
-CorrelationPlotMean(vorinostat_ratios, "ratio_efficiency", targets = vorinostat.hist.corr)
-
-vorinostat_ratios %>% filter(abs(log(ratio_efficiency)) > 2) 
+CorrelationPlotMean(vorinostat_ratios, "diff_efficiency", targets = vorinostat.hist.corr)
 ```
 
 ```{r}
-vorinostat_ratios %>% ggplot(., aes(diff_MMEJ_MMEJNHEJ)) + geom_density()
-vorinostat_ratios %>% ggplot(., aes(ratio_MMEJ_MMEJNHEJ)) + geom_density()
+# vorinostat_ratios %>% ggplot(., aes(vorinostat_ratios)) + geom_density()
+vorinostat_ratios %>% ggplot(., aes(logFC_MMEJ_NHEJ)) + geom_density()
 vorinostat_ratios %>% ggplot(., aes(diff_efficiency)) + geom_density()
 vorinostat_ratios %>% ggplot(., aes(ratio_efficiency)) + geom_density()
 
+vorinostat_ratios %>% ggplot(., aes(diff_efficiency, logFC_MMEJ_NHEJ)) + geom_point() + geom_smooth(method= "lm")
+vorinostat_ratios %>% filter(efficiency_DMSO > 0.7) %>% ggplot(., aes(log2(ratio_efficiency), efficiency_DMSO, color = H3K27me3_domain)) + geom_point() + geom_smooth(method= "lm")
+vorinostat_ratios %>% filter(efficiency_DMSO > 0.7) %>% ggplot(., aes(log2(ratio_efficiency), efficiency_DMSO, color = late_replicating_domain)) + geom_point() + geom_smooth(method= "lm")
+vorinostat_ratios %>% filter(efficiency_DMSO > 0.7) %>% ggplot(., aes(log2(ratio_efficiency), efficiency_DMSO, color = LAD_domain)) + geom_point() + geom_smooth(method= "lm")
+
+
+vorinostat_ratios %>% 
+  # filter(efficiency_DMSO > 0.7) %>% 
+  ggplot(., aes(logFC_MMEJ_NHEJ, MMEJ_NHEJ_DMSO)) + geom_point() + geom_smooth(method= "lm")
+
+vorinostat_ratios %>% 
+  # filter(efficiency_DMSO > 0.7) %>% 
+  ggplot(., aes(MMEJ_NHEJ_Vorinostat, MMEJ_NHEJ_DMSO)) + geom_point() + geom_smooth(method= "lm") + geom_abline(slope = 1, type = 2)
+
+vorinostat_ratios %>% 
+  # filter(efficiency_DMSO > 0.7) %>% 
+  ggplot(., aes(efficiency_Vorinostat, efficiency_DMSO)) + geom_point() + geom_smooth(method= "lm") + geom_abline(slope = 1, type = 2)
 ```
 
 ```{r}
 vorinostat_ratios %>%
-  dplyr::select(barcode, diff_MMEJ_MMEJNHEJ, ratio_MMEJ_MMEJNHEJ, diff_efficiency, ratio_efficiency, LMNB1, H3K4me1, POL2AS2, EZH2, H3K27ac, H3K27me3) %>%
+  dplyr::select(barcode, logFC_MMEJ_NHEJ, diff_efficiency, ratio_efficiency, LMNB1, H3K9me2, POL2AS2, EZH2, H3K27ac, H3K27me3) %>%
   group_by(barcode) %>%
-  gather(diff_MMEJ_MMEJNHEJ, ratio_MMEJ_MMEJNHEJ, diff_efficiency, ratio_efficiency, key = "pathway", value = "ratio") %>%
-  gather(LMNB1, H3K4me1, POL2AS2, EZH2, H3K27ac, H3K27me3, key = "feature", value = "value") %>%
-  ggplot(., aes(ratio, value))  +  
+  gather(logFC_MMEJ_NHEJ, diff_efficiency, ratio_efficiency, key = "pathway", value = "ratio") %>%
+  gather(LMNB1, H3K9me2, POL2AS2, EZH2, H3K27ac, H3K27me3, key = "feature", value = "value") %>%
+  ggplot(., aes(value, ratio))  +  
   geom_point() +
   geom_smooth(method= "lm") +
   theme_bw(base_size = 16) +
   stat_cor(method = "spearman") +
-  facet_grid(feature ~ pathway, scales = "free")
+  facet_grid(pathway ~ feature, scales = "free")
 ```
 
 
-```{r}
-barcodes.vori = vorinostat_ratios %>% filter(ratio_MMEJ_MMEJNHEJ > 2) %>% pull(barcode)
+```{r indel patterns in changing sites}
+barcodes.vori = vorinostat_ratios %>% filter(logFC_MMEJ_NHEJ > 1) %>% pull(barcode)
 colores <- c("wt" = "#808184", "other" = "black", "NHEJ" = "#e1251b", "MMEJ" = "#26419a", "SSTR" = "#007A4C")
 
 
@@ -715,7 +728,7 @@ validations_indels %>%
   scale_x_discrete(name="indel size", breaks = c("<-14", -7, 0, 1, ">2")) + 
   facet_grid(barcode ~ drug)
 
-barcodes.vori = vorinostat_ratios %>% filter(ratio_MMEJ_MMEJNHEJ < 0.2) %>% pull(barcode)
+barcodes.vori = vorinostat_ratios %>% filter(logFC_MMEJ_NHEJ < -1) %>% pull(barcode)
 
 validations_indels %>% 
   filter(type %in% c("grouped_indel", "core") & 
@@ -731,7 +744,23 @@ validations_indels %>%
   facet_grid(barcode ~ drug)
 
 
-barcodes.vori = vorinostat_ratios %>% filter(abs((ratio_efficiency)) > 1.2) %>% pull(barcode)
+barcodes.vori = vorinostat_ratios %>% filter(diff_efficiency > 0.1) %>% pull(barcode)
+
+
+validations_indels %>% 
+  filter(type %in% c("grouped_indel", "core") & 
+           barcode %in% barcodes.vori & 
+           plasmid == "LBR2", 
+         replicate == "mean") %>% 
+  ggplot(., aes(mutation, freq)) + 
+  geom_bar(stat = "identity", aes(fill = color)) + 
+  scale_fill_manual("legend", values = colores) + 
+  theme_bw() +
+  scale_y_continuous(name="frequency") +
+  scale_x_discrete(name="indel size", breaks = c("<-14", -7, 0, 1, ">2")) + 
+  facet_grid(barcode ~ drug)
+
+barcodes.vori = vorinostat_ratios %>% filter(diff_efficiency < -0.1) %>% pull(barcode)
 
 
 validations_indels %>% 
@@ -838,7 +867,7 @@ signif_IPRs_tib = validations_ratios %>%
   add_significance() %>% 
   distinct(barcode, p.signif, p)
 
-signif_bcs = signif_IPRs_full_tib %>% filter(p < 0.001) %>% pull(barcode)
+signif_bcs = signif_IPRs_full_tib %>% filter(p < 0.01) %>% pull(barcode)
 
 
 ```
@@ -933,8 +962,8 @@ domain_levels = c('late_replicating', 'LAD', 'H3K9me2', 'H3K27me3', 'DHS')
 domains = paste0(domain_levels, '_domain')
 
 indel.dt = vorinostat_ratios %>%
-  filter(!is.na(diff_MMEJ_MMEJNHEJ)) %>%
-  dplyr::select(barcode, diff_MMEJ_MMEJNHEJ, domains) %>%
+  filter(!is.na(logFC_MMEJ_NHEJ )) %>%
+  dplyr::select(barcode, logFC_MMEJ_NHEJ , domains) %>%
   distinct(barcode, .keep_all = TRUE) %>%
   data.table()
 
@@ -956,35 +985,34 @@ opt_df = get_combinations(domain_levels)
 
 # Ratio of SSTR vs MME
 plot_comb_grid_beeswarm(indel.dt, opt_df,
-                        domain_levels, 'diff_MMEJ_MMEJNHEJ', min_count = 10, y_plabel=c(-3, 3))
+                        domain_levels, 'logFC_MMEJ_NHEJ', min_count = 10, y_plabel=c(-2, 2))
 
 k27me3 = indel.dt %>% filter(late_replicating == 0, 
                              LAD == 0,
                              H3K9me2 == 0,
-                             H3K27me3 == 1,
-                             DHS == 0) %>% 
-  pull(diff_MMEJ_MMEJNHEJ)
+                             H3K27me3 == 1) %>% 
+  pull(logFC_MMEJ_NHEJ)
 
 hetcomb = indel.dt %>% filter(late_replicating == 1, 
                               LAD == 1,
                               H3K9me2 == 1,
                               H3K27me3 == 0,
                               DHS == 0) %>% 
-  pull(diff_MMEJ_MMEJNHEJ)
+  pull(logFC_MMEJ_NHEJ)
 
 idomain = indel.dt %>% filter(late_replicating == 0, 
                               LAD == 0,
                               H3K9me2 == 0,
                               H3K27me3 == 0,
                               DHS == 0) %>% 
-  pull(diff_MMEJ_MMEJNHEJ)
+  pull(logFC_MMEJ_NHEJ)
 
 DHS = indel.dt %>% filter(late_replicating == 0, 
                           LAD == 0,
                           H3K9me2 == 0,
                           H3K27me3 == 0,
                           DHS == 1) %>% 
-  pull(diff_MMEJ_MMEJNHEJ)
+  pull(logFC_MMEJ_NHEJ)
 
 wilcox.test(idomain, k27me3, alternative = "greater")
 wilcox.test(idomain, hetcomb, alternative = "two.sided")
