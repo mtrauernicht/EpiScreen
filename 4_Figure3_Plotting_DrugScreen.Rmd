@@ -350,8 +350,7 @@ ggplot_custom <- function(...) ggplot2::ggplot(...) +
 
 ```{r data import, echo = FALSE, warning = FALSE}
 # Import data from preprocessing script
-indel.data <- readRDS("/DATA/usr/m.trauernicht/projects/EpiScreen/files_scripts/mt20220125_episcreen.RDS")
-indel.data <- readRDS("/DATA/projects/DSBrepair/data/R/rs20220127_episcreen/initials20220127_episcreen_ratios.RDS")
+indel.data <- readRDS("/DATA/projects/DSBrepair/data/R/rs20220131_episcreen/rs20220131_episcreen_ratios.4.RDS")
 ```
 
 
@@ -414,7 +413,7 @@ eff.data <- eff.data %>%
 
 
 ggplot_custom(eff.data,
-              aes(y = reorder(target, -number), x = number, fill = sign, color = "black")) +
+              aes(y = reorder(target, -number), x = number, fill = sign)) +
   geom_bar(stat = "identity") +
   facet_wrap(~conc_char)+
   scale_fill_manual(values = c("#e07a5f", "#3d405b", "#C2C2C2"))
@@ -446,8 +445,8 @@ chromatin <- readRDS(
 
 # Change colors of annotations
 chrom_colors = c("Euchromatin" = "#EAEEE8",
-                  "other-heterochromatin" = "#CAD6C2",  
-                     "H3K27me3" = "#a5a58d", 
+                  "other-heterochromatin" = "#a5a58d",  
+                     "H3K27me3" = "#CAD6C2", 
                   "Triple Heterochromatin" = "#6b705c")
 
 # colors <- brewer.pal(length(unique(barcode.annotation$cluster)), "Pastel2")
@@ -466,8 +465,8 @@ annotation_colors_scr = list(
 
 # Order the annotation legend
 ordered_marks <- c("Euchromatin", 
+                   "H3K27me3", 
                      "other-heterochromatin",  
-                     "H3K27me3", 
                      "Triple Heterochromatin")
 
 annotation_colors_scr$chromatin <- annotation_colors_scr$chromatin[ordered_marks]
@@ -489,22 +488,29 @@ eff.data.heatmap <- eff.data.heatmap %>%
   mutate(min = ave(MMEJ_zscore_comb, drug, conc_char, FUN = min)) %>%
   filter(min < 0.01)
 
-#eff.data.heatmap2$MMEJ_ratio_norm[eff.data.heatmap2$MMEJ_zscore_comb > 0.05] <- NA
+#eff.data.heatmap$MMEJ_ratio_norm[eff.data.heatmap$MMEJ_zscore_comb > 0.05] <- NA
 eff.data.heatmap2 <- eff.data.heatmap %>%
   dplyr::select(-min, -MMEJ_zscore_comb) %>%
   spread(IPR, MMEJ_ratio_norm)
 
-chromatin_ord <- chromatin %>% 
-  rownames_to_column('IPR') %>%
-  mutate(chromatin = gsub("Euc", "0_Euc", chromatin)) %>%
-  mutate(chromatin = gsub("other-heterochromatin", "1_other-heterochromatin", chromatin)) %>%
-  mutate(chromatin = gsub("H3K27me3", "2_H3K27me3", chromatin)) %>%
-  mutate(chromatin = gsub("Triple Heterochromatin", "3_Triple Heterochromatin", chromatin)) %>%
-  arrange(chromatin)
+dmso_freq <- indel.data %>%
+  filter(drug == "DMSO") %>%
+  distinct(IPR, MMEJratio) %>%
+  mutate(MMEJratio = ave(MMEJratio, IPR, FUN = mean)) %>%
+  dplyr::select('dmso_eff' = MMEJratio, IPR) %>%
+  distinct() %>%
+  mutate(mean_freq_dmso = mean(dmso_eff),
+         dif_freq_dmso = log2(dmso_eff/mean_freq_dmso)) %>%
+  distinct(dif_freq_dmso, IPR) %>%
+  arrange(desc(dif_freq_dmso))
 
-eff.data.heatmap2 <- eff.data.heatmap2[,c("drug", "target", "conc_char", chromatin_ord$IPR)]
+iprs <- dmso_freq$IPR
+iprs <- as.character(iprs)
 
-breaks <- quantile(unlist(eff.data.heatmap2 %>% dplyr::select(contains('IPR'))), c(.1,.99), na.rm = T) # change these numbers according to where you want to set the cutoff
+eff.data.heatmap2 <- eff.data.heatmap2[,c("drug", "target", "conc_char", iprs)]
+eff.data.heatmap2$drug <- gsub("[(].*[)]", "", eff.data.heatmap2$drug) #shorten name of drug
+
+breaks <- quantile(unlist(eff.data.heatmap2 %>% dplyr::select(contains('IPR'))), c(.15,1), na.rm = T) # change these numbers according to where you want to set the cutoff
 palette_length <- 100
 
 myBreaks <- c(seq(breaks[1], 0, length.out=ceiling(palette_length/2) + 1), 
@@ -531,7 +537,8 @@ for (i in unique(eff.data.heatmap2$conc_char)) {
            cellwidth = 8,
            cellheight = 8,
            cluster_rows = F,
-           cluster_cols = F,
+           cluster_cols = T,
+           angle_col = 90,
            na_col = "white",
            breaks = myBreaks,
            main = paste('MMEJ ratio, concentration =', i),
@@ -620,7 +627,8 @@ pheatmap(corr_dmso %>%
          border_color = F,
          cellwidth = 8,
          cellheight = 8,
-         annotation_col = target1)
+         annotation_col = target1,
+annotation_colors = annotation_colors_scr)
   
 
 
