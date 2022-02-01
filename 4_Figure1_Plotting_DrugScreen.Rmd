@@ -53,29 +53,32 @@ StartTime <-Sys.time()
 # 8-digit Date tag:
 Date <- substr(gsub("-","",Sys.time()),1,8) 
 # libraries:
-library(dplyr)
-library(outliers)
+library(tidyverse)
+# library(outliers)
 library(ggplot2)
 library(ggbeeswarm)
 library(data.table)
-library(ggrepel)
+# library(ggrepel)
 library(GGally)
-library(DESeq2)
-library(gghighlight)
-library(platetools)
+# library(DESeq2)
+# library(gghighlight)
+# library(platetools)
 library(ggpubr)
-library(tidyr)
-library(Laurae)
-library(tibble)
-library(pheatmap)
-library(RColorBrewer)
+# library(Laurae)
+# library(pheatmap)
+# library(RColorBrewer)
 library(ggrastr)
+
+## Select outdir
+# out.dir = paste0("/DATA/projects/DSBrepair/scratch/figures_episcreen/figure1_", Date, "/")
+# dir.create(out.dir)
+# opts_chunk$set(dev=c('png', 'pdf'), fig.path = file.path(out.dir))
+# pdf.options(useDingbats = FALSE)
 ```
 
 ### Functions
 
 ```{r load_functions, echo = FALSE, warning = FALSE}
-
 p.adjust <- function(p, method = p.adjust.methods, n = length(p))
 {
     ## Methods 'Hommel', 'BH', 'BY' and speed improvements
@@ -346,7 +349,7 @@ ggplot_custom <- function(...) ggplot2::ggplot(...) +
 
 ```{r data import, echo = FALSE, warning = FALSE}
 # Import data from preprocessing script
-indel.data <- readRDS("/DATA/projects/DSBrepair/data/R/rs20220131_episcreen/rs20220131_episcreen_ratios.4.RDS")
+indel.data <- readRDS("/DATA/projects/DSBrepair/data/R/rs20220201_episcreen/rs20220201_episcreen_ratios.RDS")
 
 # Complete data without exlcluding wells <0.75 viability (I need this for plotting)
 viability.data = as.data.table(readRDS("/DATA/projects/DSBrepair/git/EpiScreen/files_scripts/rs20211221_Episcreen_Reads_Viab_Metadata.RDS")) %>%
@@ -435,7 +438,7 @@ ggplot_custom(viability.data %>%
   scale_color_manual(values = c(colors_diverse[1], colors_diverse[4]))
 ```
 
-*Figure 1C: Filtering of toxic compounds. Compounds that decreased viability by >55% in more than one technical replicate in one or both biological replicate were removed (marked in yellow).*
+*Figure 1C: Filtering of toxic compounds. Compounds that decreased viability by >75% in more than one technical replicate in one or both biological replicate were removed (marked in yellow).*
 
 **Conclusion: The higher the concentration, the more toxic the compounds are to the cells.**
 
@@ -481,7 +484,7 @@ ggplot(indel.data2 %>%
        aes(x = IPR, y = freqCut)) +
   geom_quasirandom_rast(aes(color = sample), dodge.width = 0.75, raster.dpi = 600) +
   scale_color_manual(values = c(colors_drugs[2], colors_drugs[7], colors_drugs[4], "#000000")) +
-  facet_wrap(~chromatin, scales = "free_x", nrow = 1) +
+  facet_wrap(~chromatin, scales = "free_x", nrow = 1)
 ```
 
 *Figure 1D: Compound-induced changes in cutting efficiency on the 19 genomic locations. The three probed concentrations are plotted next to each other.*
@@ -718,9 +721,9 @@ ggplot_custom(viab_mmej_cor,
 
 
 ```{r export}
-setwd("/DATA/usr/m.trauernicht/projects/EpiScreen/files_scripts/")
-filename <- SetFileName("_indel.data", "mt")
-save(indel.data, file = filename)
+# setwd("/DATA/usr/m.trauernicht/projects/EpiScreen/files_scripts/")
+# filename <- SetFileName("_indel.data", "mt")
+# save(indel.data, file = filename)
 ```
 
 # Session Info
