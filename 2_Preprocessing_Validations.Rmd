@@ -219,7 +219,7 @@ mut.list = mclapply(names(df.list), function(exp){
 
 ## list of mapped barcodes
 ```{r generating mapped barcode list}
-mapped_barcodes <- c(analysis.mapped.integrations.df$barcode, barcodes.list)
+mapped_barcodes <- c(analysis.mapped.integrations.df$barcode, barcodes.list, clone5barcodes)
 ```
 
 
@@ -325,7 +325,7 @@ bc_count.dt = mutations.dt[, list(sum_bc_reads = sum(count)), by=c("exp", 'barco
 # We used approximately 100,000 cells per experiment in the PCRs.
 # (by amount of gDNA used (3x200ng / 6 pg) = 100,000 * average IPR per cell (6))
 bc_count.dt = bc_count.dt[, cells:=(sum_bc_reads/sum(sum_bc_reads, na.rm = TRUE))*600000, by='exp']
-mutations.cutoff.dt = mutations.dt[bc_count.dt[cells > 50, ], on = c("exp", "barcode")]
+mutations.cutoff.dt = mutations.dt[bc_count.dt[cells > 100, ], on = c("exp", "barcode")]
 
 dim(mutations.cutoff.dt)
 
@@ -348,7 +348,7 @@ dim(complete.mutations.mapped.dt)
 
 
 # Merge metadata with the mutation data table.
-complete.mutations.mapped.meta.dt = complete.mutations.mapped.dt[metadata,on = c("exp" = "ID")]
+complete.mutations.mapped.meta.dt = complete.mutations.mapped.dt[metadata, on = c("exp" = "ID")]
 
 # Add group column to calculate means, this is done by grouping all
 # the different conditions together. 
@@ -360,8 +360,8 @@ remove(mut.list)
 remove(df.list)
 remove(mutations.dt)
 remove(mutations.cutoff.dt)
-remove(complete.mutations.dt)
-remove(complete.mutations.mapped.dt)
+# remove(complete.mutations.dt)
+# remove(complete.mutations.mapped.dt)
 ```
 
 ## Calculate frequencies
@@ -666,8 +666,11 @@ validation_indels_tib =  tib_ratios
 
 ```{r add chromatin data from Schep et al}
 schep_et_al_tib = readRDS("/DATA/projects/DSBrepair/data/R/RSTP2_Chromatin_2kb_Schep_et_al.RDS")
+
 clone5_chrom_tib <- readRDS("~/DSBrepair/data/R/rs20200519_clone5_newdoms_chromatin.RDS") %>% 
   mutate(barcode = paste0(barcode, ".B"))
+
+
 
 library(magrittr)
 validation_indels_tib %<>% left_join(schep_et_al_tib)
