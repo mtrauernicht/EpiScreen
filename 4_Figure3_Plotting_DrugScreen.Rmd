@@ -350,7 +350,7 @@ ggplot_custom <- function(...) ggplot2::ggplot(...) +
 
 ```{r data import, echo = FALSE, warning = FALSE}
 # Import data from preprocessing script
-indel.data <- readRDS("/DATA/projects/DSBrepair/data/R/rs20220131_episcreen/rs20220131_episcreen_ratios.4.RDS")
+indel.data <- readRDS("/DATA/projects/DSBrepair/data/R/rs20220201_episcreen/rs20220201_episcreen_ratios.RDS")
 ```
 
 
@@ -508,7 +508,7 @@ iprs <- dmso_freq$IPR
 iprs <- as.character(iprs)
 
 eff.data.heatmap2 <- eff.data.heatmap2[,c("drug", "target", "conc_char", iprs)]
-eff.data.heatmap2$drug <- gsub("[(].*[)]", "", eff.data.heatmap2$drug) #shorten name of drug
+eff.data.heatmap2$drug <- gsub(" [(].*[)]", "", eff.data.heatmap2$drug) #shorten name of drug
 
 breaks <- quantile(unlist(eff.data.heatmap2 %>% dplyr::select(contains('IPR'))), c(.15,1), na.rm = T) # change these numbers according to where you want to set the cutoff
 palette_length <- 100

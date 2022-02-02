@@ -346,7 +346,7 @@ ggplot_custom <- function(...) ggplot2::ggplot(...) +
 
 ```{r data import, echo = FALSE, warning = FALSE}
 # Import data from preprocessing script
-indel.data <- readRDS("/DATA/projects/DSBrepair/data/R/rs20220131_episcreen/rs20220131_episcreen_ratios.4.RDS")
+indel.data <- readRDS("/DATA/projects/DSBrepair/data/R/rs20220201_episcreen/rs20220201_episcreen_ratios.RDS")
 
 # Complete data without exlcluding wells <0.75 viability (I need this for plotting)
 viability.data = as.data.table(readRDS("/DATA/projects/DSBrepair/git/EpiScreen/files_scripts/rs20211221_Episcreen_Reads_Viab_Metadata.RDS")) %>%
