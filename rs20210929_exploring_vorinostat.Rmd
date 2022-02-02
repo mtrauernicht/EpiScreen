@@ -30,7 +30,7 @@ library(data.table)
 library(cowplot)
 
 ## Select outdir
-out.dir = paste0("figures/rs", Date, "/")
+out.dir = paste0("/DATA/projects/DSBrepair/scratch/figures_episcreen/exploratory_", Date, "/")
 dir.create(out.dir)
 opts_chunk$set(dev=c('png', 'pdf'), fig.path = file.path(out.dir))
 pdf.options(useDingbats = FALSE)
@@ -39,14 +39,6 @@ pdf.options(useDingbats = FALSE)
 ## Functions 
 
 ```{r functions, message=FALSE, warnings=FALSE}
-SetFileName <- function(filename, initials) {
-  # Set filename with extension and initials to make filename with date integrated.
-  filename <- substitute(filename)
-  initials <- substitute(initials)
-  filename <- paste0(initials, substr(gsub("-","",Sys.time()),1,8), "_", filename)
-  filename
-}
-
 CorrelationDFMean <- function(data, feature_name, targets, p.value=0.001){
   hist.corr.list <- data %>% dplyr::select(feature_name, targets) %>% as.matrix() %>% rcorr(type = "spearman")
   

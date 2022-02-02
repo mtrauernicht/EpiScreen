@@ -28,7 +28,7 @@ library(rstatix)
 # Load libraries (Just need a data table with all the data and )
 ```{r}
 #Chromatin data (it needs a barcode column)
-indel.data <- readRDS("/DATA/projects/DSBrepair/data/R/rs20220128_episcreen/rs20220128_episcreen_ratios.RDS")
+indel.data <- readRDS("/DATA/projects/DSBrepair/data/R/rs20220201_episcreen/rs20220201_episcreen_ratios.RDS")
 clone5_chrom_tib <- readRDS('/DATA/projects/DSBrepair/data/R/cl20201026_ChIP_zscore_selection.RDS')
 
 
@@ -40,8 +40,16 @@ chrom_data = indel.data %>% select(barcode, all_of(chromatin.features)) %>% dist
 
 ```{r}
 # Data table and compute log2_ratio (This line needs to be adjusted)
+filtered_drug_conc = indel.data %>%
+  filter(abs(mean_eff_zscore_comb) > 1.96 | abs(MMEJ_zscore_comb) > 1.96 | drug == "DMSO") %>%
+  distinct(drug, conc_char) %>%
+  mutate(drug_conc_char = paste(drug, conc_char, sep = "_")) %>%
+  pull(drug_conc_char)
+
+
 ratios_tib <- indel.data %>%
-  filter(abs(mean_eff_zscore_global_comb) > 2.58 | abs(MMEJ_zscore_global_comb) > 2.58 | drug == "DMSO") %>%
+  mutate(drug_conc_char = paste(drug, conc_char, sep = "_")) %>%
+  filter(drug_conc_char %in% filtered_drug_conc) %>%
   distinct(MMEJratio, freqCut, drug, conc_char, target, barcode) %>%
   mutate(MMEJratio = ave(MMEJratio, drug, conc_char, barcode, FUN = mean)) %>%
   mutate(MMEJratio.log2 = log2(MMEJratio)) %>%
@@ -95,7 +103,7 @@ ggplot(ratios_tib %>%
 
 ggplot(ratios_tib %>% 
          filter(drug %in% c("Resveratrol 10 µM", "Belinostat (PXD101)")),
-       aes(late_replicating.zscore
+       aes(H3K4me3.zscore
            ,log2.dist.ratio, color = drug)) + 
   geom_point() +
   stat_cor(method = "spearman") + 
@@ -152,10 +160,15 @@ for (i in unique(ratios_tib$drug_conc)) {
                 pull(p.value))
   }
 }
+
 # Remove the 1st NA column
 slope.protein.features %<>% 
   filter(!is.na(.)) %>%
   mutate(term = ifelse(term == "(Intercept)", "intercept", "slope"))
+
+```
+
+```{r epistasis filtering}
 
 # Calculate postition where the linear model crosses y = 0, we do this by -intercept / slope
 epistasis_tib = slope.protein.features %>% 
@@ -178,30 +191,18 @@ p.vals = slope.protein.features %>% filter(term == "slope") %>% select(-term, -i
 
 epistasis_tib %<>% left_join(effect_compounts)  %>% 
   left_join(p.vals) %>%
-  mutate(x_intercept_indelrate = ifelse(indelrate_effect == "mixed" & p.value.indelrate < 0.05, 
-                                        x_intercept_indelrate, NA),
-         x_intercept_ratio = ifelse(ratio_effect == "mixed" & p.value.ratio < 0.05, 
-                                    x_intercept_ratio, NA),
-         orientation_indelrate = ifelse(indelrate_slope < 0 & indelrate_effect == "indel_rate_decrease" | 
-                                         indelrate_slope > 0 & indelrate_effect == "indel_rate_increase", "divergent", 
-                                        ifelse(indelrate_slope < 0 & indelrate_effect == "indel_rate_increase" | 
-                                         indelrate_slope > 0 & indelrate_effect == "indel_rate_decrease", "convergent",
-                                         "complex")),
-         indelrate_slope_plot = ifelse(orientation_indelrate == "divergent" | orientation_indelrate == "complex" & x_intercept_indelrate > 1, indelrate_slope, NA),
-         orientation_ratio = ifelse(ratio_slope < 0 & ratio_effect == "NHEJ_increase" | 
-                                         ratio_slope > 0 & ratio_effect == "MMEJ_increase", "divergent", 
-                                        ifelse(ratio_slope < 0 & ratio_effect == "MMEJ_increase" | 
-                                         ratio_slope > 0 & ratio_effect == "NHEJ_increase", "convergent",
-                                         "complex")),
-         ratio_slope_plot = ifelse(orientation_ratio == "divergent" | orientation_ratio == "complex" & x_intercept_ratio > 1, ratio_slope, NA))  
+  mutate(
+    # x_intercept_indelrate = ifelse(p.value.indelrate < 0.05,
+    #                                x_intercept_indelrate, NA),
+    # x_intercept_ratio = ifelse(p.value.ratio < 0.05,
+    #                            x_intercept_ratio, NA),
+    indelrate_slope_plot = ifelse(x_intercept_indelrate < 1, indelrate_slope, NA),
+    ratio_slope_plot = ifelse(x_intercept_ratio < 1, ratio_slope, NA))  
 
 
 ###WIP###\
 
 # no positive intercept(x)
-
-
-epistasis_tib %>% distinct( drug_conc, indelrate_effect, ratio_effect, orientation_indelrate) %>% pivot_longer(., cols = c(indelrate_effect, ratio_effect, orientation_indelrate), names_to = "measure", values_to = "effect") %>% ggplot(., aes(measure)) + geom_bar(aes(fill = effect))
 
 ggplot(ratios_tib %>% 
          filter(drug %in% c("DNA-PKi 10 µM", "Nexturastat A", "SGC-CBP30")),
@@ -212,8 +213,8 @@ ggplot(ratios_tib %>%
   geom_smooth(method = "lm") + 
   theme_bw() +
   facet_wrap(. ~ conc_char)
-
 ```
+
 
 ```{r filter checking}
 hits = epistasis_tib %>% 
@@ -257,6 +258,21 @@ ratios_tib %>%
   geom_smooth(method = "lm") + 
   theme_bw() +
   facet_wrap(feature ~ conc_char)
+
+ratios_tib %>% 
+  ungroup() %>%
+  select(barcode, drug, conc_char, target, all_of(chromatin.features), log2.dist.ratio) %>%
+  pivot_longer(cols = all_of(chromatin.features), names_to = "feature", values_to = "zscore") %>%
+  mutate(drug_conc_feature = paste(drug, conc_char, feature, sep = "_")) %>%
+  filter(drug_conc_feature %in% hits, conc_char == "100 nM") %>%
+  select(-drug_conc_feature) %>%
+  ggplot(., aes(zscore
+                ,log2.dist.ratio, color = target)) + 
+  geom_point() +
+  stat_cor(method = "spearman") + 
+  geom_smooth(method = "lm") + 
+  theme_bw() +
+  facet_wrap(feature ~ .)
 
 ```
 
