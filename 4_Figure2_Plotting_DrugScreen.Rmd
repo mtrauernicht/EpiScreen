@@ -510,7 +510,7 @@ eff.data.heatmap2 <- eff.data.heatmap %>%
   spread(IPR, freqCut_norm_mean)
 
 eff.data.heatmap2 <- eff.data.heatmap2[,c("drug", "target", "conc_char", iprs)]
-eff.data.heatmap2$drug <- gsub("[(].*[)]", "", eff.data.heatmap2$drug) #shorten name of drug
+eff.data.heatmap2$drug <- gsub(" [(].*[)]", "", eff.data.heatmap2$drug) #shorten name of drug
 
 
 breaks <- quantile(unlist(eff.data.heatmap2 %>% dplyr::select(contains('IPR'))), c(.01,.99), na.rm = T) # change these numbers according to where you want to set the cutoff
@@ -568,6 +568,27 @@ corr_dmso <- merge(eff.data.heatmap, dmso_freq) %>%
   mutate(mean_effect = ave(freqCut_norm_mean, drug, conc_char, FUN = mean)) %>%
   mutate(sign = sign(mean_effect)) 
 
+## Only include compounds at lowest concentration
+corr_dmso <- corr_dmso %>%
+  mutate(compound_n = ave(drug, drug, IPR, FUN = length))
+all_conc <- corr_dmso[corr_dmso$compound_n == "3" & corr_dmso$conc_char %in% c("1 µM", "10 µM"),]
+corr_dmso <- anti_join(corr_dmso, all_conc)
+
+corr_dmso$conc <- 1
+corr_dmso$conc[corr_dmso$conc_char == "1 µM"] <- 2
+corr_dmso$conc[corr_dmso$conc_char == "10 µM"] <- 3
+
+for (i in unique(corr_dmso$drug)) {
+  if (corr_dmso$compound_n[corr_dmso$drug == i] == "2") {
+    max_conc <- max(corr_dmso$conc[corr_dmso$compound_n == "2" & corr_dmso$drug == i])
+    remove <- corr_dmso[corr_dmso$compound_n == "2" & corr_dmso$drug == i & corr_dmso$conc == max_conc,]
+    corr_dmso <-anti_join(corr_dmso, remove)
+  }
+}
+
+corr_dmso <- corr_dmso %>%
+  dplyr::select(-compound_n, -conc)
+
 ## Correlation with H3K27me3
 h3k27me3 <- indel.data %>%
   distinct(IPR, H3K27me3.zscore, late_replicating.zscore)
@@ -610,26 +631,29 @@ corr_dmso <- corr_dmso %>%
 
 ggplot(corr_dmso %>%
          filter(abs(mean_effect) > 0.025) %>%
+         filter(sign == 1) %>%
          distinct(p.value_dmso, drug_conc, sign, target, conc_char),
-       aes(y = -log10(p.value_dmso), x = target, color = as.character(sign), 
+       aes(y = -log10(p.value_dmso), x = target, 
+           #color = as.character(sign), 
            shape = ifelse(p.value_dmso < 0.01, "1", "2"))) +
   geom_quasirandom() +
-  scale_color_manual(values = c("#e07a5f", "#3d405b")) +
+  #scale_color_manual(values = c("#e07a5f", "#3d405b")) +
   theme_classic_lines_90() +
-  geom_hline(yintercept = -log10(0.01), lty = "dashed") +
-  facet_wrap(~sign, nrow = 2)
+  geom_hline(yintercept = -log10(0.01), lty = "dashed") #+
+  #facet_wrap(~sign, nrow = 2)
   
-corr_hits <- corr_dmso %>% filter(drug_conc %in% c("PCI-24781 (Abexinostat)_100 nM", "Fluoro-SAHA_1 µM",
-                                             "B2_10 µM", "Aurora A Inhibitor I_100 nM")) 
+corr_hits <- corr_dmso %>% filter(drug_conc %in% c("PCI-24781 (Abexinostat)_100 nM", "Fluoro-SAHA_1 µM")) 
 
 corr_h3k27me3_hits <- corr_dmso %>% filter(drug %in% c("EPZ-6438"))
 
 ggplot(corr_hits,
-       aes(y = freqCut_norm_mean, x = dmso_eff, color = ifelse(sign == 1, "red", "black"))) +
+       aes(y = freqCut_norm_mean, x = dmso_eff, 
+           #color = ifelse(sign == 1, "red", "black")
+           )) +
   geom_point() +
   geom_abline(lty = "twodash") +
-  geom_smooth(method = "lm", lty = "dashed") +
-  scale_color_manual(values = c("#e07a5f", "#3d405b")) +
+  geom_smooth(method = "lm", color = "black", lty = "dashed") +
+  #scale_color_manual(values = c("#e07a5f", "#3d405b")) +
   stat_cor(method = "pearson") +
   facet_wrap(~drug_conc, scales = "free_y")
 
@@ -649,8 +673,8 @@ chrom_corr <- indel.data %>%
 
 drugs_sel <- corr_dmso %>%
   filter(abs(mean_effect) > 0.025) %>%
-  filter(sign == 1) %>%
-  distinct(drug_conc, p.value_dmso, p.value_h3k27me3, slope_h3k27me3)
+  #filter(sign == 1) %>%
+  distinct(drug_conc, p.value_dmso, p.value_h3k27me3, slope_h3k27me3, sign)
 
 chrom_corr <- merge(chrom_corr, drugs_sel)
 
@@ -658,11 +682,19 @@ chrom_corr$global <- "no"
 chrom_corr$global[abs(chrom_corr$p.value_dmso) < 0.01] <- "yes"
 
 ggplot(chrom_corr %>%
-         distinct(drug_conc, p.value_dmso, slope_h3k27me3, target, global),
-       aes(x = global, y = slope_h3k27me3)) +
-  geom_boxplot(outlier.shape = NA) +
-  geom_quasirandom() +
-  facet_wrap(~target)
+         filter(sign == 1) %>%
+         filter(target == "HDAC") %>%
+         distinct(drug_conc, p.value_dmso, p.value_h3k27me3, target, global, sign),
+       aes(x = global, y = -log10(p.value_h3k27me3), shape = ifelse(p.value_h3k27me3 < 0.05, "1", "2"))) +
+  #geom_boxplot(outlier.shape = NA) +
+  geom_hline(yintercept = -log10(0.05), lty = "dashed") +
+  geom_quasirandom() #+
+  #facet_wrap(~target) 
+
+# Can the different HDAC inhibitor phenotypes be explained by which HDAC they target?
+hdac_class <- chrom_corr %>%
+  filter(target == "HDAC") %>%
+  distinct(drug, global, conc_char)
 ```
 
 *Figure 2C: Heatmap of cutting efficiency change induced by HDAC inhibitors at 19 genomic locations.*
