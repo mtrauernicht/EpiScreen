@@ -1,5 +1,5 @@
 ---
-title: "rs20220204_epistasis_code"
+title: "xv20211214_epistasis_code"
 output: html_document
 ---
 
@@ -75,6 +75,22 @@ dmso_ratios_tib <- indel.data %>%
 ratios_tib <- merge(ratios_tib, dmso_ratios_tib)
 ```
 
+
+
+```{r}
+indel.data  %>% 
+  select(barcode, drug, conc_char, target,mean_eff_zscore_comb, all_of(chromatin.features)) %>% 
+  filter(grepl("Mocet", drug), conc_char == "100 nM") %>% 
+  pivot_longer(cols = all_of(chromatin.features), names_to = "feature", values_to = "zscore") %>%
+  ggplot(., aes(zscore  
+                ,mean_eff_zscore_comb)) + 
+  geom_point(mapping =  aes(color = abs(mean_eff_zscore_comb) > 1.96)) +
+  stat_cor(method = "spearman") + 
+  geom_smooth(method = "lm") + 
+  theme_bw() +
+  facet_wrap(. ~ feature)
+```
+
 The log2 distance ratio in our case is positive if it promotes MMEJ and negative if it promotes NHEJ
 
 
@@ -86,13 +102,51 @@ ratios_tib <- ratios_tib %>%
   mutate(log2.dist.ratio = MMEJratio.log2 - DMSO.ratio.log2, 
          log2.dist.freqCut = freqCut.log2 - DMSO.freqCut.log2) %>%
   left_join(chrom_data)
+
+#Plot slopes
+ggplot(ratios_tib %>% 
+         filter(drug %in% c("DMSO","DNA-PKi","PCI-24781 (Abexinostat)")),
+       aes(H3K27me3.zscore,log2.dist.ratio, color = drug)) + 
+  geom_point() + 
+  stat_cor(method = "spearman") + 
+  geom_smooth(method = "lm") + 
+  theme_bw() +
+  facet_wrap(. ~ conc_char)
+
+ggplot(ratios_tib %>% 
+         filter(drug %in% c("DMSO","DNA-PKi","PCI-24781 (Abexinostat)")),
+       aes(HDAC1.zscore,log2.dist.freqCut, color = drug)) + 
+  geom_point() +
+  stat_cor(method = "spearman") + 
+  geom_smooth(method = "lm") + 
+  theme_bw() +
+  facet_wrap(. ~ conc_char)
+
+ggplot(ratios_tib %>% 
+         filter(drug %in% c("EPZ-6438")),
+       aes(H3K79me2.zscore  
+           ,log2.dist.ratio, color = drug)) + 
+  geom_point() +
+  stat_cor(method = "spearman") + 
+  geom_smooth(method = "lm") + 
+  theme_bw() +
+  facet_wrap(. ~ conc_char)
+
 ```
+
 
 
 # Extract slopes for all genes
 ```{r}
 # Perform analysis across all features for three test genes
 ratios_tib %<>% mutate(drug_conc = paste(drug, conc_char, sep = "_"))
+
+# 
+# test.log2.dist <- ratios_tib %>% 
+#   dplyr::group_by(drug_conc) %>% 
+#   t_test(log2.dist.ratio ~ 0) %>% 
+#   mutate(p.adj = p.adjust(p, method = "fdr")) %>% 
+#   left_join(ratios_tib, by = "drug_conc")
 
 slope.protein.features <- tibble(drug_conc = NA, feature = NA,  term = NA, 
                                  indelrate = NA, p.value.indelrate = NA, 
@@ -132,9 +186,11 @@ for (i in unique(ratios_tib$drug_conc)) {
 slope.protein.features %<>% 
   filter(!is.na(.)) %>%
   mutate(term = ifelse(term == "(Intercept)", "intercept", "slope"))
+
 ```
 
 ```{r epistasis filtering}
+
 # Calculate postition where the linear model crosses y = 0, we do this by -intercept / slope
 epistasis_tib = slope.protein.features %>% 
   distinct(drug_conc, term, feature, indelrate, ratio) %>% 
@@ -158,13 +214,90 @@ p.vals = slope.protein.features %>% filter(term == "slope") %>% select(-term, -i
 epistasis_tib %<>% left_join(effect_compounts)  %>% 
   left_join(p.vals) %>%
   mutate(
-    x_intercept_indelrate = ifelse(p.value.indelrate < 0.05,
-                                   x_intercept_indelrate, NA),
-    x_intercept_ratio = ifelse(p.value.ratio < 0.05,
-                               x_intercept_ratio, NA),
+    # x_intercept_indelrate = ifelse(p.value.indelrate < 0.05,
+    #                                x_intercept_indelrate, NA),
+    # x_intercept_ratio = ifelse(p.value.ratio < 0.05,
+    #                            x_intercept_ratio, NA),
     indelrate_slope_plot = ifelse(x_intercept_indelrate < 1 & effect_on_indelrate, indelrate_slope, NA),
     ratio_slope_plot = ifelse(x_intercept_ratio < 1 & effect_on_ratio, ratio_slope, NA))  
+
+
+###WIP###\
+
+# no positive intercept(x)
+
+ggplot(ratios_tib %>% 
+         filter(drug %in% c("DNA-PKi 10 µM", "Nexturastat A", "SGC-CBP30")),
+       aes(H3K27me3.zscore
+           ,log2.dist.ratio, color = drug)) + 
+  geom_point() +
+  stat_cor(method = "spearman") + 
+  geom_smooth(method = "lm") + 
+  theme_bw() +
+  facet_wrap(. ~ conc_char)
 ```
+
+
+```{r filter checking}
+hits = epistasis_tib %>% 
+  distinct(feature, drug_conc, indelrate_slope_plot) %>% 
+  filter(!is.na(indelrate_slope_plot)) %>% 
+  mutate(drug_conc_feature = paste(drug_conc, feature, sep = "_")) %>% 
+  pull(drug_conc_feature)
+
+ratios_tib %>% 
+  ungroup() %>%
+  select(barcode, drug, conc_char, target, all_of(chromatin.features), log2.dist.freqCut) %>%
+  pivot_longer(cols = all_of(chromatin.features), names_to = "feature", values_to = "zscore") %>%
+  mutate(drug_conc_feature = paste(drug, conc_char, feature, sep = "_")) %>%
+  filter(drug_conc_feature %in% hits) %>%
+  select(-drug_conc_feature) %>%
+  ggplot(., aes(zscore
+                ,log2.dist.freqCut, color = target)) + 
+  geom_point() +
+  stat_cor(method = "spearman") + 
+  geom_smooth(method = "lm") + 
+  theme_bw() +
+  facet_wrap(feature ~ conc_char)
+
+hits = epistasis_tib %>% 
+  distinct(feature, drug_conc, ratio_slope_plot) %>% 
+  filter(!is.na(ratio_slope_plot)) %>% 
+  mutate(drug_conc_feature = paste(drug_conc, feature, sep = "_")) %>% 
+  pull(drug_conc_feature)
+
+ratios_tib %>% 
+  ungroup() %>%
+  select(barcode, drug, conc_char, target, all_of(chromatin.features), log2.dist.ratio) %>%
+  pivot_longer(cols = all_of(chromatin.features), names_to = "feature", values_to = "zscore") %>%
+  mutate(drug_conc_feature = paste(drug, conc_char, feature, sep = "_")) %>%
+  filter(drug_conc_feature %in% hits) %>%
+  select(-drug_conc_feature) %>%
+  ggplot(., aes(zscore
+                ,log2.dist.ratio, color = target)) + 
+  geom_point() +
+  stat_cor(method = "spearman") + 
+  geom_smooth(method = "lm") + 
+  theme_bw() +
+  facet_wrap(feature ~ conc_char)
+
+ratios_tib %>% 
+  ungroup() %>%
+  select(barcode, drug, conc_char, target, all_of(chromatin.features), log2.dist.ratio) %>%
+  pivot_longer(cols = all_of(chromatin.features), names_to = "feature", values_to = "zscore") %>%
+  mutate(drug_conc_feature = paste(drug, conc_char, feature, sep = "_")) %>%
+  filter(drug_conc_feature %in% hits, conc_char == "100 nM") %>%
+  select(-drug_conc_feature) %>%
+  ggplot(., aes(zscore
+                ,log2.dist.ratio, color = target)) + 
+  geom_point() +
+  stat_cor(method = "spearman") + 
+  geom_smooth(method = "lm") + 
+  theme_bw() +
+  facet_wrap(feature ~ .)
+
+```
+
 
 ```{r tile plots}
 ## Quick tile plot for indel rate
@@ -232,56 +365,48 @@ slope.features.tib <-   epistasis_tib %>%
   group_by(drug_conc) %>%
   mutate(count_ratio = sum(is.na(ratio_slope_plot)), 
          count_rate = sum(is.na(indelrate_slope_plot))) %>%
-  separate(drug_conc, into = c("drug", "conc"), sep = "_")
+  separate(drug_conc, into = c("drug", "conc"), sep = "_") %>% 
+  mutate_all(~replace(., is.na(.), 0))
 
 slope.ratio.features.list <- slope.features.tib %>% 
   select(drug, conc, ratio_slope_plot, feature, count_ratio) %>%
   filter(count_ratio != 25) %>% # remove if 25x NA
   select(-count_ratio) %>%
-  group_by(feature, drug, conc) %>%
-  mutate(count_feature_ratio = sum(ratio_slope_plot)) %>%
-  filter(count_feature_ratio != 0) %>% # remove if 25x NA
-  select(-count_feature_ratio)  %>% 
   group_by(conc) %>%
   group_split(.keep = FALSE) 
-
-slope.ratio.features.scale.dcast.1um = slope.ratio.features.list[[1]] %>%
-  reshape2::dcast(drug ~ feature, value.var = "ratio_slope_plot", fill = 0) %>% 
-  column_to_rownames(var = "drug") %>% 
-  mutate_all(~replace(., is.na(.), 0))
-
-slope.ratio.features.scale.dcast.10um = slope.ratio.features.list[[2]] %>%
-  reshape2::dcast(drug ~ feature, value.var = "ratio_slope_plot", fill = 0) %>% 
-  column_to_rownames(var = "drug")%>% 
-  mutate_all(~replace(., is.na(.), 0))
-
-slope.ratio.features.scale.dcast.100nm = slope.ratio.features.list[[3]] %>%
-  reshape2::dcast(drug ~ feature, value.var = "ratio_slope_plot", fill = 0) %>% 
-  column_to_rownames(var = "drug")
 
 slope.rate.features.list <- slope.features.tib %>% 
   select(drug, conc, indelrate_slope_plot, feature, count_rate) %>%
   filter(count_rate != 25) %>%
   select(-count_rate) %>%
-  group_by(feature, drug, conc) %>%
-  mutate(count_feature_rate = sum(indelrate_slope_plot)) %>%
-  filter(count_feature_rate != 0) %>% # remove if 25x NA
-  select(-count_feature_rate) %>%
   group_by(conc) %>%
   group_split(.keep = FALSE) 
 
+slope.ratio.features.scale.dcast.1um = slope.ratio.features.list[[1]] %>%
+  reshape2::dcast(drug ~ feature, value.var = "ratio_slope_plot") %>% 
+  column_to_rownames(var = "drug")
+
+slope.ratio.features.scale.dcast.10um = slope.ratio.features.list[[2]] %>%
+  reshape2::dcast(drug ~ feature, value.var = "ratio_slope_plot") %>% 
+  column_to_rownames(var = "drug")
+
+
+slope.ratio.features.scale.dcast.100nm = slope.ratio.features.list[[3]] %>%
+  reshape2::dcast(drug ~ feature, value.var = "ratio_slope_plot") %>% 
+  column_to_rownames(var = "drug")
+
 slope.indelrate.features.scale.dcast.1um = slope.rate.features.list[[1]] %>%
-  reshape2::dcast(drug ~ feature, value.var = "indelrate_slope_plot", fill = 0) %>% 
+  reshape2::dcast(drug ~ feature, value.var = "indelrate_slope_plot") %>% 
   column_to_rownames(var = "drug")
 
 
 slope.indelrate.features.scale.dcast.10um = slope.rate.features.list[[2]] %>%
-  reshape2::dcast(drug ~ feature, value.var = "indelrate_slope_plot", fill = 0) %>% 
+  reshape2::dcast(drug ~ feature, value.var = "indelrate_slope_plot") %>% 
   column_to_rownames(var = "drug")
 
 
 slope.indelrate.features.scale.dcast.100nm = slope.rate.features.list[[3]] %>%
-  reshape2::dcast(drug ~ feature, value.var = "indelrate_slope_plot", fill = 0) %>% 
+  reshape2::dcast(drug ~ feature, value.var = "indelrate_slope_plot") %>% 
   column_to_rownames(var = "drug")
 ```
 
@@ -431,6 +556,20 @@ pheatmap(t(slope.indelrate.features.scale.dcast.10um),
 # 
 # # Relative slope
 # tmp.rel.slope <- slope.protein.features.all %>% filter(gene %in% tmp.gene.hits) %>% mutate(rel.epistasis = slope*6/mean.fc)
+```
+
+# Figure 4C: Epistasis per library
+```{r}
+# slope.library <- slope.protein.features.all %>% left_join(hits.both.screens %>% separate(ID_gene, into = "gene", remove = T) %>% select(gene,library,pathway) %>% distinct()) %>% filter(library %in% c("Chromatin","DNA_repair"))
+# 
+# # Plot per library(all)
+# ggplot(slope.library) + geom_quasirandom(aes(library,abs(epistasis), color = library)) + theme_bw() + scale_color_manual(values = levels(as_factor(library.colors$color))) + theme(legend.position = "top")
+# 
+# #test
+# chromatin.genes.slope <- slope.library %>% filter(library == "Chromatin") %>% pull(epistasis) %>% abs()
+# dna_repair.genes.slope <- slope.library %>% filter(library == "DNA_repair") %>% pull(epistasis) %>% abs()
+# 
+# ks.test.library <- ks.test(chromatin.genes.slope,dna_repair.genes.slope)
 ```
 
 #Figure 4D: Epistasis per pathway
