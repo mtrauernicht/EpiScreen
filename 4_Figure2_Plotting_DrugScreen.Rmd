@@ -502,7 +502,7 @@ eff.data.heatmap <- eff.data.heatmap %>%
   mutate(mean_eff_zscore_comb = 2*pnorm(q = abs(mean_eff_zscore_comb), lower.tail = F)) %>%
   mutate(mean_eff_zscore_comb = p.adjust(mean_eff_zscore_comb, method = 'fdr')) %>%
   mutate(min = ave(mean_eff_zscore_comb, drug, conc_char, FUN = min)) %>%
-  filter(min < 0.01) %>%
+  filter(min < 0.05) %>%
   distinct(drug, target, conc_char, freqCut_norm_mean, IPR)
 
 #eff.data.heatmap2$freqCut_norm_mean[eff.data.heatmap2$mean_eff_zscore_comb > 0.05] <- NA
@@ -528,8 +528,7 @@ ordered_marks2 <- ordered_marks2$target
 
 annotation_colors_scr$target <- annotation_colors_scr$target[ordered_marks2]
 
-for (i in unique(eff.data.heatmap2$conc_char)) {
-  pheatmap(eff.data.heatmap2[eff.data.heatmap2$conc_char == i,] %>%
+p1<- pheatmap(eff.data.heatmap2[eff.data.heatmap2$conc_char == "100 nM",] %>%
                        arrange(target) %>%
                        column_to_rownames('drug') %>%
                        dplyr::select(contains('IPR')) %>%
@@ -542,20 +541,57 @@ for (i in unique(eff.data.heatmap2$conc_char)) {
            cluster_cols = T,
            angle_col = 90,
            na_col = "white",
-           main = paste('efficiency change, concentration =', i),
+           main = paste('efficiency change, concentration =', "100 nM"),
            annotation_col = target,
            annotation_row = chromatin,
            color = colorRampPalette(c("#e07a5f", "#e5e5e5", "#3d405b"))(palette_length),
            annotation_colors = annotation_colors_scr, 
            annotation_legend = T)
-}
-```
+print(p1)
 
+p2 <- pheatmap(eff.data.heatmap2[eff.data.heatmap2$conc_char == "1 µM",] %>%
+                       arrange(target) %>%
+                       column_to_rownames('drug') %>%
+                       dplyr::select(contains('IPR')) %>%
+                       t(),
+           border_color = F,
+           cellwidth = 8,
+           cellheight = 8,
+           breaks = myBreaks,
+           cluster_rows = F,
+           cluster_cols = T,
+           angle_col = 90,
+           na_col = "white",
+           main = paste('efficiency change, concentration =', "1 µM"),
+           annotation_col = target,
+           annotation_row = chromatin,
+           color = colorRampPalette(c("#e07a5f", "#e5e5e5", "#3d405b"))(palette_length),
+           annotation_colors = annotation_colors_scr, 
+           annotation_legend = T)
+print(p2)
 
-## Are the changes in indel rate correlated with the starting indel rates?
+p3 <- pheatmap(eff.data.heatmap2[eff.data.heatmap2$conc_char == "10 µM",] %>%
+                       arrange(target) %>%
+                       column_to_rownames('drug') %>%
+                       dplyr::select(contains('IPR')) %>%
+                       t(),
+           border_color = F,
+           cellwidth = 8,
+           cellheight = 8,
+           breaks = myBreaks,
+           cluster_rows = F,
+           cluster_cols = T,
+           angle_col = 90,
+           na_col = "white",
+           main = paste('efficiency change, concentration =', "10 µM"),
+           annotation_col = target,
+           annotation_row = chromatin,
+           color = colorRampPalette(c("#e07a5f", "#e5e5e5", "#3d405b"))(palette_length),
+           annotation_colors = annotation_colors_scr, 
+           annotation_legend = T)
+print(p3)
 
-```{r warning = FALSE}
-## Correlation with DMSO
+## Add correlation with DMSO values to heatmap
 dmso_freq <- indel.data %>%
   filter(drug == "DMSO") %>%
   distinct(IPR, freqCut) %>%
@@ -566,9 +602,114 @@ dmso_freq <- indel.data %>%
 corr_dmso <- merge(eff.data.heatmap, dmso_freq) %>%
   mutate(drug_conc = paste(drug, conc_char, sep = "_")) %>%
   mutate(mean_effect = ave(freqCut_norm_mean, drug, conc_char, FUN = mean)) %>%
-  mutate(sign = sign(mean_effect)) 
+  mutate(sign = sign(mean_effect))
 
-## Only include compounds at lowest concentration
+## Correlation with H3K27me3 (not included in the heatmaps atm, can be added)
+h3k27me3 <- indel.data %>%
+  distinct(IPR, H3K27me3.zscore, late_replicating.zscore)
+
+corr_dmso <- merge(corr_dmso, h3k27me3) 
+
+corr_heatmap <- corr_dmso
+
+for (i in unique(corr_heatmap$drug_conc)) {
+  corr_heatmap$cor_dmso[corr_heatmap$drug_conc == i] <- 
+    cor(corr_heatmap$freqCut_norm_mean[corr_heatmap$drug_conc == i],
+        corr_heatmap$dmso_eff[corr_heatmap$drug_conc == i])
+  corr_heatmap$cor_h3k27me3[corr_heatmap$drug_conc == i] <- 
+    cor(corr_heatmap$freqCut_norm_mean[corr_heatmap$drug_conc == i],
+        corr_heatmap$H3K27me3.zscore[corr_heatmap$drug_conc == i])
+}
+
+pc1 <- corr_heatmap %>%
+  filter(conc_char == "100 nM") %>%
+  distinct(drug, cor_dmso) %>%
+  mutate(drug = gsub(" [(].*[)]", "", drug))
+
+col_order <- data.frame("drug" = p1$tree_col[["labels"]],
+                        "order" = p1$tree_col[["order"]])
+
+col_order2 <- col_order %>%
+  rownames_to_column("new_order") %>%
+  arrange(factor(new_order, levels = order)) %>%
+  distinct(drug) 
+
+pc1 <- left_join(col_order2, pc1)
+
+breaks <- seq(-1,1,0.02)
+
+pheatmap(pc1%>%
+           column_to_rownames("drug") %>%
+           t(),
+         border_color = F,
+         cellwidth = 8,
+         cellheight = 8,
+         cluster_rows = F,
+         cluster_cols = F,
+         breaks = breaks,
+         color = colorRampPalette(c("black", "white", colors_diverse[4]))(palette_length))
+
+pc2 <- corr_heatmap %>%
+  filter(conc_char == "1 µM") %>%
+  distinct(drug, cor_dmso) %>%
+  mutate(drug = gsub(" [(].*[)]", "", drug))
+
+col_order <- data.frame("drug" = p2$tree_col[["labels"]],
+                        "order" = p2$tree_col[["order"]])
+
+col_order2 <- col_order %>%
+  rownames_to_column("new_order") %>%
+  arrange(factor(new_order, levels = order)) %>%
+  distinct(drug) 
+
+pc2 <- left_join(col_order2, pc2)
+
+pheatmap(pc2 %>%
+           column_to_rownames("drug") %>%
+           t(),
+         border_color = F,
+         cellwidth = 8,
+         cellheight = 8,
+         cluster_rows = F,
+         cluster_cols = F,
+         breaks = breaks,
+         color = colorRampPalette(c("black", "white", colors_diverse[4]))(palette_length))
+
+pc3 <- corr_heatmap %>%
+  filter(conc_char == "10 µM") %>%
+  distinct(drug, cor_dmso) %>%
+  mutate(drug = gsub(" [(].*[)]", "", drug))
+
+
+col_order <- data.frame("drug" = p3$tree_col[["labels"]],
+                        "order" = p3$tree_col[["order"]])
+
+col_order2 <- col_order %>%
+  rownames_to_column("new_order") %>%
+  arrange(factor(new_order, levels = order)) %>%
+  distinct(drug) 
+
+pc3 <- left_join(col_order2, pc3)
+
+
+pheatmap(pc3 %>%
+           column_to_rownames("drug") %>%
+           t(),
+         border_color = F,
+         cellwidth = 8,
+         cellheight = 8,
+         cluster_rows = F,
+         cluster_cols = F,
+         breaks = breaks,
+         color = colorRampPalette(c("black", "white", colors_diverse[4]))(palette_length))
+
+```
+
+
+## Are the changes in indel rate correlated with the starting indel rates?
+
+```{r warning = FALSE}
+ ## Only include compounds at lowest concentration
 corr_dmso <- corr_dmso %>%
   mutate(compound_n = ave(drug, drug, IPR, FUN = length))
 all_conc <- corr_dmso[corr_dmso$compound_n == "3" & corr_dmso$conc_char %in% c("1 µM", "10 µM"),]
@@ -589,13 +730,11 @@ for (i in unique(corr_dmso$drug)) {
 corr_dmso <- corr_dmso %>%
   dplyr::select(-compound_n, -conc)
 
-## Correlation with H3K27me3
-h3k27me3 <- indel.data %>%
-  distinct(IPR, H3K27me3.zscore, late_replicating.zscore)
+
 
 
 ## Calculate correlations by linear model
-corr_dmso <- merge(corr_dmso, h3k27me3) %>%
+corr_dmso <- corr_dmso %>%
   mutate(slope_dmso = NA, p.value_dmso = NA,
           slope_h3k27me3 = NA, p.value_h3k27me3 = NA) 
 
