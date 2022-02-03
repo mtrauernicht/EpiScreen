@@ -458,3 +458,17 @@ validation_indels_tib %>% filter(replicate == "mean" & plasmid == "LBR2") %>% di
 
 ```
 
+
+```{r}
+indel.data  %>% 
+  select(barcode, drug, conc_char, target,mean_eff_zscore_comb, all_of(chromatin.features)) %>% 
+  filter(grepl("Mocet", drug), conc_char == "100 nM") %>% 
+  pivot_longer(cols = all_of(chromatin.features), names_to = "feature", values_to = "zscore") %>%
+  ggplot(., aes(zscore  
+                ,mean_eff_zscore_comb)) + 
+  geom_point(mapping =  aes(color = abs(mean_eff_zscore_comb) > 1.96)) +
+  stat_cor(method = "spearman") + 
+  geom_smooth(method = "lm") + 
+  theme_bw() +
+  facet_wrap(. ~ feature)
+```
