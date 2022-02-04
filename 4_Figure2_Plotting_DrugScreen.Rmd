@@ -1,10 +1,10 @@
 ---
-title: "DSB Episcreen data analysis & plotting"
+title: "DSB epigenetic drug screen - Figure 2"
 author:
-- name: Max Trauernicht
-  email: m.trauernicht@nki.nl
-  affiliation: Netherlands Cancer Institute
-date: "`r format(Sys.time(), "%d/%m/%Y")`"
+  - name: "Max Trauernicht & Ruben Schep"
+    email: "m.trauernicht@nki.nl"
+    affiliation: "Netherlands Cancer Institute"
+date: '`r format(Sys.time(), "%d/%m/%Y")`'
 
 output:
   html_document:
@@ -74,6 +74,7 @@ library(tibble)
 library(pheatmap)
 library(RColorBrewer)
 library(ggrastr)
+library(rstatix)
 ```
 
 ### Functions

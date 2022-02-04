@@ -1,7 +1,7 @@
 ---
-title: "DSB Episcreen data analysis & plotting"
+title: "DSB epigenetic drug screen - Figure 1"
 author: 
-  - name: "Max Trauernicht"
+  - name: "Max Trauernicht & Ruben Schep"
     email: "m.trauernicht@nki.nl"
     affiliation: "Netherlands Cancer Institute"
 date: '`r format(Sys.time(), "%d/%m/%Y")`'
