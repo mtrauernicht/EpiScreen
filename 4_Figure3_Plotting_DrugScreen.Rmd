@@ -74,6 +74,7 @@ library(pheatmap)
 library(RColorBrewer)
 library(ggrastr)
 library(broom)
+library(ggsignif)
 ```
 
 ### Functions
@@ -486,25 +487,19 @@ eff.data.heatmap <- eff.data.heatmap %>%
   mutate(MMEJ_zscore_comb = 2*pnorm(q = abs(MMEJ_zscore_comb), lower.tail = F)) %>%
   mutate(MMEJ_zscore_comb = p.adjust(MMEJ_zscore_comb, method = 'fdr')) %>%
   mutate(min = ave(MMEJ_zscore_comb, drug, conc_char, FUN = min)) %>%
-  filter(min < 0.01)
+  filter(min < 0.05)
 
 #eff.data.heatmap$MMEJ_ratio_norm[eff.data.heatmap$MMEJ_zscore_comb > 0.05] <- NA
 eff.data.heatmap2 <- eff.data.heatmap %>%
   dplyr::select(-min, -MMEJ_zscore_comb) %>%
   spread(IPR, MMEJ_ratio_norm)
 
-dmso_freq <- indel.data %>%
-  filter(drug == "DMSO") %>%
-  distinct(IPR, MMEJratio) %>%
-  mutate(MMEJratio = ave(MMEJratio, IPR, FUN = mean)) %>%
-  dplyr::select('dmso_eff' = MMEJratio, IPR) %>%
-  distinct() %>%
-  mutate(mean_freq_dmso = mean(dmso_eff),
-         dif_freq_dmso = log2(dmso_eff/mean_freq_dmso)) %>%
-  distinct(dif_freq_dmso, IPR) %>%
-  arrange(desc(dif_freq_dmso))
+# Order IPRs by their H3K27me3 values
+h3k27_score <- indel.data %>%
+  distinct(IPR, H3K27me3.zscore) %>%
+  arrange(desc(H3K27me3.zscore))
 
-iprs <- dmso_freq$IPR
+iprs <- h3k27_score$IPR
 iprs <- as.character(iprs)
 
 eff.data.heatmap2 <- eff.data.heatmap2[,c("drug", "target", "conc_char", iprs)]
@@ -527,8 +522,10 @@ annotation_colors_scr$target <- annotation_colors_scr$target[ordered_marks2]
 
 
 
-for (i in unique(eff.data.heatmap2$conc_char)) {
-  pheatmap(as.matrix(eff.data.heatmap2[eff.data.heatmap2$conc_char == i,] %>%
+
+
+
+p1 <- pheatmap(as.matrix(eff.data.heatmap2[eff.data.heatmap2$conc_char == "100 nM",] %>%
                        arrange(target) %>%
                        column_to_rownames('drug') %>%
                        dplyr::select(contains('IPR')) %>%
@@ -541,23 +538,58 @@ for (i in unique(eff.data.heatmap2$conc_char)) {
            angle_col = 90,
            na_col = "white",
            breaks = myBreaks,
-           main = paste('MMEJ ratio, concentration =', i),
+           main = paste('MMEJ ratio, concentration = 100 nM'),
            annotation_col = target,
            annotation_row = chromatin,
            color = colorRampPalette(c("#e07a5f", "#e5e5e5", "#3d405b"))(palette_length),
            annotation_colors = annotation_colors_scr, 
            annotation_legend = T)
-}
-```
+print(p1)
 
-*Figure 3C: Heatmap of MMEJ z-score per IPR for 15 most potent compounds per concentration.*
+p2 <- pheatmap(as.matrix(eff.data.heatmap2[eff.data.heatmap2$conc_char == "1 µM",] %>%
+                       arrange(target) %>%
+                       column_to_rownames('drug') %>%
+                       dplyr::select(contains('IPR')) %>%
+                       t()),
+           border_color = F,
+           cellwidth = 8,
+           cellheight = 8,
+           cluster_rows = F,
+           cluster_cols = T,
+           angle_col = 90,
+           na_col = "white",
+           breaks = myBreaks,
+           main = paste('MMEJ ratio, concentration = 1 µM'),
+           annotation_col = target,
+           annotation_row = chromatin,
+           color = colorRampPalette(c("#e07a5f", "#e5e5e5", "#3d405b"))(palette_length),
+           annotation_colors = annotation_colors_scr, 
+           annotation_legend = T)
+print(p2)
 
-**Conclusion: At all three concentrations, the 15 most potent drugs reduce the MMEJ score. IPR10 is very sensitive to MMEJ score reduction, especially by HDACs.**
+p3 <- pheatmap(as.matrix(eff.data.heatmap2[eff.data.heatmap2$conc_char == "10 µM",] %>%
+                       arrange(target) %>%
+                       column_to_rownames('drug') %>%
+                       dplyr::select(contains('IPR')) %>%
+                       t()),
+           border_color = F,
+           cellwidth = 8,
+           cellheight = 8,
+           cluster_rows = F,
+           cluster_cols = T,
+           angle_col = 90,
+           na_col = "white",
+           breaks = myBreaks,
+           main = paste('MMEJ ratio, concentration = 10 µM'),
+           annotation_col = target,
+           annotation_row = chromatin,
+           color = colorRampPalette(c("#e07a5f", "#e5e5e5", "#3d405b"))(palette_length),
+           annotation_colors = annotation_colors_scr, 
+           annotation_legend = T)
+print(p3)
 
-## Correlation of mmej ratio changes with starting mmej ratio
 
-```{r}
-## Correlation with DMSO
+## Add correlation with DMSO values to heatmap
 dmso_freq <- indel.data %>%
   filter(drug == "DMSO") %>%
   distinct(IPR, MMEJratio) %>%
@@ -566,115 +598,143 @@ dmso_freq <- indel.data %>%
   distinct()
 
 corr_dmso <- merge(eff.data.heatmap, dmso_freq) %>%
-  mutate(drug_conc = paste(drug, conc_char, sep = "_"))
-
-viab_drugs <- indel.data %>%
   mutate(drug_conc = paste(drug, conc_char, sep = "_")) %>%
-  filter(drug_conc %in% corr_dmso$drug_conc) %>%
-  distinct(viab_mean, drug_conc) %>%
-  mutate(viab_mean = ave(viab_mean, drug_conc, FUN = mean)) %>%
-  distinct()
+  mutate(mean_effect = ave(MMEJ_ratio_norm, drug, conc_char, FUN = mean)) %>%
+  mutate(sign = sign(mean_effect))
 
-corr_dmso <- merge(corr_dmso, viab_drugs)
-
+## Correlation with H3K27me3
 h3k27me3 <- indel.data %>%
-  distinct(IPR, H3K27me3.zscore, late_replicating.zscore)
+  distinct(IPR, HDAC2.zscore, late_replicating.zscore)
 
-corr_dmso <- merge(corr_dmso, h3k27me3)
+corr_dmso <- merge(corr_dmso, h3k27me3) 
 
-for (i in unique(corr_dmso$drug_conc)) {
-  corr_dmso$corr[corr_dmso$drug_conc == i] <- cor(corr_dmso$dmso_eff[corr_dmso$drug_conc == i],
-                                                  corr_dmso$MMEJ_ratio_norm[corr_dmso$drug_conc == i])
+corr_heatmap <- corr_dmso
+
+for (i in unique(corr_heatmap$drug_conc)) {
+  corr_heatmap$cor_dmso[corr_heatmap$drug_conc == i] <- 
+    cor(corr_heatmap$MMEJ_ratio_norm[corr_heatmap$drug_conc == i],
+        corr_heatmap$dmso_eff[corr_heatmap$drug_conc == i])
+  corr_heatmap$cor_h3k27me3[corr_heatmap$drug_conc == i] <- 
+    cor(corr_heatmap$MMEJ_ratio_norm[corr_heatmap$drug_conc == i],
+        corr_heatmap$HDAC2.zscore[corr_heatmap$drug_conc == i])
 }
 
-for (i in unique(corr_dmso$drug_conc)) {
-  corr_dmso$corr_h3k27me3[corr_dmso$drug_conc == i] <- cor(corr_dmso$H3K27me3.zscore[corr_dmso$drug_conc == i],
-                                                  corr_dmso$MMEJ_ratio_norm[corr_dmso$drug_conc == i])
-}
+pc1 <- corr_heatmap %>%
+  filter(conc_char == "100 nM") %>%
+  distinct(drug, cor_h3k27me3, cor_dmso) %>%
+  mutate(drug = gsub(" [(].*[)]", "", drug))
 
-for (i in unique(corr_dmso$drug_conc)) {
-  corr_dmso$corr_repli[corr_dmso$drug_conc == i] <- cor(corr_dmso$late_replicating.zscore[corr_dmso$drug_conc == i],
-                                                  corr_dmso$MMEJ_ratio_norm[corr_dmso$drug_conc == i])
-}
+col_order <- data.frame("drug" = p1$tree_col[["labels"]],
+                        "order" = p1$tree_col[["order"]])
 
-pheatmap(corr_dmso2 %>%
-           #filter(target == "HDAC") %>%
-           distinct(drug_conc, corr, corr_repli, viab_mean) %>%
-           mutate(viab_mean = log2(viab_mean + 0.3)) %>%
-           column_to_rownames("drug_conc") %>%
+col_order2 <- col_order %>%
+  rownames_to_column("new_order") %>%
+  arrange(factor(new_order, levels = order)) %>%
+  distinct(drug) 
+
+pc1 <- left_join(col_order2, pc1)
+
+breaks <- seq(-1,1,0.02)
+
+pheatmap(pc1%>%
+           column_to_rownames("drug") %>%
            t(),
          border_color = F,
          cellwidth = 8,
          cellheight = 8,
-         annotation_col = target1,
-         annotation_colors = annotation_colors_scr)
+         cluster_rows = F,
+         cluster_cols = F,
+         breaks = breaks,
+         color = colorRampPalette(c("black", "white", "#184e77"))(palette_length))
 
-target1 <- target %>%
-  rownames_to_column("drug")
-target2 <- expand.grid("conc_char" = unique(corr_dmso$conc_char), "drug" =target1$drug)
-target1 <- merge(target1, target2) %>%
-  mutate(drug_conc = paste(drug, conc_char, sep = "_")) %>%
-  distinct(drug_conc, target) %>%
-  column_to_rownames("drug_conc")
+pc2 <- corr_heatmap %>%
+  filter(conc_char == "1 µM") %>%
+  distinct(drug, cor_h3k27me3) %>%
+  mutate(drug = gsub(" [(].*[)]", "", drug))
 
-pheatmap(corr_dmso %>%
-#           filter(target == "HDAC") %>%
-           distinct(drug_conc, corr, corr_h3k27me3) %>%
-           mutate(corr = abs(corr),
-                  corr_h3k27me3 = abs(corr_h3k27me3)) %>%
-           column_to_rownames("drug_conc") %>%
+col_order <- data.frame("drug" = p2$tree_col[["labels"]],
+                        "order" = p2$tree_col[["order"]])
+
+col_order2 <- col_order %>%
+  rownames_to_column("new_order") %>%
+  arrange(factor(new_order, levels = order)) %>%
+  distinct(drug) 
+
+pc2 <- left_join(col_order2, pc2)
+
+pheatmap(pc2 %>%
+           column_to_rownames("drug") %>%
            t(),
          border_color = F,
          cellwidth = 8,
          cellheight = 8,
-         annotation_col = target1,
-annotation_colors = annotation_colors_scr)
-  
+         cluster_rows = F,
+         cluster_cols = F,
+         breaks = breaks,
+         color = colorRampPalette(c("black", "white", "#184e77"))(palette_length))
+
+pc3 <- corr_heatmap %>%
+  filter(conc_char == "10 µM") %>%
+  distinct(drug, cor_h3k27me3) %>%
+  mutate(drug = gsub(" [(].*[)]", "", drug))
 
 
+col_order <- data.frame("drug" = p3$tree_col[["labels"]],
+                        "order" = p3$tree_col[["order"]])
 
-ggplot(corr_dmso %>%
-         filter(target == "HDAC"),
-       aes(x = corr, y = corr_h3k27me3)) +
-  geom_point()
+col_order2 <- col_order %>%
+  rownames_to_column("new_order") %>%
+  arrange(factor(new_order, levels = order)) %>%
+  distinct(drug) 
 
-
-ggplot(corr_dmso %>% filter(drug_conc == "Trichostatin A (TSA)_100 nM"),
-              aes(x = MMEJ_ratio_norm, y = H3K27me3.zscore)) +
-  geom_point() +
-  geom_abline(lty = "twodash") +
-  geom_smooth(method = "lm", color = "red", lty = "dashed") +
-  stat_cor(method = "pearson")
+pc3 <- left_join(col_order2, pc3)
 
 
-
-ggplot(corr_dmso,
-              aes(x = dmso_eff, y = MMEJ_ratio_norm, color = target)) +
-  geom_point() +
-  facet_wrap(~drug_conc) +
-  geom_abline(lty = "twodash") +
-  geom_smooth(method = "lm", color = "red", lty = "dashed") +
-  stat_cor(method = "pearson") +
-  scale_color_brewer(palette = "Set3")
-
-ggplot(corr_dmso %>% filter(drug_conc == "Fluoro-SAHA_1 µM"),
-              aes(x = dmso_eff, y = MMEJ_ratio_norm)) +
-  geom_point() +
-  geom_abline(lty = "twodash") +
-  geom_smooth(method = "lm", color = "red", lty = "dashed") +
-  stat_cor(method = "pearson")
-
-ggplot(corr_dmso,
-       aes(x = corr, y = viab_mean)) +
-  geom_point()
-
-ggplot(corr_dmso %>%
-         distinct(target, drug, corr),
-              aes(x = target, y = corr)) +
-  geom_quasirandom() +
-  theme_classic_lines_90()
+pheatmap(pc3 %>%
+           column_to_rownames("drug") %>%
+           t(),
+         border_color = F,
+         cellwidth = 8,
+         cellheight = 8,
+         cluster_rows = F,
+         cluster_cols = F,
+         breaks = breaks,
+         color = colorRampPalette(c("black", "white", "#184e77"))(palette_length))
 ```
 
+*Figure 3C: Heatmap of MMEJ z-score per IPR for 15 most potent compounds per concentration.*
+
+**Conclusion: At all three concentrations, the 15 most potent drugs reduce the MMEJ score. IPR10 is very sensitive to MMEJ score reduction, especially by HDACs.**
+
+
+## Plot HDAC inhibitor effects on different chromatin types
+```{r}
+chromatin_ipr <- chromatin %>%
+  rownames_to_column("IPR")
+
+chromatin_effect <- merge(eff.data.heatmap, chromatin_ipr) %>%
+  #filter(target == "HDAC") %>%
+  mutate(MMEJ_ratio_norm = ave(MMEJ_ratio_norm, drug, chromatin, conc_char, FUN = mean)) %>%
+  distinct(MMEJ_ratio_norm, drug, chromatin, conc_char, target)
+
+sigFunc = function(x){
+  if(x < 0.001){"***"} 
+  else if(x < 0.01){"**"}
+  else if(x < 0.05){"*"}
+  else{NA}}
+
+ggplot(chromatin_effect,
+              aes(x = chromatin, y = MMEJ_ratio_norm, fill = chromatin)) +
+  geom_boxplot(outlier.shape = NA) +
+  geom_quasirandom() +
+  geom_signif(comparisons = combn(sort(unique(chromatin_effect$chromatin)), 2, simplify = F), 
+              map_signif_level=sigFunc, 
+              step_increase = 0.1) +
+  theme_classic_lines_45() +
+  scale_fill_manual(values = chrom_colors) +
+  theme(legend.position = "none") +
+  facet_wrap(~target)
+```
 
 
 
