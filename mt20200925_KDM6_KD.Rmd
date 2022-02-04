@@ -94,6 +94,46 @@ RemoveLowReads <- function(reads) {
   } 
 }
 
+corColor <- function(data, mapping, color = I("black"), sizeRange = c(1, 3), ...) {
+
+  x   <- eval_data_col(data, mapping$x)
+  y   <- eval_data_col(data, mapping$y)
+  r   <- cor(x, y)
+  rt  <- format(r, digits = 3)
+  tt  <- as.character(rt)
+  cex <- max(sizeRange)
+
+  # helper function to calculate a useable size
+  percent_of_range <- function(percent, range) {
+    percent * diff(range) + min(range, na.rm = TRUE)
+  }
+
+  # plot correlation coefficient
+  p <- ggally_text(label = tt, mapping = aes(), xP = 0.5, yP = 0.5,
+                   size = I(percent_of_range(cex * abs(r), sizeRange)), color = color, ...) +
+    theme(panel.grid.minor=element_blank(),
+          panel.grid.major=element_blank())
+
+  corColors <- RColorBrewer::brewer.pal(n = 7, name = "RdYlBu")[2:6]
+
+  if (r <= boundaries[1]) {
+    corCol <- corColors[1]
+  } else if (r <= boundaries[2]) {
+    corCol <- corColors[2]
+  } else if (r < boundaries[3]) {
+    corCol <- corColors[3]
+  } else if (r < boundaries[4]) {
+    corCol <- corColors[4]
+  } else {
+    corCol <- corColors[5]
+  }
+
+  p <- p +
+    theme(panel.background = element_rect(fill = corCol))
+
+  return(p)
+}
+
 Read_Counts <- function(x) {
   #This function sums all the reads per barcode
   tmp <- x %>% group_by(barcode) %>% summarise(sum = sum(count))
@@ -339,8 +379,8 @@ indels.df <- indels.df %>%
 
 # Let's plot the distribution of the amount of reads per drug
 indels.df <- mutate_all(indels.df, funs(replace(., is.na(.), 0)))
-indels.df$read.count <- rowSums(indels.df[,c(3:96)])
-indels.df$all.indels <- rowSums(indels.df[,c(3:59,61:96)])
+indels.df$read.count <- rowSums(indels.df[,c(4:97)])
+indels.df$all.indels <- rowSums(indels.df[,c(4:60,62:97)])
 ggplot(indels.df, aes(read.count)) + geom_density(fill = "#3D9F83") + theme_bw() + 
   labs(title = "read count distribution of all conditions")
 ggplot(indels.df, aes(read.count)) + geom_density(fill = "#3D9F83") + theme_bw() + 
@@ -351,23 +391,18 @@ ggplot(indels.df, aes(read.count)) + geom_density(fill = "#3D9F83") + theme_bw()
   facet_wrap(~barcode)
 
 # Filter out noisy data
-indels.df$read.count1.7 <- rowSums(indels.df[,c(53,61)])
+indels.df$read.count1.7 <- rowSums(indels.df[,c(54,62)])
 indels.df <- indels.df[indels.df$read.count1.7 > 30,] %>% 
   select(-read.count1.7)
 
 
 # Calculate NHEJ/MMEJ ratios and efficiency
 indels.df <- indels.df %>%
-  mutate(freqMMEJ = X.7 / all.indels,
-         freqNHEJ = X1 / all.indels,
-         NHEJMMEJratio = freqMMEJ / freqNHEJ,
-         MMEJscore = freqMMEJ / (freqMMEJ + freqNHEJ),
-         NHEJscore = freqNHEJ / (freqNHEJ + freqMMEJ),
+  mutate(MMEJratio = X.7 / all.indels,
          freqCut = 1 - (X0 / (X0 + all.indels)))
 indels_df <- indels.df
 indels.df <- indels.df %>%
-  select(.id, barcode, siRNA, rep, freqMMEJ, freqNHEJ,
-         NHEJMMEJratio, MMEJscore, NHEJscore, freqCut) %>%
+  select(.id, barcode, siRNA, rep, MMEJratio, freqCut) %>%
   setnames(".id", "id")
 
 
@@ -376,6 +411,24 @@ indels.df <- indels.df[indels.df$barcode != "ACCCCTAAAGGCGCTG",]
 
 # Exclude NA rows
 indels.df <- indels.df[rowSums(is.na(indels.df)) != ncol(indels.df), ]
+
+# Compute mean per condition and normalize against scrambled control
+scr_ctrl <- indels.df %>%
+  filter(siRNA == "Scr") %>%
+  mutate(MMEJratio_mean_Scr = ave(MMEJratio, barcode, FUN = mean)) %>%
+  mutate(freqCut_mean_Scr = ave(freqCut, barcode, FUN = mean)) %>%
+  mutate(MMEJratio_Scr = ave(MMEJratio, barcode, rep, FUN = mean)) %>%
+  mutate(freqCut_Scr = ave(freqCut, barcode, rep, FUN = mean)) %>%
+  distinct(MMEJratio_Scr, freqCut_Scr, MMEJratio_mean_Scr, freqCut_mean_Scr, barcode, rep)
+
+indels.df <- merge(indels.df, scr_ctrl) %>%
+  mutate(freqCut_mean = ave(freqCut, siRNA, barcode, FUN = mean),
+         MMEJratio_mean = ave(MMEJratio, siRNA, barcode, FUN = mean)) %>%
+  mutate(freqCut_norm = log2(freqCut / freqCut_Scr),
+         MMEJratio_norm = log2(MMEJratio / MMEJratio_Scr)) %>%
+  mutate(freqCut_mean_norm = log2(freqCut_mean / freqCut_mean_Scr),
+         MMEJratio_mean_norm = log2(MMEJratio_mean / MMEJratio_mean_Scr)) %>%
+  dplyr::select(-freqCut_Scr, -MMEJratio_Scr, -freqCut_mean_Scr, -MMEJratio_mean_Scr)
 ```
 
 
@@ -383,24 +436,97 @@ indels.df <- indels.df[rowSums(is.na(indels.df)) != ncol(indels.df), ]
 
 # Make first plots
 ```{r, out.width= "100%", fig.align= "center", echo=FALSE, warning= FALSE}
+# Import GSK J4 data from drug screen
+gsk.data <- readRDS("/DATA/projects/DSBrepair/data/R/rs20220201_episcreen/rs20220201_episcreen_ratios.RDS") %>%
+  filter(drug == "GSK J4 HCl") %>%
+  distinct(MMEJ_ratio_norm, IPR) %>%
+  mutate(MMEJ_ratio_norm = log2(ave(MMEJ_ratio_norm, IPR, FUN = mean))) %>%
+  distinct() %>%
+  setnames("MMEJ_ratio_norm", "gsk_mmej_ratio_norm")
+
+# Add IPR
+indels.df.heatmap <- readRDS("/DATA/projects/DSBrepair/data/R/rs20200519_clone5_newdoms_chromatin.RDS") %>%
+  filter(IPR != "IPR1") %>%
+  distinct(barcode, IPR) %>%
+  left_join(indels.df)
+
+compare_hdm <- indels.df.heatmap %>%
+  filter(str_detect(siRNA, "KDM")) %>%
+  distinct(MMEJratio_norm, id, IPR)
+
+compare_hdm <- merge(compare_hdm, gsk.data)
+
+ggplot(compare_hdm, 
+       aes(x = gsk_mmej_ratio_norm, y = MMEJratio_norm)) +
+  geom_quasirandom() +
+  facet_wrap(~id) +
+  theme_classic_lines_90()
+
+# Replicate correlation
+compare_hdm <- compare_hdm %>%
+  spread(id, MMEJratio_norm) %>%
+  dplyr::select(-gsk_mmej_ratio_norm)
+
+boundaries <- c(0.7,0.75,0.8,0.85)
+ggpairs(compare_hdm %>% dplyr::select(contains("KDM6B")),
+               upper = list(continuous = corColor),
+               lower = list(continuous = function(data, mapping, ...) {
+                   ggally_points(data = data, mapping = mapping, alpha = 0.6, size = 0.5) +
+                   scale_y_continuous(breaks = c(-2, -1, 0), limits = c(-1.9, 0.5)) +
+                   scale_x_continuous(breaks = c(-2, -1, 0), limits = c(-1.9, 0.5)) +
+                   geom_abline(slope = 1, lty = "twodash", col = "grey") +
+                   geom_smooth(method = "lm", color = "red", lty = "dashed", size = 0.5)}),
+               diag = list(continuous = function(data, mapping, ...) {
+                   ggally_densityDiag(data = data, mapping = mapping, alpha = 0.3, fill = "red")})) +
+  xlab("MMEJ ratio change (log2)") +
+  ylab("MMEJ ratio change (log2)")
+
+
+
+# Add chromatin type
+indels.df.heatmap <- readRDS(
+  "/DATA/usr/x.vergara/XV_ChIPIndels/XV20200902_DDR_RS_revision/XV20200902_DDR_RS_revision/data/xv20200915_DDR_data_CHIP.rds") %>% 
+  distinct(barcode, chromatin) %>%
+  left_join(indels.df.heatmap) %>%
+  na.omit() %>% 
+  select(-barcode)
+
+# Add barcode annotation
+barcode_ann <- indels.df.heatmap %>%
+  distinct(IPR, chromatin) %>%
+  column_to_rownames("IPR")
+
+# Add chromatin colors
+# Change colors of annotations
+chrom_colors = c("Euchromatin" = "#EAEEE8",
+                  "other-heterochromatin" = "#a5a58d",  
+                     "H3K27me3" = "#CAD6C2", 
+                  "Triple Heterochromatin" = "#6b705c")
+
+# colors <- brewer.pal(length(unique(barcode.annotation$cluster)), "Pastel2")
+# names(colors) <- unique(barcode.annotation$cluster)
+
+annotation_colors_scr = list(
+  chromatin = chrom_colors)
+
+
 ## Generate MMEJscore heatmaps of id vs. barcode
-indels.df.heatmap <- indels.df %>%
-  dcast(id ~ barcode, value.var = "MMEJscore") %>%
-  column_to_rownames("id")
-# Add annotation
-barcode_ann <- read.csv2("files_scripts/mt20200925_barcode_annotation.csv")
-barcode_ann <- barcode_ann[barcode_ann$X %in% colnames(indels.df.heatmap),]
-barcode_ann <- barcode_ann %>% 
-  remove_rownames() %>%
-  column_to_rownames("X")
+indels.df.heatmap <- indels.df.heatmap %>%
+  distinct(siRNA, IPR, MMEJratio_norm) %>%
+  spread(siRNA, MMEJratio_norm) %>%
+  column_to_rownames("IPR")
 
-myBreaks1 <- seq(0,0.3,0.003)
+myBreaks1 <- seq(-3,3,0.06)
 
-pheatmap(as.matrix(indels.df.heatmap),
-         color = colorRampPalette(brewer.pal(n = 7, name = "Greys"))(100),
-         breaks = myBreaks1, border_color = "black", 
-         cellwidth = 12, cellheight = 10, annotation_col = barcode_ann,
-         angle_col = 90, main = "MMEJscore of all samples per barcode")
+pheatmap(indels.df.heatmap,
+         color = colorRampPalette(c("red", "white", "blue"))(100),
+         breaks = myBreaks1, 
+         border_color = F, 
+         cellwidth = 8, 
+         cellheight = 8, 
+         annotation_row = barcode_ann,
+         annotation_colors = annotation_colors_scr, 
+         main = "MMEJscore of all samples per barcode")
 
 
 ## Generate freqCut heatmaps of id vs. barcode
