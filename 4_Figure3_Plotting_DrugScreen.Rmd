@@ -381,6 +381,39 @@ ggplot(indel.data %>%
   facet_wrap(~conc_char, scales = "free") +
   annotate("rect",xmin=log2(1.05),xmax=log2(0.95),ymin=-Inf,ymax=Inf, alpha=0.1, fill="black") +
   annotate("rect",xmin=-Inf,xmax=Inf,ymin=-Inf,ymax=-log10(0.05), alpha=0.1, fill="black")
+
+# Plot raw MMEJ ratio
+dmso_freq <- indel.data %>%
+  filter(drug == "DMSO") %>%
+  dplyr::select('dmso_freq' = MMEJratio, IPR) %>%
+  mutate(max_dmso_freq = ave(dmso_freq, IPR, FUN = mean),
+         dmso_freq = mean(dmso_freq)) %>%
+  mutate(max_dmso_freq = max(max_dmso_freq)) %>%
+  #mutate(max_dmso_freq = max_dmso_freq - dmso_freq) %>%
+  distinct(dmso_freq, max_dmso_freq)
+
+
+ggplot(indel.data %>%
+                filter(sample == "drug") %>%
+                distinct(MMEJratio, drug, conc_char, MMEJ_zscore_global_comb) %>%
+                mutate(MMEJratio = ave(MMEJratio, drug, conc_char, FUN = mean)) %>%
+                distinct() %>%
+                mutate(MMEJ_pval_global_comb = 2*pnorm(q = abs(MMEJ_zscore_global_comb), lower.tail = F)) %>%
+                mutate(MMEJ_pval_adj_global_comb = p.adjust(MMEJ_pval_global_comb, method = 'fdr')),
+              aes(y = -log10(MMEJ_pval_adj_global_comb), x = MMEJratio, 
+                  color = ifelse(MMEJ_pval_adj_global_comb < 0.05 & MMEJratio > (dmso_freq$dmso_freq + 0.02), "green", 
+                               ifelse(MMEJ_pval_adj_global_comb < 0.05 & MMEJratio < (dmso_freq$dmso_freq - 0.02), "yellow","blue")))) +
+  geom_point() +
+  geom_hline(linetype = "dashed", yintercept = -log10(0.05)) +
+  geom_vline(linetype = "dashed", xintercept = (dmso_freq$dmso_freq + 0.02)) +
+  geom_vline(linetype = "dashed", xintercept = (dmso_freq$dmso_freq - 0.02)) +
+  ggtitle("first z-score per tech. rep., then mean of z-scores") +
+  scale_color_manual(values = c("#C2C2C2", "#3d405b", "#e07a5f")) +
+  facet_wrap(~conc_char) +
+  annotate("rect",xmin=(dmso_freq$dmso_freq - 0.02),xmax=(dmso_freq$dmso_freq + 0.02),ymin=-Inf,ymax=Inf, alpha=0.1, fill="black") +
+  annotate("rect",xmin=-Inf,xmax=Inf,ymin=-Inf,ymax=-log10(0.05), alpha=0.1, fill="black") +
+  scale_x_continuous(labels = scales::percent) +
+  coord_flip()
 ```
 
 *Figure 3A: Compound-induced change in MMEJ ratio of all tested compounds. Mean MMEJ z-score per drug & concentration.* 
@@ -395,15 +428,15 @@ Are there any target groups that are prone to changes in MMEJ ratio?
 # C: Bar plot
 eff.data <- indel.data %>%
   filter(sample == "drug") %>%
-  distinct(MMEJ_zscore_global_comb, drug, target, conc_char, MMEJ_ratio_norm) %>%
-  mutate(MMEJ_ratio_norm = ave(MMEJ_ratio_norm, drug, conc_char, FUN = mean)) %>%
+  distinct(MMEJ_zscore_global_comb, drug, target, conc_char, MMEJratio) %>%
+  mutate(MMEJratio = ave(MMEJratio, drug, conc_char, FUN = mean)) %>%
   distinct() %>%
   mutate(MMEJ_pval_global_comb = 2*pnorm(q = abs(MMEJ_zscore_global_comb), lower.tail = F)) %>%
   mutate(MMEJ_pval_adj_global_comb = p.adjust(MMEJ_pval_global_comb, method = 'fdr'))
 
 eff.data$sign <- "2_No"
-eff.data$sign[eff.data$MMEJ_ratio_norm > 1.05 & eff.data$MMEJ_pval_adj_global_comb < 0.05] <- "1_Up"
-eff.data$sign[eff.data$MMEJ_ratio_norm < 0.95 & eff.data$MMEJ_pval_adj_global_comb < 0.05] <- "0_Down"
+eff.data$sign[eff.data$MMEJratio > (dmso_freq$dmso_freq + 0.02) & eff.data$MMEJ_pval_adj_global_comb < 0.05] <- "1_Up"
+eff.data$sign[eff.data$MMEJratio < (dmso_freq$dmso_freq - 0.02) & eff.data$MMEJ_pval_adj_global_comb < 0.05] <- "0_Down"
 
 eff.data <- eff.data %>%
   mutate(number = ave(target, target, sign, conc_char, FUN = length)) %>%
@@ -414,11 +447,12 @@ eff.data <- eff.data %>%
   pivot_longer(`0_Down`:`2_No`, names_to = "sign", values_to = "number")
 
 
-ggplot_custom(eff.data,
+ggplot(eff.data,
               aes(y = reorder(target, -number), x = number, fill = sign)) +
   geom_bar(stat = "identity") +
   facet_wrap(~conc_char)+
-  scale_fill_manual(values = c("#e07a5f", "#3d405b", "#C2C2C2"))
+  scale_fill_manual(values = c("#e07a5f", "#3d405b", "#C2C2C2")) +
+  theme_pubr(border = T)
 ```
 
 *Figure 2B: Number of compounds with significant changes in MMEJ ratio per target group.*
@@ -442,7 +476,7 @@ chromatin <- readRDS(
   distinct(barcode, chromatin) %>%
   left_join(distinct(indel.data, barcode, IPR)) %>%
   filter(IPR != "<NA>") %>% 
-  select(-barcode) %>%
+  dplyr::select(-barcode) %>%
   column_to_rownames(var="IPR")
 
 # Change colors of annotations
@@ -497,8 +531,8 @@ eff.data.heatmap2 <- eff.data.heatmap %>%
 
 # Order IPRs by their H3K27me3 values
 h3k27_score <- indel.data %>%
-  distinct(IPR, H3K27me3.zscore) %>%
-  arrange(desc(H3K27me3.zscore))
+  distinct(IPR, HDAC3.zscore) %>%
+  arrange(desc(HDAC3.zscore))
 
 iprs <- h3k27_score$IPR
 iprs <- as.character(iprs)

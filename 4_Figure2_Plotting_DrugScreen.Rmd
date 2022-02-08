@@ -340,6 +340,12 @@ theme_set(theme_classic_lines())
 colors_diverse <- c("#264653", "#9AC1AE", "#5D987B", "#f2cc8f", "#e76f51")
 colors_drugs <- c("#FA8D62", "#65BFA4", "#8CA0C4", "#808184", "#F6D289", "#E5E5E5", "#ACACAC", "#737373")
 #colors_diverse <- c("#264653", "#2a9d8f", "#e9c46a", "#f4a261", "#e76f51") 
+colors_targets <-  c(HDAC="#60988D", HAT="#C6D0A8", Sirtuin="#8FCAAC",
+             HMT="#FDCDAC", DNMT="#D69C81", `Histone Demethylase`="#FFF2AE",
+             HIF="#E3DCD5", JAK="#C8D7E2", PIM="#9AB8C4", `Aurora Kinase`="#F4CAE4",
+             PARP="#CB546F", `Epigenetic Reader Domain`= "#476D61", `DNA-PK`="#E07A43"
+             )
+
 
 ggplot_custom <- function(...) ggplot2::ggplot(...) + 
   scale_color_manual(values = colors_diverse) + 
@@ -360,26 +366,87 @@ indel.data <- readRDS("/DATA/projects/DSBrepair/data/R/rs20220201_episcreen/rs20
 ## A: Cutting efficiency change per drug
 Are there any drugs (per concentration) that significantly change the cutting efficiency significantly across all IPRs?
 ```{r warning = FALSE}
-# A: Cutting efficiency per drug - beeswarm plot
-ggplot(indel.data %>%
+# A: Global cutting efficiency change induced by all drugs 
+## Plot mean DMSO cutting efficiency in middle, and difference from that to the left and right in percent
+indel.data.freq <- indel.data %>%
+  filter(sample == "drug" | drug == "DMSO") %>%
+  distinct(freqCut_norm_global_mean, drug, conc_char, mean_eff_zscore_global_comb, freqCut, sample, IPR, target)
+
+dmso_freq <- indel.data.freq %>%
+  filter(drug == "DMSO") %>%
+  dplyr::select('dmso_freq' = freqCut, IPR) %>%
+  mutate(max_dmso_freq = ave(dmso_freq, IPR, FUN = mean),
+         dmso_freq = mean(dmso_freq)) %>%
+  mutate(max_dmso_freq = max(max_dmso_freq)) %>%
+  #mutate(max_dmso_freq = max_dmso_freq - dmso_freq) %>%
+  distinct(dmso_freq, max_dmso_freq)
+
+indel.data.freq <- merge(indel.data.freq, dmso_freq) %>%
+  mutate(freqCut_dif = freqCut - dmso_freq) %>%
+  mutate(freqCut_dif = ave(freqCut_dif, drug, conc_char, FUN = mean)) %>%
+  mutate(freqCut = ave(freqCut, drug, conc_char, FUN = mean))
+
+  
+ggplot(indel.data.freq %>%
                 filter(sample == "drug") %>%
-                distinct(freqCut_norm_global_mean, drug, conc_char, mean_eff_zscore_global_comb) %>%
-                mutate(freqCut_norm_global_mean = ave(freqCut_norm_global_mean, drug, conc_char, FUN = mean)) %>%
-                distinct() %>%
+                distinct(freqCut, drug, conc_char, mean_eff_zscore_global_comb) %>%
                 mutate(mean_eff_pval_global_comb = 2*pnorm(q = abs(mean_eff_zscore_global_comb), lower.tail = F)) %>%
                 mutate(mean_eff_pval_adj_global_comb = p.adjust(mean_eff_pval_global_comb, method = 'fdr')),
-              aes(y = -log10(mean_eff_pval_adj_global_comb), x = log2(freqCut_norm_global_mean), 
-                  color = ifelse(mean_eff_pval_adj_global_comb < 0.05 & freqCut_norm_global_mean > 1.025, "green", 
-                               ifelse(mean_eff_pval_adj_global_comb < 0.05 & freqCut_norm_global_mean < 0.975, "yellow","blue")))) +
+              aes(y = -log10(mean_eff_pval_adj_global_comb), x = freqCut, 
+                  color = ifelse(mean_eff_pval_adj_global_comb < 0.05 & freqCut > (dmso_freq$dmso_freq + 0.02), "green", 
+                               ifelse(mean_eff_pval_adj_global_comb < 0.05 & freqCut < (dmso_freq$dmso_freq - 0.02), "yellow","blue")))) +
   geom_point() +
   geom_hline(linetype = "dashed", yintercept = -log10(0.05)) +
-  geom_vline(linetype = "dashed", xintercept = log2(1.025)) +
-  geom_vline(linetype = "dashed", xintercept = log2(0.975)) +
+  geom_vline(linetype = "dashed", xintercept = (dmso_freq$dmso_freq + 0.02)) +
+  geom_vline(linetype = "dashed", xintercept = (dmso_freq$dmso_freq - 0.02)) +
+  geom_vline(linetype = "twodash", xintercept = unique(indel.data.freq$max_dmso_freq))+
   ggtitle("first z-score per tech. rep., then mean of z-scores") +
   scale_color_manual(values = c("#C2C2C2", "#3d405b", "#e07a5f")) +
   facet_wrap(~conc_char) +
-  annotate("rect",xmin=log2(1.025),xmax=log2(0.975),ymin=-Inf,ymax=Inf, alpha=0.1, fill="black") +
-  annotate("rect",xmin=-Inf,xmax=Inf,ymin=-Inf,ymax=-log10(0.05), alpha=0.1, fill="black")
+  annotate("rect",xmin=(dmso_freq$dmso_freq - 0.02),xmax=(dmso_freq$dmso_freq + 0.02),ymin=-Inf,ymax=Inf, alpha=0.1, fill="black") +
+  annotate("rect",xmin=unique(indel.data.freq$max_dmso_freq),xmax=Inf,ymin=-Inf,ymax=Inf, alpha=0.25, fill="black") +
+  annotate("rect",xmin=-Inf,xmax=Inf,ymin=-Inf,ymax=-log10(0.05), alpha=0.1, fill="black") +
+  scale_x_continuous(labels = scales::percent) +
+  coord_flip()
+
+# Alternative: label drugs and color targets
+indel.data.freq2  <- indel.data.freq %>%
+    filter(sample == "drug") %>%
+    distinct(freqCut, freqCut_dif, drug, conc_char, mean_eff_zscore_global_comb, target) %>%
+    mutate(mean_eff_pval_global_comb = 2*pnorm(q = abs(mean_eff_zscore_global_comb), lower.tail = F)) %>%
+    mutate(mean_eff_pval_adj_global_comb = p.adjust(mean_eff_pval_global_comb, method = 'fdr'))
+
+labels <- indel.data.freq2 %>%
+  mutate(freqCut_dif = abs(freqCut_dif)) %>%
+    group_by(conc_char) %>%
+    top_n(3, freqCut_dif) %>%
+    ungroup() %>%
+    mutate(flag = "TRUE") %>%
+  distinct(drug, conc_char, flag)
+
+indel.data.freq2 <- merge(indel.data.freq2, labels, all = T)
+indel.data.freq2$flag[is.na(indel.data.freq2$flag)] <- "FALSE"
+indel.data.freq2$drug <- gsub(" [(].*[)]", "", indel.data.freq2$drug) #shorten name of drug
+
+
+ggplot(indel.data.freq2,
+              aes(y = -log10(mean_eff_pval_adj_global_comb), x = freqCut, 
+                  color = target)) +
+  geom_point(aes(alpha = ifelse(abs(freqCut_dif)>0.02, 1, 0.1)), size = 2) +
+  #geom_label_repel(data = indel.data.freq2 %>% filter(flag == "TRUE") %>% unique(), 
+                   #aes(label = drug)) +
+  geom_hline(linetype = "dashed", yintercept = -log10(0.05)) +
+  geom_vline(linetype = "dashed", xintercept = (dmso_freq$dmso_freq + 0.02)) +
+  geom_vline(linetype = "dashed", xintercept = (dmso_freq$dmso_freq - 0.02)) +
+  geom_vline(linetype = "twodash", xintercept = unique(indel.data.freq$max_dmso_freq))+
+  ggtitle("first z-score per tech. rep., then mean of z-scores") +
+  scale_color_manual(values = colors_targets) +
+  facet_wrap(~conc_char) +
+  annotate("rect",xmin=(dmso_freq$dmso_freq + 0.02),xmax=unique(indel.data.freq$max_dmso_freq),ymin=-log10(0.05),ymax=Inf, alpha=0.1, fill="#e07a5f") +
+  annotate("rect",xmin=unique(indel.data.freq$max_dmso_freq),xmax=Inf,ymin=-Inf,ymax=Inf, alpha=0.25, fill="black") +
+  annotate("rect",xmin=-Inf,xmax=(dmso_freq$dmso_freq - 0.02),ymin=-log10(0.05),ymax=Inf, alpha=0.1, fill="#3d405b") +
+  scale_x_continuous(labels = scales::percent) +
+  coord_flip()
 ```
 
 *Figure 2A: Compound-induced change in cutting efficiency of all tested compounds. Mean per drug & concentration vs. p-value from t-test.*
@@ -393,31 +460,32 @@ ggplot(indel.data %>%
 Are there any target groups that are prone to changes in cutting efficiency?
 ```{r warning = FALSE}
 # C: Bar plot
-eff.data <- indel.data %>%
-  filter(sample == "drug") %>%
-  distinct(mean_eff_zscore_global_comb, drug, target, conc_char, freqCut_norm_global_mean) %>%
-  mutate(freqCut_norm_global_mean = ave(freqCut_norm_global_mean, drug, conc_char, FUN = mean)) %>%
-  distinct() %>%
-  mutate(mean_eff_pval_global_comb = 2*pnorm(q = abs(mean_eff_zscore_global_comb), lower.tail = F)) %>%
-  mutate(mean_eff_pval_adj_global_comb = p.adjust(mean_eff_pval_global_comb, method = 'fdr'))
+eff.data <- indel.data.freq %>%
+    filter(sample == "drug") %>%
+    distinct(mean_eff_zscore_global_comb, drug, target, conc_char, freqCut_dif) %>%
+    mutate(freqCut_dif = ave(freqCut_dif, drug, conc_char, FUN = mean)) %>%
+    distinct() %>%
+    mutate(mean_eff_pval_global_comb = 2*pnorm(q = abs(mean_eff_zscore_global_comb), lower.tail = F)) %>%
+    mutate(mean_eff_pval_adj_global_comb = p.adjust(mean_eff_pval_global_comb, method = 'fdr'))
 
 eff.data$sign <- "2_No"
-eff.data$sign[eff.data$freqCut_norm_global_mean > 1.025 & eff.data$mean_eff_pval_adj_global_comb < 0.05] <- "1_Up"
-eff.data$sign[eff.data$freqCut_norm_global_mean < 0.975 & eff.data$mean_eff_pval_adj_global_comb < 0.05] <- "0_Down"
+eff.data$sign[eff.data$freqCut_dif > 0.02 & eff.data$mean_eff_pval_adj_global_comb < 0.05] <- "1_Up"
+eff.data$sign[eff.data$freqCut_dif < -0.02 & eff.data$mean_eff_pval_adj_global_comb < 0.05] <- "0_Down"
 
 eff.data <- eff.data %>%
-  mutate(number = ave(target, target, sign, conc_char, FUN = length)) %>%
-  mutate(number = as.numeric(number)) %>%
-  distinct(conc_char, target, sign, number) %>%
-  spread(sign, number, fill = 0) %>%
-  mutate(fraction = (`1_Up` + `0_Down`) / (`2_No` + (`1_Up` + `0_Down`))) %>%
-  pivot_longer(`0_Down`:`2_No`, names_to = "sign", values_to = "number")
+    mutate(number = ave(target, target, sign, conc_char, FUN = length)) %>%
+    mutate(number = as.numeric(number)) %>%
+    distinct(conc_char, target, sign, number) %>%
+    spread(sign, number, fill = 0) %>%
+    mutate(fraction = (`1_Up` + `0_Down`) / (`2_No` + (`1_Up` + `0_Down`))) %>%
+    pivot_longer(`0_Down`:`2_No`, names_to = "sign", values_to = "number")
 
 ggplot(eff.data,
-              aes(y = reorder(target, -number), x = number, fill = sign)) +
-  geom_bar(stat = "identity") +
-  facet_wrap(~conc_char)+
-  scale_fill_manual(values = c("#e07a5f", "#3d405b", "#C2C2C2"))
+       aes(y = reorder(target, -number), x = number, fill = sign)) +
+    geom_bar(stat = "identity") +
+    facet_wrap(~conc_char)+
+    scale_fill_manual(values = c("#e07a5f", "#3d405b", "#C2C2C2")) +
+    theme_pubr(border = T)
 ```
 
 *Figure 2B: Number of compounds with significant changes in cutting efficiency per target group.*
@@ -443,7 +511,7 @@ chromatin <- readRDS(
 # chromatin$IPR[is.na(chromatin$IPR)] <- "IPR1"
 chromatin <- chromatin %>%
   filter(IPR != "<NA>") %>% 
-  select(-barcode) %>%
+  dplyr::select(-barcode) %>%
   column_to_rownames(var="IPR")
 
 # Change colors of annotations
@@ -480,10 +548,7 @@ dmso_freq <- indel.data %>%
   mutate(freqCut = ave(freqCut, IPR, FUN = mean)) %>%
   dplyr::select('dmso_eff' = freqCut, IPR) %>%
   distinct() %>%
-  mutate(mean_freq_dmso = mean(dmso_eff),
-         dif_freq_dmso = log2(dmso_eff/mean_freq_dmso)) %>%
-  distinct(dif_freq_dmso, IPR) %>%
-  arrange(desc(dif_freq_dmso))
+  arrange(desc(dmso_eff))
 
 iprs <- dmso_freq$IPR
 iprs <- as.character(iprs)
@@ -494,9 +559,17 @@ eff.data.heatmap <- indel.data %>%
   #filter(target != "Aurora Kinase") %>%
   filter(sample == "drug") %>%
   #filter(Mod(mean_eff_zscore_comb) >= 2.58) %>%  # we can choose to display all drugs that have significant global hits
-  distinct(conc_char, drug, target, IPR, mean_eff_zscore_comb, freqCut_norm_mean) %>%
-  mutate(freqCut_norm_mean = log2(ave(freqCut_norm_mean, drug, conc_char, IPR, FUN = mean))) %>%
+  distinct(conc_char, drug, target, IPR, mean_eff_zscore_comb, freqCut)
+
+dmso_eff <- indel.data %>%
+  filter(drug == "DMSO") %>%
+  dplyr::select('dmso_freq' = freqCut, IPR) %>%
+  mutate(dmso_freq = ave(dmso_freq, IPR, FUN = mean)) %>%
   distinct()
+
+eff.data.heatmap <- merge(eff.data.heatmap, dmso_eff) %>%
+  mutate(freqCut_dif = freqCut - dmso_freq) %>%
+  mutate(freqCut_dif = ave(freqCut_dif, drug, conc_char, IPR, FUN = mean))
 
 ## Select drugs that have a large effect size in at least one location (some drugs might have a small global effect size, but large local)
 eff.data.heatmap <- eff.data.heatmap %>%
@@ -504,11 +577,11 @@ eff.data.heatmap <- eff.data.heatmap %>%
   mutate(mean_eff_zscore_comb = p.adjust(mean_eff_zscore_comb, method = 'fdr')) %>%
   mutate(min = ave(mean_eff_zscore_comb, drug, conc_char, FUN = min)) %>%
   filter(min < 0.05) %>%
-  distinct(drug, target, conc_char, freqCut_norm_mean, IPR)
+  distinct(drug, target, conc_char, freqCut_dif, IPR)
 
 #eff.data.heatmap2$freqCut_norm_mean[eff.data.heatmap2$mean_eff_zscore_comb > 0.05] <- NA
 eff.data.heatmap2 <- eff.data.heatmap %>%
-  spread(IPR, freqCut_norm_mean)
+  spread(IPR, freqCut_dif)
 
 eff.data.heatmap2 <- eff.data.heatmap2[,c("drug", "target", "conc_char", iprs)]
 eff.data.heatmap2$drug <- gsub(" [(].*[)]", "", eff.data.heatmap2$drug) #shorten name of drug
@@ -592,6 +665,23 @@ p3 <- pheatmap(eff.data.heatmap2[eff.data.heatmap2$conc_char == "10 µM",] %>%
            annotation_legend = T)
 print(p3)
 
+breaks <- seq(0.4,0.9,0.006)
+pheatmap(dmso_freq %>%
+             column_to_rownames(var = "IPR"),
+         cluster_rows = F,
+         cluster_cols = F,
+         cellwidth = 8,
+         cellheight = 8,
+         border_color = NA,
+         breaks = breaks,
+         color = colorRampPalette(c("white", "black"))(palette_length))
+
+```
+
+
+## Are the changes in indel rate correlated with the starting indel rates?
+
+```{r warning = FALSE}
 ## Add correlation with DMSO values to heatmap
 dmso_freq <- indel.data %>%
   filter(drug == "DMSO") %>%
@@ -602,7 +692,7 @@ dmso_freq <- indel.data %>%
 
 corr_dmso <- merge(eff.data.heatmap, dmso_freq) %>%
   mutate(drug_conc = paste(drug, conc_char, sep = "_")) %>%
-  mutate(mean_effect = ave(freqCut_norm_mean, drug, conc_char, FUN = mean)) %>%
+  mutate(mean_effect = ave(freqCut_dif, drug, conc_char, FUN = mean)) %>%
   mutate(sign = sign(mean_effect))
 
 ## Correlation with H3K27me3 (not included in the heatmaps atm, can be added)
@@ -616,15 +706,15 @@ corr_heatmap <- corr_dmso
 for (i in unique(corr_heatmap$drug_conc)) {
   
   corr_heatmap$cor_dmso[corr_heatmap$drug_conc == i] <- 
-    cor(corr_heatmap$freqCut_norm_mean[corr_heatmap$drug_conc == i],
+    cor(corr_heatmap$freqCut_dif[corr_heatmap$drug_conc == i],
         corr_heatmap$dmso_eff[corr_heatmap$drug_conc == i])
   
   corr_heatmap$cor_h3k27me3[corr_heatmap$drug_conc == i] <- 
-    cor(corr_heatmap$freqCut_norm_mean[corr_heatmap$drug_conc == i],
+    cor(corr_heatmap$freqCut_dif[corr_heatmap$drug_conc == i],
         corr_heatmap$H3K27me3.zscore[corr_heatmap$drug_conc == i])
   
   corr_heatmap$cor_repl[corr_heatmap$drug_conc == i] <- 
-    cor(corr_heatmap$freqCut_norm_mean[corr_heatmap$drug_conc == i],
+    cor(corr_heatmap$freqCut_dif[corr_heatmap$drug_conc == i],
         corr_heatmap$late_replicating.zscore[corr_heatmap$drug_conc == i])
 }
 
@@ -710,13 +800,9 @@ pheatmap(pc3 %>%
          breaks = breaks,
          color = colorRampPalette(c("black", "white", "#184e77"))(palette_length))
 
-```
 
 
-## Are the changes in indel rate correlated with the starting indel rates?
-
-```{r warning = FALSE}
- ## Only include compounds at lowest concentration
+## Only include compounds at lowest concentration
 corr_dmso <- corr_dmso %>%
   mutate(compound_n = ave(drug, drug, IPR, FUN = length))
 all_conc <- corr_dmso[corr_dmso$compound_n == "3" & corr_dmso$conc_char %in% c("1 µM", "10 µM"),]
@@ -746,7 +832,7 @@ corr_dmso <- corr_dmso %>%
           slope_h3k27me3 = NA, p.value_h3k27me3 = NA) 
 
 for (i in unique(corr_dmso$drug_conc)) {
-    model.correlation <- lm(formula = freqCut_norm_mean ~ dmso_eff, 
+    model.correlation <- lm(formula = freqCut_dif ~ dmso_eff, 
                                data = corr_dmso[corr_dmso$drug_conc == i,]) %>% 
       tidy()
     
@@ -758,7 +844,7 @@ for (i in unique(corr_dmso$drug_conc)) {
 }
 
 for (i in unique(corr_dmso$drug_conc)) {
-    model.correlation <- lm(formula = freqCut_norm_mean ~ H3K27me3.zscore, 
+    model.correlation <- lm(formula = freqCut_dif ~ H3K27me3.zscore, 
                                data = corr_dmso[corr_dmso$drug_conc == i,]) %>% 
       tidy()
     
@@ -788,20 +874,39 @@ ggplot(corr_dmso %>%
   geom_hline(yintercept = -log10(0.01), lty = "dashed") #+
   #facet_wrap(~sign, nrow = 2)
   
-corr_hits <- corr_dmso %>% filter(drug_conc %in% c("PCI-24781 (Abexinostat)_100 nM", "Fluoro-SAHA_1 µM")) 
+corr_hits <- corr_dmso %>% filter(drug_conc %in% c("PCI-24781 (Abexinostat)_100 nM", "Fluoro-SAHA_1 µM", "Belinostat (PXD101)_100 nM", "Droxinostat_10 µM")) 
 
 corr_h3k27me3_hits <- corr_dmso %>% filter(drug %in% c("EPZ-6438"))
 
-ggplot(corr_hits,
-       aes(y = freqCut_norm_mean, x = dmso_eff, 
-           #color = ifelse(sign == 1, "red", "black")
-           )) +
-  geom_point() +
-  geom_abline(lty = "twodash") +
-  geom_smooth(method = "lm", color = "black", lty = "dashed") +
+corr_hits <- merge(corr_hits, chromatin_2)
+
+ggplot(corr_hits %>%
+         mutate(freqCut = dmso_eff + freqCut_dif)) +
+  geom_abline(lty = "twodash", slope = 1) +
+  geom_hline(yintercept = max(dmso_freq$dmso_eff)*100, lty = "dashed") + 
+  geom_point(aes(y = freqCut*100, x = dmso_eff*100, color = chromatin)) +
   #scale_color_manual(values = c("#e07a5f", "#3d405b")) +
-  stat_cor(method = "pearson") +
-  facet_wrap(~drug_conc, scales = "free_y")
+  #stat_cor(method = "pearson") +
+  #annotate("rect",xmin=(dmso_freq$dmso_eff + 0.02),xmax=unique(indel.data.freq$max_dmso_freq),ymin=-log10(0.05),ymax=Inf, alpha=0.1, fill="#e07a5f") +
+  facet_wrap(~drug_conc)+
+  scale_color_manual(values = chrom_colors)
+
+corr_hits <- corr_hits %>%
+  mutate(drug_eff = dmso_eff + freqCut_dif) %>%
+  distinct(drug_eff, drug_conc, IPR)
+
+dmso_freq2 <- dmso_freq %>%
+  mutate(drug_conc = "DMSO") %>%
+  dplyr::select("drug_eff" = dmso_eff, drug_conc, IPR)
+
+corr_hits <- rbind(corr_hits, dmso_freq2)
+
+ggplot_custom(corr_hits,
+       aes(x = drug_eff, y = IPR, fill = drug_conc)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  scale_x_continuous(labels = scales::percent) +
+  geom_vline(xintercept = max(dmso_freq$dmso_eff))
+
 
 ggplot(corr_h3k27me3_hits,
        aes(y = freqCut_norm_mean, x = H3K27me3.zscore, color = ifelse(sign == 1, "red", "black"))) +
