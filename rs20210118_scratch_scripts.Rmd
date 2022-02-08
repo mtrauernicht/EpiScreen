@@ -385,12 +385,11 @@ for (i in unique(eff.data.heatmap2$conc_char)) {
 }
 ```
 
-
-```{r}
-mut.data = readRDS("/DATA/projects/DSBrepair/data/R/rs20220122_episcreen/rs20220122_episcreen_mutations.RDS") 
+```{r check belinostat and CUDC}
+ratio.data = readRDS("/DATA/projects/DSBrepair/data/R/rs20220207_episcreen/rs20220207_episcreen_ratios.RDS") 
 
 mut.data.filt = mut.data %>% 
-  filter(drug %in% c("Vorinostat (SAHA, MK0683)", "PCI-24781 (Abexinostat)","DMSO") & conc_char == "100 nM" & type %in% c("core", "grouped_indel"), IPR %in% c("IPR16", "IPR10")) %>% 
+  filter(drug %in% c("CUDC-101","Belinostat (PXD101)","DMSO") & conc_char == "100 nM" & type %in% c("core", "grouped_indel")) %>% 
   distinct(IPR, mutation, color, type, drug, freq_mean, freq_sd)
 
 colores <- c("wt" = "#808184", "other" = "black", "NHEJ" = "#e1251b", "MMEJ" = "#26419a", "SSTR" = "#007A4C")
@@ -406,6 +405,54 @@ p <- ggplot(mut.data.filt,
   geom_errorbar(aes(ymin=freq_mean-freq_sd, ymax=freq_mean+freq_sd), width=.2,
                 position=position_dodge(.9)) 
 p + facet_grid(IPR ~ drug)
+
+check_tib = ratio.data %>% 
+  filter(drug %in% c("CUDC-101","Belinostat (PXD101)","DMSO")  & conc_char == "100 nM") %>%
+  distinct(MMEJ_zscore_comb, IPR, drug)
+
+ggplot(check_tib, aes(drug, MMEJ_zscore_comb, color = IPR)) + geom_quasirandom() + theme_bw(base_size = 16)
+
+check_tib %>% filter(drug != "DMSO") %>% pivot_wider(names_from = drug, values_from = MMEJ_zscore_comb) %>% ggplot(., aes(`Belinostat (PXD101)`, `CUDC-101`)) + 
+  geom_point() + geom_smooth(method = "lm")
+```
+
+```{r}
+mut.data = readRDS("/DATA/projects/DSBrepair/data/R/rs20220207_episcreen/rs20220207_episcreen_mutations.RDS") 
+
+mut.data.filt = mut.data %>% 
+  filter(drug %in% c("PCI-24781 (Abexinostat)","DMSO") & conc_char == "100 nM" & type %in% c("core", "grouped_indel")) %>% 
+  distinct(IPR, mutation, color, type, drug, freq_mean, freq_sd)
+
+colores <- c("wt" = "#808184", "other" = "black", "NHEJ" = "#e1251b", "MMEJ" = "#26419a", "SSTR" = "#007A4C")
+
+
+p <- ggplot(mut.data.filt, 
+            aes(mutation, freq_mean)) + 
+  geom_bar(stat = "identity", aes(fill = color)) + 
+  scale_fill_manual("legend", values = colores) + 
+  theme_bw() +
+  scale_y_continuous(name="frequency") +
+  scale_x_discrete(name="indel size", breaks = c("<-14", -7, 0, 1, ">2")) +
+  geom_errorbar(aes(ymin=freq_mean-freq_sd, ymax=freq_mean+freq_sd), width=.2,
+                position=position_dodge(.9)) 
+p + facet_grid(IPR ~ drug)
+
+
+mut.data.filt = mut.data %>% 
+  filter(drug %in% c("PCI-24781 (Abexinostat)","DMSO") & conc_char == "100 nM" & mutation == 0) %>% 
+  distinct(IPR, color, type, drug, freq_mean, freq_sd)
+
+IPR_levels = mut.data.filt %>% filter(drug == "DMSO") %>% distinct(IPR, freq_mean) %>% arrange(-freq_mean) %>% pull(IPR) %>% as.character()
+
+mut.data.filt %<>% mutate(IPR = factor(IPR, levels = IPR_levels))
+
+ggplot(mut.data.filt, 
+            aes(IPR, freq_mean, fill = drug)) + 
+  geom_bar(stat = "identity", position = position_dodge(1)) + 
+  theme_bw() +
+  scale_y_continuous(name="frequency") +
+  geom_errorbar(aes(ymin=freq_mean-freq_sd, ymax=freq_mean+freq_sd), width=.2,
+                position = position_dodge(width = 1))
 
 mut.data.filt = mut.data %>% 
   filter(drug %in% c("Vorinostat (SAHA, MK0683)", "PCI-24781 (Abexinostat)","DMSO") & conc_char == "100 nM" & type %in% c("core", "grouped_indel"), IPR %in% c("IPR16", "IPR10")) %>% 

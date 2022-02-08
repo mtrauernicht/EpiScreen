@@ -55,27 +55,27 @@ filtered_drug_conc = indel.data %>%
 ratios_tib <- indel.data %>%
   mutate(drug_conc_char = paste(drug, conc_char, sep = "_")) %>%
   semi_join(filtered_drug_conc) %>%
-  distinct(MMEJratio, freqCut, drug, conc_char, target, barcode) %>%
-  mutate(MMEJratio = ave(MMEJratio, drug, conc_char, barcode, FUN = mean)) %>%
-  mutate(MMEJratio.log2 = log2(MMEJratio)) %>%
+  distinct(NHEJratio, freqCut, drug, conc_char, target, barcode) %>%
+  mutate(NHEJratio = ave(NHEJratio, drug, conc_char, barcode, FUN = mean)) %>%
+  mutate(NHEJratio.log2 = log2(NHEJratio)) %>%
   mutate(freqCut = (ave(freqCut, drug, conc_char, barcode, FUN = mean))) %>%
   mutate(freqCut.log2 = log2(freqCut)) %>%
   distinct()
 
 dmso_ratios_tib <- indel.data %>%
   filter(drug == "DMSO") %>%
-  distinct(MMEJratio, freqCut, barcode) %>%
-  mutate(DMSO.ratio = ave(MMEJratio, barcode, FUN = mean)) %>%
+  distinct(NHEJratio, freqCut, barcode) %>%
+  mutate(DMSO.ratio = ave(NHEJratio, barcode, FUN = mean)) %>%
   mutate(DMSO.ratio.log2 = log2(DMSO.ratio)) %>%
   mutate(DMSO.freqCut = ave(freqCut, barcode, FUN = mean)) %>%
   mutate(DMSO.freqCut.log2 = log2(DMSO.freqCut)) %>%
-  dplyr::select(-MMEJratio, -freqCut) %>%
+  dplyr::select(-NHEJratio, -freqCut) %>%
   distinct()
   
 ratios_tib <- merge(ratios_tib, dmso_ratios_tib)
 ```
 
-The log2 distance ratio in our case is positive if it promotes MMEJ and negative if it promotes NHEJ
+The log2 distance ratio in our case is positive if it promotes NHEJ and negative if it promotes NHEJ
 
 
 # 2nd step check compute distances and plot them
@@ -83,7 +83,7 @@ The log2 distance ratio in our case is positive if it promotes MMEJ and negative
 # Each replicate has a different value (compute differences by replicate)
 ratios_tib <- ratios_tib %>% 
   dplyr::group_by(barcode, drug, conc_char) %>% 
-  mutate(log2.dist.ratio = MMEJratio.log2 - DMSO.ratio.log2, 
+  mutate(log2.dist.ratio = NHEJratio.log2 - DMSO.ratio.log2, 
          log2.dist.freqCut = freqCut.log2 - DMSO.freqCut.log2) %>%
   left_join(chrom_data)
 ```
@@ -148,8 +148,8 @@ effect_compounts = ratios_tib %>%
          indelrate_effect = ifelse(indelrate_pos >= 17, "indel_rate_increase", 
                          ifelse(indelrate_pos <= 1, "indel_rate_decrease", "mixed")),
          ratio_pos = sum(log2.dist.ratio > 0),
-         ratio_effect = ifelse(ratio_pos >= 17, "MMEJ_increase", 
-                         ifelse(ratio_pos <= 1, "NHEJ_increase", "mixed"))) %>%
+         ratio_effect = ifelse(ratio_pos >= 17, "NHEJ_increase", 
+                         ifelse(ratio_pos <= 1, "MMEJ_increase", "mixed"))) %>%
   distinct(drug_conc, indelrate_effect, ratio_effect) %>% 
   left_join(distinct(filtered_drug_conc, drug_conc, effect_on_indelrate, effect_on_ratio))
 
@@ -158,10 +158,10 @@ p.vals = slope.protein.features %>% filter(term == "slope") %>% select(-term, -i
 epistasis_tib %<>% left_join(effect_compounts)  %>% 
   left_join(p.vals) %>%
   mutate(
-    x_intercept_indelrate = ifelse(p.value.indelrate < 0.05,
-                                   x_intercept_indelrate, NA),
-    x_intercept_ratio = ifelse(p.value.ratio < 0.05,
-                               x_intercept_ratio, NA),
+    # x_intercept_indelrate = ifelse(p.value.indelrate < 0.05,
+    #                                x_intercept_indelrate, NA),
+    # x_intercept_ratio = ifelse(p.value.ratio < 0.05,
+    #                            x_intercept_ratio, NA),
     indelrate_slope_plot = ifelse(x_intercept_indelrate < 1 & effect_on_indelrate, indelrate_slope, NA),
     ratio_slope_plot = ifelse(x_intercept_ratio < 1 & effect_on_ratio, ratio_slope, NA))  
 ```
@@ -234,6 +234,8 @@ slope.features.tib <-   epistasis_tib %>%
          count_rate = sum(is.na(indelrate_slope_plot))) %>%
   separate(drug_conc, into = c("drug", "conc"), sep = "_")
 
+
+
 slope.ratio.features.list <- slope.features.tib %>% 
   select(drug, conc, ratio_slope_plot, feature, count_ratio) %>%
   filter(count_ratio != 25) %>% # remove if 25x NA
@@ -242,26 +244,28 @@ slope.ratio.features.list <- slope.features.tib %>%
   mutate(count_feature_ratio = sum(ratio_slope_plot)) %>%
   filter(count_feature_ratio != 0) %>% # remove if 25x NA
   select(-count_feature_ratio)  %>% 
-  group_by(conc) %>%
-  group_split(.keep = FALSE) 
+  group_by(conc) %>% 
+  group_split(slope.features.tib.filt, .keep = FALSE) %>% 
+  set_names(unlist(group_keys(slope.features.tib.filt)))   
 
-slope.ratio.features.scale.dcast.1um = slope.ratio.features.list[[1]] %>%
+slope.ratio.features.scale.dcast.1um = slope.ratio.features.list[["1 µM"]] %>%
   reshape2::dcast(drug ~ feature, value.var = "ratio_slope_plot", fill = 0) %>% 
   column_to_rownames(var = "drug") %>% 
   mutate_all(~replace(., is.na(.), 0))
 
-slope.ratio.features.scale.dcast.10um = slope.ratio.features.list[[2]] %>%
+slope.ratio.features.scale.dcast.10um = slope.ratio.features.list[["10 µM"]] %>%
   reshape2::dcast(drug ~ feature, value.var = "ratio_slope_plot", fill = 0) %>% 
-  column_to_rownames(var = "drug")%>% 
+  column_to_rownames(var = "drug") %>% 
   mutate_all(~replace(., is.na(.), 0))
 
-slope.ratio.features.scale.dcast.100nm = slope.ratio.features.list[[3]] %>%
+slope.ratio.features.scale.dcast.100nm = slope.ratio.features.list[["100 nM"]] %>%
   reshape2::dcast(drug ~ feature, value.var = "ratio_slope_plot", fill = 0) %>% 
-  column_to_rownames(var = "drug")
+  column_to_rownames(var = "drug") %>% 
+  mutate_all(~replace(., is.na(.), 0))
 
 slope.rate.features.list <- slope.features.tib %>% 
   select(drug, conc, indelrate_slope_plot, feature, count_rate) %>%
-  filter(count_rate != 25) %>%
+  filter(count_rate != 25) %>% # this removes compounds that only have NAs
   select(-count_rate) %>%
   group_by(feature, drug, conc) %>%
   mutate(count_feature_rate = sum(indelrate_slope_plot)) %>%
@@ -270,24 +274,24 @@ slope.rate.features.list <- slope.features.tib %>%
   group_by(conc) %>%
   group_split(.keep = FALSE) 
 
-slope.indelrate.features.scale.dcast.1um = slope.rate.features.list[[1]] %>%
+slope.indelrate.features.scale.dcast.1um = slope.rate.features.list[["1 µM"]] %>%
   reshape2::dcast(drug ~ feature, value.var = "indelrate_slope_plot", fill = 0) %>% 
   column_to_rownames(var = "drug")
 
 
-slope.indelrate.features.scale.dcast.10um = slope.rate.features.list[[2]] %>%
+slope.indelrate.features.scale.dcast.10um = slope.rate.features.list[["10 µM"]] %>%
   reshape2::dcast(drug ~ feature, value.var = "indelrate_slope_plot", fill = 0) %>% 
   column_to_rownames(var = "drug")
 
 
-slope.indelrate.features.scale.dcast.100nm = slope.rate.features.list[[3]] %>%
+slope.indelrate.features.scale.dcast.100nm = slope.rate.features.list[["100 nM"]] %>%
   reshape2::dcast(drug ~ feature, value.var = "indelrate_slope_plot", fill = 0) %>% 
   column_to_rownames(var = "drug")
 ```
 
 
 
-```{r heatmaps}
+```{r heatmaps pathway indel rate}
 # Set annotation for heatmap
 # Row annotation: annotate drugs with the target group
 target <- indel.data %>% 
@@ -309,12 +313,18 @@ ordered_marks2 <- c("Negative Control", "MRN", "DNA-PK","Epigenetic Reader Domai
                     "HIF", "JAK", "PIM",
                     "Aurora Kinase", "PARP")
 
+#Epistatic interaction colors
+slope.colors <- tibble(color = c("#8c510a", "#f5f5f5","#01665e"),label = c("negative","none","positive"), feature = "epistasis")
+
+
 annotation_colors_scr$target <- annotation_colors_scr$target[ordered_marks2]
 
-max_slope = round(max(c(max(slope.ratio.features.scale.dcast.100nm), abs(min(slope.ratio.features.scale.dcast.100nm)))), 2)
-breaks <- seq(-max_slope, max_slope, 0.001)
-colors = colorRampPalette(rev(brewer.pal(n = 7, name = "RdBu")))(length(breaks))
-colors[which(breaks == 0)-1] = "gray"
+quant_breaks <- quantile(slope.ratio.features.scale.dcast.100nm, c(.01,.99), na.rm = T) # change these numbers according to where you want to set the cutoff
+palette_length <- 100
+breaks <- c(seq(quant_breaks[1], 0, length.out=ceiling(palette_length/2) + 1), 
+              seq(quant_breaks[2]/palette_length, quant_breaks[2], length.out=floor(palette_length/2)))
+colors = colorRampPalette(slope.colors %>% pull(color))(length(breaks))
+colors[which(quant_breaks == 0)-1] = "gray90"
 
 pheatmap(t(slope.ratio.features.scale.dcast.100nm),
          border_color = F,
@@ -327,10 +337,13 @@ pheatmap(t(slope.ratio.features.scale.dcast.100nm),
          annotation_colors = annotation_colors_scr, annotation_legend = T)
 
 
-max_slope = round(max(c(max(slope.ratio.features.scale.dcast.1um), abs(min(slope.ratio.features.scale.dcast.1um)))), 2)
-breaks <- seq(-max_slope, max_slope, 0.001)
-colors = colorRampPalette(rev(brewer.pal(n = 7, name = "RdBu")))(length(breaks))
-colors[which(breaks == 0)-1] = "gray"
+quant_breaks <- quantile(slope.ratio.features.scale.dcast.1um, c(.01,.99), na.rm = T) # change these numbers according to where you want to set the cutoff
+palette_length <- 100
+breaks <- c(seq(quant_breaks[1], 0, length.out=ceiling(palette_length/2) + 1), 
+              seq(quant_breaks[2]/palette_length, quant_breaks[2], length.out=floor(palette_length/2)))
+colors = colorRampPalette(slope.colors %>% pull(color))(length(breaks))
+colors[which(quant_breaks == 0)-1] = "gray90"
+
 
 pheatmap(t(slope.ratio.features.scale.dcast.1um),
          border_color = F,
@@ -343,10 +356,13 @@ pheatmap(t(slope.ratio.features.scale.dcast.1um),
          annotation_colors = annotation_colors_scr, annotation_legend = T)
 
 
-max_slope = round(max(c(max(slope.ratio.features.scale.dcast.10um), abs(min(slope.ratio.features.scale.dcast.10um)))), 2)
-breaks <- seq(-max_slope, max_slope, 0.001)
-colors = colorRampPalette(rev(brewer.pal(n = 7, name = "RdBu")))(length(breaks))
-colors[which(breaks == 0)-1] = "gray"
+quant_breaks <- quantile(slope.ratio.features.scale.dcast.10um, c(.01,.99), na.rm = T) # change these numbers according to where you want to set the cutoff
+palette_length <- 100
+breaks <- c(seq(quant_breaks[1], 0, length.out=ceiling(palette_length/2) + 1), 
+              seq(quant_breaks[2]/palette_length, quant_breaks[2], length.out=floor(palette_length/2)))
+colors = colorRampPalette(slope.colors %>% pull(color))(length(breaks))
+colors[which(quant_breaks == 0)-1] = "gray90"
+
 
 pheatmap(t(slope.ratio.features.scale.dcast.10um),
          border_color = F,
@@ -361,12 +377,92 @@ pheatmap(t(slope.ratio.features.scale.dcast.10um),
 
 ```
 
+```{r all concentrations combined pathway}
+clone5.matrix = indel.data %>% select(IPR, ends_with(".zscore")) %>% distinct() %>%
+  column_to_rownames(var="IPR")
 
-```{r}
-max_slope = round(max(c(max(slope.indelrate.features.scale.dcast.100nm), abs(min(slope.indelrate.features.scale.dcast.100nm)))), 2)
-breaks <- seq(-max_slope, max_slope, 0.001)
-colors = colorRampPalette(rev(brewer.pal(n = 7, name = "RdBu")))(length(breaks))
-colors[which(breaks == 0)-1] = "gray"
+clone5_map = hclust(dist(t(clone5.matrix)))
+clone5_map = hclust(dist(t(all_compounts_epistasis)))
+
+# Set annotation for heatmap
+# Row annotation: annotate drugs with the target group
+target <- indel.data %>% 
+  mutate(drug_conc = paste(drug, conc_char, sep = " ")) %>%
+  distinct(target, conc_char, drug_conc) %>% 
+  column_to_rownames(var="drug_conc")
+
+# colors <- brewer.pal(length(unique(barcode.annotation$cluster)), "Pastel2")
+# names(colors) <- unique(barcode.annotation$cluster)
+annotation_colors_scr = list(
+  target = c(HDAC="#60988D", HAT="#C6D0A8", Sirtuin="#8FCAAC",
+             HMT="#FDCDAC", DNMT="#D69C81", `Histone Demethylase`="#FFF2AE",
+             HIF="#E3DCD5", JAK="#C8D7E2", PIM="#9AB8C4", `Aurora Kinase`="#F4CAE4",
+             PARP="#CB546F", `Epigenetic Reader Domain`= "#476D61", `DNA-PK`="#E07A43", `Negative Control` = "gray50", MRN = "black"
+             ),
+  conc_char = c(`100 nM` = "#78BF84", `1 µM`  = "#1E9532", `10 µM` = "#0F4A19"))
+
+
+ordered_marks2 <- c("Negative Control", "MRN", "DNA-PK","Epigenetic Reader Domain", "HDAC",  "Sirtuin", "HAT", 
+                    "Histone Demethylase", "HMT", "DNMT", 
+                    "HIF", "JAK", "PIM",
+                    "Aurora Kinase", "PARP")
+
+#Epistatic interaction colors
+slope.colors <- tibble(color = c("#8c510a", "#f5f5f5","#01665e"),label = c("negative","none","positive"), feature = "epistasis")
+
+
+annotation_colors_scr$target <- annotation_colors_scr$target[ordered_marks2]
+
+all_compounts_epistasis = slope.features.tib %>% 
+  select(drug, conc, ratio_slope_plot, feature, count_rate) %>%
+  filter(count_rate != 25) %>% 
+  select(-count_rate) %>%
+  group_by(feature, drug, conc) %>%
+  mutate(count_feature_rate = sum(ratio_slope_plot),
+         drug_conc = paste(drug, conc, sep = " ")) %>%
+  filter(count_feature_rate != 0) %>% # remove if 25x NA
+  select(-count_feature_rate) %>%
+  reshape2::dcast(drug_conc ~ feature, value.var = "ratio_slope_plot", fill = 0) %>% 
+  column_to_rownames(var = "drug_conc") %>%
+  mutate_all(type.convert)
+
+# giveNAs = which(is.na(as.matrix(dist(all_compounts_epistasis))),arr.ind=TRUE)
+# unique(giveNAs)
+# 
+# tab = sort(table(c(giveNAs)),decreasing=TRUE)
+# checkNA = sapply(1:length(tab),function(i){
+# sum(is.na(as.matrix(dist(all_compounts_epistasis[-as.numeric(names(tab[1:i])),]))))
+# })
+# rmv = names(tab)[1:min(which(checkNA==0))]
+
+
+
+quant_breaks <- quantile(all_compounts_epistasis, c(.01,.99), na.rm = T) # change these numbers according to where you want to set the cutoff
+palette_length <- 100
+breaks <- c(seq(quant_breaks[1], 0, length.out=ceiling(palette_length/2) + 1), 
+              seq(quant_breaks[2]/palette_length, quant_breaks[2], length.out=floor(palette_length/2)))
+colors = colorRampPalette(slope.colors %>% pull(color))(length(breaks))
+colors[which(quant_breaks == 0)-1] = "gray90"
+
+pheatmap(all_compounts_epistasis[, clone5_map$labels],
+         border_color = F,
+         cellwidth = 8,
+         cellheight = 8,
+         cluster_cols = clone5_map,
+         breaks = breaks,
+         annotation_row = target,
+         main = "Pathway balance slopes for all compounds with significant hit",
+         color = colors,
+         annotation_colors = annotation_colors_scr, annotation_legend = T)
+```
+
+```{r indel rate sep conc}
+quant_breaks <- quantile(slope.indelrate.features.scale.dcast.100nm, c(.01,.99), na.rm = T) # change these numbers according to where you want to set the cutoff
+palette_length <- 100
+breaks <- c(seq(quant_breaks[1], 0, length.out=ceiling(palette_length/2) + 1), 
+              seq(quant_breaks[2]/palette_length, quant_breaks[2], length.out=floor(palette_length/2)))
+colors = colorRampPalette(slope.colors %>% pull(color))(length(breaks))
+colors[which(quant_breaks == 0)-1] = "gray90"
 
 pheatmap(t(slope.indelrate.features.scale.dcast.100nm),
          border_color = F,
@@ -379,10 +475,13 @@ pheatmap(t(slope.indelrate.features.scale.dcast.100nm),
          annotation_colors = annotation_colors_scr, annotation_legend = T)
 
 
-max_slope = round(max(c(max(slope.indelrate.features.scale.dcast.1um), abs(min(slope.indelrate.features.scale.dcast.1um)))), 2)
-breaks <- seq(-max_slope, max_slope, 0.001)
-colors = colorRampPalette(rev(brewer.pal(n = 7, name = "RdBu")))(length(breaks))
-colors[which(breaks == 0)-1] = "gray"
+quant_breaks <- quantile(slope.indelrate.features.scale.dcast.1um, c(.01,.99), na.rm = T) # change these numbers according to where you want to set the cutoff
+palette_length <- 100
+breaks <- c(seq(quant_breaks[1], 0, length.out=ceiling(palette_length/2) + 1), 
+              seq(quant_breaks[2]/palette_length, quant_breaks[2], length.out=floor(palette_length/2)))
+colors = colorRampPalette(slope.colors %>% pull(color))(length(breaks))
+colors[which(quant_breaks == 0)-1] = "gray90"
+
 
 pheatmap(t(slope.indelrate.features.scale.dcast.1um),
          border_color = F,
@@ -395,10 +494,13 @@ pheatmap(t(slope.indelrate.features.scale.dcast.1um),
          annotation_colors = annotation_colors_scr, annotation_legend = T)
 
 
-max_slope = round(max(c(max(slope.indelrate.features.scale.dcast.10um), abs(min(slope.indelrate.features.scale.dcast.10um)))), 2)
-breaks <- seq(-max_slope, max_slope, 0.001)
-colors = colorRampPalette(rev(brewer.pal(n = 7, name = "RdBu")))(length(breaks))
-colors[which(breaks == 0)-1] = "gray"
+quant_breaks <- quantile(slope.indelrate.features.scale.dcast.10um, c(.01,.99), na.rm = T) # change these numbers according to where you want to set the cutoff
+palette_length <- 100
+breaks <- c(seq(quant_breaks[1], 0, length.out=ceiling(palette_length/2) + 1), 
+              seq(quant_breaks[2]/palette_length, quant_breaks[2], length.out=floor(palette_length/2)))
+colors = colorRampPalette(slope.colors %>% pull(color))(length(breaks))
+colors[which(quant_breaks == 0)-1] = "gray90"
+
 
 pheatmap(t(slope.indelrate.features.scale.dcast.10um),
          border_color = F,
@@ -411,38 +513,175 @@ pheatmap(t(slope.indelrate.features.scale.dcast.10um),
          annotation_colors = annotation_colors_scr, annotation_legend = T)
 ```
 
+```{r all concentrations combined indel rate}
+all_compounts_epistasis = slope.features.tib %>% 
+  select(drug, conc, indelrate_slope_plot, feature, count_rate) %>%
+  filter(count_rate != 25) %>% 
+  select(-count_rate) %>%
+  group_by(feature, drug, conc) %>%
+  mutate(count_feature_rate = sum(indelrate_slope_plot),
+         drug_conc = paste(drug, conc, sep = " ")) %>%
+  filter(count_feature_rate != 0) %>% # remove if 25x NA
+  select(-count_feature_rate) %>%
+  reshape2::dcast(drug_conc ~ feature, value.var = "indelrate_slope_plot", fill = 0) %>% 
+  column_to_rownames(var = "drug_conc") %>%
+  mutate_all(type.convert)
 
+quant_breaks <- quantile(all_compounts_epistasis, c(.01,.99), na.rm = T) # change these numbers according to where you want to set the cutoff
+palette_length <- 100
+breaks <- c(seq(quant_breaks[1], 0, length.out=ceiling(palette_length/2) + 1), 
+              seq(quant_breaks[2]/palette_length, quant_breaks[2], length.out=floor(palette_length/2)))
+colors = colorRampPalette(slope.colors %>% pull(color))(length(breaks))
+colors[which(quant_breaks == 0)-1] = "gray90"
 
-
-# Figure 4B: Matrix for hits
-```{r heatmap}
-##genes to select
-# tmp.hits <- slope.protein.features %>%
-#   # filter(p.value < 0.05 & term == "unlist(model.dt[j])") %>% 
-#   pull(drug_conc) %>%
-# 
-# # heatmap
-# ggplot(slope.protein.features.all %>% filter(gene %in% tmp.gene.hits & abs(slope) > 0.05)) + 
-#   geom_tile(aes(fct_relevel(gene,heatmap.gene.order.slope.diff.hits),fct_relevel(feature, heatmap.chromatin.order.slope.diff.hits), fill = slope)) +
-#   scale_fill_gradient2( low = "#8c510a",mid = "#f5f5f5", high = "#01665e")  + theme_bw() + theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5), axis.title = element_blank(), legend.position = "top") + coord_fixed(expand = F,ratio = 1)
-# 
-# # Dendrogram
-# ggdendrogram(heatmap.slope.diff.hits$tree_row)
-# 
-# # Relative slope
-# tmp.rel.slope <- slope.protein.features.all %>% filter(gene %in% tmp.gene.hits) %>% mutate(rel.epistasis = slope*6/mean.fc)
+pheatmap(all_compounts_epistasis[, clone5_map$labels],
+         border_color = F,
+         cellwidth = 8,
+         cellheight = 8,
+         breaks = breaks,
+         cluster_cols = clone5_map,
+         annotation_col = target,
+         main = "Indel rate slopes for all compounds with significant hit",
+         color = colors,
+         annotation_colors = annotation_colors_scr, annotation_legend = T)
 ```
 
-#Figure 4D: Epistasis per pathway
+
+
 ```{r}
-# # Plot per library 
-# ggplot(slope.library %>% filter(pathway != "NA")) + geom_quasirandom(aes(pathway, abs(epistasis), color = pathway)) + theme_bw() + scale_color_manual(values = c("#EB2030","#2E358F")) + theme(legend.position = "top")
-# 
-# #test
-# NHEJ.genes.slope <- slope.library %>% filter(pathway == "NHEJ") %>% pull(epistasis) %>% abs()
-# eff.genes.slope <- slope.library %>% filter(pathway == "eff") %>% pull(epistasis) %>% abs()
-# 
-# ks.test.pathway <- ks.test(NHEJ.genes.slope,eff.genes.slope)
+HDACi = target %>% filter(target %in% c("HDAC", "DNA-PK")) %>% rownames()
+
+for (i in names(slope.ratio.features.list)) {
+HDAC_epistasis = slope.ratio.features.list[[i]] %>%
+  filter(drug %in% HDACi) %>%
+  reshape2::dcast(drug ~ feature, value.var = "ratio_slope_plot", fill = 0) %>% 
+  column_to_rownames(var = "drug")
+
+quant_breaks <- quantile(HDAC_epistasis, c(.01,.99), na.rm = T) # change these numbers according to where you want to set the cutoff
+palette_length <- 100
+breaks <- c(seq(quant_breaks[1], 0, length.out=ceiling(palette_length/2) + 1), 
+              seq(quant_breaks[2]/palette_length, quant_breaks[2], length.out=floor(palette_length/2)))
+colors = colorRampPalette(slope.colors %>% pull(color))(length(breaks))
+colors[which(quant_breaks == 0)-1] = "gray90"
+
+
+p = pheatmap(t(HDAC_epistasis),
+         border_color = F,
+         cellwidth = 8,
+         cellheight = 8,
+         breaks = breaks,
+         annotation_col = target,
+         main = paste("Indel rate slopes for HDACi", i, sep = " "),
+         color = colors,
+         annotation_colors = annotation_colors_scr, annotation_legend = T)
+
+print(p)
+
+}
 ```
 
+
+```{r}
+clone5_domains <- readRDS("/DATA/projects/DSBrepair/data/R/rs20200311_domains_clone5.RDS")
+chip.dt = readRDS('/DATA/projects/DSBrepair/data/R/cl20201026_ChIP_zscore_selection.RDS')
+chip.dt = chip.dt[, H3K9me3 := NULL]
+
+clone5_domains.df = as.data.frame(clone5_domains[, c("barcode", "ID", "IPR", "group")])
+row.names(clone5_domains.df) = clone5_domains.df$IPR
+
+chip_clone5 = chip.dt[clone5_domains.df, on = c("ID")]
+
+row.names(clone5_domains.df) <- clone5_domains.df$IPR
+clone5_domains.df = clone5_domains.df[, "group", drop = FALSE]
+colnames(clone5_domains.df) = "domain"
+
+clustering = data.frame(row.names=c('LMNB1', 'late_replicating', 'H3K9me2',
+                                    'H3K27me3', 'EZH2', 'CTCF', 'SMC3',
+                                    'HDAC3', 'HDAC2', 'HDAC1', 'H3K4me1',
+                                    'H3K4me2', 'H3K4me3', 'H3K27ac',
+                                    'H4K5acK8ac', 'H2AFZ', 'DNAse', 'Dam', 'm5C',
+                                    'H3K79me2', 'TTseq', 'H3K36me3', 'POL2AS2',
+                                    'POL2'),
+                        group=factor(c(rep('repressive', 5), rep('insulator', 2),
+                                       rep('HDAC', 3), rep('euchromatin', 6),
+                                       rep('accessibility', 2), 'methylation',
+                                       rep('transcribing', 5)),
+                                     levels=c('transcribing', 'accessibility',
+                                              'methylation', 'euchromatin',
+                                              'HDAC', 'insulator', 'repressive')))
+feature_fill = c(insulator="#a6b5a3", repressive="#304441", euchromatin="#cda4cc",
+                 transcribing="#FBB040", HDAC="#aac9e0", accessibility='#cebc85',
+                 methylation='#7dc98f')
+
+chom_df = t(chip_clone5[,-c('pool', 'binsize', 'ID', "barcode", "IPR", "group")])
+colnames(chom_df) = chip_clone5$IPR
+
+order_vec=rownames(clustering)[nrow(clustering):1]
+
+clone5_heatmap = pheatmap(chom_df[order_vec,], cluster_rows=F, annotation_row=clustering,
+         annotation_colors=list(group=feature_fill),
+         color = colorRampPalette(rev(brewer.pal(n = 11, name="RdBu")))(100),
+         annotation_col = clone5_domains.df)
+```
+
+
+```{r}
+# ratio_targets = slope.features.tib %>% left_join(rownames_to_column(target, var = "drug")) %>% 
+#   distinct(drug, conc, ratio_slope_plot, target, feature, conc) %>% 
+#   filter(ratio_slope_plot != 0) %>% 
+#   group_by(target, conc) %>% 
+#   mutate(sign = ifelse(ratio_slope_plot < 0, "increase NHEJ", "increase MMEJ"),
+#         total = length(target)) %>%
+#   group_by(conc, sign, target) %>%
+#   mutate(n = length(sign)) %>%
+#   ungroup() %>%
+#   distinct(target, total, sign, conc, n)
+# 
+# ggplot(ratio_targets,
+#        aes(y = reorder(target, -total), x = n, fill = sign)) +
+#   geom_bar(stat = "identity") +
+#   facet_wrap(~conc)+
+#   scale_fill_manual(values = c("#e07a5f", "#3d405b", "#C2C2C2"))
+
+
+ratio_features = slope.features.tib %>% left_join(rownames_to_column(target, var = "drug")) %>% 
+  distinct(drug, conc, ratio_slope_plot, target, feature, conc) %>% 
+  filter(ratio_slope_plot != 0) %>% 
+  mutate(sign = ifelse(ratio_slope_plot < 0, "increase MMEJ", "increase NHEJ")) %>%
+  group_by(conc, feature, sign) %>% 
+  mutate(total = length(target)) %>%
+  group_by(conc, sign, feature, target) %>%
+  mutate(n = length(target),
+         fraction = n/total) %>%
+  distinct(conc, feature, total, sign, n, target, fraction)
+
+ggplot(ratio_features,
+       aes(y = reorder(feature, -total), x = n, fill = target)) +
+  geom_bar(stat = "identity") +
+  facet_grid(conc ~ sign)+
+  scale_fill_manual(values = annotation_colors_scr$target)
+```
+
+```{r}
+ratio_features = slope.features.tib %>% left_join(rownames_to_column(target, var = "drug")) %>% 
+  distinct(drug, conc, indelrate_slope_plot, target, feature, conc) %>% 
+  filter(indelrate_slope_plot != 0) %>% 
+  mutate(sign = ifelse(indelrate_slope_plot < 0, "decreased indel rate", "increased indel rate")) %>%
+  group_by(conc, feature, sign) %>% 
+  mutate(total = length(target)) %>%
+  group_by(conc, sign, feature, target) %>%
+  mutate(n = length(target),
+         fraction = n/total) %>%
+  distinct(conc, feature, total, sign, n, target, fraction)
+
+ggplot(ratio_features,
+       aes(y = reorder(feature, -total), x = n, fill = target)) +
+  geom_bar(stat = "identity") +
+  facet_grid(conc ~ sign)+
+  scale_fill_manual(values = annotation_colors_scr$target)
+```
+
+```{r}
+
+```
 
