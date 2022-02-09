@@ -33,7 +33,7 @@ clone5_chrom_tib <- readRDS('/DATA/projects/DSBrepair/data/R/cl20201026_ChIP_zsc
 
 
 chromatin.features <- colnames(indel.data)[grepl("[.]zscore", colnames(indel.data))]
-chrom_data = indel.data %>% select(barcode, all_of(chromatin.features)) %>% distinct()
+chrom_data = indel.data %>% dplyr::select(barcode, all_of(chromatin.features)) %>% distinct()
 ```
 
 ## Prepare data
@@ -153,7 +153,7 @@ effect_compounts = ratios_tib %>%
   distinct(drug_conc, indelrate_effect, ratio_effect) %>% 
   left_join(distinct(filtered_drug_conc, drug_conc, effect_on_indelrate, effect_on_ratio))
 
-p.vals = slope.protein.features %>% filter(term == "slope") %>% select(-term, -indelrate , -ratio) %>% distinct()
+p.vals = slope.protein.features %>% filter(term == "slope") %>% dplyr::select(-term, -indelrate , -ratio) %>% distinct()
 
 epistasis_tib %<>% left_join(effect_compounts)  %>% 
   left_join(p.vals) %>%
@@ -227,8 +227,8 @@ epistasis_tib %>%
 
 
 ```{r processing for heatmaps}
-slope.features.tib <-   epistasis_tib %>% 
-  select(drug_conc, ratio_slope_plot, indelrate_slope_plot, feature) %>%
+slope.features.tib <- epistasis_tib %>% 
+  dplyr::select(drug_conc, ratio_slope_plot, indelrate_slope_plot, feature) %>%
   group_by(drug_conc) %>%
   mutate(count_ratio = sum(is.na(ratio_slope_plot)), 
          count_rate = sum(is.na(indelrate_slope_plot))) %>%
@@ -237,16 +237,17 @@ slope.features.tib <-   epistasis_tib %>%
 
 
 slope.ratio.features.list <- slope.features.tib %>% 
-  select(drug, conc, ratio_slope_plot, feature, count_ratio) %>%
+  dplyr::select(drug, conc, ratio_slope_plot, feature, count_ratio) %>%
   filter(count_ratio != 25) %>% # remove if 25x NA
-  select(-count_ratio) %>%
+  dplyr::select(-count_ratio) %>%
   group_by(feature, drug, conc) %>%
+  na.omit() %>%
   mutate(count_feature_ratio = sum(ratio_slope_plot)) %>%
   filter(count_feature_ratio != 0) %>% # remove if 25x NA
-  select(-count_feature_ratio)  %>% 
-  group_by(conc) %>% 
-  group_split(slope.features.tib.filt, .keep = FALSE) %>% 
-  set_names(unlist(group_keys(slope.features.tib.filt)))   
+  dplyr::select(-count_feature_ratio)  %>% 
+  group_by(conc, .add = T) %>% 
+  group_split(.keep = FALSE) %>% 
+  set_names(unlist(group_keys(slope.features.tib)))   
 
 slope.ratio.features.scale.dcast.1um = slope.ratio.features.list[["1 µM"]] %>%
   reshape2::dcast(drug ~ feature, value.var = "ratio_slope_plot", fill = 0) %>% 
@@ -264,13 +265,13 @@ slope.ratio.features.scale.dcast.100nm = slope.ratio.features.list[["100 nM"]] %
   mutate_all(~replace(., is.na(.), 0))
 
 slope.rate.features.list <- slope.features.tib %>% 
-  select(drug, conc, indelrate_slope_plot, feature, count_rate) %>%
+  dplyr::select(drug, conc, indelrate_slope_plot, feature, count_rate) %>%
   filter(count_rate != 25) %>% # this removes compounds that only have NAs
-  select(-count_rate) %>%
+  dplyr::select(-count_rate) %>%
   group_by(feature, drug, conc) %>%
   mutate(count_feature_rate = sum(indelrate_slope_plot)) %>%
   filter(count_feature_rate != 0) %>% # remove if 25x NA
-  select(-count_feature_rate) %>%
+  dplyr::select(-count_feature_rate) %>%
   group_by(conc) %>%
   group_split(.keep = FALSE) 
 
@@ -378,7 +379,7 @@ pheatmap(t(slope.ratio.features.scale.dcast.10um),
 ```
 
 ```{r all concentrations combined pathway}
-clone5.matrix = indel.data %>% select(IPR, ends_with(".zscore")) %>% distinct() %>%
+clone5.matrix = indel.data %>% dplyr::select(IPR, ends_with(".zscore")) %>% distinct() %>%
   column_to_rownames(var="IPR")
 
 clone5_map = hclust(dist(t(clone5.matrix)))
@@ -414,14 +415,14 @@ slope.colors <- tibble(color = c("#8c510a", "#f5f5f5","#01665e"),label = c("nega
 annotation_colors_scr$target <- annotation_colors_scr$target[ordered_marks2]
 
 all_compounts_epistasis = slope.features.tib %>% 
-  select(drug, conc, ratio_slope_plot, feature, count_rate) %>%
+  dplyr::select(drug, conc, ratio_slope_plot, feature, count_rate) %>%
   filter(count_rate != 25) %>% 
-  select(-count_rate) %>%
+  dplyr::select(-count_rate) %>%
   group_by(feature, drug, conc) %>%
   mutate(count_feature_rate = sum(ratio_slope_plot),
          drug_conc = paste(drug, conc, sep = " ")) %>%
   filter(count_feature_rate != 0) %>% # remove if 25x NA
-  select(-count_feature_rate) %>%
+  dplyr::select(-count_feature_rate) %>%
   reshape2::dcast(drug_conc ~ feature, value.var = "ratio_slope_plot", fill = 0) %>% 
   column_to_rownames(var = "drug_conc") %>%
   mutate_all(type.convert)
@@ -515,14 +516,14 @@ pheatmap(t(slope.indelrate.features.scale.dcast.10um),
 
 ```{r all concentrations combined indel rate}
 all_compounts_epistasis = slope.features.tib %>% 
-  select(drug, conc, indelrate_slope_plot, feature, count_rate) %>%
+  dplyr::select(drug, conc, indelrate_slope_plot, feature, count_rate) %>%
   filter(count_rate != 25) %>% 
-  select(-count_rate) %>%
+  dplyr::select(-count_rate) %>%
   group_by(feature, drug, conc) %>%
   mutate(count_feature_rate = sum(indelrate_slope_plot),
          drug_conc = paste(drug, conc, sep = " ")) %>%
   filter(count_feature_rate != 0) %>% # remove if 25x NA
-  select(-count_feature_rate) %>%
+  dplyr::select(-count_feature_rate) %>%
   reshape2::dcast(drug_conc ~ feature, value.var = "indelrate_slope_plot", fill = 0) %>% 
   column_to_rownames(var = "drug_conc") %>%
   mutate_all(type.convert)
