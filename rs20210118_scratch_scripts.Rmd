@@ -386,6 +386,8 @@ for (i in unique(eff.data.heatmap2$conc_char)) {
 ```
 
 ```{r check belinostat and CUDC}
+mut.data %>% pull(drug) %>% unique() %>% .[grepl("Res", .)]
+
 ratio.data = readRDS("/DATA/projects/DSBrepair/data/R/rs20220207_episcreen/rs20220207_episcreen_ratios.RDS") 
 
 mut.data.filt = mut.data %>% 
@@ -414,6 +416,143 @@ ggplot(check_tib, aes(drug, MMEJ_zscore_comb, color = IPR)) + geom_quasirandom()
 
 check_tib %>% filter(drug != "DMSO") %>% pivot_wider(names_from = drug, values_from = MMEJ_zscore_comb) %>% ggplot(., aes(`Belinostat (PXD101)`, `CUDC-101`)) + 
   geom_point() + geom_smooth(method = "lm")
+
+p1 = ratio.data %>% 
+  filter(drug %in% c("CUDC-101","Belinostat (PXD101)")  & conc_char == "100 nM") %>%
+  distinct(MMEJ_zscore_comb, IPR, drug) %>%
+ pivot_wider(names_from = drug, values_from = MMEJ_zscore_comb) %>% ggplot(., aes(`CUDC-101`, `Belinostat (PXD101)`)) + 
+  geom_point() + geom_smooth(method = "lm")
+
+p2 = ratio.data %>% 
+  filter(drug %in% c("Mocetinostat (MGCD0103)","Belinostat (PXD101)")  & conc_char == "100 nM") %>%
+  distinct(MMEJ_zscore_comb, IPR, drug) %>%
+ pivot_wider(names_from = drug, values_from = MMEJ_zscore_comb) %>% ggplot(., aes(`Mocetinostat (MGCD0103)`, `Belinostat (PXD101)`)) + 
+  geom_point() + geom_smooth(method = "lm")
+
+p3 = ratio.data %>% 
+  filter(drug %in% c("Mocetinostat (MGCD0103)","EPZ-6438")  & conc_char == "100 nM") %>%
+  distinct(MMEJ_zscore_comb, IPR, drug) %>%
+ pivot_wider(names_from = drug, values_from = MMEJ_zscore_comb) %>% ggplot(., aes(`Mocetinostat (MGCD0103)`, `EPZ-6438`)) + 
+  geom_point() + geom_smooth(method = "lm")
+
+boundaries <- c(-5,-2.5, 2.5 , 5)
+ratio.data %>% 
+  filter(drug %in% c("Mocetinostat (MGCD0103)", "Resminostat", "Belinostat (PXD101)", "CUDC-101", "Vorinostat (SAHA, MK0683)", "DNA-PKi")  & conc_char == "100 nM") %>%
+  distinct(MMEJ_zscore_comb, IPR, drug) %>%
+  pivot_wider(names_from = drug, values_from = MMEJ_zscore_comb) %>% 
+  select(-IPR) %>%
+  ggpairs(.,
+          upper = list(continuous = corColor),
+          lower = list(continuous = function(data, mapping, ...) {
+            ggally_points(data = data, mapping = mapping, alpha = 0.6, size = 0.5) +
+              # scale_y_continuous(breaks = c(-2, -1, 0), limits = c(-1.9, 0.5)) +
+              # scale_x_continuous(breaks = c(-2, -1, 0), limits = c(-1.9, 0.5)) +
+              geom_abline(slope = 1, lty = "twodash", col = "grey") +
+              geom_smooth(method = "lm", color = "red", lty = "dashed", size = 0.5)}),
+          diag = list(continuous = function(data, mapping, ...) {
+            ggally_densityDiag(data = data, mapping = mapping, alpha = 0.3, fill = "red")})) +
+  xlab("MMEJ ratio change (log2)") +
+  ylab("MMEJ ratio change (log2)")
+
+
+cormat = ratio.data %>% 
+  filter(target %in% c("HDAC")) %>%
+  mutate(drug_conc = paste(drug, conc_char, sep = " ")) %>%
+  distinct(MMEJ_zscore_comb, IPR, drug_conc) %>%
+  pivot_wider(names_from = drug_conc, values_from = MMEJ_zscore_comb) %>% 
+  select(-IPR) %>%
+  cor()
+
+
+
+reorder_cormat <- function(cormat){
+# Use correlation between variables as distance
+dd <- as.dist((1-cormat)/2)
+hc <- hclust(dd)
+cormat <-cormat[hc$order, hc$order]
+}
+
+# Get lower triangle of the correlation matrix
+get_lower_tri<-function(cormat){
+  cormat[upper.tri(cormat)] <- NA
+  return(cormat)
+}
+# Get upper triangle of the correlation matrix
+get_upper_tri <- function(cormat){
+  cormat[lower.tri(cormat)]<- NA
+  return(cormat)
+}
+
+# Reorder the correlation matrix
+cormat <- reorder_cormat(cormat)
+upper_tri <- get_upper_tri(cormat)
+# Melt the correlation matrix
+melted_cormat <- melt(upper_tri, na.rm = TRUE)
+# Create a ggheatmap
+ggheatmap <- ggplot(melted_cormat, aes(Var2, Var1, fill = value))+
+ geom_tile(color = "white")+
+ scale_fill_gradient2(low = "blue", high = "red", mid = "white", 
+   midpoint = 0, limit = c(-1,1), space = "Lab", 
+    name="Pearson\nCorrelation") +
+  theme_minimal()+ # minimal theme
+ theme(axis.text.x = element_text(angle = 45, vjust = 1, 
+    size = 12, hjust = 1))+
+ coord_fixed()
+# Print the heatmap
+print(ggheatmap)
+
+```
+```{r}
+cormat = ratio.data %>% 
+  filter(target %in% c("Aurora Kinase")) %>%
+  mutate(drug_conc = paste(drug, conc_char, sep = " ")) %>%
+  distinct(MMEJ_zscore_comb, IPR, drug_conc) %>%
+  pivot_wider(names_from = drug_conc, values_from = MMEJ_zscore_comb) %>% 
+  select(-IPR) %>%
+  cor()
+
+
+
+reorder_cormat <- function(cormat){
+# Use correlation between variables as distance
+dd <- as.dist((1-cormat)/2)
+hc <- hclust(dd)
+cormat <-cormat[hc$order, hc$order]
+}
+
+# Get lower triangle of the correlation matrix
+get_lower_tri<-function(cormat){
+  cormat[upper.tri(cormat)] <- NA
+  return(cormat)
+}
+# Get upper triangle of the correlation matrix
+get_upper_tri <- function(cormat){
+  cormat[lower.tri(cormat)]<- NA
+  return(cormat)
+}
+
+# Reorder the correlation matrix
+cormat <- reorder_cormat(cormat)
+upper_tri <- get_upper_tri(cormat)
+# Melt the correlation matrix
+melted_cormat <- melt(upper_tri, na.rm = TRUE)
+# Create a ggheatmap
+ggheatmap <- ggplot(melted_cormat, aes(Var2, Var1, fill = value))+
+ geom_tile(color = "white")+
+ scale_fill_gradient2(low = "blue", high = "red", mid = "white", 
+   midpoint = 0, limit = c(-1,1), space = "Lab", 
+    name="Pearson\nCorrelation") +
+  theme_minimal()+ # minimal theme
+ theme(axis.text.x = element_text(angle = 45, vjust = 1, 
+    size = 12, hjust = 1))+
+ coord_fixed()
+# Print the heatmap
+print(ggheatmap)
+```
+
+
+```{r}
+
 ```
 
 ```{r}
