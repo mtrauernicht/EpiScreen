@@ -1,0 +1,190 @@
+---
+title: "FACS analysis"
+author: "Max Trauernicht"
+date: "`r format(Sys.time(), '%Y-%m-%d')`"
+output: 
+  html_document:
+    theme: journal #cerulean
+    highlight: monochrome
+    toc: true
+    toc_float: true
+    code_folding: show
+  editor_options:
+    chunk_output_type: console
+---
+
+# knitr document van Steensel lab
+
+# TRIP Clone identification
+
+# Introduction
+This script generates plots of FACS data. This way the effect of drugs on cell cycle will be visualized.
+
+
+## Description of Data
+How to make a good rendering table: 
+```{r table1, echo=FALSE, message=FALSE, warnings=FALSE, results='asis'}
+tabl <- "
+| column1	|	column2	|	column3	|	
+|----|----|----|
+|1	|	2	|	3	|	
+|a	|	b	|	c	|	
+"
+cat(tabl) # output the table in a format good for HTML/PDF/docx conversion
+```
+
+# Data processing
+## Path, Libraries, Parameters and Useful Functions
+```{r setup}
+knitr::opts_chunk$set(echo = TRUE)
+StartTime <-Sys.time()
+
+# 8-digit Date tag:
+Date <- substr(gsub("-","",Sys.time()),1,8) 
+# libraries:
+library(maditr)
+library(plyr)
+library(ggplot2)
+library(ggpubr)
+```
+
+### Custom functions
+Functions used thoughout this script.
+```{r}
+SetFileName <- function(filename, initials) {
+  # Set filename with extension and initials to make filename with date integrated.
+  filename <- substitute(filename)
+  initials <- substitute(initials)
+  filename <- paste0(initials, Date, filename)
+  filename
+}
+```
+
+
+## Data import
+```{r}
+setwd("/DATA/usr/m.trauernicht/projects/EpiScreen/FACS/Data/")
+PD.samples <- read.csv2("mt20190412_PD_FlowJo.csv")
+```
+
+# Analysis
+
+## Bring dataframe in right format
+```{r out.width= "80%", fig.align= "center", echo = FALSE, warning = FALSE}
+# Remove not needed column
+PD.samples <- PD.samples[,c(-1,-4)]
+
+# Remove not needed rows
+PD.samples <- PD.samples[PD.samples$Statistic != "",]
+
+# Create new column
+PD.samples$sample <- gsub("(.*?).fcs.*", "\\1", PD.samples$Name)
+
+# Rename column
+PD.samples$Name <- gsub(".*/Cells(.*?)", "\\1", PD.samples$Name)
+PD.samples <- PD.samples[PD.samples$Name != "",]
+PD.samples$Name <- gsub("/Single Cells", "\\1", PD.samples$Name)
+PD.samples <- PD.samples[PD.samples$Name != "",]
+PD.samples$Name <- gsub("/", "\\1", PD.samples$Name)
+
+# Restructure dataframe for visualization
+PD.samples <- dcast(PD.samples, sample ~ Name, value.var = "Statistic")
+
+# Compute relative G2, G1 and S fraction
+PD.samples$sum <- as.numeric(as.character(PD.samples$G1)) + as.numeric(as.character(PD.samples$S)) + as.numeric(as.character(PD.samples$G2))
+PD.samples$G2 <- as.numeric(as.character(PD.samples$G2)) / as.numeric(as.character(PD.samples$sum))
+PD.samples$G1 <- as.numeric(as.character(PD.samples$G1)) / as.numeric(as.character(PD.samples$sum))
+PD.samples$S <- as.numeric(as.character(PD.samples$S)) / as.numeric(as.character(PD.samples$sum))
+PD.samples <- PD.samples[,-5]
+
+
+```
+
+
+
+## Visualisation
+```{r out.width= "80%", fig.align= "center", echo = FALSE, warning = FALSE}
+# Melt data for ggplot
+PD.samples <- melt(PD.samples, id.vars = "sample")
+
+# Include reps
+PD.samples$rep <- gsub(".*(.{1}$)", "\\1", PD.samples$sample)
+PD.samples$sample <- gsub(".{1}$", "\\1", PD.samples$sample)
+
+# Rename columns 
+colnames(PD.samples)[names(PD.samples) == "variable"] <- "stage"
+colnames(PD.samples)[names(PD.samples) == "value"] <- "frequency"
+
+# Compute mean per sample
+PD.samples$mean.frequency <- ave(PD.samples$frequency, PD.samples$sample, PD.samples$stage, FUN = function(x) mean(x))
+PD.samples$SD <- ave(PD.samples$frequency, PD.samples$sample, PD.samples$stage, FUN = function(x) sd(x))
+PD.samples2 <- PD.samples
+PD.samples <- PD.samples[,c(-3:-4)]
+PD.samples <- PD.samples[!duplicated(PD.samples),]
+
+# Reorder stages according to biology
+PD.samples$stage <- factor(PD.samples$stage, levels=c("G2", "S","G1"))
+
+# G2/G1 ratio before and after damage over each other
+ggplot(PD.samples, aes(sample, mean.frequency)) +
+  geom_bar(stat="identity",
+    aes(group = stage, fill = stage),
+    data = PD.samples
+    ) +
+  geom_errorbar(
+    aes(ymin = mean.frequency-SD, ymax = mean.frequency+SD, color = stage),
+    data = PD.samples, width = 0.2
+    )+
+  scale_fill_manual(values = c("#DED89C","#BF7538","#749075"))
+
+```
+
+# Statistical analysis
+```{r}
+t.test.PD1 <- t.test(PD.samples2$frequency[PD.samples2$stage == "G1" & 
+                                               PD.samples2$sample == "GFP_DMSO"],
+                      PD.samples2$frequency[PD.samples2$stage == "G1" & 
+                                               PD.samples2$sample == "GFP_PD"])
+
+t.test.PD2 <- t.test(PD.samples2$frequency[PD.samples2$stage == "G1" & 
+                                               PD.samples2$sample == "LBR2_DMSO"],
+                      PD.samples2$frequency[PD.samples2$stage == "G1" & 
+                                               PD.samples2$sample == "LBR2_PD"])
+
+# Sequencing TIDE data statistical analysis
+# Manually imported from indel plots
+tide.data <- data.frame("drug" = c("DMSO","DMSO","PD","PD"),
+                        "rep" = c(1,2,1,2),
+                        "MMEJ" = c(16.3,16.3,5.9,6.7))
+tide.data$mean <- ave(tide.data$MMEJ, tide.data$drug, 
+                      FUN = function(x) mean(x))
+tide.data$sd <- ave(tide.data$MMEJ, tide.data$drug, 
+                      FUN = function(x) sd(x))
+t.test.tide <- t.test(tide.data$MMEJ[tide.data$drug == "DMSO"],
+                      tide.data$MMEJ[tide.data$drug == "PD"])
+
+tide.data <- data.frame("drug" = c("DMSO","DMSO","PD","PD"),
+                        "rep" = c(1,2,1,2),
+                        "NHEJ" = c(59.5,51.8,55,55.2))
+tide.data$mean <- ave(tide.data$NHEJ, tide.data$drug, 
+                      FUN = function(x) mean(x))
+tide.data$sd <- ave(tide.data$NHEJ, tide.data$drug, 
+                      FUN = function(x) sd(x))
+t.test.tide.nhej <- t.test(tide.data$NHEJ[tide.data$drug == "DMSO"],
+                      tide.data$NHEJ[tide.data$drug == "PD"])
+```
+
+# Conclusion: PD induces G1 arrest
+
+## Exporting potential data. 
+```{r}
+```
+
+# Session Info
+```{r}
+paste("Run time: ",format(Sys.time()-StartTime))
+getwd()
+date()
+sessionInfo()
+```
+

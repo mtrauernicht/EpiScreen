@@ -1,0 +1,206 @@
+---
+title: "FACS analysis"
+author: "Max Trauernicht"
+date: "`r format(Sys.time(), '%Y-%m-%d')`"
+output: 
+  html_document:
+    theme: journal #cerulean
+    highlight: monochrome
+    toc: true
+    toc_float: true
+    code_folding: show
+  editor_options:
+    chunk_output_type: console
+---
+
+# knitr document van Steensel lab
+
+# TRIP Clone identification
+
+# Introduction
+This script generates plots of FACS data. This way the effect of drugs on cell cycle will be visualized.
+In this particular experiment, decitabine and DNA-PKi synergy was tested on several days after break induction (3,4,5,6 days).
+
+
+## Description of Data
+How to make a good rendering table: 
+```{r table1, echo=FALSE, message=FALSE, warnings=FALSE, results='asis'}
+tabl <- "
+| column1	|	column2	|	column3	|	
+|----|----|----|
+|1	|	2	|	3	|	
+|a	|	b	|	c	|	
+"
+cat(tabl) # output the table in a format good for HTML/PDF/docx conversion
+```
+
+# Data processing
+## Path, Libraries, Parameters and Useful Functions
+```{r setup}
+knitr::opts_chunk$set(echo = TRUE)
+StartTime <-Sys.time()
+
+# 8-digit Date tag:
+Date <- substr(gsub("-","",Sys.time()),1,8) 
+# libraries:
+library(maditr)
+library(ggplot2)
+```
+
+### Custom functions
+Functions used thoughout this script.
+```{r}
+SetFileName <- function(filename, initials) {
+  # Set filename with extension and initials to make filename with date integrated.
+  filename <- substitute(filename)
+  initials <- substitute(initials)
+  filename <- paste0(initials, Date, filename)
+  filename
+}
+```
+
+
+## Data import
+```{r}
+setwd("/DATA/usr/m.trauernicht/projects/EpiScreen/FACS/Data/")
+synergy.samples2 <- read.csv2("mt20190228_FlowJo_2.csv")
+```
+
+# Analysis
+
+## The same for second df
+```{r}
+synergy.samples2 <- synergy.samples2[,-6]
+synergy.samples2 <- setnames(synergy.samples2, "Drug", "drug")
+synergy.samples2$day <- 3
+synergy.samples2$rep <- 3
+synergy.samples2$rep[c(13:18,25:30,49:54,61:66)] <- 4
+synergy.samples2$rep[c(19:24,31:36,55:60,85:90)] <- 5
+synergy.samples2$rep[c(67:72)] <- 6
+synergy.samples2$rep[c(73:78)] <- 7
+synergy.samples2$rep[c(79:84)] <- 8
+synergy.samples2$rep[c(91:96)] <- 9
+synergy.samples2$rep[c(97:102)] <- 10
+synergy.samples2$rep[c(103:108)] <- 11
+synergy.samples2$damage <- "10 Gy"
+synergy.samples2$damage[c(109:114)] <- "GFP"
+synergy.samples2$damage[c(115:120)] <- "LBR2"
+
+# Remove not needed rows
+synergy.samples2 <- synergy.samples2[synergy.samples2$Statistic != "",]
+
+# Remove not needed column
+synergy.samples2 <- synergy.samples2[,-1]
+
+# Rename column
+synergy.samples2$Name <- gsub("[A-Z][1-9].fcs/Cells(.*?)", "\\1", synergy.samples2$Name)
+synergy.samples2$Name <- gsub("[A-Z][1-9][0-9].fcs/Cells(.*?)", "\\1", synergy.samples2$Name)
+synergy.samples2$Name <- gsub("/Single Cells", "\\1", synergy.samples2$Name)
+synergy.samples2$Name <- gsub("/", "\\1", synergy.samples2$Name)
+
+# Remove not needed rows
+synergy.samples2 <- synergy.samples2[synergy.samples2$Name != "",]
+synergy.samples2 <- na.omit(synergy.samples2)
+
+# Remove data with low cell numbers 
+synergy.samples2$cell.count <- ave(synergy.samples2$X.Cells, synergy.samples2$drug, synergy.samples2$day, synergy.samples2$rep, FUN = function(x) sum(x))
+synergy.samples2 <- synergy.samples2[synergy.samples2$cell.count > 1000,]
+# synergy.samples2 <- synergy.samples2 [,c(-3,-8)]
+
+## Rearrange to wide format
+synergy.samples2 <- dcast(synergy.samples2, drug + day + rep + damage ~ Name, value.var = "Statistic", fun.aggregate = mean)
+
+
+# Compute relative G2, G1 and S fraction
+for (i in synergy.samples2$rep) {
+synergy.samples2$sum.apo[synergy.samples2$rep == i] <- synergy.samples2$G1[synergy.samples2$rep == i] + 
+  synergy.samples2$S[synergy.samples2$rep == i] + synergy.samples2$G2[synergy.samples2$rep == i] + 
+  synergy.samples2$`Apoptotic cells`[synergy.samples2$rep == i]
+}
+for (i in synergy.samples2$rep) {
+synergy.samples2$sum[synergy.samples2$rep == i] <- synergy.samples2$G1[synergy.samples2$rep == i] + 
+  synergy.samples2$S[synergy.samples2$rep == i] + synergy.samples2$G2[synergy.samples2$rep == i] 
+}
+
+synergy.samples2$G2 <- synergy.samples2$G2 / synergy.samples2$sum
+synergy.samples2$G1 <- synergy.samples2$G1 / synergy.samples2$sum
+synergy.samples2$S <- synergy.samples2$S / synergy.samples2$sum
+synergy.samples2 <- synergy.samples2[,c(-8:-9)]
+
+# Merge the two dfs
+synergy.samples2 <- melt(synergy.samples2, id.vars = c("drug", "day", "rep", "damage"))
+synergy.samples2$drug <- as.character(synergy.samples2$drug)
+synergy.samples2$drug[grep("Decitabine + NU7441", synergy.samples2$drug)] <- "NU7441 + Decitabine"
+
+# Combine drug and day columns
+# synergy.samples2$drug <- paste0(synergy.samples2$drug, "_", synergy.samples2$day)
+# synergy.samples2 <- synergy.samples2[,-2]
+```
+
+
+## Visualisation
+```{r out.width= "80%", fig.align= "center", echo = FALSE, warning = FALSE}
+# Arrange everything in the right order
+# synergy.samples2$conc <- factor(synergy.samples2$conc, levels=c("100nm", "1um", "10um"))
+synergy.samples2$variable <- factor(synergy.samples2$variable, levels=c("G2", "S","G1"))
+synergy.samples2$drug <- factor(synergy.samples2$drug, levels=c("DMSO", "NU7441", "Decitabine", "Decitabine + NU7441", "NU7441_GFP", "NU7441_LBR2"))
+
+synergy.samples2 <- synergy.samples2[!duplicated(synergy.samples2),]
+synergy.samples2 <- na.omit(synergy.samples2)
+
+synergy.samples2$drug <- paste(synergy.samples2$drug, synergy.samples2$damage)
+
+synergy.samples2$SD <- ave(synergy.samples2$value, synergy.samples2$drug, 
+                                   synergy.samples2$variable, FUN = function(x) sd(x))
+synergy.samples2$mean.value <- ave(synergy.samples2$value, synergy.samples2$drug, 
+                                   synergy.samples2$variable, FUN = function(x) mean(x))
+synergy.samples3 <- synergy.samples2
+synergy.samples2 <- synergy.samples2[,c(-2:-4,-6)]
+synergy.samples2 <- unique(synergy.samples2)
+
+
+# Barplot of each drug next to each other
+ggplot(data = synergy.samples2, aes(y = mean.value, x = drug, fill = variable)) +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1.0, vjust = 0)) +
+  geom_bar(stat="identity") +
+  geom_errorbar(aes(ymin = mean.value-SD, ymax = mean.value+SD, color = variable), width = 0.2) +
+  scale_fill_manual(values = c("#DED89C","#BF7538","#749075"))
+  labs(title = "cell cycle arrest upon blocking NHEJ (NU7441) and/or MMEJ (Decitabine)", 
+       x = "days after damage induction", y = "G1, S, and G2 fractions") + 
+  scale_fill_manual(values = c("#DED89C","#BF7538","#749075"))
+  
+  
+# facet_grid(rows = vars(rep), cols = vars(drug))
+# geom_errorbar(aes(ymin = mean.value-SD, ymax = mean.value+SD), data = synergy.samples2, width = 0.2)
+
+  
+```
+
+# Statistics
+```{r}
+t.test.facs <- t.test(synergy.samples3$value[synergy.samples3$variable == "G2" & 
+                                               synergy.samples3$drug == "DMSO 10 Gy"],
+                      synergy.samples3$value[synergy.samples3$variable == "G2" & 
+                                               synergy.samples3$drug == "Decitabine + NU7441 10 Gy"])
+
+t.test.facs <- t.test(synergy.samples3$value[synergy.samples3$variable == "G2" & 
+                                               synergy.samples3$drug == "DMSO 10 Gy"],
+                      synergy.samples3$value[synergy.samples3$variable == "G2" & 
+                                               synergy.samples3$drug == "NU7441 10 Gy"])
+```
+
+# Conclusion: We get a massive G2 arrest upon double drug treatment and dna damage induction
+
+
+## Exporting potential data. 
+```{r}
+```
+
+# Session Info
+```{r}
+paste("Run time: ",format(Sys.time()-StartTime))
+getwd()
+date()
+sessionInfo()
+```
+
