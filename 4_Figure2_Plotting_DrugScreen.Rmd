@@ -501,6 +501,7 @@ Are the effects on cutting efficiency global or local? Can we plot all interesti
 # Row annotation: annotate drugs with the target group
 target <- indel.data %>% 
   filter(!target %in% c("Negative Control", "MRN", "DNA-PK")) %>% 
+  mutate(drug = gsub(" [(].*[)]", "", drug)) %>%
   distinct(drug, target) %>% 
   column_to_rownames(var="drug")
 
@@ -528,8 +529,8 @@ annotation_colors_scr = list(
   target = c(HDAC="#60988D", HAT="#C6D0A8", Sirtuin="#8FCAAC",
              HMT="#FDCDAC", DNMT="#D69C81", `Histone Demethylase`="#FFF2AE",
              HIF="#E3DCD5", JAK="#C8D7E2", PIM="#9AB8C4", `Aurora Kinase`="#F4CAE4",
-             PARP="#CB546F", `Epigenetic Reader Domain`= "#476D61", `DNA-PK`="#E07A43"
-             ))
+             PARP="#CB546F", `Epigenetic Reader Domain`= "#476D61", `DNA-PK`="#E07A43"),
+  clusters_drugs = c(`1` = "grey10", `2` = "grey30", `3` = "grey50", `4` = "grey70"))
 
 
 
@@ -575,8 +576,8 @@ eff.data.heatmap <- merge(eff.data.heatmap, dmso_eff) %>%
 eff.data.heatmap <- eff.data.heatmap %>%
   mutate(mean_eff_zscore_comb = 2*pnorm(q = abs(mean_eff_zscore_comb), lower.tail = F)) %>%
   mutate(mean_eff_zscore_comb = p.adjust(mean_eff_zscore_comb, method = 'fdr')) %>%
-  mutate(min = ave(mean_eff_zscore_comb, drug, conc_char, FUN = min)) %>%
-  filter(min < 0.05) %>%
+  mutate(min_score = ave(mean_eff_zscore_comb, drug, conc_char, FUN = min)) %>%
+  filter(min_score < 0.05) %>%
   distinct(drug, target, conc_char, freqCut_dif, IPR)
 
 #eff.data.heatmap2$freqCut_norm_mean[eff.data.heatmap2$mean_eff_zscore_comb > 0.05] <- NA
@@ -602,49 +603,44 @@ ordered_marks2 <- ordered_marks2$target
 
 annotation_colors_scr$target <- annotation_colors_scr$target[ordered_marks2]
 
-p1<- pheatmap(eff.data.heatmap2[eff.data.heatmap2$conc_char == "100 nM",] %>%
-                       arrange(target) %>%
-                       column_to_rownames('drug') %>%
-                       dplyr::select(contains('IPR')) %>%
-                       t(),
-           border_color = F,
-           cellwidth = 8,
-           cellheight = 8,
-           breaks = myBreaks,
-           cluster_rows = F,
-           cluster_cols = T,
-           angle_col = 90,
-           na_col = "white",
-           main = paste('efficiency change, concentration =', "100 nM"),
-           annotation_col = target,
-           annotation_row = chromatin,
-           color = colorRampPalette(c("#e07a5f", "#e5e5e5", "#3d405b"))(palette_length),
-           annotation_colors = annotation_colors_scr, 
-           annotation_legend = T)
-print(p1)
+# Only include lowest effective concentrations
+eff.data.heatmap2 <- eff.data.heatmap2 %>%
+  mutate(compound_n = ave(drug, drug, FUN = length))
+all_conc <- eff.data.heatmap2[eff.data.heatmap2$compound_n == "3" & eff.data.heatmap2$conc_char %in% c("1 µM", "10 µM"),]
+eff.data.heatmap2 <- anti_join(eff.data.heatmap2, all_conc)
 
-p2 <- pheatmap(eff.data.heatmap2[eff.data.heatmap2$conc_char == "1 µM",] %>%
-                       arrange(target) %>%
-                       column_to_rownames('drug') %>%
-                       dplyr::select(contains('IPR')) %>%
-                       t(),
-           border_color = F,
-           cellwidth = 8,
-           cellheight = 8,
-           breaks = myBreaks,
-           cluster_rows = F,
-           cluster_cols = T,
-           angle_col = 90,
-           na_col = "white",
-           main = paste('efficiency change, concentration =', "1 µM"),
-           annotation_col = target,
-           annotation_row = chromatin,
-           color = colorRampPalette(c("#e07a5f", "#e5e5e5", "#3d405b"))(palette_length),
-           annotation_colors = annotation_colors_scr, 
-           annotation_legend = T)
-print(p2)
+eff.data.heatmap2$conc <- 1
+eff.data.heatmap2$conc[eff.data.heatmap2$conc_char == "1 µM"] <- 2
+eff.data.heatmap2$conc[eff.data.heatmap2$conc_char == "10 µM"] <- 3
 
-p3 <- pheatmap(eff.data.heatmap2[eff.data.heatmap2$conc_char == "10 µM",] %>%
+for (i in unique(eff.data.heatmap2$drug)) {
+  if (eff.data.heatmap2$compound_n[eff.data.heatmap2$drug == i] == "2") {
+    max_conc <- max(eff.data.heatmap2$conc[eff.data.heatmap2$compound_n == "2" & eff.data.heatmap2$drug == i])
+    remove <- eff.data.heatmap2[eff.data.heatmap2$compound_n == "2" & eff.data.heatmap2$drug == i & eff.data.heatmap2$conc == max_conc,]
+    eff.data.heatmap2 <-anti_join(eff.data.heatmap2, remove)
+  }
+}
+
+eff.data.heatmap2 <- eff.data.heatmap2 %>%
+  dplyr::select(-compound_n, -conc)
+
+# Add cluster annotation
+clusters_drugs <- hclust(dist(eff.data.heatmap2), method = "complete")
+clusters_drugs <- cutree(tree = as.dendrogram(clusters_drugs), k = 7)
+clusters_drugs <- data.frame(clusters_drugs)
+eff.data.heatmap2 <- cbind(eff.data.heatmap2, clusters_drugs)
+clusters_drugs <- eff.data.heatmap2 %>%
+  distinct(drug, clusters_drugs)
+target <- target %>%
+  rownames_to_column("drug") %>%
+  left_join(clusters_drugs) %>%
+  na.omit()
+rownames(target) <- target$drug
+target <- target %>%
+  dplyr::select(target, clusters_drugs)
+
+
+pheatmap(eff.data.heatmap2 %>%
                        arrange(target) %>%
                        column_to_rownames('drug') %>%
                        dplyr::select(contains('IPR')) %>%
@@ -657,13 +653,14 @@ p3 <- pheatmap(eff.data.heatmap2[eff.data.heatmap2$conc_char == "10 µM",] %>%
            cluster_cols = T,
            angle_col = 90,
            na_col = "white",
-           main = paste('efficiency change, concentration =', "10 µM"),
+           main = 'efficiency change, all concentrations',
            annotation_col = target,
            annotation_row = chromatin,
            color = colorRampPalette(c("#e07a5f", "#e5e5e5", "#3d405b"))(palette_length),
            annotation_colors = annotation_colors_scr, 
            annotation_legend = T)
-print(p3)
+
+
 
 breaks <- seq(0.4,0.9,0.006)
 pheatmap(dmso_freq %>%
@@ -677,6 +674,43 @@ pheatmap(dmso_freq %>%
          color = colorRampPalette(c("white", "black"))(palette_length))
 
 ```
+
+## Do the different clusters have different effects on different chromatin types?
+```{r}
+chromatin_ipr <- chromatin %>%
+  rownames_to_column("IPR")
+
+eff.data.heatmap3 <- eff.data.heatmap2 %>%
+    pivot_longer(cols = contains("IPR"), names_to = "IPR", values_to = "freqCut_dif")
+
+chromatin_effect <- merge(eff.data.heatmap3, chromatin_ipr) %>%
+  #filter(target == "HDAC") %>%
+  mutate(freqCut_dif = ave(freqCut_dif, drug, chromatin, conc_char, FUN = mean)) %>%
+  distinct(freqCut_dif, drug, chromatin, conc_char, target)
+
+chromatin_effect <- merge(chromatin_effect, clusters_drugs)
+
+sigFunc = function(x){
+  if(x < 0.001){"***"} 
+  else if(x < 0.01){"**"}
+  else if(x < 0.05){"*"}
+  else{NA}}
+
+ggplot(chromatin_effect,
+              aes(x = chromatin, y = freqCut_dif, fill = chromatin)) +
+  geom_boxplot(outlier.shape = NA) +
+  geom_quasirandom() +
+  geom_signif(comparisons = combn(sort(unique(chromatin_effect$chromatin)), 2, simplify = F), 
+              map_signif_level=sigFunc, 
+              step_increase = 0.1) +
+  theme_classic_lines_45() +
+  scale_fill_manual(values = chrom_colors) +
+  theme(legend.position = "none") +
+  facet_wrap(~clusters_drugs)
+```
+
+
+
 
 
 ## Are the changes in indel rate correlated with the starting indel rates?
@@ -697,7 +731,7 @@ corr_dmso <- merge(eff.data.heatmap, dmso_freq) %>%
 
 ## Correlation with H3K27me3 (not included in the heatmaps atm, can be added)
 h3k27me3 <- indel.data %>%
-  distinct(IPR, H3K27me3.zscore, late_replicating.zscore)
+  distinct(IPR, EZH2.zscore, late_replicating.zscore)
 
 corr_dmso <- merge(corr_dmso, h3k27me3) 
 
@@ -711,94 +745,12 @@ for (i in unique(corr_heatmap$drug_conc)) {
   
   corr_heatmap$cor_h3k27me3[corr_heatmap$drug_conc == i] <- 
     cor(corr_heatmap$freqCut_dif[corr_heatmap$drug_conc == i],
-        corr_heatmap$H3K27me3.zscore[corr_heatmap$drug_conc == i])
+        corr_heatmap$EZH2.zscore[corr_heatmap$drug_conc == i])
   
   corr_heatmap$cor_repl[corr_heatmap$drug_conc == i] <- 
     cor(corr_heatmap$freqCut_dif[corr_heatmap$drug_conc == i],
         corr_heatmap$late_replicating.zscore[corr_heatmap$drug_conc == i])
 }
-
-pc1 <- corr_heatmap %>%
-  filter(conc_char == "100 nM") %>%
-  distinct(drug, cor_dmso) %>%
-  mutate(drug = gsub(" [(].*[)]", "", drug))
-
-col_order <- data.frame("drug" = p1$tree_col[["labels"]],
-                        "order" = p1$tree_col[["order"]])
-
-col_order2 <- col_order %>%
-  rownames_to_column("new_order") %>%
-  arrange(factor(new_order, levels = order)) %>%
-  distinct(drug) 
-
-pc1 <- left_join(col_order2, pc1)
-
-breaks <- seq(-1,1,0.02)
-
-pheatmap(pc1%>%
-           column_to_rownames("drug") %>%
-           t(),
-         border_color = F,
-         cellwidth = 8,
-         cellheight = 8,
-         cluster_rows = F,
-         cluster_cols = F,
-         breaks = breaks,
-         color = colorRampPalette(c("black", "white", "#184e77"))(palette_length))
-
-pc2 <- corr_heatmap %>%
-  filter(conc_char == "1 µM") %>%
-  distinct(drug, cor_dmso) %>%
-  mutate(drug = gsub(" [(].*[)]", "", drug))
-
-col_order <- data.frame("drug" = p2$tree_col[["labels"]],
-                        "order" = p2$tree_col[["order"]])
-
-col_order2 <- col_order %>%
-  rownames_to_column("new_order") %>%
-  arrange(factor(new_order, levels = order)) %>%
-  distinct(drug) 
-
-pc2 <- left_join(col_order2, pc2)
-
-pheatmap(pc2 %>%
-           column_to_rownames("drug") %>%
-           t(),
-         border_color = F,
-         cellwidth = 8,
-         cellheight = 8,
-         cluster_rows = F,
-         cluster_cols = F,
-         breaks = breaks,
-         color = colorRampPalette(c("black", "white", "#184e77"))(palette_length))
-
-pc3 <- corr_heatmap %>%
-  filter(conc_char == "10 µM") %>%
-  distinct(drug, cor_dmso) %>%
-  mutate(drug = gsub(" [(].*[)]", "", drug))
-
-
-col_order <- data.frame("drug" = p3$tree_col[["labels"]],
-                        "order" = p3$tree_col[["order"]])
-
-col_order2 <- col_order %>%
-  rownames_to_column("new_order") %>%
-  arrange(factor(new_order, levels = order)) %>%
-  distinct(drug) 
-
-pc3 <- left_join(col_order2, pc3)
-
-
-pheatmap(pc3 %>%
-           column_to_rownames("drug") %>%
-           t(),
-         border_color = F,
-         cellwidth = 8,
-         cellheight = 8,
-         cluster_rows = F,
-         cluster_cols = F,
-         breaks = breaks,
-         color = colorRampPalette(c("black", "white", "#184e77"))(palette_length))
 
 
 
@@ -844,7 +796,7 @@ for (i in unique(corr_dmso$drug_conc)) {
 }
 
 for (i in unique(corr_dmso$drug_conc)) {
-    model.correlation <- lm(formula = freqCut_dif ~ H3K27me3.zscore, 
+    model.correlation <- lm(formula = freqCut_dif ~ EZH2.zscore, 
                                data = corr_dmso[corr_dmso$drug_conc == i,]) %>% 
       tidy()
     
@@ -874,7 +826,7 @@ ggplot(corr_dmso %>%
   geom_hline(yintercept = -log10(0.01), lty = "dashed") #+
   #facet_wrap(~sign, nrow = 2)
   
-corr_hits <- corr_dmso %>% filter(drug_conc %in% c("PCI-24781 (Abexinostat)_100 nM", "Fluoro-SAHA_1 µM", "Belinostat (PXD101)_100 nM", "Droxinostat_10 µM")) 
+corr_hits <- corr_dmso %>% filter(drug_conc %in% c("PCI-24781 (Abexinostat)_100 nM", "Fluoro-SAHA_1 µM")) 
 
 corr_h3k27me3_hits <- corr_dmso %>% filter(drug %in% c("EPZ-6438"))
 
@@ -884,32 +836,16 @@ ggplot(corr_hits %>%
          mutate(freqCut = dmso_eff + freqCut_dif)) +
   geom_abline(lty = "twodash", slope = 1) +
   geom_hline(yintercept = max(dmso_freq$dmso_eff)*100, lty = "dashed") + 
-  geom_point(aes(y = freqCut*100, x = dmso_eff*100, color = chromatin)) +
+  geom_point(aes(y = freqCut*100, x = dmso_eff*100, fill = chromatin), color = ifelse(corr_hits$freqCut_dif > 0.02, "red", "black"), shape = 21, size = 3) +
   #scale_color_manual(values = c("#e07a5f", "#3d405b")) +
   #stat_cor(method = "pearson") +
   #annotate("rect",xmin=(dmso_freq$dmso_eff + 0.02),xmax=unique(indel.data.freq$max_dmso_freq),ymin=-log10(0.05),ymax=Inf, alpha=0.1, fill="#e07a5f") +
   facet_wrap(~drug_conc)+
-  scale_color_manual(values = chrom_colors)
-
-corr_hits <- corr_hits %>%
-  mutate(drug_eff = dmso_eff + freqCut_dif) %>%
-  distinct(drug_eff, drug_conc, IPR)
-
-dmso_freq2 <- dmso_freq %>%
-  mutate(drug_conc = "DMSO") %>%
-  dplyr::select("drug_eff" = dmso_eff, drug_conc, IPR)
-
-corr_hits <- rbind(corr_hits, dmso_freq2)
-
-ggplot_custom(corr_hits,
-       aes(x = drug_eff, y = IPR, fill = drug_conc)) +
-  geom_bar(stat = "identity", position = "dodge") +
-  scale_x_continuous(labels = scales::percent) +
-  geom_vline(xintercept = max(dmso_freq$dmso_eff))
+  scale_fill_manual(values = chrom_colors) 
 
 
 ggplot(corr_h3k27me3_hits,
-       aes(y = freqCut_norm_mean, x = H3K27me3.zscore, color = ifelse(sign == 1, "red", "black"))) +
+       aes(y = freqCut_dif, x = EZH2.zscore, color = ifelse(sign == 1, "red", "black"))) +
   geom_point() +
   geom_smooth(method = "lm", lty = "dashed") +
   scale_color_manual(values = c("#e07a5f", "#3d405b")) +
@@ -941,16 +877,101 @@ ggplot(chrom_corr %>%
   geom_hline(yintercept = -log10(0.05), lty = "dashed") +
   geom_quasirandom() #+
   #facet_wrap(~target) 
-
-# Can the different HDAC inhibitor phenotypes be explained by which HDAC they target?
-hdac_class <- chrom_corr %>%
-  filter(target == "HDAC") %>%
-  distinct(drug, global, conc_char)
 ```
 
 *Figure 2C: Heatmap of cutting efficiency change induced by HDAC inhibitors at 19 genomic locations.*
 
 **Conclusion: Many different HDAC inhibitors can change cutting efficiency locally. As expected, heterochromatin is more prone to an increase in cutting efficiency.**
+
+## Epistasis per cluster
+```{r}
+drug_clusters <- eff.data.heatmap2 %>%
+  mutate(drug_conc = paste(drug, conc_char, sep = "_")) %>%
+  distinct(drug_conc, clusters_drugs)
+
+epistasis_cluster <- epistasis_tib %>%
+  distinct(drug_conc, feature, indelrate_slope) %>%
+  mutate(drug_conc = gsub(" [(].*[)]", "", drug_conc)) %>%
+  left_join(drug_clusters) %>%
+  na.omit() %>%
+  mutate(clusters_drugs = as.character(clusters_drugs)) %>%
+  
+
+ggplot(epistasis_cluster %>%
+         filter(clusters_drugs %in% c('4', '5','7')) %>%
+         filter(feature %in% c("LMNB1.zscore", "")),
+       aes(x = clusters_drugs, y = indelrate_slope)) +
+  geom_quasirandom() +
+  facet_wrap(~feature)
+
+ 
+
+
+
+
+
+epistasis_cluster <- epistasis_cluster %>%
+  spread(feature, indelrate_slope)
+
+rownames(drug_clusters) <- drug_clusters$drug_conc
+drug_clusters <- drug_clusters %>%
+  dplyr::select(-drug_conc)
+
+epistasis_cluster <- epistasis_cluster[epistasis_cluster$drug_conc %in% drug_clusters$drug_conc,]
+
+pheatmap(epistasis_cluster %>%
+             column_to_rownames(var = "drug_conc"),
+         cluster_rows = T,
+         cluster_cols = T,
+         cellwidth = 8,
+         cellheight = 8,
+         annotation_row = drug_clusters,
+         border_color = NA,
+         color = colorRampPalette(c("blue", "white", "red"))(palette_length))
+
+```
+
+
+
+
+## UMAP
+```{r}
+eff.data.heatmap3 <- eff.data.heatmap2 %>%
+  mutate(drug_conc = paste(drug, conc_char, sep = "_"))
+
+umap_df <- indel.data %>% 
+  distinct(freqCut, drug, conc_char, IPR, target) %>% 
+  mutate(freqCut = ave(freqCut, drug, conc_char, IPR, FUN = mean)) %>% 
+  mutate(drug_conc = paste(drug, conc_char, sep = "_")) %>%
+  filter(drug_conc %in% eff.data.heatmap3$drug_conc) %>%
+  distinct(drug_conc, target, freqCut, IPR) %>%
+  spread(IPR, freqCut)
+
+epistasis_umap <- epistasis_tib %>%
+  distinct(drug_conc, feature, indelrate_slope) %>%
+  spread(feature, indelrate_slope) %>%
+  distinct()
+
+targets <- indel.data %>%
+  mutate(drug_conc = paste(drug, conc_char, sep = "_")) %>%
+  distinct(drug_conc, target)
+
+epistasis_umap <- merge(epistasis_umap, targets) %>%
+  filter(target == "HDAC")
+
+umap_df_umap <- umap::umap(epistasis_umap %>% dplyr::select(contains("zscore")))
+
+layout <- umap_df_umap[["layout"]] 
+layout <- data.frame(layout) 
+final <- cbind(layout, 'drug_conc' = epistasis_umap$drug_conc, 'target' = epistasis_umap$target, 'EZH2.zscore' = epistasis_umap$EZH2.zscore)
+
+ggplot(final,
+       aes(x = X1, y = X2, color = EZH2.zscore)) +
+  geom_point() +
+  scale_color_viridis()
+
+```
+
 
 
 
