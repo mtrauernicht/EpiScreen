@@ -1,0 +1,96 @@
+---
+title: "Clone identification"
+author: "Ruben Schep"
+date: "`r format(Sys.time(), '%Y-%m-%d')`"
+output: 
+  html_document:
+    theme: journal #cerulean
+    highlight: monochrome
+    toc: true
+    toc_float: true
+    code_folding: show
+  editor_options:
+    chunk_output_type: console
+---
+
+# knitr document van Steensel lab
+
+# TRIP Clone identification
+
+# Introduction
+
+## Description of Data
+How to make a good rendering table: 
+```{r table1, echo=FALSE, message=FALSE, warnings=FALSE, results='asis'}
+tabl <- "
+| column1	|	column2	|	column3	|	
+|----|----|----|
+|1	|	2	|	3	|	
+|a	|	b	|	c	|	
+"
+cat(tabl) # output the table in a format good for HTML/PDF/docx conversion
+```
+
+# Data processing
+## Path, Libraries, Parameters and Useful Functions
+```{r setup}
+knitr::opts_chunk$set(echo = TRUE)
+StartTime <-Sys.time()
+
+# 8-digit Date tag:
+Date <- substr(gsub("-","",Sys.time()),1,8) 
+# libraries:
+library(maditr)
+library(ggplot2)
+library(platetools)
+```
+
+### Custom functions
+Functions used thoughout this script.
+```{r}
+SetFileName <- function(filename, initials) {
+  # Set filename with extension and initials to make filename with date integrated.
+  filename <- substitute(filename)
+  initials <- substitute(initials)
+  filename <- paste0(initials, Date, filename)
+  filename
+}
+```
+
+
+## Data import
+```{r}
+setwd("/DATA/usr/m.trauernicht/projects/EpiScreen/FACS/Data/")
+viability.IR <- read.csv2("mt20190328_transposed.csv")
+```
+
+# Analysis
+
+## Visualize viability data
+```{r}
+viability.df <- melt(viability.IR)
+viability.df$value <- ave(viability.df$value, viability.df$variable, FUN = function(x) x/max(x))
+
+
+for (i in unique(viability.df$variable)) {
+p <- raw_grid(data = viability.df$value[viability.df$variable == i],
+       well = viability.df$X[viability.df$variable == i],
+       plate_id = viability.df$variable[viability.df$variable == i])
+print(p)
+}
+```
+
+
+## Exporting potential data. 
+```{r}
+
+```
+
+# Session Info
+```{r}
+paste("Run time: ",format(Sys.time()-StartTime))
+getwd()
+date()
+sessionInfo()
+```
+

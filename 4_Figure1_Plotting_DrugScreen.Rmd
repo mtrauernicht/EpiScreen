@@ -371,9 +371,12 @@ targets <- viability.data %>%
   mutate(number = as.numeric(number)) %>%
   dplyr::distinct(target, number)
 
-ggplot_custom(targets, aes(y = reorder(target, +number), x = number)) + 
+ggplot(targets, 
+       aes(y = reorder(target, +number), x = number, fill = as.numeric(number))) + 
   geom_bar(stat = "identity")  + 
-  ylab("")
+  ylab("") +
+  theme_pubr(border = T) +
+  scale_fill_grey()
 ```
 
 *Figure 1B: Number of probed compounds per target group.*
@@ -434,9 +437,10 @@ ggplot_custom(viability.data %>%
                 filter(group == "drug") %>%
                 mutate(mean_viab = ave(mean_viab, drug, conc_char, FUN = mean)) %>%
                 dplyr::distinct(mean_viab, drug, conc_char, removed),
-       aes(x = conc_char, y = mean_viab, color = removed)) +
-  geom_quasirandom() +
-  scale_color_manual(values = c(colors_diverse[1], colors_diverse[4]))
+       aes(x = conc_char, y = mean_viab)) +
+  geom_quasirandom(aes(fill = removed), color = "black", shape = 21, size = 2) +
+  scale_fill_manual(values = c(colors_diverse[1], colors_diverse[4])) +
+  theme_pubr(border = T)
 ```
 
 *Figure 1C: Filtering of toxic compounds. Compounds that decreased viability by >75% in more than one technical replicate in one or both biological replicate were removed (marked in yellow).*
@@ -460,7 +464,7 @@ indel.data2 <- indel.data %>%
 indel.data2$sample[indel.data2$sample == "drug" & indel.data2$conc_char == "100 nM"] <- "100 nM"
 indel.data2$sample[indel.data2$sample == "drug" & indel.data2$conc_char == "10 µM"] <- "10 µM"
 indel.data2$sample[indel.data2$sample == "drug" & indel.data2$conc_char == "1 µM"] <- "1 µM"
-sample_order <- c("10 µM","1 µM", "100 nM",  "DMSO (neg control)")
+sample_order <- c("DMSO (neg control)", "100 nM", "1 µM","10 µM")
 indel.data2$sample <- factor(indel.data2$sample, levels = sample_order)
 # indel.data2 <- indel.data2 %>%
 #   mutate(IPR = gsub("IPR", "", IPR))
@@ -482,20 +486,23 @@ indel.data2$chromatin <- factor(indel.data2$chromatin, levels = ordered_marks)
 plt1 = ggplot(indel.data2 %>%
          mutate(freqCut = ave(freqCut, drug, conc_char, IPR, FUN = mean)) %>%
          distinct(freqCut, drug, conc_char, IPR, chromatin, sample),
-       aes(x = IPR, y = freqCut)) +
-  geom_quasirandom_rast(aes(color = sample), dodge.width = 0.75, raster.dpi = 600) +
-  scale_color_manual(values = c(colors_drugs[2], colors_drugs[7], colors_drugs[4], "#000000")) +
-  facet_wrap(~chromatin, scales = "free_x", nrow = 1)
+       aes(x = IPR, y = freqCut*100)) +
+  geom_quasirandom_rast(aes(color = sample), dodge.width = 0.75, raster.dpi = 600, size = 0.5) +
+  scale_color_manual(values = c("DMSO (neg control)" = colors_drugs[2], "100 nM" = colors_drugs[7], "1 µM" = colors_drugs[4], "10 µM" = "#000000")) +
+  facet_wrap(~chromatin, scales = "free_x", nrow = 1) +
+  theme_pubr(border = T)
 
 plt2 = ggplot(indel.data2 %>%
-        distinct(mean_eff_zscore_comb , drug, conc_char, IPR, chromatin, sample),
-       aes(x = IPR, y = mean_eff_zscore_comb )) +
-  geom_quasirandom_rast(aes(color = sample), dodge.width = 0.75, raster.dpi = 600) +
+        distinct(MMEJratio , drug, conc_char, IPR, chromatin, sample) %>%
+          mutate(MMEJratio = ave(MMEJratio, drug, conc_char, IPR, FUN = mean)) %>%
+          distinct(),
+       aes(x = IPR, y = MMEJratio*100)) +
+  geom_quasirandom_rast(aes(color = sample), dodge.width = 0.75, raster.dpi = 600, size = 0.5) +
   scale_color_manual(values = c(colors_drugs[2], colors_drugs[7], colors_drugs[4], "#000000")) +
   facet_wrap(~chromatin, scales = "free_x", nrow = 1) +
-  geom_hline(linetype = "dashed", yintercept = 1.96) +
-  geom_hline(linetype = "dashed", yintercept = -1.96) +
-  theme_classic_lines_90()
+  #geom_hline(linetype = "dashed", yintercept = 1.96) +
+  #geom_hline(linetype = "dashed", yintercept = -1.96) +
+  theme_pubr(border = T)
 
 plot_grid(plt1, plt2, labels = "AUTO", nrow = 2)
 ```

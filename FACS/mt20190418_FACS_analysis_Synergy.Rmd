@@ -1,0 +1,191 @@
+---
+title: "FACS analysis"
+author: "Max Trauernicht"
+date: "`r format(Sys.time(), '%Y-%m-%d')`"
+output: 
+  html_document:
+    theme: journal #cerulean
+    highlight: monochrome
+    toc: true
+    toc_float: true
+    code_folding: show
+  editor_options:
+    chunk_output_type: console
+---
+
+# knitr document van Steensel lab
+
+# TRIP Clone identification
+
+# Introduction
+This script generates plots of FACS data. This way the effect of drugs on cell cycle will be visualized.
+In this particular experiment, decitabine and DNA-PKi synergy was tested on several days after break induction (3,4,5,6 days).
+
+
+## Description of Data
+How to make a good rendering table: 
+```{r table1, echo=FALSE, message=FALSE, warnings=FALSE, results='asis'}
+tabl <- "
+| column1	|	column2	|	column3	|	
+|----|----|----|
+|1	|	2	|	3	|	
+|a	|	b	|	c	|	
+"
+cat(tabl) # output the table in a format good for HTML/PDF/docx conversion
+```
+
+# Data processing
+## Path, Libraries, Parameters and Useful Functions
+```{r setup}
+knitr::opts_chunk$set(echo = TRUE)
+StartTime <-Sys.time()
+
+# 8-digit Date tag:
+Date <- substr(gsub("-","",Sys.time()),1,8) 
+# libraries:
+library(maditr)
+library(ggplot2)
+```
+
+### Custom functions
+Functions used thoughout this script.
+```{r}
+SetFileName <- function(filename, initials) {
+  # Set filename with extension and initials to make filename with date integrated.
+  filename <- substitute(filename)
+  initials <- substitute(initials)
+  filename <- paste0(initials, Date, filename)
+  filename
+}
+```
+
+
+## Data import
+```{r}
+setwd("/DATA/usr/m.trauernicht/projects/EpiScreen/FACS/Data/")
+synergy.samples <- read.csv2("mt20190419_FlowJo_synergy.csv")
+```
+
+# Analysis
+
+## Bring dataframe in right format
+```{r out.width= "80%", fig.align= "center", echo = FALSE, warning = FALSE}
+# Remove not needed rows
+synergy.samples <- synergy.samples[synergy.samples$Statistic != "",]
+
+# Remove not needed column
+synergy.samples <- synergy.samples[,-1]
+
+# Rename column
+synergy.samples$Name <- gsub("[A-Z][1-9].fcs/Cells(.*?)", "\\1", synergy.samples$Name)
+synergy.samples$Name <- gsub("[A-Z][1-9][0-9].fcs/Cells(.*?)", "\\1", synergy.samples$Name)
+synergy.samples$Name <- gsub("/Single Cells", "\\1", synergy.samples$Name)
+synergy.samples$Name <- gsub("/", "\\1", synergy.samples$Name)
+
+# Remove not needed rows
+synergy.samples <- synergy.samples[synergy.samples$Name != "",]
+
+# Make apopototic cells df
+synergy.samples$Statistic <- as.numeric(as.character(synergy.samples$Statistic))
+apoptotic.samples <- synergy.samples[synergy.samples$Name == "Apoptotic cells",]
+apoptotic.samples$drug <- paste0(apoptotic.samples$drug, "_", apoptotic.samples$day)
+apoptotic.samples$drug <- paste0(apoptotic.samples$drug, "_", apoptotic.samples$damage)
+
+
+# Look at which samples have highest apoptotic cell fractions
+ggplot(data = apoptotic.samples[apoptotic.samples$Statistic >= 1,], aes(x = reorder(drug, -Statistic), y = Statistic)) +
+  geom_bar(stat = "identity")+
+   theme(axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1, size = 10))+ 
+  ylab("Apoptotic cell population (%)") + xlab("Drug and experiment day")+ labs(title = "Apoptotic cell population after drug treatment")
+
+
+# Remove data with low cell numbers 
+synergy.samples$cell.count <- ave(synergy.samples$X.Cells, synergy.samples$drug, synergy.samples$day, synergy.samples$rep, FUN = function(x) sum(x))
+synergy.samples <- synergy.samples[synergy.samples$cell.count > 1000,]
+synergy.samples <- synergy.samples [,c(-3,-8)]
+
+## Rearrange to wide format
+synergy.samples <- dcast(synergy.samples, drug + day + rep + damage ~ Name, value.var = "Statistic", fun.aggregate = mean)
+
+
+# Compute relative G2, G1 and S fraction
+for (i in synergy.samples$rep) {
+synergy.samples$sum.apo[synergy.samples$rep == i] <- synergy.samples$G1[synergy.samples$rep == i] + 
+  synergy.samples$S[synergy.samples$rep == i] + synergy.samples$G2[synergy.samples$rep == i] + 
+  synergy.samples$`Apoptotic cells`[synergy.samples$rep == i]
+}
+for (i in synergy.samples$rep) {
+synergy.samples$sum[synergy.samples$rep == i] <- synergy.samples$G1[synergy.samples$rep == i] + 
+  synergy.samples$S[synergy.samples$rep == i] + synergy.samples$G2[synergy.samples$rep == i] 
+}
+
+synergy.samples$G2 <- synergy.samples$G2 / synergy.samples$sum
+synergy.samples$G1 <- synergy.samples$G1 / synergy.samples$sum
+synergy.samples$S <- synergy.samples$S / synergy.samples$sum
+synergy.samples$`Apoptotic cells` <- synergy.samples$`Apoptotic cells` / synergy.samples$sum.apo
+synergy.samples <- synergy.samples[,c(-9:-10)]
+
+# Remove conditions with high apoptotic cell counts
+synergy.samples <- synergy.samples[synergy.samples$`Apoptotic cells` < 0.10,]
+
+# Merge the two dfs
+synergy.samples <- melt(synergy.samples, id.vars = c("drug", "day", "rep", "damage"))
+
+# Combine drug and day columns
+# synergy.samples$drug <- paste0(synergy.samples$drug, "_", synergy.samples$day)
+# synergy.samples <- synergy.samples[,-2]
+
+```
+
+
+
+## Visualisation
+```{r out.width= "80%", fig.align= "center", echo = FALSE, warning = FALSE}
+# Arrange everything in the right order
+# synergy.samples$conc <- factor(synergy.samples$conc, levels=c("100nm", "1um", "10um"))
+synergy.samples$variable <- factor(synergy.samples$variable, levels=c("Apoptotic cells", "G2", "S","G1"))
+synergy.samples$drug <- factor(synergy.samples$drug, levels=c("DMSO", "NU7441", "Decitabine", "NU7441 + Decitabine"))
+
+synergy.samples$SD <- ave(synergy.samples$value, synergy.samples$drug, 
+                             synergy.samples$day, synergy.samples$variable, 
+                             synergy.samples$damage,
+                             FUN = function(x) sd(x))
+
+synergy.samples$value <- ave(synergy.samples$value, synergy.samples$drug, 
+                             synergy.samples$day, synergy.samples$variable, 
+                             synergy.samples$damage,
+                             FUN = function(x) mean(x))
+
+synergy.samples <- synergy.samples[,-3]
+synergy.samples <- synergy.samples[!duplicated(synergy.samples),]
+
+
+synergy.samples <- synergy.samples[synergy.samples$day == 3, ]
+
+# Barplot of each drug next to each other
+ggplot(data = synergy.samples[synergy.samples$variable != "Apoptotic cells",], aes(y = value, x = day, fill = variable)) +
+  geom_bar(stat="identity") + 
+  geom_errorbar(aes(ymin = value-SD, ymax = value+SD, color = variable), width = 0.2) +
+  labs(title = "cell cycle arrest upon blocking NHEJ (NU7441) and/or MMEJ (Decitabine)", 
+       x = "days after damage induction", y = "G1, S, and G2 fractions") + 
+  scale_fill_manual(values = c("#DED89C","#BF7538","#749075"))+
+  facet_grid(rows = vars(damage), cols = vars(drug))
+
+
+```
+
+
+# Conclusion: We get a massive G2 arrest upon double drug treatment and dna damage induction
+
+## Exporting potential data. 
+```{r}
+```
+
+# Session Info
+```{r}
+paste("Run time: ",format(Sys.time()-StartTime))
+getwd()
+date()
+sessionInfo()
+```
+

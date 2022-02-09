@@ -1,0 +1,167 @@
+---
+title: "FACS analysis"
+author: "Max Trauernicht"
+date: "`r format(Sys.time(), '%Y-%m-%d')`"
+output: 
+  html_document:
+    theme: journal #cerulean
+    highlight: monochrome
+    toc: true
+    toc_float: true
+    code_folding: show
+  editor_options:
+    chunk_output_type: console
+---
+
+# knitr document van Steensel lab
+
+# TRIP Clone identification
+
+# Introduction
+This script generates plots of FACS data. This way the effect of drugs on cell cycle will be visualized.
+
+
+## Description of Data
+How to make a good rendering table: 
+```{r table1, echo=FALSE, message=FALSE, warnings=FALSE, results='asis'}
+tabl <- "
+| column1	|	column2	|	column3	|	
+|----|----|----|
+|1	|	2	|	3	|	
+|a	|	b	|	c	|	
+"
+cat(tabl) # output the table in a format good for HTML/PDF/docx conversion
+```
+
+# Data processing
+## Path, Libraries, Parameters and Useful Functions
+```{r setup}
+knitr::opts_chunk$set(echo = TRUE)
+StartTime <-Sys.time()
+
+# 8-digit Date tag:
+Date <- substr(gsub("-","",Sys.time()),1,8) 
+# libraries:
+library(maditr)
+library(ggplot2)
+```
+
+### Custom functions
+Functions used thoughout this script.
+```{r}
+SetFileName <- function(filename, initials) {
+  # Set filename with extension and initials to make filename with date integrated.
+  filename <- substitute(filename)
+  initials <- substitute(initials)
+  filename <- paste0(initials, Date, filename)
+  filename
+}
+```
+
+
+## Data import
+```{r}
+setwd("/DATA/usr/m.trauernicht/projects/EpiScreen/FACS/Data/")
+gfp.samples <- read.csv2("mt20190415_GFP_FlowJo.csv")
+lbr.samples <- read.csv2("mt20190415_LBR2_FlowJo.csv")
+```
+
+# Analysis
+
+## Bring dataframe in right format
+```{r}
+# Remove not needed column
+gfp.samples <- gfp.samples[,c(-1,-4)]
+lbr.samples <- lbr.samples[,c(-1)]
+
+# Remove not needed rows
+gfp.samples <- gfp.samples[gfp.samples$Statistic != "",]
+lbr.samples <- lbr.samples[lbr.samples$Statistic != "",]
+
+# Rename column
+gfp.samples$Name <- gsub("[A-Z][1-9].fcs/Cells(.*?)", "\\1", gfp.samples$Name)
+lbr.samples$Name <- gsub("[A-Z][1-9].fcs/Cells(.*?)", "\\1", lbr.samples$Name)
+gfp.samples$Name <- gsub("[A-Z][1-9][0-9].fcs/Cells(.*?)", "\\1", gfp.samples$Name)
+lbr.samples$Name <- gsub("[A-Z][1-9][0-9].fcs/Cells(.*?)", "\\1", lbr.samples$Name)
+gfp.samples$Name <- gsub("/Single Cells", "\\1", gfp.samples$Name)
+lbr.samples$Name <- gsub("/Single Cells", "\\1", lbr.samples$Name)
+gfp.samples$Name <- gsub("/", "\\1", gfp.samples$Name)
+lbr.samples$Name <- gsub("/", "\\1", lbr.samples$Name)
+
+
+# Remove not needed rows
+gfp.samples <- gfp.samples[gfp.samples$Name != "",]
+lbr.samples <- lbr.samples[lbr.samples$Name != "",]
+
+## Prepare data for visualization
+gfp.samples$Statistic <- as.numeric(as.character(gfp.samples$Statistic))
+gfp.samples <- dcast(gfp.samples, drug + conc ~ Name, value.var = "Statistic", fun.aggregate = mean)
+lbr.samples$Statistic <- as.numeric(as.character(lbr.samples$Statistic))
+lbr.samples <- dcast(lbr.samples, drug + conc ~ Name, value.var = "Statistic", fun.aggregate = mean)
+
+# Compute relative G2, G1 and S fraction
+gfp.samples$sum <- gfp.samples$G1 + gfp.samples$S + gfp.samples$G2
+gfp.samples$G2 <- gfp.samples$G2 / gfp.samples$sum
+gfp.samples$G1 <- gfp.samples$G1 / gfp.samples$sum
+gfp.samples$S <- gfp.samples$S / gfp.samples$sum
+gfp.samples <- gfp.samples[-6]
+gfp.samples$ID <- "GFP"
+
+lbr.samples$sum <- lbr.samples$G1 + lbr.samples$S + lbr.samples$G2
+lbr.samples$G2 <- lbr.samples$G2 / lbr.samples$sum
+lbr.samples$G1 <- lbr.samples$G1 / lbr.samples$sum
+lbr.samples$S <- lbr.samples$S / lbr.samples$sum
+lbr.samples <- lbr.samples[-6]
+lbr.samples$ID <- "LBR2"
+
+# Merge the two dfs
+all.samples <- rbind(lbr.samples, gfp.samples)
+all.samples <- melt(all.samples, id.vars = c("drug", "conc", "ID"))
+
+# Combine drug and conc columns
+all.samples$drug <- paste0(all.samples$drug, "_", all.samples$conc)
+all.samples <- all.samples[,-2]
+
+```
+
+
+
+## Visualisation
+```{r}
+# Arrange everything in the right order
+all.samples <- all.samples[-grep("PAO", all.samples$drug),]
+# all.samples$conc <- factor(all.samples$conc, levels=c("100nm", "1um", "10um"))
+all.samples$variable <- factor(all.samples$variable, levels=c("G2", "S","G1"))
+# all.samples$drug <- factor(all.samples$drug, levels=c("DMSO", "LBR2_DMSO","Alisertib", "LBR2_Alisertib","AMG-900", "LBR2_AMG-900","Apicidin", "AR-42", "LBR2_AR-42", "Aurora A Inhibitor I", "LBR2_Aurora A Inhibitor I", "Azacitidine","LBR2_Azacitidine", "Barasertib", "LBR2_Barasertib", "BML-210", "LBR2_BML-210", "C646", "LBR2_C646", "CI994", "LBR2_CI994", "CTPB", "LBR2_CTPB", "CX-6258", "LBR2_CX-6258", "CYC116", "LBR2_CYC116", "CYT387", "LBR2_CYT387", "Danusertib", "LBR2_Danusertib", "DZNeP", "LBR2_DZNeP", "Entinostat", "LBR2_Entinostat", "Givinostat", "LBR2_Givinostat", "I-BET-762", "LBR2_I-BET-762", "LY2784544", "LBR2_LY2784544", "MK-5108","LBR2_MK-5108", "NSC-3852", "LBR2_NSC-3852", "OTX015", "LBR2_OTX015", "PCI-24781", "LBR2_PCI-24781", "PJ34 HCl", "LBR2_PJ34 HCl", "Pracinostat", "LBR2_Pracinostat", "Quercetin", "LBR2_Quercetin", "Resveratrol", "LBR2_Resveratrol", "RG2833", "LBR2_RG2833", "RGFP966", "LBR2_RGFP966", "RVX-208", "LBR2_RVX-208", "Scriptaid", "LBR2_Scriptaid", "SGC 0946", "LBR2_SGC 0946", "SGC-CBP30", "LBR2_SGC-CBP30", "SNS-314 Mesylate", "LBR2_SNS-314 Mesylate", "Suramin", "LBR2_Suramin", "TG101209", "LBR2_TG101209", "Tubastatin A HCl", "LBR2_Tubastatin A HCl", "Vorinostat", "LBR2_Vorinostat"))
+all.samples <- na.omit(all.samples)
+
+# Barplot of each drug next to each other
+ggplot() +
+  geom_bar(data = all.samples, aes(y = value, x = ID, fill = variable), stat="identity") + 
+  labs(title = "cell cycle arrest upon PD treatment", 
+       x = "cells", y = "G1, S, and G2 fractions") + scale_fill_manual(values = c("#DED89C","#BF7538","#749075"))+
+  facet_wrap(~drug, nrow = 10, ncol = 10, scales = "free_x")
+
+
+```
+
+# Results
+```{r}
+```
+
+# Conclusions
+```{r}
+```
+
+## Exporting potential data. 
+```{r}
+```
+
+# Session Info
+```{r}
+paste("Run time: ",format(Sys.time()-StartTime))
+getwd()
+date()
+sessionInfo()
+```
+
