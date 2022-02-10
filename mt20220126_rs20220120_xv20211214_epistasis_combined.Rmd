@@ -34,6 +34,7 @@ clone5_chrom_tib <- readRDS('/DATA/projects/DSBrepair/data/R/cl20201026_ChIP_zsc
 figure_out = "/DATA/projects/DSBrepair/scratch/episcreen/"
 chromatin.features <- colnames(indel.data)[grepl("[.]zscore", colnames(indel.data))]
 chrom_data = indel.data %>% dplyr::select(barcode, all_of(chromatin.features)) %>% distinct()
+
 ```
 
 ## Prepare data
@@ -710,7 +711,7 @@ order_vec=rownames(clustering)[nrow(clustering):1]
 clone5_heatmap = pheatmap(chom_df[order_vec,], cluster_rows=F, annotation_row=clustering,
          annotation_colors=list(group=feature_fill),
          color = colorRampPalette(rev(brewer.pal(n = 11, name="RdBu")))(100),
-         annotation_col = clone5_domains.df)
+         annotation_col = domains_c5)
 ```
 
 
@@ -770,7 +771,89 @@ ggplot(ratio_features,
   scale_fill_manual(values = annotation_colors_scr$target)
 ```
 
-```{r}
 
+
+
+```{r all concentrations combined indel rate}
+quant_breaks <- quantile(all_compounds_indelrate_synergy, c(.01,.99), na.rm = T) # change these numbers according to where you want to set the cutoff
+palette_length <- 1000
+breaks <- c(seq(quant_breaks[1], 
+                0, 
+                length.out = ceiling(palette_length/2) + 1), 
+            seq(quant_breaks[2]/palette_length, 
+                quant_breaks[2], 
+                length.out=floor(palette_length/2)))
+colors = colorRampPalette(slope.colors %>% pull(color))(length(breaks))
+colors[which(quant_breaks == 0)-1] = "gray90"
+
+pdf(paste0(figure_out, "rs20220210_synergy_indelrate_all.pdf"), width=10, height=20)
+pheatmap(all_compounds_indelrate_synergy[, clone5_map$labels],
+         border_color = F,
+         cellwidth = 8,
+         cellheight = 8,
+         breaks = breaks,
+         # cluster_cols = clone5_map,
+         annotation_row = target,
+         main = "Indel rate slopes for all compounds with significant hit",
+         color = colors,
+         annotation_colors = annotation_colors_scr, annotation_legend = T,
+         cutree_rows = 8)
+dev.off()
 ```
+
+
+```{r all concentrations indel rate z-score}
+ritios_tib_epi_effects = screen_ratios %>% 
+  mutate(drug_conc = paste(drug, conc_char, sep = " ")) %>% 
+  filter(drug_conc %in% rownames(all_compounds_indelrate_synergy), 
+         drug != "DNA-PKi") %>%
+  distinct(IPR, mean_eff_zscore_comb, drug_conc, drug, conc_char) 
+
+mmejzscore_matrix = ritios_tib_epi_effects %>%
+  distinct(drug_conc, IPR, mean_eff_zscore_comb) %>% 
+  pivot_wider(names_from = IPR, values_from = mean_eff_zscore_comb) %>%
+  column_to_rownames(var = "drug_conc")
+
+quant_breaks <- quantile(mmejzscore_matrix, c(.01,.99), na.rm = T) # change these numbers according to where you want to set the cutoff
+palette_length <- 1000
+breaks <- breaks <- c(seq(quant_breaks[1], 
+                          0, 
+                          length.out=ceiling(palette_length/2) + 1), 
+                      seq(quant_breaks[2]/palette_length,  
+                          quant_breaks[2], 
+                          length.out=floor(palette_length/2)))
+colors = colorRampPalette(slope.colors %>% pull(color))(length(breaks))
+colors[-which(breaks < -1.96 | breaks > 1.96 )] = "gray90"
+
+clone5_domains <- readRDS("/DATA/projects/DSBrepair/data/R/rs20200311_domains_clone5.RDS")
+chip.dt = readRDS('/DATA/projects/DSBrepair/data/R/cl20201026_ChIP_zscore_selection.RDS')
+chip.dt = chip.dt[, H3K9me3 := NULL]
+clone5_domains.df = as.data.frame(clone5_domains[, c("barcode", "ID", "IPR", "group")])
+
+row.names(clone5_domains.df) = clone5_domains.df$IPR
+
+chip_clone5 = chip.dt[clone5_domains.df, on = c("ID")]
+
+row.names(clone5_domains.df) <- clone5_domains.df$IPR
+clone5_domains.df = clone5_domains.df[, "group", drop = FALSE]
+colnames(clone5_domains.df) = "domain"
+
+pdf(paste0(figure_out, "rs20220210_zscoreindelrate_all.pdf"), width=10, height=20)
+pheatmap(mmejzscore_matrix[, clone5_map_ipr$labels],
+         border_color = F,
+         cellwidth = 8,
+         cellheight = 8,
+         # cluster_cols = clone5_map_ipr,
+         breaks = breaks,
+         annotation_row = target,
+         main = "indel rate z-scores of the synergy hits",
+         color = colors,
+         annotation_colors = annotation_colors_scr, annotation_legend = T,
+         annotation_col = domains_c5,
+         cutree_rows = 8)
+dev.off()
+```
+
+
+
 
