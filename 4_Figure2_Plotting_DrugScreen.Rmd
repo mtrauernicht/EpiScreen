@@ -450,6 +450,32 @@ ggplot(indel.data.freq2,
   annotate("rect",xmin=-Inf,xmax=(dmso_freq$dmso_freq - 0.02),ymin=-log10(0.05),ymax=Inf, alpha=0.1, fill="#3d405b") +
   scale_x_continuous(labels = scales::percent) +
   coord_flip()
+
+aurora_targets <- data.frame("drug" = c("Alisertib","Aurora A Inhibitor I", "Barasertib","CCT129202", "CCT137690", "CYC116",
+                                        "ENMD-2076","Hesperadin","JNJ-7706621","KW-2449","MK-5108","MLN8054","PHA-680632","SNS-314 Mesylate","ZM 447439"),
+                             "A_B" = c("A", "A", "B", "A+B", "A+B","A+B", "A", "B", "A+B", "A", "A", "A", "A", "A+B", "A+B"),
+                             "B" = c("No", "No", "Yes", "Yes", "Yes", "Yes", "No", "Yes", "Yes", "No", "No", "No", "No", "Yes", "Yes"),
+                             "A" = c("Yes", "Yes", "No", "Yes", "Yes", "Yes", "Yes", "No", "Yes", "Yes", "Yes", "Yes", "Yes", "Yes", "Yes"))
+
+ggplot(indel.data.freq2 %>%
+         filter(target == "Aurora Kinase") %>%
+         left_join(aurora_targets),
+              aes(y = -log10(mean_eff_pval_adj_global_comb), x = freqCut, 
+                  color = A_B)) +
+  geom_point(size = 2) +
+  #geom_label_repel(data = indel.data.freq2 %>% filter(flag == "TRUE") %>% unique(), 
+                   #aes(label = drug)) +
+  geom_hline(linetype = "dashed", yintercept = -log10(0.05)) +
+  geom_vline(linetype = "dashed", xintercept = (dmso_freq$dmso_freq + 0.02)) +
+  geom_vline(linetype = "dashed", xintercept = (dmso_freq$dmso_freq - 0.02)) +
+  #geom_vline(linetype = "twodash", xintercept = unique(indel.data.freq$max_dmso_freq))+
+  scale_color_manual(values = c("#6d6875", "#b5838d", "#ffb4a2")) +
+  #facet_wrap(~conc_char) +
+  #annotate("rect",xmin=(dmso_freq$dmso_freq + 0.02),xmax=unique(indel.data.freq$max_dmso_freq),ymin=-log10(0.05),ymax=Inf, alpha=0.1, fill="#e07a5f") +
+  #annotate("rect",xmin=unique(indel.data.freq$max_dmso_freq),xmax=Inf,ymin=-Inf,ymax=Inf, alpha=0.25, fill="black") +
+  #nnotate("rect",xmin=-Inf,xmax=(dmso_freq$dmso_freq - 0.02),ymin=-log10(0.05),ymax=Inf, alpha=0.1, fill="#3d405b") +
+  scale_x_continuous(labels = scales::percent) +
+  coord_flip()
 ```
 
 *Figure 2A: Compound-induced change in cutting efficiency of all tested compounds. Mean per drug & concentration vs. p-value from t-test.*
@@ -484,7 +510,7 @@ eff.data <- eff.data %>%
     pivot_longer(`0_Down`:`2_No`, names_to = "sign", values_to = "number")
 
 ggplot(eff.data,
-       aes(y = reorder(target, -number), x = number, fill = sign)) +
+       aes(y = reorder(target, number), x = number, fill = sign)) +
     geom_bar(stat = "identity") +
     facet_wrap(~conc_char)+
     scale_fill_manual(values = c("#e07a5f", "#3d405b", "#C2C2C2")) +
@@ -534,7 +560,8 @@ annotation_colors_scr = list(
              HMT="#FDCDAC", DNMT="#D69C81", `Histone Demethylase`="#FFF2AE",
              HIF="#E3DCD5", JAK="#C8D7E2", PIM="#9AB8C4", `Aurora Kinase`="#F4CAE4",
              PARP="#CB546F", `Epigenetic Reader Domain`= "#476D61", `DNA-PK`="#E07A43"),
-  conc_char = c(`100 nM` = "#78BF84", `1 µM`  = "#1E9532", `10 µM` = "#0F4A19"))
+  conc_char = c(`100 nM` = "#78BF84", `1 µM`  = "#1E9532", `10 µM` = "#0F4A19"),
+  clusters_drugs = c(`1` = "grey10", `2` = "grey20", `3` = "grey50"))
 
 
 
@@ -781,8 +808,73 @@ ggplot(chromatin_effect,
   facet_wrap(~clusters_drugs)
 dev.off()
 ```
+## Plot HDAC inhibitor effects on different chromatin types
+```{r}
+chromatin_ipr <- chromatin %>%
+  rownames_to_column("IPR")
+
+eff.data.heatmap3 <- eff.data.heatmap2 %>%
+  pivot_longer(contains("IPR"), names_to = "IPR", values_to = "freqCut_dif")
+
+chromatin_effect <- merge(eff.data.heatmap3, chromatin_ipr) %>%
+  #filter(target == "HDAC") %>%
+  mutate(freqCut_dif = ave(freqCut_dif, drug, chromatin, conc_char, FUN = mean)) %>%
+  distinct(freqCut_dif, drug, chromatin, conc_char, target, clusters_drugs)
+
+sigFunc = function(x){
+  if(x < 0.001){"***"} 
+  else if(x < 0.01){"**"}
+  else if(x < 0.05){"*"}
+  else{NA}}
+
+ggplot(chromatin_effect %>%
+         filter(target == "HDAC") %>%
+         filter(clusters_drugs %in% c('2', '7')),
+              aes(x = chromatin, y = freqCut_dif, fill = chromatin)) +
+  geom_boxplot(outlier.shape = NA) +
+  geom_quasirandom() +
+  geom_signif(comparisons = combn(sort(unique(chromatin_effect$chromatin)), 2, simplify = F), 
+              map_signif_level=sigFunc, 
+              step_increase = 0.1) +
+  theme_classic_lines_45() +
+  scale_fill_manual(values = chrom_colors) +
+  theme(legend.position = "none") +
+  facet_wrap(~clusters_drugs)
+```
 
 
+
+## Aurora A vs. Aurora B
+```{r}
+aurora_df <- eff.data.heatmap2 %>%
+  filter(target == "Aurora Kinase") %>%
+  pivot_longer(contains("IPR"), names_to = "IPR", values_to = "freqCut_dif") %>%
+  mutate(freqCut_dif = ave(freqCut_dif, drug, FUN = mean)) %>%
+  dplyr::select(-IPR) %>%
+  distinct()
+
+aurora_targets <- data.frame("drug" = c("Alisertib","Aurora A Inhibitor I", "Barasertib","CCT129202",
+                                        "ENMD-2076","Hesperadin","JNJ-7706621","MK-5108","MLN8054","PHA-680632","SNS-314 Mesylate","ZM 447439"),
+                             "A_B" = c("A", "A", "B", "A+B+C", "A", "B", "A+B", "A", "A", "A", "A+B+C", "A+B"),
+                             "B" = c("No", "No", "Yes", "Yes", "No", "Yes", "Yes", "No", "No", "No", "Yes", "Yes"))
+aurora_df <- merge(aurora_df, aurora_targets)
+
+ggplot(aurora_df, 
+       aes(x = A_B, y = freqCut_dif)) + 
+  geom_boxplot() +
+  geom_quasirandom() +
+  geom_signif(comparisons = combn(sort(unique(aurora_df$A_B)), 2, simplify = F), 
+              map_signif_level=sigFunc, 
+              step_increase = 0.1) 
+
+ggplot(aurora_df, 
+       aes(x = B, y = freqCut_dif)) + 
+  geom_boxplot() +
+  geom_quasirandom() +
+  geom_signif(comparisons = combn(sort(unique(aurora_df$B)), 2, simplify = F), 
+              map_signif_level=sigFunc, 
+              step_increase = 0.1) 
+```
 
 
 
@@ -969,7 +1061,7 @@ ggplot(chrom_corr %>%
 ```{r}
 drug_clusters <- eff.data.heatmap2 %>%
   mutate(drug_conc = paste(drug, conc_char, sep = "_")) %>%
-  distinct(drug_conc, clusters_drugs)
+  distinct(drug_conc, clusters_drugs, target)
 
 epistasis_cluster <- epistasis_tib %>%
   distinct(drug_conc, feature, indelrate_slope) %>%
@@ -977,11 +1069,10 @@ epistasis_cluster <- epistasis_tib %>%
   left_join(drug_clusters) %>%
   na.omit() %>%
   mutate(clusters_drugs = as.character(clusters_drugs)) %>%
-  
+  filter(target == "Aurora Kinase")# %>%
+  #filter(clusters_drugs %in% c('4','2','5','7'))
 
-ggplot(epistasis_cluster %>%
-         filter(clusters_drugs %in% c('4', '5','7')) %>%
-         filter(feature %in% c("LMNB1.zscore", "")),
+ggplot(epistasis_cluster,
        aes(x = clusters_drugs, y = indelrate_slope)) +
   geom_quasirandom() +
   facet_wrap(~feature)
@@ -993,23 +1084,25 @@ ggplot(epistasis_cluster %>%
 
 
 epistasis_cluster <- epistasis_cluster %>%
+  #filter(feature %in% c("HDAC1.zscore", "HDAC2.zscore", "LMNB1.zscore", "EZH2.zscore")) %>%
   spread(feature, indelrate_slope)
 
 rownames(drug_clusters) <- drug_clusters$drug_conc
 drug_clusters <- drug_clusters %>%
-  dplyr::select(-drug_conc)
-
-epistasis_cluster <- epistasis_cluster[epistasis_cluster$drug_conc %in% drug_clusters$drug_conc,]
+  mutate(clusters_drugs = as.character(clusters_drugs)) %>%
+  dplyr::select(-drug_conc, -target)
 
 pheatmap(epistasis_cluster %>%
-             column_to_rownames(var = "drug_conc"),
+           column_to_rownames(var = "drug_conc") %>%
+           dplyr::select(contains("zscore")),
          cluster_rows = T,
          cluster_cols = T,
          cellwidth = 8,
          cellheight = 8,
          annotation_row = drug_clusters,
+         annotation_colors = annotation_colors_scr,
          border_color = NA,
-         color = colorRampPalette(c("blue", "white", "red"))(palette_length))
+         color = colorRampPalette(c("#8c510a", "#f5f5f5","#01665e"))(palette_length))
 
 ```
 

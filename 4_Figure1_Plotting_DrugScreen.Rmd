@@ -336,7 +336,7 @@ theme_classic_lines_90 <- function() {
 theme_set(theme_classic_lines())
 
 colors_diverse <- c("#264653", "#9AC1AE", "#5D987B", "#f2cc8f", "#e76f51")
-colors_drugs <- c("#FA8D62", "#65BFA4", "#8CA0C4", "#808184", "#F6D289", "#E5E5E5", "#ACACAC", "#737373")
+colors_drugs <- c("DMSO (neg control)" = "#65BFA4", "DNA-PKi (NHEJ control)" = "#8CA0C4", "drugs" = "#808184", "Mirin (MMEJ control)" = "#5D79AC")
 #colors_diverse <- c("#264653", "#2a9d8f", "#e9c46a", "#f4a261", "#e76f51") 
 
 ggplot_custom <- function(...) ggplot2::ggplot(...) + 
@@ -372,11 +372,10 @@ targets <- viability.data %>%
   dplyr::distinct(target, number)
 
 ggplot(targets, 
-       aes(y = reorder(target, +number), x = number, fill = as.numeric(number))) + 
-  geom_bar(stat = "identity")  + 
+       aes(y = reorder(target, number), x = number)) + 
+  geom_bar(stat = "identity", fill = "black")  + 
   ylab("") +
-  theme_pubr(border = T) +
-  scale_fill_grey()
+  theme_pubr(border = T) 
 ```
 
 *Figure 1B: Number of probed compounds per target group.*
@@ -439,7 +438,7 @@ ggplot_custom(viability.data %>%
                 dplyr::distinct(mean_viab, drug, conc_char, removed),
        aes(x = conc_char, y = mean_viab)) +
   geom_quasirandom(aes(fill = removed), color = "black", shape = 21, size = 2) +
-  scale_fill_manual(values = c(colors_diverse[1], colors_diverse[4])) +
+  scale_fill_manual(values = c(colors_diverse[1], "#FA8D62")) +
   theme_pubr(border = T)
 ```
 
@@ -454,7 +453,7 @@ How do the drugs impact cutting efficiency in general? Does the genomic location
 ```{r warning = FALSE}
 # D: Cutting efficiency per IPR
 indel.data2 <- indel.data %>%
-  filter(sample != "DNA-PKi (NHEJ control)", sample != "Mirin (MMEJ control)") %>%
+ # filter(sample != "DNA-PKi (NHEJ control)", sample != "Mirin (MMEJ control)") %>%
   dplyr::distinct(freqCut, IPR, drug, conc_char, tech, sample, replicate, barcode, MMEJratio, MMEJ_zscore_comb, mean_eff_zscore_comb) %>%
   mutate(freqCut = ave(freqCut, IPR, drug, conc_char, tech, replicate)) %>%
   mutate(MMEJratio = ave(MMEJratio, IPR, drug, conc_char, tech, replicate)) %>%
