@@ -620,10 +620,10 @@ plot_comb_grid_beeswarm <- function(dt, opt_df, domains, y_name, min_count=0,
 
 
 ```{r}
-validations_ratios = readRDS("/DATA/projects/DSBrepair/data/R/rs20220201_episcreen/rs20220201_episcreen_validation_ratios.RDS")
-validations_indels = readRDS("/DATA/projects/DSBrepair/data/R/rs20220201_episcreen/rs20220201_episcreen_validation_indels.RDS")
-screen_indels = readRDS("/DATA/projects/DSBrepair/data/R/rs20220201_episcreen/rs20220201_episcreen_mutations.RDS")
-screen_ratios = readRDS("/DATA/projects/DSBrepair/data/R/rs20220201_episcreen/rs20220201_episcreen_ratios.RDS")
+validations_ratios = readRDS("/DATA/projects/DSBrepair/data/R/rs20220208_episcreen/rs20220208_episcreen_validation_ratios.RDS")
+validations_indels = readRDS("/DATA/projects/DSBrepair/data/R/rs20220208_episcreen/rs20220208_episcreen_validation_indels.RDS")
+screen_indels = readRDS("/DATA/projects/DSBrepair/data/R/rs20220207_episcreen/rs20220207_episcreen_mutations.RDS")
+screen_ratios = readRDS("/DATA/projects/DSBrepair/data/R/rs20220207_episcreen/rs20220207_episcreen_ratios.RDS")
 ```
 
 
@@ -817,7 +817,7 @@ screen_indels %>% filter(type %in% c("grouped_indel", "core") & drug == "Baraser
 ## Affected reporters
 ```{r}
 barcde_all_reps = validations_ratios %>% 
-  filter(replicate != "mean" & plasmid == "LBR2") %>% 
+  filter(replicate != "mean" & plasmid == "LBR2" & pool %in% c("A", "B")) %>% 
   distinct(barcode, replicate, drug) %>% 
   group_by(barcode) %>%
   summarise(bccount = n()) %>% 
@@ -826,7 +826,7 @@ barcde_all_reps = validations_ratios %>%
   
 
 barcde_2_reps = validations_ratios %>% 
-  filter(replicate != "mean" & plasmid == "LBR2") %>% 
+  filter(replicate != "mean" & plasmid == "LBR2" & pool %in% c("A", "B")) %>% 
   distinct(barcode, replicate, drug) %>% 
   group_by(barcode) %>%
   summarise(bccount = n()) %>% 
@@ -834,7 +834,7 @@ barcde_2_reps = validations_ratios %>%
   pull(barcode)
   
 vorinostat_reps_ratios = validations_ratios %>% 
-  filter(replicate != "mean" & plasmid == "LBR2", barcode %in% barcde_all_reps) %>% 
+  filter(replicate != "mean" & plasmid == "LBR2", barcode %in% barcde_all_reps & pool %in% c("A", "B")) %>% 
   distinct(barcode, drug, MMEJ_MMEJNHEJ, efficiency, replicate) %>%
   group_by(barcode, drug) %>%
   pivot_wider(names_from = drug, values_from = c(efficiency, MMEJ_MMEJNHEJ)) %>%
@@ -845,14 +845,14 @@ vorinostat_reps_ratios = validations_ratios %>%
 
 
 signif_IPRs_full_tib = validations_ratios %>% 
-  filter(replicate != "mean" & plasmid == "LBR2" & barcode %in% barcde_all_reps) %>% 
+  filter(replicate != "mean" & plasmid == "LBR2" & barcode %in% barcde_all_reps & pool %in% c("A", "B")) %>% 
   distinct(barcode, drug, MMEJ_MMEJNHEJ, replicate) %>%
   group_by(barcode)  %>%
   t_test(MMEJ_MMEJNHEJ ~ drug, paired = TRUE) %>%
   add_significance()
 
 signif_IPRs_tib = validations_ratios %>% 
-  filter(replicate != "mean" & plasmid == "LBR2" & barcode %in% barcde_all_reps) %>% 
+  filter(replicate != "mean" & plasmid == "LBR2" & barcode %in% barcde_all_reps & pool %in% c("A", "B")) %>% 
   distinct(barcode, drug, MMEJ_MMEJNHEJ, replicate) %>%
   group_by(barcode)  %>%
   t_test(MMEJ_MMEJNHEJ ~ drug, paired = TRUE) %>%
@@ -863,36 +863,40 @@ signif_bcs = signif_IPRs_full_tib %>% filter(p < 0.01) %>% pull(barcode)
 
 
 ```
+
 ```{r}
 validations_ratios %>% 
-  filter(plasmid == "LBR2") %>%
+  filter(plasmid == "LBR2", pool == "AB") %>%
   mutate(signif = ifelse(barcode %in% signif_bcs, "p > 0.05", "n.s.")) %>% 
   select(barcode, drug, sum_bc_reads, signif, replicate, pool) %>%
   ggplot(., aes(signif, log(sum_bc_reads), color = pool)) + geom_beeswarm() + facet_grid(replicate ~ drug)
 
 validations_ratios %>% 
-  filter(plasmid == "LBR2") %>%
+  filter(plasmid == "LBR2", pool == "AB") %>%
   mutate(signif = ifelse(barcode %in% signif_bcs, "p > 0.05", "n.s.")) %>% 
   select(barcode, drug, MMEJ, signif, replicate, pool) %>%
   ggplot(., aes(signif, MMEJ, color = pool)) + geom_beeswarm() + facet_grid(replicate ~ drug)
 
 validations_ratios %>% 
-  filter(plasmid == "LBR2") %>%
+  filter(plasmid == "LBR2", pool == "AB") %>%
   mutate(signif = ifelse(barcode %in% signif_bcs, "p > 0.05", "n.s.")) %>% 
   select(barcode, drug, NHEJ, signif, replicate, pool) %>%
   ggplot(., aes(signif, NHEJ, color = pool)) + geom_beeswarm() + facet_grid(replicate ~ drug)
 
 
-validations_ratios %>%
+validations_ratios  %>% 
+  filter(plasmid == "LBR2", pool == "AB")%>% 
   ggplot(., aes(pool, cells)) + geom_beeswarm() + facet_grid(replicate ~ drug) + ylim(0, 100)
 
 
 validations_ratios %>% 
+  filter(plasmid == "LBR2", pool == "AB") %>% 
   mutate(signif = ifelse(barcode %in% signif_bcs, "p > 0.05", "n.s.")) %>% 
   select(barcode, drug, NHEJ, sum_bc_reads, replicate) %>%
   ggplot(., aes(sum_bc_reads, NHEJ)) + geom_point() + facet_grid(replicate ~ drug)
 
-validations_ratios %>% 
+validations_ratios  %>% 
+  filter(plasmid == "LBR2", pool == "AB") %>% 
   mutate(signif = ifelse(barcode %in% signif_bcs, "p > 0.05", "n.s.")) %>% 
   select(barcode, drug, NHEJ, MMEJ, replicate, plasmid) %>%
   ggplot(., aes(MMEJ, NHEJ, color = plasmid)) + geom_point() + facet_grid(replicate ~ drug)
@@ -900,8 +904,8 @@ validations_ratios %>%
 
 
 ```{r}
-vorinostat_ratios_signif_subsample = validations_ratios %>% filter(replicate != "mean" & plasmid == "LBR2" & barcode %in% sample(signif_bcs, 10)) %>% group_by(barcode)
-vorinostat_ratios_signif = validations_ratios %>% filter(replicate != "mean" & plasmid == "LBR2" & barcode %in% signif_bcs) %>% group_by(barcode)
+vorinostat_ratios_signif_subsample = validations_ratios %>% filter(replicate != "mean" & plasmid == "LBR2" & barcode %in% sample(signif_bcs, 10) & pool %in% c("A", "B")) %>% group_by(barcode)
+vorinostat_ratios_signif = validations_ratios %>% filter(replicate != "mean" & plasmid == "LBR2" & barcode %in% signif_bcs & pool %in% c("A", "B")) %>% group_by(barcode)
 
 
 vorinostat_ratios_signif %>% ggplot(., aes(drug, MMEJ_MMEJNHEJ)) + 

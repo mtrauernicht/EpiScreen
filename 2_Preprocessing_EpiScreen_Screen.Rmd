@@ -496,22 +496,22 @@ ratios_tib <- screen.indel.dt %>%
   pivot_wider(names_from = mutation, 
               values_from = ratio_indels_split, 
               values_fill = 0) %>%
-  mutate(freqMMEJ = `-7` / 1,
-         freqNHEJ = `1` / 1,
-         MMEJratio = freqMMEJ / freqNHEJ,
+  dplyr::rename(freqMMEJ = `-7`,
+         freqNHEJ = `1`) %>%
+  mutate(MMEJratio = freqMMEJ / freqNHEJ,
          NHEJratio = freqNHEJ / freqMMEJ,
          MMEJscore = freqMMEJ / (freqMMEJ + freqNHEJ),
-         NHEJscore = freqNHEJ / (freqNHEJ+ freqMMEJ)) %>%
-  distinct(exp, barcode, freqMMEJ, freqNHEJ, MMEJratio, NHEJratio, MMEJscore, NHEJscore) 
+         NHEJscore = freqNHEJ / (freqNHEJ+ freqMMEJ))
 
 
 freqs_ratios_tib <- screen.indel.dt %>%
   as_tibble() %>%
   filter(mutation == "0") %>%
-  dplyr::distinct(exp, barcode, mutation, freq_split) %>% 
+  dplyr::distinct(exp, barcode, freq_split) %>% 
   mutate(freqCut = 1 - freq_split,
-         freqCut_global = ave(freqCut, exp, FUN = mean)) %>%
-  distinct(exp, barcode, freqCut, freqCut_global) %>% 
+         freqCut_global = ave(freqCut, exp, FUN = mean),
+         freqCut_max = ave(freqCut, exp, FUN = max)) %>%
+  distinct(exp, barcode, freqCut, freqCut_global, freqCut_max) %>% 
   left_join(ratios_tib, by = c("exp", "barcode"))
 
 screen.indel.dt = left_join(screen.indel.dt, freqs_ratios_tib, by = c("exp", "barcode"))
@@ -713,11 +713,7 @@ dmso.eff.score <- screen.ratio.dt %>%
   mutate(DMSO = ave(DMSO, barcode, well, replicate, tech, plate, FUN = mean)) %>%
   distinct(barcode, replicate, tech, well, plate, DMSO) %>%
   mutate(mean_DMSO = ave(DMSO, barcode, replicate, tech, FUN = mean), 
-         sd_DMSO = ave(DMSO, barcode, replicate, tech, FUN = sd)
-         #,
-         #mean_DMSO_pooled = ave(DMSO, barcode, replicate, FUN = mean), 
-         #sd_DMSO_pooled = ave(DMSO, barcode, replicate, FUN = sd)
-         ) %>%
+         sd_DMSO = ave(DMSO, barcode, replicate, tech, FUN = sd)) %>%
   dplyr::select(-DMSO, -well) %>%
   distinct() 
 
@@ -727,11 +723,7 @@ dmso.eff.score <- screen.ratio.dt %>%
   mutate(DMSO_global = ave(DMSO_global, replicate, tech, well, plate, FUN = mean)) %>%
   distinct(replicate, tech, well, plate, DMSO_global) %>%
   mutate(mean_DMSO_global = ave(DMSO_global, replicate, tech, FUN = mean), 
-         sd_DMSO_global = ave(DMSO_global, replicate, tech, FUN = sd)
-         #,
-         #mean_DMSO_global_pooled = ave(DMSO_global, replicate, FUN = mean), 
-         #sd_DMSO_global_pooled = ave(DMSO_global, replicate, FUN = sd)
-         ) %>%
+         sd_DMSO_global = ave(DMSO_global, replicate, tech, FUN = sd)) %>%
   dplyr::select(-DMSO_global, -well) %>%
   distinct() %>% right_join(dmso.eff.score)
 
@@ -744,28 +736,15 @@ screen.ratio.dt = left_join(screen.ratio.dt, dmso.eff.score)
 eff.zscore = screen.ratio.dt %>%
   distinct(barcode, replicate, tech, drug, well, freqCut, conc_char, 
            mean_DMSO, sd_DMSO) %>%
-  # Then calculate the mean over the technical replicates
-  #mutate(eff_score_mean = ave(freqCut, drug, conc_char, barcode, replicate, FUN = mean)) %>%
   # And calculate the z-scores
   mutate(eff_zscore = (freqCut - mean_DMSO)/ sd_DMSO,
-         #eff_zscore_pooled = (eff_score_mean - mean_DMSO_pooled)/ sd_DMSO_pooled,
-         mean_eff_zscore = ave(eff_zscore, drug, conc_char, barcode, replicate, FUN = mean)
-         #,
-         #eff_zscore_comb = ave(eff_zscore, drug, conc_char, barcode, 
-         #                       FUN = function(x) sum(x)/sqrt(length(x))
-         )
+         mean_eff_zscore = ave(eff_zscore, drug, conc_char, barcode, replicate, FUN = mean))
 
 
 # Combine the mean of the z-scores
 mean.eff.zscore.comb = eff.zscore %>% distinct(drug, conc_char, barcode, replicate, mean_eff_zscore) %>%
          mutate(mean_eff_zscore_comb = ave(mean_eff_zscore, drug, conc_char, barcode, 
                                 FUN = function(x) sum(x)/sqrt(length(x))))
-
-# # Combine the mean z-scores
-# eff.zscore.pooled.comb = eff.zscore %>% distinct(drug, conc_char, barcode, replicate, eff_zscore_pooled) %>%
-#          mutate(eff_zscore_pooled_comb = ave(eff_zscore_pooled, drug, conc_char, barcode, 
-#                                 FUN = function(x) sum(x)/sqrt(length(x)))) %>% 
-#   left_join(mean.eff.zscore.comb)
 
 eff.zscore %<>% left_join(mean.eff.zscore.comb)
 ```
@@ -775,19 +754,13 @@ eff.zscore %<>% left_join(mean.eff.zscore.comb)
 eff.zscore.global = screen.ratio.dt %>%
   distinct(replicate, tech, drug, well, freqCut_global, conc_char, 
            mean_DMSO_global, sd_DMSO_global) %>%
-  # Then calculate the mean over the technical replicates
-  #mutate(eff_score_global_mean = ave(freqCut_global, drug, conc_char, replicate, FUN = mean)) %>%
   # And calculate the z-scores
   mutate(eff_zscore_global = (freqCut_global - mean_DMSO_global)/ sd_DMSO_global) %>%
-         #eff_zscore_pooled_global = (eff_score_global_mean - 
-                                       #mean_DMSO_global_pooled) / sd_DMSO_global_pooled) %>%
   mutate(mean_eff_zscore_global = ave(eff_zscore_global, drug, conc_char, replicate, FUN = mean))
 
 # Combine the global z-scores
 eff.zscore.pooled.global.comb = eff.zscore.global %>% 
   distinct(drug, conc_char, replicate, mean_eff_zscore_global) %>%
-         # mutate(eff_zscore_pooled_global_comb = ave(eff_zscore_pooled_global, drug, conc_char, 
-         #                        FUN = function(x) sum(x)/sqrt(length(x)))) %>%
          mutate(mean_eff_zscore_global_comb = ave(mean_eff_zscore_global, drug, conc_char, 
                                 FUN = function(x) sum(x)/sqrt(length(x))))
 
@@ -797,26 +770,16 @@ eff.zscore.global %<>% left_join(eff.zscore.pooled.global.comb)
 eff.zscore %<>% left_join(eff.zscore.global) %>% 
   select(-mean_DMSO, 
          -sd_DMSO,
-         #-mean_DMSO_pooled, 
-         #-sd_DMSO_pooled,
          -mean_DMSO_global, 
-         -sd_DMSO_global,
-         #-mean_DMSO_global_pooled, 
-         #-sd_DMSO_global_pooled
-  )
+         -sd_DMSO_global)
 
 # Merge with main table
 screen.ratio.dt <- left_join(screen.ratio.dt, 
                              eff.zscore) %>% 
   select(-mean_DMSO, 
          -sd_DMSO,
-         #-mean_DMSO_pooled, 
-         #-sd_DMSO_pooled,
          -mean_DMSO_global, 
-         -sd_DMSO_global,
-         #-mean_DMSO_global_pooled, 
-         #-sd_DMSO_global_pooled
-         )
+         -sd_DMSO_global)
 ```
 
 ## Pathway ratio z-score calculation
@@ -839,8 +802,6 @@ dmso.mmej.score <- screen.ratio.dt %>%
 screen.ratio.dt <- left_join(screen.ratio.dt, dmso.mmej.score, by = c("barcode", "replicate", "tech"))
 
 screen.ratio.dt <- screen.ratio.dt %>%
-  # Then calculate the mean over the technical replicates
-  #mutate(MMEJ_ratio_mean = ave(MMEJratio, drug, concentration, barcode, replicate, FUN = mean)) %>%
   # And calculate the z-scores
   mutate(MMEJ_ratio_norm = MMEJratio / mean_DMSO) %>%
   mutate(MMEJ_zscore = (MMEJratio - mean_DMSO)/ sd_DMSO) %>%
@@ -887,6 +848,26 @@ screen.ratio.dt <- left_join(screen.ratio.dt, zscores_comb)
 screen.ratio.dt <- left_join(screen.ratio.dt, zscores_comb_global)
 
 ```
+# Calculate Log2 fold change
+```{r}
+dmso.mmej.score <- screen.ratio.dt %>%
+  filter(drug == "DMSO") %>%
+  ungroup() %>%
+  distinct(barcode, replicate, tech, drug, well, plate, MMEJratio) %>%
+  dplyr::select('DMSO' = MMEJratio, barcode, replicate, tech) %>%
+  mutate(mean_DMSO = ave(DMSO, barcode, replicate, tech, FUN = mean)) %>%
+  dplyr::select(-DMSO) %>%
+  distinct()
+
+screen.ratio.dt %<>% left_join(dmso.mmej.score) %>% mutate(MMEJ_log2_FC = log2(MMEJratio/mean_DMSO)) %>% select(-mean_DMSO)
+
+# Double check correlation between replicates
+cormat <- dmso.mmej.score %>% pivot_wider(names_from = c(replicate, tech), values_from = mean_DMSO) %>%
+  column_to_rownames(var = "barcode") %>% cor %>% round(.,2)
+cormat
+```
+
+
 # Data export
 
 ## Add chromatin data
@@ -939,6 +920,7 @@ ratio.cols = c("replicate",
          "viab_mean",
          "sample",
          "freqCut",
+         "freqCut_max",
          "freqMMEJ", 
          "freqNHEJ",
          "MMEJratio",
@@ -961,7 +943,8 @@ ratio.cols = c("replicate",
          "MMEJ_zscore_global",
          "MMEJ_zscore_global_mean",
          "MMEJ_zscore_comb" ,
-         "MMEJ_zscore_global_comb")
+         "MMEJ_zscore_global_comb",
+         "MMEJ_log2_FC")
 
 screen_ratios_tib =  screen.ratios.chrom.dt %>% 
   select(all_of(c(ratio.cols, chrom_colnames))) %>%
@@ -980,10 +963,6 @@ saveRDS(screen.indels.chrom.dt, file = filename)
 # The ratios list of the split technical replicates
 filename <- SetFileName("_episcreen_ratios", initials = initials, extension = "RDS")
 saveRDS(screen_ratios_tib, file = filename)
-
-# # The ratios list of the merged technical replicates
-# filename <- SetFileName("_episcreen_all.RDS", initials = initials)
-# saveRDS(screen_all_tib, file = filename)
 ```
 
 # Conclusions 
