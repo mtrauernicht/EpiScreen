@@ -869,6 +869,8 @@ FC_ttest = screen_ratios %>%
   do(tidy(t.test(.$MMEJ_log2_FC))) %>% 
   ungroup() %>%
   mutate(p.adj = p.adjust(p.value, method = "fdr"))
+
+
 ```
 
 
