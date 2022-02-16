@@ -346,10 +346,10 @@ ggplot_custom <- function(...) ggplot2::ggplot(...) +
 
 ```{r data import, echo = FALSE, warning = FALSE}
 # Import data from preprocessing script
-validations_ratios = readRDS("/DATA/projects/DSBrepair/data/R/rs20220208_episcreen/rs20220208_episcreen_validation_ratios.RDS")
-validations_indels = readRDS("/DATA/projects/DSBrepair/data/R/rs20220208_episcreen/rs20220208_episcreen_validation_indels.RDS")
-screen_indels = readRDS("/DATA/projects/DSBrepair/data/R/rs20220211_episcreen/rs20220211_episcreen_mutations.RDS")
-screen_ratios = readRDS("/DATA/projects/DSBrepair/data/R/rs20220211_episcreen/rs20220211_episcreen_ratios.RDS")
+# validations_ratios = readRDS("/DATA/projects/DSBrepair/data/R/rs20220208_episcreen/rs20220208_episcreen_validation_ratios.RDS")
+# validations_indels = readRDS("/DATA/projects/DSBrepair/data/R/rs20220208_episcreen/rs20220208_episcreen_validation_indels.RDS")
+# screen_indels = readRDS("/DATA/projects/DSBrepair/data/R/rs20220211_episcreen/rs20220211_episcreen_mutations.RDS")
+screen_ratios = readRDS("/DATA/projects/DSBrepair/data/R/rs20220216_episcreen/rs20220216_episcreen_ratios.3.RDS")
 
 # Complete data without exlcluding wells <0.45 viability (I need this for plotting)
 viability.data = as.data.table(readRDS("/DATA/projects/DSBrepair/git/EpiScreen/files_scripts/rs20211221_Episcreen_Reads_Viab_Metadata.RDS")) %>%
@@ -357,7 +357,7 @@ viability.data = as.data.table(readRDS("/DATA/projects/DSBrepair/git/EpiScreen/f
 
 # Chromatin info
 chromatin.features.zs <- colnames(screen_ratios)[grepl("[.]zscore", colnames(screen_ratios))]
-chrom_data = screen_ratios %>% dplyr::select(barcode, all_of(chromatin.features.zs)) %>% distinct()
+chrom_data = screen_ratios %>% dplyr::select(IPR, all_of(chromatin.features.zs)) %>% distinct()
 
 chromatin.features.zs
 # chromatin.feature.colors = c()
@@ -378,10 +378,10 @@ figure_out = "/DATA/projects/DSBrepair/scratch/episcreen/"
 ```{r}
 # Data table and compute log2_ratio (This line needs to be adjusted)
 filtered_drug_conc = screen_ratios %>%
-  filter(abs(mean_eff_zscore_comb) > 1.96 | abs(MMEJ_zscore_comb) > 1.96 | drug == "DMSO") %>%
+  filter(abs(mean_eff_zscore_comb) > 2.58 | abs(MMEJ_zscore_comb) > 2.58 | drug == "DMSO") %>%
   mutate(drug_conc = paste(drug, conc_char, sep = "_"),
-         effect_on_indelrate = ifelse(abs(mean_eff_zscore_comb) > 1.96, TRUE, FALSE),
-         effect_on_ratio = ifelse(abs(MMEJ_zscore_comb) > 1.96, TRUE, FALSE)) %>%
+         effect_on_indelrate = ifelse(abs(mean_eff_zscore_comb) > 2.58, TRUE, FALSE),
+         effect_on_ratio = ifelse(abs(MMEJ_zscore_comb) > 2.58, TRUE, FALSE)) %>%
   distinct(drug, conc_char, drug_conc, effect_on_indelrate, effect_on_ratio) %>%
   mutate(counts = ave(drug_conc, drug, conc_char, FUN = function(x) length(x)),
          keep = ifelse(counts > 1 & !effect_on_indelrate | counts > 1 & !effect_on_ratio, FALSE, TRUE)) %>%
@@ -392,25 +392,25 @@ filtered_drug_conc = screen_ratios %>%
 ratios_tib <- screen_ratios %>%
   mutate(drug_conc_char = paste(drug, conc_char, sep = "_")) %>%
   semi_join(filtered_drug_conc) %>%
-  distinct(NHEJratio, freqCut, drug, conc_char, target, barcode) %>%
-  mutate(NHEJratio = ave(NHEJratio, drug, conc_char, barcode, FUN = mean)) %>%
+  distinct(NHEJratio, freqCut, drug, conc_char, target, IPR, barcode) %>%
+  mutate(NHEJratio = ave(NHEJratio, drug, conc_char, IPR, barcode, FUN = mean)) %>%
   mutate(NHEJratio.log2 = log2(NHEJratio)) %>%
-  mutate(freqCut = (ave(freqCut, drug, conc_char, barcode, FUN = mean))) %>%
+  mutate(freqCut = (ave(freqCut, drug, conc_char, IPR, barcode, FUN = mean))) %>%
   mutate(freqCut.log2 = log2(freqCut)) %>%
   distinct()
 
 dmso_ratios_tib <- screen_ratios %>%
   filter(drug == "DMSO") %>%
-  distinct(NHEJratio, freqCut, barcode) %>%
-  mutate(DMSO.ratio = ave(NHEJratio, barcode, FUN = mean)) %>%
+  distinct(NHEJratio, freqCut, IPR) %>%
+  mutate(DMSO.ratio = ave(NHEJratio, IPR, FUN = mean)) %>%
   mutate(DMSO.ratio.log2 = log2(DMSO.ratio)) %>%
-  mutate(DMSO.freqCut = ave(freqCut, barcode, FUN = mean)) %>%
+  mutate(DMSO.freqCut = ave(freqCut, IPR, FUN = mean)) %>%
   mutate(DMSO.freqCut.log2 = log2(DMSO.freqCut)) %>%
   dplyr::select(-NHEJratio, -freqCut) %>%
   distinct()
 
 ratios_tib <- merge(ratios_tib, dmso_ratios_tib) %>% 
-  dplyr::group_by(barcode, drug, conc_char) %>% 
+  dplyr::group_by(IPR, drug, conc_char) %>% 
   mutate(log2.FC.ratio = NHEJratio.log2 - DMSO.ratio.log2, 
          log2.FC.freqCut = freqCut.log2 - DMSO.freqCut.log2) %>%
   left_join(chrom_data)
@@ -427,19 +427,34 @@ slope.protein.features <- tibble(drug_conc = NA, feature = NA,  term = NA,
                                  indelrate = NA, p.value.indelrate = NA, 
                                  ratio = NA, p.value.ratio = NA)
 
-for (i in unique(ratios_tib$drug_conc)) {
+synergy_calc_tib = ratios_tib %>% ungroup() %>% select(log2.FC.freqCut, log2.FC.ratio, IPR, drug_conc, all_of(chromatin.features.zs))
+
+for (i in unique(synergy_calc_tib$drug_conc)) {
   for (j in chromatin.features.zs) {
-    model_tib <- ratios_tib %>% filter(drug_conc == i) 
+    model_tib_if <- synergy_calc_tib %>% filter(!is.na(log2.FC.freqCut), drug_conc == i)
+    model_tib_pf <- synergy_calc_tib %>% filter(!is.na(log2.FC.ratio), drug_conc == i)
     
     # Indel rates
-    model.indelrate.log2 <- lm(formula = log2.FC.freqCut ~ unlist(model_tib[j]), 
-                               data = model_tib) %>% 
+    model.indelrate.log2 = tibble(term = c("(Intercept)", "slope"), estimate  = NA, p.value = NA)
+
+    if (dim(model_tib_if)[1] != 0) {
+      
+    model.indelrate.log2 <- lm(formula = log2.FC.freqCut ~ unlist(model_tib_if[j]), 
+                               data = model_tib_if) %>% 
       tidy()
+    model.indelrate.log2[2, 1] <- "slope"
+    }   
+    
     
     # Pathway balance
-    model.ratio.log2 <- lm(formula = log2.FC.ratio ~ unlist(model_tib[j]), 
-                           data = model_tib) %>% 
+    model.ratio.log2 = tibble(term = c("(Intercept)", "slope"), estimate  = NA, p.value = NA)
+    if (dim(model_tib_pf)[1] != 0) {
+
+    model.ratio.log2 <- lm(formula = log2.FC.ratio ~ unlist(model_tib_pf[j]), 
+                           data = model_tib_pf) %>% 
       tidy()
+    model.ratio.log2[2, 1] <- "slope"
+    }    
     
     slope.protein.features <- slope.protein.features %>% 
       add_row(drug_conc = i, 
@@ -451,7 +466,7 @@ for (i in unique(ratios_tib$drug_conc)) {
               p.value.indelrate = model.indelrate.log2 %>% 
                 pull(p.value),
               ratio = model.ratio.log2 %>% 
-                pull(estimate), 
+                pull(estimate),
               p.value.ratio = model.ratio.log2 %>% 
                 pull(p.value))
   }
@@ -472,7 +487,7 @@ synergy_tib = slope.protein.features %>%
   mutate(x_intercept_indelrate = -indelrate_intercept / indelrate_slope,
          x_intercept_ratio = -ratio_intercept / ratio_slope)
 
-effect_compounts = ratios_tib %>%
+effect_compounds = ratios_tib %>%
   group_by(drug_conc)  %>% 
   mutate(indelrate_pos = sum(log2.FC.freqCut > 0),
          indelrate_effect = ifelse(indelrate_pos >= 17, "indel_rate_increase", 
@@ -485,7 +500,7 @@ effect_compounts = ratios_tib %>%
 
 p.vals = slope.protein.features %>% filter(term == "slope") %>% dplyr::select(-term, -indelrate , -ratio) %>% distinct()
 
-synergy_tib %<>% left_join(effect_compounts)  %>% 
+synergy_tib %<>% left_join(effect_compounds)  %>% 
   left_join(p.vals) %>%
   mutate(
     # x_intercept_indelrate = ifelse(p.value.indelrate < 0.05,
@@ -541,8 +556,8 @@ domains_c5[c("IPR3", "IPR19"), ] <- "euchromatin-regulation"
 domains_c5[c("IPR8", "IPR13", "IPR17"), ] <- "other"
 
 
-# colors <- brewer.pal(length(unique(barcode.annotation$cluster)), "Pastel2")
-# names(colors) <- unique(barcode.annotation$cluster)
+# colors <- brewer.pal(length(unique(IPR.annotation$cluster)), "Pastel2")
+# names(colors) <- unique(IPR.annotation$cluster)
 annotation_colors_scr = list(
   target = c(HDAC="#60988D", HAT="#C6D0A8", Sirtuin="#8FCAAC",
              HMT="#FDCDAC", DNMT="#D69C81", `Histone Demethylase`="#FFF2AE",
@@ -552,8 +567,8 @@ annotation_colors_scr = list(
   conc_char = c(`100 nM` = "#78BF84", `1 µM`  = "#1E9532", `10 µM` = "#0F4A19"),
   chromatin = c(H3K27me3 = "#E5077E", `euchromatin-regulation` = "#FFE156", 
   transcription = "#F08217", `late_replicating-LAD-H3K9me2` = "#4B235D", other = "#AFB5A6"),
-  group = c(insulator="#874000", repressive="#010001", polycomb ="#2B0504", euchromatin="#70F8BA",
-                 transcribing="#CAFE48", HDAC="#BC5F04", accessibility='#F4442E',
+  group = c(insulator="#BD263D", repressive="#8D1B60", polycomb ="#D21F8A", euchromatin="#F7941D",
+                 transcribing="#8CC63F", HDAC="#BC5F04", accessibility='#FFFF00',
                  methylation='#7CB4B8'))
 
 
@@ -573,7 +588,7 @@ clone5.matrix = screen_ratios %>% dplyr::select(IPR, ends_with(".zscore")) %>%
   distinct() %>%
   column_to_rownames(var="IPR")
 
-clone5_map = hclust(FC(t(clone5.matrix)))
+clone5_map = hclust(dist(t(clone5.matrix)))
 
 # Set annotation for heatmap
 # Row annotation: annotate drugs with the target group
@@ -613,7 +628,8 @@ filtered_drug_conc_ratio = filtered_drug_conc %>%
 ratios_tib_screen = screen_ratios %>% 
   mutate(drug_conc = paste(drug, conc_char, sep = " ")) %>% 
   filter(drug_conc %in% filtered_drug_conc_ratio & 
-           drug != "DNA-PKi") %>%
+           drug != "DNA-PKi",
+         !is.na(MMEJ_zscore_comb)) %>%
   distinct(IPR, MMEJ_zscore_comb, drug_conc, drug, conc_char) 
 
 mmejzscore_matrix = ratios_tib_screen %>%
@@ -621,9 +637,9 @@ mmejzscore_matrix = ratios_tib_screen %>%
   pivot_wider(names_from = IPR, values_from = MMEJ_zscore_comb) %>%
   column_to_rownames(var = "drug_conc")
 
-clone5_map_ipr_18 = hclust(FC(clone5.matrix))
+clone5_map_ipr_18 = hclust(dist(clone5.matrix))
 # clone5_map_ipr_19 = chip_clone5 %>% 
-#   select(-barcode, -group, -pool, -binsize, -ID) %>%
+#   select(-IPR, -group, -pool, -binsize, -ID) %>%
 #   column_to_rownames(var = "IPR") %>% 
 #   as.matrix() %>%
 #   FC() %>% 
@@ -643,7 +659,7 @@ colors = colorRampPalette(slope.colors %>% pull(color))(length(breaks))
 # colors[-which(breaks < -1.96 | breaks > 1.96 )] = "gray90"
 
 # 
-pdf(paste0(figure_out, "rs20220210_zscorepathwayratio_all.pdf"), width=10, height=20)
+pdf(paste0(figure_out, "rs20220217_zscorepathwayratio_all.pdf"), width=10, height=20)
 
 pheatmap(mmejzscore_matrix[, clone5_map_ipr_18$labels],
          border_color = F,
@@ -707,6 +723,7 @@ dev.off()
 # rmv = names(tab)[1:min(which(checkNA==0))]
 
 # screen_ratios %>% dis
+all_compounds_pathway_synergy = all_compounds_pathway_synergy[!grepl("DNA-PK|Mirin|Null", rownames(all_compounds_pathway_synergy)), ]
 
 quant_breaks <- quantile(all_compounds_pathway_synergy, c(.01,.99), na.rm = T) # change these numbers according to where you want to set the cutoff
 palette_length <- 1000
@@ -716,7 +733,7 @@ colors = colorRampPalette(slope.colors %>% pull(color))(length(breaks))
 colors[which(quant_breaks == 0)-1] = "gray90"
 
 
-pdf(paste0(figure_out, "rs20220211_synergy_pathwayratio_all.pdf"), width=10, height=13)
+pdf(paste0(figure_out, "rs20220217_synergy_pathwayratio_all.pdf"), width=10, height=13)
 
 pheatmap(all_compounds_pathway_synergy[, clone5_map$labels],
          border_color = F,
@@ -731,6 +748,39 @@ pheatmap(all_compounds_pathway_synergy[, clone5_map$labels],
          annotation_col = clustering,
          cutree_rows = 8)
 
+dev.off()
+
+############################# INDEL FREQUENCY ########################
+all_compounds_indelrate_synergy
+
+all_compounds_indelrate_synergy = all_compounds_indelrate_synergy[!grepl("DNA-PK|Mirin|Null", rownames(all_compounds_indelrate_synergy)), ]
+
+quant_breaks <- quantile(all_compounds_indelrate_synergy, c(.01,.99), na.rm = T) # change these numbers according to where you want to set the cutoff
+palette_length <- 1000
+breaks <- c(seq(quant_breaks[1], 0, length.out=ceiling(palette_length/2) + 1), 
+            seq(quant_breaks[2]/palette_length, quant_breaks[2], length.out=floor(palette_length/2)))
+colors = colorRampPalette(slope.colors %>% pull(color))(length(breaks))
+colors[which(quant_breaks == 0)-1] = "gray90"
+
+
+
+clone5_map_ipr_18 = hclust(dist(t(clone5.matrix)))
+clone5_map_ipr_18_labes =  clone5_map_ipr_18$labels[clone5_map_ipr_18$labels %in% colnames(all_compounds_indelrate_synergy)]
+
+pdf(paste0(figure_out, "rs20220217_synergy_indelfreq_all.pdf"), width=22, height=12)
+
+pheatmap(t(all_compounds_indelrate_synergy[, clone5_map_ipr_18_labes]),
+         border_color = F,
+         cellwidth = 8,
+         cellheight = 8,
+         cluster_rows = clone5_map,
+         breaks = breaks,
+         annotation_col = target,
+         main = "Indel frequency synergy for all compounds with significant hit",
+         color = colors,
+         annotation_colors = annotation_colors_scr, annotation_legend = T,
+         annotation_row = clustering,
+         cutree_cols = 9)
 dev.off()
 ```
 
@@ -752,23 +802,23 @@ filtered_drug_conc = screen_ratios %>%
 ratios_tib <- screen_ratios %>%
   mutate(drug_conc_char = paste(drug, conc_char, sep = "_")) %>%
   semi_join(filtered_drug_conc) %>%
-  distinct(NHEJratio, drug, conc_char, target, barcode) %>%
-  mutate(NHEJratio = ave(NHEJratio, drug, conc_char, barcode, FUN = mean)) %>%
+  distinct(NHEJratio, drug, conc_char, target, IPR) %>%
+  mutate(NHEJratio = ave(NHEJratio, drug, conc_char, IPR, FUN = mean)) %>%
   mutate(NHEJratio.log2 = log2(NHEJratio)) %>%
   distinct()
 
 dmso_ratios_tib <- screen_ratios %>%
   filter(drug == "DMSO") %>%
-  distinct(NHEJratio, freqCut, barcode) %>%
-  mutate(DMSO.ratio = ave(NHEJratio, barcode, FUN = mean)) %>%
+  distinct(NHEJratio, freqCut, IPR) %>%
+  mutate(DMSO.ratio = ave(NHEJratio, IPR, FUN = mean)) %>%
   mutate(DMSO.ratio.log2 = log2(DMSO.ratio)) %>%
-  mutate(DMSO.freqCut = ave(freqCut, barcode, FUN = mean)) %>%
+  mutate(DMSO.freqCut = ave(freqCut, IPR, FUN = mean)) %>%
   mutate(DMSO.freqCut.log2 = log2(DMSO.freqCut)) %>%
   dplyr::select(-NHEJratio, -freqCut) %>%
   distinct()
 
 ratios_tib <- merge(ratios_tib, dmso_ratios_tib) %>% 
-  dplyr::group_by(barcode, drug, conc_char) %>% 
+  dplyr::group_by(IPR, drug, conc_char) %>% 
   mutate(log2.FC.ratio = NHEJratio.log2 - DMSO.ratio.log2, 
          log2.FC.freqCut = freqCut.log2 - DMSO.freqCut.log2) %>%
   left_join(chrom_data)
@@ -779,14 +829,14 @@ ratios_tib <- merge(ratios_tib, dmso_ratios_tib) %>%
 ```{r vorinostat synergy}
 vorinostat_ratios = validations_ratios %>% 
   filter(replicate == "mean" & plasmid == "LBR2" & pool == "AB") %>% 
-  distinct(barcode, drug, NHEJ_MMEJ , efficiency) %>% 
+  distinct(IPR, drug, NHEJ_MMEJ , efficiency) %>% 
   pivot_wider(names_from = drug, values_from = c(efficiency, NHEJ_MMEJ)) %>%
   mutate(diff_efficiency = efficiency_Vorinostat - efficiency_DMSO,
          ratio_efficiency = efficiency_Vorinostat/efficiency_DMSO,
          logFC_NHEJ_MMEJ = log2(NHEJ_MMEJ_Vorinostat / NHEJ_MMEJ_DMSO))  %>%
   filter(!is.na(logFC_NHEJ_MMEJ) & !is.na(ratio_efficiency) & !is.infinite(logFC_NHEJ_MMEJ))
   
-vorinostat_ratios %<>% left_join(unique(validations_ratios[, c(1, 42:75)]), by = "barcode") %>% distinct(barcode, .keep_all = TRUE)
+vorinostat_ratios %<>% left_join(unique(validations_ratios[, c(1, 42:75)]), by = "IPR") %>% distinct(IPR, .keep_all = TRUE)
 
 chromatin.features <- colnames(validations_ratios)[42:65]
 
@@ -839,14 +889,14 @@ dev.off()
 ```{r}
 vorino_screen = ratios_tib %>% filter(drug == "Vorinostat (SAHA, MK0683)") %>% 
   ungroup() %>%
-  select(all_of(chromatin.features.zs), barcode, log2.FC.ratio, NHEJratio, DMSO.ratio) %>% 
+  select(all_of(chromatin.features.zs), IPR, log2.FC.ratio, NHEJratio, DMSO.ratio) %>% 
   dplyr::rename(screen_FC = log2.FC.ratio, DMSO_screen = DMSO.ratio) %>%
-  distinct(barcode, screen_FC, H3K27me3.zscore, NHEJratio, DMSO_screen)
+  distinct(IPR, screen_FC, H3K27me3.zscore, NHEJratio, DMSO_screen)
 
 vorino_pool_screen = vorinostat_ratios %>% 
-  mutate(barcode = gsub(".[AB]$", "", barcode)) %>% 
-  filter(barcode %in% vorino_screen$barcode) %>% 
-  distinct(barcode, logFC_NHEJ_MMEJ, H3K27me3, NHEJ_MMEJ_Vorinostat, NHEJ_MMEJ_DMSO) %>%
+  mutate(IPR = gsub(".[AB]$", "", IPR)) %>% 
+  filter(IPR %in% vorino_screen$IPR) %>% 
+  distinct(IPR, logFC_NHEJ_MMEJ, H3K27me3, NHEJ_MMEJ_Vorinostat, NHEJ_MMEJ_DMSO) %>%
   dplyr::rename(pool_FC = logFC_NHEJ_MMEJ, 
                 NHEJratio_pool = NHEJ_MMEJ_Vorinostat, 
                 DMSO_pool = NHEJ_MMEJ_DMSO) %>%
@@ -1020,16 +1070,16 @@ GSK_BIX_molcell_tib <- readRDS("/DATA/projects/DSBrepair/data/R/rs20210311/RSTP2
                          "mean_RSTP2_2000_LBR2_GSK126_64")) 
 
 GSK_fc = GSK_BIX_molcell_tib %>% 
-  distinct(barcode, drug, NHEJ, MMEJ) %>%
+  distinct(IPR, drug, NHEJ, MMEJ) %>%
   mutate(NHEJ_MMEJ = NHEJ/MMEJ) %>%
   select(-NHEJ, -MMEJ) %>%
   pivot_wider(values_from = NHEJ_MMEJ, names_from = drug) %>%
   filter(complete.cases(.)) %>%
   mutate(logFC_GSK= log2(GSK126 / DMSO_GSK))  %>%
   filter(!is.na(logFC_GSK) & !is.infinite(logFC_GSK)) %>%
-  select(barcode, logFC_GSK)
+  select(IPR, logFC_GSK)
   
-chrom_data_pool = GSK_BIX_molcell_tib %>% select(barcode, all_of(chromatin.features)) %>% distinct()
+chrom_data_pool = GSK_BIX_molcell_tib %>% select(IPR, all_of(chromatin.features)) %>% distinct()
 
 GSK_fc %<>% left_join(chrom_data_pool)
 

@@ -107,8 +107,10 @@ CallTrueBarcodes <- function(df) {
 # initials (for file export)
 initials = "rs"
 
-# Viability (% of DMSO)
-viab_limit = 0.75
+# Viability (% of DMSO) for efficiency
+viab_limit_eff = 0.25
+# Viability threshold for repair pathway balance
+viab_limit_bal = 0.75
 
 # Read count limit of +1 & -7 combined
 read_count_limit = 40
@@ -329,10 +331,10 @@ mutations.stat.dt = merge(mutations.dt, indel.statistics.dt)
 
 # Filter the low viability reads
 # This filters out all drugs at a certain concentration were at least 2/3 technical replicates were below 0.75 in at least one biological replicate 
-keep_drugs <- mutations.stat.dt %>%
+keep_drugs_eff <- mutations.stat.dt %>%
   distinct(plate, drug, conc_char, well, tech, replicate, viab_norm_split) %>%
   # filter for samples with higher viab than the limit
-  filter(viab_norm_split > viab_limit) %>%
+  filter(viab_norm_split > viab_limit_eff) %>%
   distinct(conc_char, drug, tech, replicate) %>%
   mutate(conc_char_drug = paste(conc_char, drug, sep = " "),
          tech_n = ave(conc_char_drug, conc_char_drug, replicate, FUN = length),
@@ -343,22 +345,44 @@ keep_drugs <- mutations.stat.dt %>%
   mutate(rep_n = ave(conc_char_drug,conc_char_drug, FUN = length)) %>%
   # And in both bio replicates
   filter(rep_n > 1) %>% 
-  pull(conc_char_drug_rep) %>%
+  pull(conc_char_drug) %>%
+  unique()
+
+# This filters out all drugs at a certain concentration were at least 2/3 technical replicates were below 0.75 in at least one biological replicate 
+keep_drugs_bal <- mutations.stat.dt %>%
+  distinct(plate, drug, conc_char, well, tech, replicate, viab_norm_split) %>%
+  # filter for samples with higher viab than the limit
+  filter(viab_norm_split > viab_limit_bal) %>%
+  distinct(conc_char, drug, tech, replicate) %>%
+  mutate(conc_char_drug = paste(conc_char, drug, sep = " "),
+         tech_n = ave(conc_char_drug, conc_char_drug, replicate, FUN = length),
+         conc_char_drug_rep = paste(conc_char, drug, replicate, sep = " ")) %>%
+  # These conditions need to be present in at least 2 (out of 3) technical replicates per bio replicate
+  filter(tech_n > 1) %>% 
+  distinct(replicate, conc_char_drug, conc_char_drug_rep) %>%
+  mutate(rep_n = ave(conc_char_drug,conc_char_drug, FUN = length)) %>%
+  # And in both bio replicates
+  filter(rep_n > 1) %>% 
+  pull(conc_char_drug) %>%
   unique()
 
 dim(mutations.stat.dt)
+
 # Filter for the viability
 mutations.screen.dt <- mutations.stat.dt %>%
   # filter out technical replicates below the viability cutoff
-  filter(viab_norm_split > viab_limit) %>%
+  # filter(viab_norm_split > viab_limit_eff) %>%
   # make filter for the conditions for which we do not have at least 2 technical replicates
-  mutate(conc_char_drug_rep = paste(conc_char, drug, replicate, sep = " ")) %>%
-  # apply filter
-  filter(conc_char_drug_rep %in% keep_drugs) %>%
+  mutate(conc_char_drug = paste(conc_char, drug, sep = " "),
+         indel_freq_filter = ifelse(conc_char_drug %in% keep_drugs_eff, TRUE, FALSE),
+         pathway_bal_filter = ifelse(conc_char_drug %in% keep_drugs_bal, TRUE, FALSE),
+         viab_norm_split_eff = ifelse(indel_freq_filter & viab_norm_split > viab_limit_eff, viab_norm_split, NA), 
+         viab_norm_split_bal = ifelse(pathway_bal_filter & viab_norm_split > viab_limit_bal, viab_norm_split, NA)) %>%
   # remove these colums
-  dplyr::select(-conc_char_drug_rep, -mut.counts) %>%
+  dplyr::select(-mut.counts) %>%
   # Calculate new mean
-  mutate(viab_mean = ave(viab_norm_split, drug, conc_char, replicate, FUN = mean))
+  mutate(viab_mean_if = ave(viab_norm_split_eff, drug, conc_char, replicate, FUN=function(x) mean(x, na.rm=T)),
+         viab_mean_pb = ave(viab_norm_split_bal, drug, conc_char, replicate, FUN=function(x) mean(x, na.rm=T)))
 
 dim(mutations.screen.dt)
 
@@ -370,32 +394,13 @@ mutations.screen.dt[barcode == "ACTGTCGAGTTGTCCG" & drug == "Zebularine" & mutat
 mutations.screen.dt[is.na(mutation), ]
 ```
 
-## We will also remove samples that are not in at least in 2 technical replicates (out of 3) and are present both biological replicates. 
-
-```{r filter for reproducibility}
-mutations.screen.dt %>% 
-  distinct(concentration, replicate, tech, drug) %>% 
-  group_by(concentration, replicate, drug) %>% 
-  dplyr::summarise(count = n()) %>% 
-  filter(count < 2)
-
-mutations.screen.dt %>% 
-  distinct(concentration, replicate, drug) %>% 
-  group_by(concentration, drug) %>% 
-  dplyr::summarise(count = n()) %>% 
-  filter(count < 2)
-```
-
-These two tables are empty, that means that all the samples we have here are all in at least 2 same screen replicates and 2 difference screen replicates.
-
-
 ## Pooling large indels for indel spectrum plotting
 
 ```{r large indel pooling for indel plots}
 # Fix large deletions for every deletion above 25 (we do not sequence deletions larger than 130 bp)
 largedels <- as.character(seq(-130, -15))
 
-mutations.large.del.dt = mutations.screen.dt[mutation %in% largedels, ]
+mutations.large.del.dt = mutations.screen.dt[mutation %in% largedels & pathway_bal_filter & viab_norm_split > viab_limit_bal, ]
 
 # Sum large dels
 mutations.large.del.sum.dt = 
@@ -427,7 +432,7 @@ mutations.large.del.sum.base.dt[is.na(mutation), ]
 
 # Fix large insertions for every insertions above 3
 largeins <- as.character(seq(3, 20))
-mutations.large.ins.dt = mutations.screen.dt[mutation %in% largeins, ]
+mutations.large.ins.dt = mutations.screen.dt[mutation %in% largeins & pathway_bal_filter & viab_norm_split > viab_limit_bal, ]
 
 # Sum large ins
 mutations.large.ins.sum.dt = mutations.large.ins.dt[, lapply(.SD, sum, na.rm=TRUE),  by=c("exp", "barcode"),
@@ -491,7 +496,7 @@ rm(list = ls()[grep("mutations.dt", ls())])
 ```{r calculate_ratios}
 # Calculate NHEJ/MMEJ ratios and efficiences
 ratios_tib <- screen.indel.dt %>%
-  filter(mutation %in% c("1", "-7")) %>%
+  filter(mutation %in% c("1", "-7") & pathway_bal_filter & viab_norm_split > viab_limit_bal) %>%
   dplyr::distinct(exp, barcode, mutation, ratio_indels_split) %>% 
   pivot_wider(names_from = mutation, 
               values_from = ratio_indels_split, 
@@ -506,7 +511,7 @@ ratios_tib <- screen.indel.dt %>%
 
 freqs_ratios_tib <- screen.indel.dt %>%
   as_tibble() %>%
-  filter(mutation == "0") %>%
+  filter(mutation == "0" & indel_freq_filter & viab_norm_split > viab_limit_eff) %>%
   dplyr::distinct(exp, barcode, freq_split) %>% 
   mutate(freqCut = 1 - freq_split,
          freqCut_global = ave(freqCut, exp, FUN = mean),
@@ -539,11 +544,18 @@ indel.cols = c("replicate",
          "drug",
          "target",
          "viab_norm_split",
+         "indel_freq_filter",
+         "pathway_bal_filter",
+         "viab_mean_if",
+         "viab_mean_pb",
          "conc_char",
          "viab_mean",
          "sample",
          "type",
-         "color")
+         "color",
+         "freqCut",
+         "freqCut_global",
+         "freqCut_max")
 
 screen.indels.dt = screen.indel.dt %>% select(all_of(indel.cols))
 
@@ -568,17 +580,32 @@ screen.ratio.dt = screen.indel.dt %>% select(-any_of(indel.cols.only)) %>% disti
 ```{r averaging indel frequencies}
 screen.indels.dt %<>% as.data.table()
 
+# Calculate all the means even with those not passing filters, why I don't know, we're constantly testing anyways...
 screen.indels.dt[, 
-                c("freq_mean_rep", "freq_sd_rep") := 
+                c("freq_mean_rep_all", "freq_sd_rep_all") := 
                   list(mean(freq_split, na.rm = TRUE), 
                        sd(freq_split, na.rm = TRUE)), 
                 by=c("barcode", "mutation", "replicate", "drug", "conc_char")] 
 
 screen.indels.dt[, 
+                c("freq_mean_all", "freq_sd_all") := 
+                  list(mean(freq_split, na.rm = TRUE), 
+                       sd(freq_split, na.rm = TRUE)), 
+                by=c("barcode", "mutation", "drug", "conc_char")] 
+
+# Calculate the means with the filters on.
+screen.indels.dt[pathway_bal_filter & viab_norm_split > viab_limit_bal, 
+                c("freq_mean_rep", "freq_sd_rep") := 
+                  list(mean(freq_split, na.rm = TRUE), 
+                       sd(freq_split, na.rm = TRUE)), 
+                by=c("barcode", "mutation", "replicate", "drug", "conc_char")] 
+
+
+screen.indels.dt[pathway_bal_filter & viab_norm_split > viab_limit_bal, 
                 c("freq_mean", "freq_sd") := 
                   list(mean(freq_split, na.rm = TRUE), 
                        sd(freq_split, na.rm = TRUE)), 
-                by=c("barcode", "mutation", "drug", "conc_char")]  
+                by=c("barcode", "mutation", "drug", "conc_char")]
 ```
 
 # Calculating the z-scores
@@ -743,6 +770,7 @@ eff.zscore = screen.ratio.dt %>%
 
 # Combine the mean of the z-scores
 mean.eff.zscore.comb = eff.zscore %>% distinct(drug, conc_char, barcode, replicate, mean_eff_zscore) %>%
+  filter(!is.na(mean_eff_zscore)) %>%
          mutate(mean_eff_zscore_comb = ave(mean_eff_zscore, drug, conc_char, barcode, 
                                 FUN = function(x) sum(x)/sqrt(length(x))))
 
@@ -761,6 +789,7 @@ eff.zscore.global = screen.ratio.dt %>%
 # Combine the global z-scores
 eff.zscore.pooled.global.comb = eff.zscore.global %>% 
   distinct(drug, conc_char, replicate, mean_eff_zscore_global) %>%
+  filter(!is.na(mean_eff_zscore_global)) %>%
          mutate(mean_eff_zscore_global_comb = ave(mean_eff_zscore_global, drug, conc_char, 
                                 FUN = function(x) sum(x)/sqrt(length(x))))
 
@@ -835,11 +864,13 @@ screen.ratio.dt <- screen.ratio.dt %>%
 # Combine z-scores of the two biological replicates: stouffer's method = sum(z-scores)/sqrt(number_of_z-scores)
 zscores_comb <- screen.ratio.dt %>%
   distinct(MMEJ_zscore_mean, drug, conc_char, barcode) %>%
+  filter(!is.na(MMEJ_zscore_mean)) %>%
   mutate(MMEJ_zscore_comb = ave(MMEJ_zscore_mean, drug, conc_char, barcode, 
                                 FUN = function(x) sum(x)/sqrt(length(x)))) 
 
 zscores_comb_global <- screen.ratio.dt %>%
-  distinct(MMEJ_zscore_global_mean, drug, conc_char) %>%
+  distinct(MMEJ_zscore_global_mean, drug, conc_char)  %>%
+  filter(!is.na(MMEJ_zscore_global_mean)) %>%
   mutate(MMEJ_zscore_global_comb = ave(MMEJ_zscore_global_mean, drug, conc_char, 
                                   FUN = function(x) sum(x)/sqrt(length(x)))) %>%
   distinct(MMEJ_zscore_global_comb, drug, conc_char)
