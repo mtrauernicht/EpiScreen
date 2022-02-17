@@ -352,7 +352,7 @@ ggplot_custom <- function(...) ggplot2::ggplot(...) +
 
 ```{r data import, echo = FALSE, warning = FALSE}
 # Import data from preprocessing script
-indel.data <- readRDS("/DATA/projects/DSBrepair/data/R/rs20220201_episcreen/rs20220201_episcreen_ratios.RDS")
+indel.data <- readRDS("/DATA/projects/DSBrepair/data/R/rs20220216_episcreen/rs20220216_episcreen_ratios.3.RDS")
 ```
 
 
@@ -525,7 +525,8 @@ annotation_colors_scr = list(
              HMT="#FDCDAC", DNMT="#D69C81", `Histone Demethylase`="#FFF2AE",
              HIF="#E3DCD5", JAK="#C8D7E2", PIM="#9AB8C4", `Aurora Kinase`="#F4CAE4",
              PARP="#CB546F", `Epigenetic Reader Domain`= "#476D61", `DNA-PK`="#E07A43"
-             ))
+             ),
+  conc_char = c(`100 nM` = "#78BF84", `1 µM`  = "#1E9532", `10 µM` = "#0F4A19"))
 
 
 
@@ -551,8 +552,7 @@ eff.data.heatmap <- indel.data %>%
 eff.data.heatmap <- eff.data.heatmap %>%
   mutate(MMEJ_zscore_comb = 2*pnorm(q = abs(MMEJ_zscore_comb), lower.tail = F)) %>%
   mutate(MMEJ_zscore_comb = p.adjust(MMEJ_zscore_comb, method = 'fdr')) %>%
-  mutate(min = ave(MMEJ_zscore_comb, drug, conc_char, FUN = min)) %>%
-  filter(min < 0.01)
+  mutate(min = ave(MMEJ_zscore_comb, drug, conc_char, FUN = min)) # %>%  filter(min < 0.05)
 
 #eff.data.heatmap$MMEJ_ratio_norm[eff.data.heatmap$MMEJ_zscore_comb > 0.05] <- NA
 eff.data.heatmap2 <- eff.data.heatmap %>%
@@ -574,7 +574,8 @@ iprs <- as.character(iprs)
 eff.data.heatmap2 <- eff.data.heatmap2[,c("drug", "target", "conc_char", iprs)]
 eff.data.heatmap2$drug <- gsub(" [(].*[)]", "", eff.data.heatmap2$drug) #shorten name of drug
 
-breaks <- quantile(unlist(eff.data.heatmap2 %>% dplyr::select(contains('IPR'))), c(.15,1), na.rm = T) # change these numbers according to where you want to set the cutoff
+
+breaks <- quantile(unlist(eff.data.heatmap2 %>% dplyr::select(contains('IPR'))), c(.01,.99), na.rm = T) # change these numbers according to where you want to set the cutoff
 palette_length <- 100
 
 myBreaks <- c(seq(breaks[1], 0, length.out=ceiling(palette_length/2) + 1), 
@@ -589,50 +590,52 @@ ordered_marks2 <- ordered_marks2$target
 
 annotation_colors_scr$target <- annotation_colors_scr$target[ordered_marks2]
 
-
-# Only include lowest effective concentrations
-eff.data.heatmap2 <- eff.data.heatmap2 %>%
-  mutate(compound_n = ave(drug, drug, FUN = length))
-all_conc <- eff.data.heatmap2[eff.data.heatmap2$compound_n == "3" & eff.data.heatmap2$conc_char %in% c("1 µM", "10 µM"),]
-eff.data.heatmap2 <- anti_join(eff.data.heatmap2, all_conc)
-
-eff.data.heatmap2$conc <- 1
-eff.data.heatmap2$conc[eff.data.heatmap2$conc_char == "1 µM"] <- 2
-eff.data.heatmap2$conc[eff.data.heatmap2$conc_char == "10 µM"] <- 3
-
-for (i in unique(eff.data.heatmap2$drug)) {
-  if (eff.data.heatmap2$compound_n[eff.data.heatmap2$drug == i] == "2") {
-    max_conc <- max(eff.data.heatmap2$conc[eff.data.heatmap2$compound_n == "2" & eff.data.heatmap2$drug == i])
-    remove <- eff.data.heatmap2[eff.data.heatmap2$compound_n == "2" & eff.data.heatmap2$drug == i & eff.data.heatmap2$conc == max_conc,]
-    eff.data.heatmap2 <-anti_join(eff.data.heatmap2, remove)
-  }
-}
-
-eff.data.heatmap2 <- eff.data.heatmap2 %>%
-  dplyr::select(-compound_n, -conc)
+# # Only include lowest effective concentrations
+# eff.data.heatmap2 <- eff.data.heatmap2 %>%
+#   mutate(compound_n = ave(drug, drug, FUN = length))
+# all_conc <- eff.data.heatmap2[eff.data.heatmap2$compound_n == "3" & eff.data.heatmap2$conc_char %in% c("1 µM", "10 µM"),]
+# eff.data.heatmap2 <- anti_join(eff.data.heatmap2, all_conc)
+# 
+# eff.data.heatmap2$conc <- 1
+# eff.data.heatmap2$conc[eff.data.heatmap2$conc_char == "1 µM"] <- 2
+# eff.data.heatmap2$conc[eff.data.heatmap2$conc_char == "10 µM"] <- 3
+# 
+# for (i in unique(eff.data.heatmap2$drug)) {
+#   if (eff.data.heatmap2$compound_n[eff.data.heatmap2$drug == i] == "2") {
+#     max_conc <- max(eff.data.heatmap2$conc[eff.data.heatmap2$compound_n == "2" & eff.data.heatmap2$drug == i])
+#     remove <- eff.data.heatmap2[eff.data.heatmap2$compound_n == "2" & eff.data.heatmap2$drug == i & eff.data.heatmap2$conc == max_conc,]
+#     eff.data.heatmap2 <-anti_join(eff.data.heatmap2, remove)
+#   }
+# }
+# 
+# eff.data.heatmap2 <- eff.data.heatmap2 %>%
+#   dplyr::select(-compound_n, -conc)
 
 
 # Add cluster annotation
 clusters_drugs <- hclust(dist(eff.data.heatmap2), method = "complete")
 clusters_drugs <- cutree(tree = as.dendrogram(clusters_drugs), k = 4)
 clusters_drugs <- data.frame(clusters_drugs)
-eff.data.heatmap2 <- cbind(eff.data.heatmap2, clusters_drugs)
-clusters_drugs <- eff.data.heatmap2 %>%
-  distinct(drug, clusters_drugs)
-target <- target %>%
-  rownames_to_column("drug") %>%
+
+eff.data.heatmap2.clusters <- cbind(eff.data.heatmap2, clusters_drugs) %>% 
+  as_tibble() %>%
+  mutate(drug_conc = paste(drug, conc_char, sep = " "))
+
+clusters_drugs <- eff.data.heatmap2.clusters %>%
+  distinct(drug_conc, clusters_drugs)
+target <- target_set %>%
+  rownames_to_column("drug_conc") %>%
   left_join(clusters_drugs) %>%
   na.omit()
-rownames(target) <- target$drug
+rownames(target) <- target$drug_conc
 target <- target %>%
-  dplyr::select(target, clusters_drugs)
+  dplyr::select(target, clusters_drugs, conc_char)
 
-
-pheatmap(as.matrix(eff.data.heatmap2 %>%
+pheatmap(eff.data.heatmap2.clusters %>%
                        arrange(target) %>%
-                       column_to_rownames('drug') %>%
+                       column_to_rownames('drug_conc') %>%
                        dplyr::select(contains('IPR')) %>%
-                       t()),
+                       t(),
            border_color = F,
            cellwidth = 8,
            cellheight = 8,
