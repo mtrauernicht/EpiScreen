@@ -458,7 +458,7 @@ aurora_targets <- data.frame("drug" = c("Alisertib","Aurora A Inhibitor I", "Bar
                              "A" = c("Yes", "Yes", "No", "Yes", "Yes", "Yes", "Yes", "No", "Yes", "Yes", "Yes", "Yes", "Yes", "Yes", "Yes"))
 
 
-pdf(paste0(figure_out, "rs20220217_aurora_kinase.pdf"), width=4, height=3)
+pdf(paste0(figure_out, "rs20220623_aurora_kinase.pdf"), width=4, height=3)
 
 ggplot(indel.data.freq2 %>%
          filter(target == "Aurora Kinase") %>%
@@ -513,7 +513,7 @@ eff.data <- eff.data %>%
     mutate(fraction = (`1_Up` + `0_Down`) / (`2_No` + (`1_Up` + `0_Down`))) %>%
     pivot_longer(`0_Down`:`2_No`, names_to = "sign", values_to = "number")
 
-pdf(paste0(figure_out, "rs20220217_indelfrequency_targets_barplot.pdf"), width=8, height=4)
+pdf(paste0(figure_out, "rs20220623_indelfrequency_targets_barplot.pdf"), width=8, height=4)
 ggplot(eff.data,
        aes(y = reorder(target, number), x = number, fill = sign)) +
     geom_bar(stat = "identity") +
@@ -533,13 +533,19 @@ dev.off()
 Are the effects on cutting efficiency global or local? Can we plot all interesting effects in one heatmap per concentration?
 ```{r warning = FALSE}
 # Set annotation for heatmap
+# viability
+viab_drug = indel.data %>% filter(drug != "PAO") %>% mutate(drug = gsub(" [(].*[)]", "", drug),
+                        drug_conc = paste(drug, conc_char, sep = " ")) %>% distinct(viab_mean, drug_conc, replicate) %>% pivot_wider(values_from = viab_mean, names_from = replicate) %>%
+  dplyr::rename(., viab_rep2 = E1504, viab_rep1 = E177)
 # Row annotation: annotate drugs with the target group
 target_set <- indel.data %>% 
-  filter(!target %in% c("Negative Control", "MRN", "DNA-PK")) %>% 
+  filter(!target %in% c("Negative Control", "MRN", "DNA-PK")) %>%
   mutate(drug = gsub(" [(].*[)]", "", drug),
          drug_conc = paste(drug, conc_char, sep = " ")) %>%
-  distinct(drug, drug_conc, conc_char, target) %>% 
+  left_join(viab_drug) %>%
+  distinct(drug, drug_conc, conc_char, target, viab_rep1, viab_rep2) %>% 
   column_to_rownames(var="drug_conc")
+
 
 chromatin <- readRDS(
   "/DATA/usr/x.vergara/XV_ChIPIndels/XV20200902_DDR_RS_revision/XV20200902_DDR_RS_revision/data/xv20200915_DDR_data_CHIP.rds") %>% 
@@ -665,7 +671,7 @@ annotation_colors_scr$target <- annotation_colors_scr$target[ordered_marks2]
 
 # Add cluster annotation
 clusters_drugs <- hclust(dist(eff.data.heatmap2), method = "complete")
-clusters_drugs <- cutree(tree = as.dendrogram(clusters_drugs), k = 4)
+clusters_drugs <- cutree(tree = clusters_drugs, k = 6)
 clusters_drugs <- data.frame(clusters_drugs)
 
 eff.data.heatmap2.clusters <- cbind(eff.data.heatmap2, clusters_drugs) %>% 
@@ -674,15 +680,16 @@ eff.data.heatmap2.clusters <- cbind(eff.data.heatmap2, clusters_drugs) %>%
 
 clusters_drugs <- eff.data.heatmap2.clusters %>%
   distinct(drug_conc, clusters_drugs)
+
 target <- target_set %>%
   rownames_to_column("drug_conc") %>%
   left_join(clusters_drugs) %>%
   na.omit()
 rownames(target) <- target$drug_conc
 target <- target %>%
-  dplyr::select(target, clusters_drugs, conc_char)
+  dplyr::select(target, clusters_drugs, conc_char, viab_rep1, viab_rep2)
 
-pdf(paste0(figure_out, "rs20220217_indelfrequency_heatmap_allconc.pdf"), width=20, height=8)
+pdf(paste0(figure_out, "rs20220623_indelfrequency_heatmap_allconc.pdf"), width=20, height=8)
 pheatmap(eff.data.heatmap2.clusters %>%
                        arrange(target) %>%
                        column_to_rownames('drug_conc') %>%
@@ -705,7 +712,7 @@ pheatmap(eff.data.heatmap2.clusters %>%
            cutree_cols = 4)
 dev.off()
 
-pdf(paste0(figure_out, "rs20220217_indelfrequency_heatmap_DMSO.pdf"), width=3, height=8)
+pdf(paste0(figure_out, "rs20220623_indelfrequency_heatmap_DMSO.pdf"), width=3, height=8)
 
 breaks <- seq(40,90,0.6)
 pheatmap(dmso_freq %>%
@@ -736,7 +743,7 @@ myBreaks <- c(seq(breaks[1], 0, length.out=ceiling(palette_length/2) + 1),
 
 # Add cluster annotation
 clusters_drugs <- hclust(dist(eff.data.heatmap.cluster1), method = "complete")
-clusters_drugs <- cutree(tree = as.dendrogram(clusters_drugs), k = 4)
+clusters_drugs <- cutree(tree = clusters_drugs, k = 4)
 clusters_drugs <- data.frame(clusters_drugs)
 
 eff.data.heatmap.cluster1 <- cbind(eff.data.heatmap.cluster1, clusters_drugs) %>% 
@@ -753,7 +760,7 @@ target.cluster1 <- target.cluster1 %>%
   dplyr::select(target, clusters_drugs, conc_char)
 
 
-pdf(paste0(figure_out, "rs20220217_indelfrequency_heatmap_HDAC.pdf"), width=16, height=8)
+pdf(paste0(figure_out, "rs20220623_indelfrequency_heatmap_HDAC.pdf"), width=16, height=8)
 pheatmap(eff.data.heatmap.cluster1 %>%
                        arrange(target.cluster1) %>%
                        column_to_rownames('drug_conc') %>%
@@ -800,7 +807,7 @@ sigFunc = function(x){
   else if(x < 0.05){"*"}
   else{NA}}
 
-pdf(paste0(figure_out, "rs20220216_indelfrequency_3clusters_chromatin.pdf"), width=8, height=4)
+pdf(paste0(figure_out, "rs20220623_indelfrequency_3clusters_chromatin.pdf"), width=8, height=4)
 ggplot(chromatin_effect,
               aes(x = chromatin, y = freqCut_dif, fill = chromatin)) +
   geom_boxplot(outlier.shape = NA) +
@@ -819,7 +826,7 @@ dev.off()
 chromatin_ipr <- chromatin %>%
   rownames_to_column("IPR")
 
-eff.data.heatmap3 <- eff.data.heatmap2 %>%
+eff.data.heatmap3 <- eff.data.heatmap2.clusters %>%
   pivot_longer(contains("IPR"), names_to = "IPR", values_to = "freqCut_dif")
 
 chromatin_effect <- merge(eff.data.heatmap3, chromatin_ipr) %>%
@@ -835,7 +842,7 @@ sigFunc = function(x){
 
 ggplot(chromatin_effect %>%
          filter(target == "HDAC") %>%
-         filter(clusters_drugs %in% c('2', '7')),
+         filter(clusters_drugs %in% c(3, 4)),
               aes(x = chromatin, y = freqCut_dif, fill = chromatin)) +
   geom_boxplot(outlier.shape = NA) +
   geom_quasirandom() +
@@ -1006,11 +1013,10 @@ ggplot(corr_dmso %>%
   geom_hline(yintercept = -log10(0.01), lty = "dashed") #+
   #facet_wrap(~sign, nrow = 2)
   
-corr_hits <- corr_dmso %>% filter(drug_conc %in% c("PCI-24781 (Abexinostat)_100 nM", "Fluoro-SAHA_1 µM")) 
+corr_hits <- corr_dmso %>% filter(drug_conc %in% c("PCI-24781 (Abexinostat) 100 nM", "Fluoro-SAHA 1 µM")) 
 
 corr_h3k27me3_hits <- corr_dmso %>% filter(drug %in% c("EPZ-6438"))
-
-corr_hits <- merge(corr_hits, chromatin_2)
+corr_hits <- merge(corr_hits, chromatin)
 
 ggplot(corr_hits %>%
          mutate(freqCut = dmso_eff + freqCut_dif)) +
@@ -1020,7 +1026,7 @@ ggplot(corr_hits %>%
   #scale_color_manual(values = c("#e07a5f", "#3d405b")) +
   #stat_cor(method = "pearson") +
   #annotate("rect",xmin=(dmso_freq$dmso_eff + 0.02),xmax=unique(indel.data.freq$max_dmso_freq),ymin=-log10(0.05),ymax=Inf, alpha=0.1, fill="#e07a5f") +
-  facet_wrap(~drug_conc)+
+  facet_wrap(~drug_conc) +
   scale_fill_manual(values = chrom_colors) 
 
 
@@ -1065,7 +1071,7 @@ ggplot(chrom_corr %>%
 
 ## Epistasis per cluster
 ```{r}
-drug_clusters <- eff.data.heatmap2 %>%
+drug_clusters <- eff.data.heatmap2.clusters %>%
   mutate(drug_conc = paste(drug, conc_char, sep = "_")) %>%
   distinct(drug_conc, clusters_drugs, target)
 
@@ -1117,7 +1123,7 @@ pheatmap(epistasis_cluster %>%
 
 ## UMAP
 ```{r}
-eff.data.heatmap3 <- eff.data.heatmap2 %>%
+eff.data.heatmap3 <- eff.data.heatmap2.clusters %>%
   mutate(drug_conc = paste(drug, conc_char, sep = "_"))
 
 umap_df <- indel.data %>% 

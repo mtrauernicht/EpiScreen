@@ -28,7 +28,7 @@ library(rstatix)
 # Load libraries (Just need a data table with all the data and )
 ```{r}
 #Chromatin data (it needs a barcode column)
-indel.data <- readRDS("/DATA/projects/DSBrepair/data/R/rs20220207_episcreen/rs20220207_episcreen_ratios.RDS")
+indel.data <- readRDS("/DATA/projects/DSBrepair/data/R/rs20220216_episcreen/rs20220216_episcreen_ratios.RDS")
 clone5_chrom_tib <- readRDS('/DATA/projects/DSBrepair/data/R/cl20201026_ChIP_zscore_selection.RDS')
 
 figure_out = "/DATA/projects/DSBrepair/scratch/episcreen/"
@@ -82,7 +82,7 @@ The log2 distance ratio in our case is positive if it promotes NHEJ and negative
 # 2nd step check compute distances and plot them
 ```{r}
 # Each replicate has a different value (compute differences by replicate)
-ratios_tib <- ratios_tib %>% 
+ratios_tib_dist <- ratios_tib %>% 
   dplyr::group_by(barcode, drug, conc_char) %>% 
   mutate(log2.dist.ratio = NHEJratio.log2 - DMSO.ratio.log2, 
          log2.dist.freqCut = freqCut.log2 - DMSO.freqCut.log2) %>%
@@ -93,15 +93,15 @@ ratios_tib <- ratios_tib %>%
 # Extract slopes for all genes
 ```{r}
 # Perform analysis across all features for three test genes
-ratios_tib %<>% mutate(drug_conc = paste(drug, conc_char, sep = "_"))
+ratios_tib_dist %<>% mutate(drug_conc = paste(drug, conc_char, sep = "_"))
 
 slope.protein.features <- tibble(drug_conc = NA, feature = NA,  term = NA, 
                                  indelrate = NA, p.value.indelrate = NA, 
                                  ratio = NA, p.value.ratio = NA)
 
-for (i in unique(ratios_tib$drug_conc)) {
+for (i in unique(ratios_tib_dist$drug_conc)) {
   for (j in chromatin.features) {
-    model_tib <- ratios_tib %>% filter(drug_conc == i) 
+    model_tib <- ratios_tib_dist %>% filter(drug_conc == i) 
     
     # Indel rates
     model.indelrate.log2 <- lm(formula = log2.dist.freqCut ~ unlist(model_tib[j]), 
@@ -165,6 +165,8 @@ epistasis_tib %<>% left_join(effect_compounts)  %>%
     #                            x_intercept_ratio, NA),
     indelrate_slope_plot = ifelse(x_intercept_indelrate < 1 & effect_on_indelrate, indelrate_slope, NA),
     ratio_slope_plot = ifelse(x_intercept_ratio < 1 & effect_on_ratio, ratio_slope, NA))  
+
+
 ```
 
 ```{r tile plots}

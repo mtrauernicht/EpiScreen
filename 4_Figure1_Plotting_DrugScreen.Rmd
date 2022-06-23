@@ -53,6 +53,7 @@ StartTime <-Sys.time()
 # 8-digit Date tag:
 Date <- substr(gsub("-","",Sys.time()),1,8) 
 # libraries:
+library(knitr)
 library(tidyverse)
 # library(outliers)
 library(ggplot2)
@@ -71,10 +72,10 @@ library(ggrastr)
 library(cowplot)
 
 ## Select outdir
-# out.dir = paste0("/DATA/projects/DSBrepair/scratch/figures_episcreen/figure1_", Date, "/")
-# dir.create(out.dir)
-# opts_chunk$set(dev=c('png', 'pdf'), fig.path = file.path(out.dir))
-# pdf.options(useDingbats = FALSE)
+out.dir = paste0("../figures/", Date, "/")
+dir.create(out.dir)
+opts_chunk$set(dev=c('png', 'pdf'), fig.path = file.path(out.dir))
+pdf.options(useDingbats = FALSE)
 ```
 
 ### Functions
@@ -359,9 +360,16 @@ viability.data = as.data.table(readRDS("/DATA/projects/DSBrepair/git/EpiScreen/f
 
 ---
 
+## A: Schematic
+```{r}
+
+```
+
+### Figure Legend
+
 ## B: Drugs per target group
 Which drugs did we use for the screen and which targets do they have?
-```{r warning = FALSE}
+```{r warning = FALSE, fig.height=1.6, fig.width=1}
 # B: Drugs per target group
 ## Plot from viability data table (because there all drugs are included)
 targets <- viability.data %>% 
@@ -386,7 +394,7 @@ ggplot(targets,
 
 ## C: Viability filtering
 How many drugs are filtered out because they are too toxic?
-```{r warning = FALSE}
+```{r warning = FALSE, fig.height = 1.6, fig.width = 1.6}
 # C: Viability filtering
 ## Calculate normalized viability (same as in script 1)
 viability.data$ID <- gsub("^E[0-9]{3,4}_", "", viability.data$ID)
@@ -450,7 +458,7 @@ ggplot_custom(viability.data %>%
 
 ## D: Cutting efficiency per IPR
 How do the drugs impact cutting efficiency in general? Does the genomic location & concentration of the drugs matter?
-```{r warning = FALSE}
+```{r warning = FALSE, fig.height=6, fig.width=8} 
 # D: Cutting efficiency per IPR
 indel.data2 <- indel.data %>%
  # filter(sample != "DNA-PKi (NHEJ control)", sample != "Mirin (MMEJ control)") %>%
