@@ -108,9 +108,9 @@ CallTrueBarcodes <- function(df) {
 initials = "rs"
 
 # Viability (% of DMSO) for efficiency
-viab_limit_eff = 0.25
+viab_limit_eff = 0.50
 # Viability threshold for repair pathway balance
-viab_limit_bal = 0.75
+viab_limit_bal = 0.50
 
 # Read count limit of +1 & -7 combined
 read_count_limit = 40
@@ -467,7 +467,7 @@ screen.indel.dt[, c("sample", "type", "color") :=  list(
   ifelse(drug == "DMSO", "DMSO (neg control)", ifelse(
   drug == "DNA-PKi", "DNA-PKi (NHEJ control)", ifelse(
     drug == "Mirin", "Mirin (MMEJ control)", ifelse(
-      drug == "PAO", "PAO (killing control)", "drug")))),
+      drug == "PAO", "PAO (killing control)", "Epigenetic Compound")))),
   # Add column to identify core, grouped (large) indels or large indels (individual)
   ifelse(mutation %in% c(largedels, largeins), "large_indel", 
          ifelse(mutation %in% c("<-14", ">2"), "grouped_indel", "core")),
