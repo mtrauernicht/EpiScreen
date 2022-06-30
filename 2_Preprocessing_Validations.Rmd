@@ -175,25 +175,7 @@ barcodes.list <- c("AGGGCGTAAAATATTT", "TATGGCTGTCGGGTAG", "TGTCCCTTAGTACTTT",
                    "CATTTCTGATCAATAA","GAGCGCGTCACCGGGT",
                    "GTACCTCTCGATAGTG","TGGCCAATATTTGTCT")
 
-clone5barcodes <- c("AGGGCGTAAAATATTT.clone5",
-                    "TATGGCTGTCGGGTAG.clone5",
-                    "TGTCCCTTAGTACTTT.clone5",
-                    "AGAAAATAATATGACG.clone5",
-                    "CGGCCTGAAGGTCAGG.clone5",
-                    "TTGAACGCGGGCTCGG.clone5",
-                    "GCTAACATCACGAATC.clone5",
-                    "GCGCACCCTTTAATTG.clone5",
-                    "ACTGTCGAGTTGTCCG.clone5",
-                    "CCGGGGACGTATGCAC.clone5",
-                    "TCTTTTGAGGAGCTGA.clone5",
-                    "ATATCGTTGCTGGAGA.clone5",
-                    "CATCCACCACACTTCA.clone5",
-                    "ACCCCTAAAGGCGCTG.clone5",
-                    "ATACTATATTTAACGG.clone5",
-                    "CATTTCTGATCAATAA.clone5",
-                    "GAGCGCGTCACCGGGT.clone5",
-                    "GTACCTCTCGATAGTG.clone5",
-                    "TGGCCAATATTTGTCT.clone5")
+clone5barcodes <- paste0(barcodes.list, ".clone5")
 ```
 
 # Data processing into large data table

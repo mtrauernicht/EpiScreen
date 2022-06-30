@@ -50,12 +50,7 @@ knitr::opts_chunk$set(echo = TRUE)
 StartTime <-Sys.time()
 
 # 6-digit Date tag:
-Date <- substr(gsub("-","",Sys.time()),1,8) 
-
-## Select outdir
-out.dir = paste0("/DATA/projects/DSBrepair/data/R/rs", Date, "_episcreen/")
-dir.create(out.dir, showWarnings = FALSE)
-
+Date <- substr(gsub("-","",Sys.time()),1,8)
 
 # libraries:
 library(tidyverse)
@@ -69,6 +64,11 @@ library(report)
 library(corrr)
 library(PerformanceAnalytics)
 library(ggbeeswarm)
+
+## Select outdir
+out.dir = list.dirs(path = "/DATA/projects/DSBrepair/data/R") %>% .[grepl("episcreen", .)] %>% tail(n = 1)
+in.dir = out.dir
+dir.create(out.dir, showWarnings = FALSE)
 ```
 
 ## Custom functions
@@ -123,8 +123,8 @@ Data import from mapping, files were generated on 21.01.2019.
 ```{r import}
 # Import files in list and make individual tables
 # First list the files from the screen (E177 & 1504). The other will be processed in another script.
-file.list <- list.files("/DATA/projects/DSBrepair/data/rs20210628_EpiScreen/indelPCR_counts/",
-                        pattern="[E177|E1504]_.*[.]count", full.names=T)
+file.list <- list.files("/DATA/projects/DSBrepair/data/rs20210628_EpiScreen/indelPCR_counts",
+                        pattern="E177_.*[.]count|E1504_.*[.]count", full.names=T)
 
 # import the data
 df.list <- mclapply(file.list, 
@@ -146,7 +146,8 @@ head(names(df.list))
 n.samples <- length(df.list)
 
 # Load the indel statistics with the metadata generated in the parsing script.
-indel.statistics.dt = as.data.table(readRDS("/DATA/projects/DSBrepair/git/EpiScreen/files_scripts/rs20211221_Episcreen_Reads_Viab_Metadata.RDS"))
+meta.viab.file = list.files(in.dir, full.names = T)  %>% .[grepl("Viab_Meta", .)] %>% tail(n = 1)
+indel.statistics.dt = as.data.table(readRDS(meta.viab.file))
 
 setnames(indel.statistics.dt, 
          c("ID", "viability", "viab_norm", 
@@ -268,7 +269,7 @@ length(unique(complete.mutations.dt$exp))
 length(unique(complete.mutations.dt[sum_bc_reads_split < 100]$exp))
 
 # Filter on minimal 40 reads per +1/-7 reads
-length(unique(complete.mutations.dt[mut.counts < 40]$exp))
+length(unique(complete.mutations.dt[mut.counts < read_count_limit]$exp))
 
 E177_pre = sum(grepl("E177", unique(complete.mutations.dt$exp)))
 E1504_pre = sum(grepl("E1504", unique(complete.mutations.dt$exp)))
@@ -327,28 +328,30 @@ mutations.dt[, ID := gsub("^(E1504|E177)_[0-9][0-9]_(1|10|100)_[123]_([12]_...$)
                           exp, 
                           perl = TRUE)]
 # Merge the indel statistics
-mutations.stat.dt = merge(mutations.dt, indel.statistics.dt)
+mutations.stat.dt = left_join(mutations.dt, indel.statistics.dt)
 
 # Filter the low viability reads
-# This filters out all drugs at a certain concentration were at least 2/3 technical replicates were below 0.75 in at least one biological replicate 
+# This filters out all drugs at a certain concentration were at least 2/3 technical replicates were below 0.5 in at least one biological replicate 
 keep_drugs_eff <- mutations.stat.dt %>%
   distinct(plate, drug, conc_char, well, tech, replicate, viab_norm_split) %>%
   # filter for samples with higher viab than the limit
-  filter(viab_norm_split > viab_limit_eff) %>%
-  distinct(conc_char, drug, tech, replicate) %>%
-  mutate(conc_char_drug = paste(conc_char, drug, sep = " "),
-         tech_n = ave(conc_char_drug, conc_char_drug, replicate, FUN = length),
-         conc_char_drug_rep = paste(conc_char, drug, replicate, sep = " ")) %>%
+  filter(viab_norm_split > viab_limit_eff) %>% # filter
+  distinct(conc_char, drug, tech, replicate) %>% # list conditions that remain
+  mutate(conc_char_drug = paste(conc_char, drug, sep = " "), # conc + drug combination
+         tech_n = ave(conc_char_drug, conc_char_drug, replicate, FUN = length), # count technical replicates in which this combination is found in
+         conc_char_drug_rep = paste(conc_char, drug, replicate, sep = " ")) %>% # conc + drug + replicate combination
   # These conditions need to be present in at least 2 (out of 3) technical replicates per bio replicate
-  filter(tech_n > 1) %>% 
-  distinct(replicate, conc_char_drug, conc_char_drug_rep) %>%
-  mutate(rep_n = ave(conc_char_drug,conc_char_drug, FUN = length)) %>%
+  filter(tech_n > 1) %>%  # filter
+  distinct(replicate, conc_char_drug, conc_char_drug_rep) %>% # list conditions that remain
+  mutate(rep_n = ave(conc_char_drug,conc_char_drug, FUN = length)) %>% # check if present in both replicates
   # And in both bio replicates
-  filter(rep_n > 1) %>% 
-  pull(conc_char_drug) %>%
-  unique()
+  filter(rep_n > 1) %>% # removes the ones in only 1 replicate
+  pull(conc_char_drug) %>% # pull the drug & concentration we keep
+  unique() # remove doublets
 
-# This filters out all drugs at a certain concentration were at least 2/3 technical replicates were below 0.75 in at least one biological replicate 
+######## This below is not needed anymore if the same cutoff is used for balance and efficiency.#######
+
+# This filters out all drugs at a certain concentration were at least 2/3 technical replicates were below 0.5 in at least one biological replicate 
 keep_drugs_bal <- mutations.stat.dt %>%
   distinct(plate, drug, conc_char, well, tech, replicate, viab_norm_split) %>%
   # filter for samples with higher viab than the limit

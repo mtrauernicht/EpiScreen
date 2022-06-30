@@ -52,8 +52,14 @@ library(gghighlight)
 library(PerformanceAnalytics)
 library(corrr)
 
+## In directory
+in.dir = "/DATA/projects/DSBrepair/git/EpiScreen/files_scripts/"
+## Select out directory
+out.dir = paste0("/DATA/projects/DSBrepair/data/R/rs", Date, "_episcreen/")
+dir.create(out.dir, showWarnings = FALSE)
 
-out.dir = "/DATA/projects/DSBrepair/git/EpiScreen/files_scripts/"
+## Initials (for file naming)
+initials = "rs"
 ```
  
 ## Custom functions  
@@ -86,11 +92,22 @@ BarcodeOverlap <- function(read1, read2) {
               sum(!read2$barcode %in% read1$barcode))
 }
 
-SetFileName <- function(filename, initials) {
+serialNext = function(prefix, extension){
+  file_name = paste(prefix, extension, sep = ".")
+  if(!file.exists(file_name)){return(paste(prefix, extension, sep = "."))}
+    i=1
+    repeat {
+       f = paste(prefix, i , extension, sep=".")
+       if(!file.exists(f)){return(f)}
+       i=i+1
+     }
+  }
+
+SetFileName <- function(filename, initials, extension) {
   # Set filename with extension and initials to make filename with date integrated.
   filename <- substitute(filename)
-  initials <- substitute(initials)
-  filename <- paste0(initials, substr(gsub("-","",Sys.time()),1,8), filename)
+  filename <- paste0(out.dir, initials, substr(gsub("-","",Sys.time()),1,8), "_", filename)
+  filename <- serialNext(filename, extension)
   filename
 }
 ```
@@ -125,7 +142,7 @@ indel.statistics.tib %<>%
   mutate(r_written_pct = reads_written / reads)
 
 # Import the cell viability data
-cell.viab.data = fread(paste0(out.dir, "mt20200618_viability_rep1-2.csv"), 
+cell.viab.data = fread(paste0(in.dir, "mt20200618_viability_rep1-2.csv"), 
                        sep = ";", col.names = c("ID", "E177", "E1504"))
 
 # Process the cell viability and add it to the indel stat table. 
@@ -636,13 +653,14 @@ viab_plot_tib %<>%
   select(-replicate2) %>%
   unique()
 
+filename <- SetFileName("Episcreen_Reads_Viab_Metadata", initials = initials, extension = "RDS")
+
 indel.statistics.tib %>%
   select(-reads_written, -n_tooshort,
                 -index, -pat1, -barcode,  -pat2) %>%
   left_join(viab_plot_tib) %>%
   write_rds(.,
-            file = paste0(out.dir,
-                          "rs20211221_Episcreen_Reads_Viab_Metadata.RDS"))
+            file = filename)
 ```
 
 
