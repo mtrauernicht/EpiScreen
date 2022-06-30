@@ -352,6 +352,8 @@ ggplot_custom <- function(...) ggplot2::ggplot(...) +
 
 ```{r data import, results = 'hide', warning = FALSE}
 # Import data from preprocessing script
+in.dir = list.dirs(path = "/DATA/projects/DSBrepair/data/R") %>% .[grepl("episcreen", .)] %>% tail(n = 1)
+file = list.files(in.dir, pattern = "ratios") %>% tail(n = 1)
 indel.data <- readRDS("/DATA/projects/DSBrepair/data/R/rs20220624_episcreen/rs20220624_episcreen_ratios.2.RDS")
 
 # Complete data without exlcluding wells <0.75 viability (I need this for plotting)
