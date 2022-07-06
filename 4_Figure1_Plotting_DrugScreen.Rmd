@@ -66,14 +66,15 @@ library(GGally)
 # library(platetools)
 library(ggpubr)
 # library(Laurae)
-# library(pheatmap)
-# library(RColorBrewer)
+library(pheatmap)
+library(RColorBrewer)
 library(ggrastr)
 library(cowplot)
 
 ## Select outdir
 out.dir = paste0("../figures/", Date, "/")
 dir.create(out.dir)
+in.dir = list.dirs(path = "/DATA/projects/DSBrepair/data/R") %>% .[grepl("episcreen", .)] %>% tail(n = 1)
 opts_chunk$set(dev=c('png', 'pdf'), fig.path = file.path(out.dir))
 pdf.options(useDingbats = FALSE)
 ```
@@ -146,11 +147,20 @@ p.adjust <- function(p, method = p.adjust.methods, n = length(p))
     p0
 }
 
-SetFileName <- function(filename, initials) {
+serialNext = function(prefix, extension){
+    i=0
+    repeat {
+       f = paste(prefix, i , extension, sep=".")
+       if(!file.exists(f)){return(f)}
+       i=i+1
+     }
+  }
+
+SetFileName <- function(filename, initials, extension) {
   # Set filename with extension and initials to make filename with date integrated.
   filename <- substitute(filename)
-  initials <- substitute(initials)
-  filename <- paste0(initials, Date, filename)
+  filename <- paste0(out.dir, "/", initials, substr(gsub("-","",Sys.time()),1,8), "_", filename)
+  filename <- serialNext(filename, extension)
   filename
 }
 
@@ -353,11 +363,12 @@ ggplot_custom <- function(...) ggplot2::ggplot(...) +
 ```{r data import, results = 'hide', warning = FALSE}
 # Import data from preprocessing script
 in.dir = list.dirs(path = "/DATA/projects/DSBrepair/data/R") %>% .[grepl("episcreen", .)] %>% tail(n = 1)
-file = list.files(in.dir, pattern = "ratios") %>% tail(n = 1)
-indel.data <- readRDS("/DATA/projects/DSBrepair/data/R/rs20220624_episcreen/rs20220624_episcreen_ratios.2.RDS")
+file = list.files(in.dir, pattern = "ratios", full.names = T) %>% tail(n = 1)
+indel.data <- readRDS(file)
 
-# Complete data without exlcluding wells <0.75 viability (I need this for plotting)
-viability.data = as.data.table(readRDS("/DATA/projects/DSBrepair/git/EpiScreen/files_scripts/rs20211221_Episcreen_Reads_Viab_Metadata.RDS")) %>%
+# Complete data without exlcluding wells <0.5 viability (I need this for plotting)
+meta.viab.file = list.files(in.dir, full.names = T)  %>% .[grepl("Viab_Meta", .)] %>% tail(n = 1)
+indel.statistics.dt = readRDS(meta.viab.file) %>%
   dplyr::select(ID, drug, target, replicate, viability, conc_char, tech)
 ```
 
@@ -375,15 +386,14 @@ Which drugs did we use for the screen and which targets do they have?
 ```{r warning = FALSE, fig.height=4, fig.width=4}
 # B: Drugs per target group
 ## Plot from viability data table (because there all drugs are included)
-targets <- viability.data %>% 
+targets <- indel.statistics.dt %>% 
+  ungroup() %>%
   filter(!drug %in% c("Mirin", "DNA-PKi", "DMSO", "PAO")) %>%
   dplyr::distinct(drug, target) %>% 
-  mutate(number = ave(target, target, FUN = function(x) length(x))) %>% 
-  mutate(number = as.numeric(number)) %>%
-  dplyr::distinct(target, number)
+  count(target, sort = TRUE)
 
 ggplot(targets, 
-       aes(y = reorder(target, number), x = number)) + 
+       aes(y = reorder(target, n), x = n)) + 
   geom_bar(stat = "identity", fill = "black")  + 
   ylab("") +
   theme_pubr(border = T) 
@@ -399,61 +409,17 @@ ggplot(targets,
 How many drugs are filtered out because they are too toxic?
 ```{r warning = FALSE, fig.height = 4, fig.width = 4}
 # C: Viability filtering
-## Calculate normalized viability (same as in script 1)
-viability.data$ID <- gsub("^E[0-9]{3,4}_", "", viability.data$ID)
-viability.data <- viability.data %>%
-  group_by(replicate) %>%
-  mutate(viability = viability - min(viability)) %>%
-  mutate(ctrl_mean = mean(viability[drug == "DMSO"]),
-         viab_norm = viability / ctrl_mean) %>%
-  ungroup() %>%
-  dplyr::select(-viability, -ctrl_mean) %>%
-  unique() 
-
-keep_drugs <- viability.data %>%
-  # filter for samples with higher viab than the limit
-  filter(viab_norm > 0.75) %>%
-  distinct(conc_char, drug, tech, replicate) %>%
-  mutate(conc_char_drug = paste(conc_char, drug, sep = "_"),
-         tech_n = ave(conc_char_drug, conc_char_drug, replicate, FUN = length),
-         conc_char_drug_rep = paste(conc_char, drug, replicate, sep = "_")) %>%
-  # These conditions need to be present in at least 2 (out of 3) technical replicates per bio replicate
-  filter(tech_n > 1) %>% 
-  distinct(replicate, conc_char_drug, conc_char_drug_rep) %>%
-  mutate(rep_n = ave(conc_char_drug, conc_char_drug, FUN = length)) %>%
-  # And in both bio replicates
-  filter(rep_n > 1) %>% 
-  mutate(removed = "kept") %>%
-  distinct(conc_char_drug_rep, removed)
-
-viability.data <- viability.data %>%
-  mutate(conc_char_drug_rep = paste(conc_char, drug, replicate, sep = "_"))
-
-viability.data <- merge(viability.data, keep_drugs, all = T) %>%
-  dplyr::select(-conc_char_drug_rep) %>%
-  distinct()
-viability.data$removed[is.na(viability.data$removed)] <- "removed"
-
-viability.data <- viability.data %>%
-  spread(key = replicate, value = viab_norm) %>%
-  mutate(mean_viab = (E1504+E177) / 2)
-
-viability.data$group <- "Epigenetic Compound"
-viability.data$group[viability.data$drug == "DMSO"] <- "DMSO"
-viability.data$group[viability.data$drug == "PAO"] <- "PAO"
-
-## Viability mean across the two biological replicates - color highlight removed drugs
-ggplot_custom(viability.data %>%
-                filter(group == "Epigenetic Compound") %>%
-                mutate(mean_viab = ave(mean_viab, drug, conc_char, FUN = mean)) %>%
-                dplyr::distinct(mean_viab, drug, conc_char, removed),
-       aes(x = conc_char, y = mean_viab)) +
-  geom_quasirandom(aes(fill = removed), color = "black", shape = 21, size = 2) +
-  scale_fill_manual(values = c(colors_diverse[1], "#FA8D62")) +
-  theme_pubr(border = T)
+indel.data %>% 
+  mutate(viab = ave(viab_mean, conc_char, drug)) %>% # average the two replicates for plotting
+  distinct(conc_char, drug, viab, pathway_bal_filter) %>%
+  ggplot_custom(.,
+              aes(x = conc_char, y = viab)) +
+    geom_quasirandom(aes(fill = pathway_bal_filter), color = "black", shape = 21, size = 2) +
+    scale_fill_manual(values = c("#FA8D62", colors_diverse[1])) +
+    theme_pubr(border = T)
 ```
 
-*Figure 1C: Filtering of toxic compounds. Compounds that decreased viability by >75% in more than one technical replicate in one or both biological replicate were removed (marked in yellow).*
+*Figure 1C: Mean viability for each compound at the three concentrations.Compounds that decreased viability by >50% in more than one technical replicate in one or both biological replicate were removed (marked in yellow).*
 
 **Conclusion: The higher the concentration, the more toxic the compounds are to the cells.**
 
@@ -464,7 +430,7 @@ How do the drugs impact cutting efficiency in general? Does the genomic location
 ```{r warning = FALSE, fig.height=6, fig.width=8} 
 # D: Cutting efficiency per IPR
 indel.data2 <- indel.data %>%
- filter(sample %in% c("Epigenetic Compound", "DMSO (neg control)")) %>%
+ filter(sample %in% c("Epigenetic Compound", "DMSO (neg control)") & indel_freq_filter == T) %>%
   distinct(freqCut, IPR, drug, conc_char, tech, sample, replicate, 
            barcode, MMEJratio, MMEJ_zscore_comb, mean_eff_zscore_comb) %>%
   mutate(freqCut = ave(freqCut, IPR, drug, conc_char, tech, replicate), 
@@ -491,26 +457,27 @@ ordered_marks <- c("Euchromatin",
 
 indel.data2$chromatin <- factor(indel.data2$chromatin, levels = ordered_marks)
 
-plt1 = ggplot(indel.data2 %>%
-         mutate(freqCut = ave(freqCut, drug, conc_char, IPR, FUN = mean)) %>%
-         distinct(freqCut, drug, conc_char, IPR, chromatin, sample_conc),
-       aes(x = IPR, y = freqCut*100)) +
+plt1 = indel.data2 %>%
+  mutate(freqCut = ave(freqCut, drug, conc_char, IPR, FUN = mean)) %>%
+  distinct(freqCut, drug, conc_char, IPR, chromatin, sample_conc) %>% 
+  ggplot(.,
+         aes(x = IPR, y = freqCut*100)) +
   geom_quasirandom_rast(aes(color = sample_conc), dodge.width = 0.75, raster.dpi = 600, size = 0.5) +
   scale_color_manual(values = c("DMSO (neg control)" = colors_drugs[2], "100 nM" = colors_drugs[7], "1 µM" = colors_drugs[4], "10 µM" = "#000000")) +
   facet_wrap(~chromatin, scales = "free_x", nrow = 1) +
-  theme_pubr(border = T)
+  theme_classic_lines_90()
 
-plt2 = ggplot(indel.data2 %>%
-        distinct(MMEJratio , drug, conc_char, IPR, chromatin, sample_conc) %>%
-          mutate(MMEJratio = ave(MMEJratio, drug, conc_char, IPR, FUN = mean)) %>%
-          distinct(),
-       aes(x = IPR, y = MMEJratio*100)) +
-  geom_quasirandom_rast(aes(color = sample_conc), dodge.width = 0.75, raster.dpi = 600, size = 0.5) +
+plt2 = 
+  indel.data2 %>%
+  distinct(mean_eff_zscore_comb, drug, conc_char, IPR, chromatin, sample_conc) %>%
+  ggplot(.,
+         aes(x = IPR, y = mean_eff_zscore_comb)) +
+  geom_quasirandom_rast(aes(color = sample_conc), dodge.width = 0.75, raster.dpi = 600) +
   scale_color_manual(values = c(colors_drugs[2], colors_drugs[7], colors_drugs[4], "#000000")) +
   facet_wrap(~chromatin, scales = "free_x", nrow = 1) +
-  #geom_hline(linetype = "dashed", yintercept = 1.96) +
-  #geom_hline(linetype = "dashed", yintercept = -1.96) +
-  theme_pubr(border = T)
+  geom_hline(linetype = "dashed", yintercept = 1.96) +
+  geom_hline(linetype = "dashed", yintercept = -1.96) +
+  theme_classic_lines_90()
 
 plot_grid(plt1, plt2, labels = "AUTO", nrow = 2)
 ```
@@ -525,17 +492,22 @@ plot_grid(plt1, plt2, labels = "AUTO", nrow = 2)
 How do the drugs impact MMEJ score in general? Does the genomic location & concentration of the drugs matter?
 ```{r warning = FALSE, fig.height=6, fig.width=8}
 # E: MMEJ score per IPR
-plt1 = ggplot(indel.data2 %>%
-         mutate(MMEJratio = ave(MMEJratio, drug, conc_char, IPR, FUN = mean)) %>%
-         distinct(MMEJratio, drug, conc_char, IPR, chromatin, sample_conc),
-       aes(x = IPR, y = log2(MMEJratio))) +
-  geom_quasirandom_rast(aes(color = sample_conc), dodge.width = 0.75, raster.dpi = 600) +
+plt1 = 
+  indel.data2 %>%
+        distinct(MMEJratio , drug, conc_char, IPR, chromatin, sample_conc) %>%
+          mutate(MMEJratio = ave(MMEJratio, drug, conc_char, IPR, FUN = mean)) %>%
+          distinct() %>% 
+  ggplot(., aes(x = IPR, y = MMEJratio)) +
+  geom_quasirandom_rast(aes(color = sample_conc), dodge.width = 0.75, raster.dpi = 600, size = 0.5) +
   scale_color_manual(values = c(colors_drugs[2], colors_drugs[7], colors_drugs[4], "#000000")) +
   facet_wrap(~chromatin, scales = "free_x", nrow = 1) +
+  #geom_hline(linetype = "dashed", yintercept = 1.96) +
+  #geom_hline(linetype = "dashed", yintercept = -1.96) +
   theme_classic_lines_90()
 
-plt2 = ggplot(indel.data2 %>%
-        distinct(MMEJ_zscore_comb, drug, conc_char, IPR, chromatin, sample_conc),
+plt2 = indel.data2 %>%
+        distinct(MMEJ_zscore_comb, drug, conc_char, IPR, chromatin, sample_conc) %>%
+  ggplot(.,
        aes(x = IPR, y = MMEJ_zscore_comb)) +
   geom_quasirandom_rast(aes(color = sample_conc), dodge.width = 0.75, raster.dpi = 600) +
   scale_color_manual(values = c(colors_drugs[2], colors_drugs[7], colors_drugs[4], "#000000")) +
@@ -553,18 +525,108 @@ plot_grid(plt1, plt2, labels = "AUTO", nrow = 2)
 
 ---
 
-## S_A: Correlate viability data from the 2 replicates
+## S1A: Clone 5 heatmap of chromatin values
+What is the chromatin environment of each IPR?
+```{r S1A clone 5 heatmap, warning = FALSE, fig.height=6, fig.width=8}
+domain_dt <- readRDS(
+  "/DATA/usr/x.vergara/XV_ChIPIndels/XV20200902_DDR_RS_revision/XV20200902_DDR_RS_revision/data/xv20200915_DDR_data_CHIP.rds")
+
+bc_IPR = indel.data %>% 
+  distinct(IPR, barcode)
+
+
+domain_matrix = bc_IPR %>% left_join(domain_dt) %>% select(IPR, chromatin) %>% column_to_rownames(., var = "IPR")
+
+chrom_tib = indel.data %>% 
+  select(IPR, barcode, contains(".zscore")) %>%
+  distinct()
+
+oldnames = colnames(chrom_tib)
+newnames = gsub(".zscore", "", colnames(chrom_tib))
+
+chrom_tib = chrom_tib %>% rename_at(all_of(oldnames), ~ newnames)
+
+chrom_matrix = chrom_tib %>% select(-barcode) %>% column_to_rownames(., var = "IPR") %>% t()
+
+
+
+clones_domains.df = clones_domains.df[, "group", drop = FALSE]
+colnames(clones_domains.df) = "domain"
+
+## Chromatin groups
+group_colors = c("Euchromatin" = "#f7941d",
+                 "other-heterochromatin" = "#838687",
+                 "Triple Heterochromatin" = "#662d91",
+                 "H3K27me3" = "#d21f8a")
+
+clustering = data.frame(row.names=c('LMNB1', 'late_replicating', 
+'H3K9me2', 'H3K9me3',
+'H3K27me3', 'EZH2', 
+'CTCF', 'SMC3',
+'HDAC3', 'HDAC2', 'HDAC1', 
+'H3K4me1', 'H3K4me2', 'H3K4me3', 'H3K27ac',
+'H4K5acK8ac', 'H2AFZ', 
+'DNAse', 'Dam', 'm5C',
+'H3K79me2', 
+'TTseq', 
+'H3K36me3', 'POL2AS2',
+'POL2'),
+group=factor(c(rep('repressive', 6), 
+  # rep('repressive', 4), 
+  rep('insulator', 2),
+  rep('HDAC', 3), 
+  rep('euchromatin', 6),
+  rep('accessibility', 2), 'methylation',
+  rep('transcribing', 5)
+  # rep('transcribing', 4)
+  ),
+  levels=c('transcribing', 'accessibility',
+           'methylation', 'euchromatin',
+           'HDAC', 'insulator', 'repressive')))
+feature_fill = c(insulator="#a6b5a3", repressive="#304441", euchromatin="#cda4cc",
+                 transcribing="#FBB040", HDAC="#aac9e0", accessibility='#cebc85',
+                 methylation='#7dc98f')
+
+order_vec=rownames(clustering)[nrow(clustering):1]
+
+### Colors
+quant_breaks <- quantile(chrom_matrix, c(.01,.99), na.rm = T) # change these numbers according to where you want to set the cutoff
+palette_length <- 100
+max_quant = max(abs(quant_breaks[1]), abs(quant_breaks[2]))
+
+breaks.chip <- c(seq(-quant_breaks[2], 0, length.out=ceiling(palette_length/2) + 1), 
+                 seq(quant_breaks[2]/palette_length, quant_breaks[2], length.out=floor(palette_length/2)))
+
+
+colors = colorRampPalette(rev(brewer.pal(n = 11, name="RdBu")))(palette_length)
+
+pheatmap(chrom_matrix, color = colors, breaks = breaks.chip, annotation_row=clustering)
+
+group_colors = group_colors[names(group_colors) %in% unique(domain_matrix$group)]
+
+pheatmap(chrom_matrix, annotation_row=clustering,
+         annotation_colors=list(chromatin=group_colors, group=feature_fill),
+         color = colors, breaks = breaks.chip,
+         annotation_col = domain_matrix)
+```
+
+
+## S1B: Correlate viability data from the 2 replicates
 How well does the viability data correlate between the two biological replicates? Did the drugs become less potent after 3 years in the freezer?
-```{r warning = FALSE, fig.height=6, fig.width=8}
+```{r S1B viability correlation, warning = FALSE, fig.height=4, fig.width=8}
 # A: Correlate viability data from the 2 replicates
-ggplot_custom(viability.data %>%
-                filter(group == "Epigenetic Compound"), aes(x = E177, y = E1504)) +
-  geom_point(aes(color = removed), size = 1, stroke = NA) +
+indel.data %>%
+  filter(sample == "Epigenetic Compound") %>%
+  distinct(viab_mean, sample, replicate, conc_char, drug, pathway_bal_filter) %>%
+  pivot_wider(names_from = replicate, values_from = viab_mean) %>%
+  ggplot_custom(., aes(x = E177, y = E1504)) +
+  geom_point(aes(color = pathway_bal_filter), size = .4, stroke = NA) +
   geom_smooth(method = "lm", color = colors_diverse[1]) +
   # geom_segment(x = 0.5, xend = 0.5, y = 0.5, yend = 1.2, linetype = "dashed") +
   # geom_segment(x = 0.5, xend = 1.2, y = 0.5, yend = 0.5, linetype = "dashed") +
-  scale_color_manual(values = c(colors_diverse[1], colors_diverse[4])) +
-  facet_wrap(~conc_char)
+  scale_color_manual(values = c(colors_diverse[4], colors_diverse[1])) +
+  facet_wrap(~conc_char) +
+  theme_classic_lines_90()
 ```
 
 *Figure S1A: Correlation of the cell viability between the two biological replicates. Marked in yellow are the compounds that were removed from the analysis.*
@@ -694,9 +756,23 @@ ggplot(biol_repl,
   stat_cor(method = "pearson")
 ```
 
+
+
 *Figure S1D: Correlation of the MMEJ z-scores between the two biological replicates.*
 
 Conclusion: MMEJ z-scores correlate well.
+
+```{r DMSO NHEJ ratios in both replicates}
+biol_repl <- indel.data %>%
+  filter(sample == "DMSO (neg control)", pathway_bal_filter == T) %>%
+  dplyr::distinct(NHEJratio, drug, replicate, conc_char, sample, barcode, tech, well, plate) %>%
+  na.omit()
+
+ggplot(biol_repl,
+       aes(x = replicate, y = NHEJratio)) +
+  geom_quasirandom() +
+  stat_cor(method = "pearson") + facet_wrap(. ~ barcode)
+```
 
 ---
 
