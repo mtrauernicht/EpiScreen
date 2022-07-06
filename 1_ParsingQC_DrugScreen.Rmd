@@ -55,13 +55,13 @@ library(corrr)
 ## In directory
 in.dir = "/DATA/projects/DSBrepair/git/EpiScreen/files_scripts/"
 ## Select out directory
-out.dir = paste0("/DATA/projects/DSBrepair/data/R/rs", Date, "_episcreen/")
+out.dir = paste0("/DATA/projects/DSBrepair/data/R/rs", Date, "_episcreen")
 dir.create(out.dir, showWarnings = FALSE)
 
 ## Initials (for file naming)
 initials = "rs"
 ```
- 
+
 ## Custom functions  
 
 Functions used in this script:   
@@ -93,20 +93,18 @@ BarcodeOverlap <- function(read1, read2) {
 }
 
 serialNext = function(prefix, extension){
-  file_name = paste(prefix, extension, sep = ".")
-  if(!file.exists(file_name)){return(paste(prefix, extension, sep = "."))}
-    i=1
-    repeat {
-       f = paste(prefix, i , extension, sep=".")
-       if(!file.exists(f)){return(f)}
-       i=i+1
-     }
+  i=0
+  repeat {
+    f = paste0(prefix, "_", i , ".", extension)
+    if(!file.exists(f)){return(f)}
+    i=i+1
   }
+}
 
 SetFileName <- function(filename, initials, extension) {
   # Set filename with extension and initials to make filename with date integrated.
   filename <- substitute(filename)
-  filename <- paste0(out.dir, initials, substr(gsub("-","",Sys.time()),1,8), "_", filename)
+  filename <- paste0(out.dir, "/", initials, substr(gsub("-","",Sys.time()),1,8), "_", filename)
   filename <- serialNext(filename, extension)
   filename
 }
@@ -124,19 +122,19 @@ screen_meta_data = fread(file, header = TRUE)
 # load the statistics data from the indels.
 file.list <- list.files(path = "/DATA/projects/DSBrepair/data/rs20210628_EpiScreen/parsed", pattern="indelPCR[.]E1.*statistics.txt", full.names = TRUE)
 indel.statistics.list <- lapply(file.list, read.table, 
-                                  header = TRUE)
+                                header = TRUE)
 names(indel.statistics.list)<- gsub(".*//indelPCR.indel_(.*?).statistics.txt", 
-                                      "\\1", 
-                                      file.list)
+                                    "\\1", 
+                                    file.list)
 
 # Format the statistics and bind the meta data
 indel.statistics.tib <- do.call(rbind.data.frame, 
-                               indel.statistics.list) %>% 
+                                indel.statistics.list) %>% 
   rownames_to_column(var = "ID") %>%
   as_tibble() %>%
   mutate(ID = gsub(".*indelPCR.(.*).statistics.txt", "\\1", ID)) %>%
   left_join(screen_meta_data)
-  
+
 # Calculate fraction written
 indel.statistics.tib %<>% 
   mutate(r_written_pct = reads_written / reads)
@@ -166,8 +164,8 @@ indel.statistics.tib %<>% left_join(cell.viab.data) %>%
          conc_char = ifelse(concentration == 100, 
                             paste0(concentration, " nM"), 
                             paste0(concentration, " µM")),
-                         conc_char = factor(conc_char, 
-                                            levels = c("100 nM", "1 µM", "10 µM"))) %>%
+         conc_char = factor(conc_char, 
+                            levels = c("100 nM", "1 µM", "10 µM"))) %>%
   select(-ctrl_mean, -bp, -bp_written) # remove this column
 ```
 
@@ -211,8 +209,8 @@ indel.statistics.tib %>%
 ```
 
 ```{r reads written per compound plate and replicate}
-  # Find reasonable limits 
-  limits <- c(10000, 200000)
+# Find reasonable limits 
+limits <- c(10000, 200000)
 
 # How many reads per well (for the 96 index) replicate 1 compound plate 1?
 well.statistics <- indel.statistics.tib %>% 
@@ -221,7 +219,7 @@ well.statistics <- indel.statistics.tib %>%
   summarise(reads = sum(reads))
 
 p1 = raw_map(well.statistics$reads, 
-                 well.statistics$well) + 
+             well.statistics$well) + 
   scale_fill_distiller(type = "div", name = "reads", limits = limits) + 
   ggtitle("total reads: replicate 1 drug plate 1")
 
@@ -232,21 +230,21 @@ well.statistics <- indel.statistics.tib %>%
   summarise(reads = sum(reads))
 
 p2 = raw_map(well.statistics$reads, 
-                 well.statistics$well) + 
+             well.statistics$well) + 
   scale_fill_distiller(type = "div", name = "reads", limits = limits) + 
   ggtitle("total reads: replicate 1 drug plate 2")
 
-  # Find reasonable limits 
-  limits <- c(20000, 2000000)
-  
+# Find reasonable limits 
+limits <- c(20000, 2000000)
+
 # How many reads per well (for the 96 index) replicate 2 compound plate 1?
 well.statistics <- indel.statistics.tib %>% 
   filter(replicate == "E1504" & drug_plate == 1) %>%
   group_by(well) %>% 
   summarise(reads = sum(reads))
-  
+
 p3 = raw_map(well.statistics$reads, 
-                 well.statistics$well) + 
+             well.statistics$well) + 
   scale_fill_distiller(type = "div", name = "reads", limits = limits) + 
   ggtitle("total reads: replicate 2 drug plate 1")
 
@@ -255,9 +253,9 @@ well.statistics <- indel.statistics.tib %>%
   filter(replicate == "E1504" & drug_plate == 2) %>%
   group_by(well) %>% 
   summarise(reads = sum(reads))
-  
+
 p4 = raw_map(well.statistics$reads, 
-                 well.statistics$well) + 
+             well.statistics$well) + 
   scale_fill_distiller(type = "div", name = "reads", limits = limits) + 
   ggtitle("total reads: replicate 2 drug plate 2")
 
@@ -282,7 +280,7 @@ for (i in 1:18) {
   # Find reasonable limits 
   limits <- c(2000, 35000)
   
-    # Plot this, first the read cound density
+  # Plot this, first the read cound density
   y <- density(data$reads)
   plt1 <- ggplot(data.frame(x = y$x, y = y$y),
                  aes(x = x, y = y)) +
@@ -295,7 +293,7 @@ for (i in 1:18) {
   
   # Then the plate with color-coded wells
   plt2 <- raw_map(data$reads, 
-                 data$well) +
+                  data$well) +
     ggtitle(unique(gsub("(.*)_...$", "\\1", data$ID))) +
     scale_fill_distiller(type = "div", limits = limits, name = "reads")
   
@@ -311,7 +309,7 @@ for (i in 1:18) {
   
   # Find reasonable limits 
   limits <- c(2000, 300000)
-
+  
   # Plot this, first the read cound density
   y <- density(data$reads)
   plt1 <- ggplot(data.frame(x = y$x, y = y$y),
@@ -325,7 +323,7 @@ for (i in 1:18) {
   
   # Then the plate with color-coded wells
   plt2 <- raw_map(data$reads, 
-                 data$well) +
+                  data$well) +
     ggtitle(unique(gsub("(.*)_...$", "\\1", data$ID))) +
     scale_fill_distiller(type = "div", limits = limits, name = "reads")
   
@@ -356,7 +354,7 @@ well.statistics <- indel.statistics.tib %>%
   summarise(r_written_pct = mean(r_written_pct))
 
 p1 = raw_map(well.statistics$r_written_pct, 
-                 well.statistics$well) + 
+             well.statistics$well) + 
   scale_fill_distiller(type = "div", limits = limits, name = "% written") + 
   ggtitle("% of reads written from the total reads: replicate 1 drug plate 1")
 
@@ -367,7 +365,7 @@ well.statistics <- indel.statistics.tib %>%
   summarise(r_written_pct = mean(r_written_pct))
 
 p2 = raw_map(well.statistics$r_written_pct, 
-                 well.statistics$well) + 
+             well.statistics$well) + 
   scale_fill_distiller(type = "div", limits = limits, name = "% written") + 
   ggtitle("% of reads written from the total reads: replicate 1 drug plate 2")
 
@@ -376,9 +374,9 @@ well.statistics <- indel.statistics.tib %>%
   filter(replicate == "E1504" & drug_plate == 1) %>%
   group_by(well) %>% 
   summarise(r_written_pct = mean(r_written_pct))
-  
+
 p3 = raw_map(well.statistics$r_written_pct, 
-                 well.statistics$well) + 
+             well.statistics$well) + 
   scale_fill_distiller(type = "div", limits = limits, name = "% written") + 
   ggtitle("% of reads written from the total reads: replicate 2 drug plate 1")
 
@@ -387,9 +385,9 @@ well.statistics <- indel.statistics.tib %>%
   filter(replicate == "E1504" & drug_plate == 2) %>%
   group_by(well) %>% 
   summarise(r_written_pct = mean(r_written_pct))
-  
+
 p4 = raw_map(well.statistics$r_written_pct, 
-                 well.statistics$well) + 
+             well.statistics$well) + 
   scale_fill_distiller(type = "div", limits = limits, name = "% written") + 
   ggtitle("% of reads written from the total reads: replicate 2 drug plate 2")
 
@@ -419,30 +417,30 @@ for (i in seq(1, 18, 2)) {
   # Find reasonable limits 
   limits <- c(0, 1)
   
-    # Then the plate with color-coded wells compound plate 1 rep 1
+  # Then the plate with color-coded wells compound plate 1 rep 1
   plt1 <- raw_map(data_dp1_rep1$r_written_pct, 
-                 data_dp1_rep1$well) +
+                  data_dp1_rep1$well) +
     ggtitle(unique(gsub("(.*)_...$", "\\1", data_dp1_rep1$ID))) +
     scale_fill_distiller(type = "div", limits = limits, name = "r_written_pct")
   
   # Then the plate with color-coded wells compound plate 2 rep 1
   plt2 <- raw_map(data_dp2_rep1$r_written_pct, 
-                 data_dp2_rep1$well) +
+                  data_dp2_rep1$well) +
     ggtitle(unique(gsub("(.*)_...$", "\\1", data_dp2_rep1$ID))) +
     scale_fill_distiller(type = "div", limits = limits, name = "r_written_pct")
-
-      # Then the plate with color-coded wells compound plate 1 rep 2
+  
+  # Then the plate with color-coded wells compound plate 1 rep 2
   plt3 <- raw_map(data_dp1_rep2$r_written_pct, 
-                 data_dp1_rep2$well) +
+                  data_dp1_rep2$well) +
     ggtitle(unique(gsub("(.*)_...$", "\\1", data_dp1_rep2$ID))) +
     scale_fill_distiller(type = "div", limits = limits, name = "r_written_pct")
   
   # Then the plate with color-coded wells compound plate 2 rep 2
   plt4 <- raw_map(data_dp2_rep2$r_written_pct, 
-                 data_dp2_rep2$well) +
+                  data_dp2_rep2$well) +
     ggtitle(unique(gsub("(.*)_...$", "\\1", data_dp2_rep2$ID))) +
     scale_fill_distiller(type = "div", limits = limits, name = "r_written_pct")
-    
+  
   grid.arrange(plt1, plt2, plt3, plt4, ncol = 2)
 }
 ```
@@ -493,7 +491,7 @@ viab_plot_tib = indel.statistics.tib %>%
            replicate, target, viab_norm) %>%
   group_by(drug, conc_char, replicate) %>%
   mutate(viab_var = var(viab_norm),
-                viab_mean = mean(viab_norm)) %>%
+         viab_mean = mean(viab_norm)) %>%
   select(-viab_norm) %>%
   pivot_wider(names_from = replicate, values_from = c(viab_mean, viab_var)) %>%
   filter(!is.na(conc_char)) %>%
@@ -570,9 +568,9 @@ for (i in unique(viab_plot_tib$target)) {
     geom_abline(slope = 1, intercept = -0.2, 
                 linetype = "dashed", alpha = 0.3) +
     geom_vline(xintercept = 0.5, 
-                linetype = "dashed", alpha = 0.3) +
+               linetype = "dashed", alpha = 0.3) +
     geom_hline(yintercept = 0.5, 
-                linetype = "dashed", alpha = 0.3) +
+               linetype = "dashed", alpha = 0.3) +
     coord_fixed() +
     ylim(0, 1.2) +
     xlim(0, 1.2) +
@@ -609,9 +607,9 @@ hi_r %>% mutate(fraction = count_low / (count_low+count_high))
 # Quick plot to check if this is related to the cell viability
 indel.statistics.tib %>% 
   mutate(viab_threshhold = ifelse(viab_norm < 0.5 | reads < 2000, "discarded", "viable & sufficient reads")) %>% 
-           ggplot(., aes(viab_norm, log10(reads), color = viab_threshhold)) +  
-           geom_point() + 
-           facet_grid(replicate ~ conc_char) 
+  ggplot(., aes(viab_norm, log10(reads), color = viab_threshhold)) +  
+  geom_point() + 
+  facet_grid(replicate ~ conc_char) 
 ```
 
 The proportion of wells that we cannot use for the balance is in general very low ~ 5%. The one plate in E1504 100 nM lost 25% of the wells, makes sense with the plots above.
@@ -643,21 +641,21 @@ The two replicates correlate quite well except for some of these outliers in E15
 
 ```{r data export}
 viab_plot_tib %<>% 
-  pivot_longer(., c("viab_mean_E1504", "viab_mean_E177"), 
-               names_to = "replicate", 
-               values_to = "viab_mean") %>% 
-  mutate(replicate = gsub("viab_mean_", "", replicate)) %>%
-  pivot_longer(., c("viab_var_E1504", "viab_var_E177"), 
-               names_to = "replicate2", 
-               values_to = "viab_var") %>%
-  select(-replicate2) %>%
+  pivot_longer(., cols = viab_mean_E1504:viab_var_E177, 
+               names_to = c("var", "replicate"), 
+               names_pattern = "(viab_.*)_(E.+)", 
+               values_to = "value") %>%
+  pivot_wider(., 
+              names_from = var, 
+              values_from = value, 
+              names_repair = "check_unique") %>%
   unique()
 
 filename <- SetFileName("Episcreen_Reads_Viab_Metadata", initials = initials, extension = "RDS")
 
 indel.statistics.tib %>%
   select(-reads_written, -n_tooshort,
-                -index, -pat1, -barcode,  -pat2) %>%
+         -index, -pat1, -barcode,  -pat2) %>%
   left_join(viab_plot_tib) %>%
   write_rds(.,
             file = filename)
