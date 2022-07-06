@@ -51,7 +51,18 @@ StartTime <-Sys.time()
 
 # 6-digit Date tag:
 Date <- substr(gsub("-","",Sys.time()),1,8)
+```
 
+```{r run QC}
+rmarkdown::render("1_ParsingQC_DrugScreen.Rmd")
+
+## Select outdir
+out.dir = list.dirs(path = "/DATA/projects/DSBrepair/data/R") %>% .[grepl("episcreen", .)] %>% tail(n = 1)
+in.dir = out.dir
+dir.create(out.dir, showWarnings = FALSE)
+```
+
+```{r libraries}
 # libraries:
 library(tidyverse)
 library(data.table)
@@ -64,12 +75,8 @@ library(report)
 library(corrr)
 library(PerformanceAnalytics)
 library(ggbeeswarm)
-
-## Select outdir
-out.dir = list.dirs(path = "/DATA/projects/DSBrepair/data/R") %>% .[grepl("episcreen", .)] %>% tail(n = 1)
-in.dir = out.dir
-dir.create(out.dir, showWarnings = FALSE)
 ```
+
 
 ## Custom functions
 
@@ -77,11 +84,9 @@ Functions used include all functions that have been used previously by Ruben (so
 
 ```{r functions}
 serialNext = function(prefix, extension){
-  file_name = paste(prefix, extension, sep = ".")
-  if(!file.exists(file_name)){return(paste(prefix, extension, sep = "."))}
-    i=1
+    i=0
     repeat {
-       f = paste(prefix, i , extension, sep=".")
+       f = paste0(prefix, "_", i , ".", extension)
        if(!file.exists(f)){return(f)}
        i=i+1
      }
@@ -90,7 +95,7 @@ serialNext = function(prefix, extension){
 SetFileName <- function(filename, initials, extension) {
   # Set filename with extension and initials to make filename with date integrated.
   filename <- substitute(filename)
-  filename <- paste0(out.dir, initials, substr(gsub("-","",Sys.time()),1,8), filename)
+  filename <- paste0(out.dir, "/", initials, substr(gsub("-","",Sys.time()),1,8), "_", filename)
   filename <- serialNext(filename, extension)
   filename
 }
@@ -108,7 +113,7 @@ CallTrueBarcodes <- function(df) {
 initials = "rs"
 
 # Viability (% of DMSO) for efficiency
-viab_limit_eff = 0.50
+viab_limit_eff = 0.25
 # Viability threshold for repair pathway balance
 viab_limit_bal = 0.50
 
@@ -146,7 +151,7 @@ head(names(df.list))
 n.samples <- length(df.list)
 
 # Load the indel statistics with the metadata generated in the parsing script.
-meta.viab.file = list.files(in.dir, full.names = T)  %>% .[grepl("Viab_Meta", .)] %>% tail(n = 1)
+meta.viab.file = list.files(in.dir, full.names = T)  %>% .[grepl("Viab_Meta", .)] %>% sort(.) %>% tail(n = 1)
 indel.statistics.dt = as.data.table(readRDS(meta.viab.file))
 
 setnames(indel.statistics.dt, 
@@ -465,19 +470,41 @@ setcolorder(large.indels.dt,colnames(mutations.screen.dt))
 
 screen.indel.dt = rbind(mutations.screen.dt, large.indels.dt) %>% 
   distinct()
-screen.indel.dt[, c("sample", "type", "color") :=  list(
+
+dim(screen.indel.dt)
+
+# screen.indel.dt[, c("sample", "type", "color") :=  list(
+#   # Add column with controls vs drug for plotting also
+#   ifelse(drug == "DMSO", "DMSO (neg control)", ifelse(
+#   drug == "DNA-PKi", "DNA-PKi (NHEJ control)", ifelse(
+#     drug == "Mirin", "Mirin (MMEJ control)", ifelse(
+#       drug == "PAO", "PAO (killing control)", "Epigenetic Compound")))),
+#   # Add column to identify core, grouped (large) indels or large indels (individual)
+#   ifelse(mutation %in% c(largedels, largeins), "large_indel", 
+#          ifelse(mutation %in% c("<-14", ">2"), "grouped_indel", "core")),
+#   # Add column with color for plotting ease
+#   ifelse(mutation == 0, "wt", 
+#          ifelse(mutation == 1, "NHEJ", 
+#                 ifelse(mutation == -7, "MMEJ", "other"))))]
+screen.indel.dt %>% setDT
+
+screen.indel.dt[, sample := 
   # Add column with controls vs drug for plotting also
   ifelse(drug == "DMSO", "DMSO (neg control)", ifelse(
   drug == "DNA-PKi", "DNA-PKi (NHEJ control)", ifelse(
     drug == "Mirin", "Mirin (MMEJ control)", ifelse(
-      drug == "PAO", "PAO (killing control)", "Epigenetic Compound")))),
+      drug == "PAO", "PAO (killing control)", "Epigenetic Compound"))))]
+
+screen.indel.dt[, type := 
   # Add column to identify core, grouped (large) indels or large indels (individual)
   ifelse(mutation %in% c(largedels, largeins), "large_indel", 
-         ifelse(mutation %in% c("<-14", ">2"), "grouped_indel", "core")),
+         ifelse(mutation %in% c("<-14", ">2"), "grouped_indel", "core"))]
+
+screen.indel.dt[, color :=
   # Add column with color for plotting ease
   ifelse(mutation == 0, "wt", 
          ifelse(mutation == 1, "NHEJ", 
-                ifelse(mutation == -7, "MMEJ", "other"))))]
+                ifelse(mutation == -7, "MMEJ", "other")))]
 
 # Make factor from mutations, so plotting is made easy
 screen.indel.dt[, mutation := factor(screen.indel.dt$mutation, levels=indels)]
@@ -560,7 +587,7 @@ indel.cols = c("replicate",
          "freqCut_global",
          "freqCut_max")
 
-screen.indels.dt = screen.indel.dt %>% select(all_of(indel.cols))
+screen.indels.dt = screen.indel.dt %>% select(all_of(indel.cols)) %>% distinct()
 
 indel.cols.only = c(
          "mutation",
@@ -925,10 +952,10 @@ clone5_chrom_tib <- readRDS("/DATA/projects/DSBrepair/data/R/rs20200519_clone5_n
 chrom_colnames = names(clone5_chrom_tib)
 
 screen.ratios.chrom.dt <- screen.ratio.dt %>% left_join(clone5_chrom_tib)
-screen.indels.chrom.dt <- screen.indels.dt %>% left_join(clone5_chrom_tib)
+screen.indels.chrom.dt <- screen.indels.dt %>% left_join(clone5_chrom_tib) 
 
-rm(screen.ratio.dt)
-rm(screen.indels.dt)
+# rm(screen.ratio.dt)
+# rm(screen.indels.dt)
 ```
 ## Exporting the data tables
 
@@ -948,10 +975,14 @@ ratio.cols = c("replicate",
          "ID",
          "concentration",
          "drug",
+         "conc_char",
          "target",
          "viab_norm_split",
-         "conc_char",
          "viab_mean",
+         "indel_freq_filter",
+         "pathway_bal_filter",
+         "viab_mean_if",
+         "viab_mean_pb",
          "sample",
          "freqCut",
          "freqCut_max",
@@ -991,11 +1022,11 @@ screen_ratios_tib =  screen.ratios.chrom.dt %>%
 ## Processed data export The files will be saved in the processed data folder.
 ```{r export}
 # The mutations list that can be loaded for the indel spectra plots.
-filename <- SetFileName("_episcreen_mutations", initials = initials, extension = "RDS")
+filename <- SetFileName("episcreen_mutations", initials = initials, extension = "RDS")
 saveRDS(screen.indels.chrom.dt, file = filename)
 
 # The ratios list of the split technical replicates
-filename <- SetFileName("_episcreen_ratios", initials = initials, extension = "RDS")
+filename <- SetFileName("episcreen_ratios", initials = initials, extension = "RDS")
 saveRDS(screen_ratios_tib, file = filename)
 ```
 
@@ -1013,7 +1044,7 @@ sessionInfo()
 getwd()
 date()
 paste("Run time: ",format(Sys.time()-StartTime))
-rm(list = ls(all.names = TRUE)) #will clear all objects includes hidden objects.
-gc() #free up memrory and report the memory usage.
+# rm(list = ls(all.names = TRUE)) #will clear all objects includes hidden objects.
+# gc() #free up memrory and report the memory usage.
 ```
 
