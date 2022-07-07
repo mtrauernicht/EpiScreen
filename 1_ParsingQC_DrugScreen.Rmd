@@ -117,7 +117,7 @@ These are data from the crispr-trip.snake script, and a text file that has has b
 ```{r Data import}
 # Import metadata 
 file = "/DATA/projects/DSBrepair/git/EpiScreen/config/rs20210713_E177_E1504_EpiScreen_metadata.txt"
-screen_meta_data = fread(file, header = TRUE)
+screen_meta_data = fread(file, header = TRUE) 
 
 # load the statistics data from the indels.
 file.list <- list.files(path = "/DATA/projects/DSBrepair/data/rs20210628_EpiScreen/parsed", pattern="indelPCR[.]E1.*statistics.txt", full.names = TRUE)
@@ -161,11 +161,16 @@ indel.statistics.tib %<>% left_join(cell.viab.data) %>%
   mutate(viability = viability - min(viability)) %>%
   mutate(ctrl_mean = mean(viability[drug == "DMSO"]),
          viab_norm = viability / ctrl_mean,
-         conc_char = ifelse(concentration == 100, 
-                            paste0(concentration, " nM"), 
-                            paste0(concentration, " µM")),
+         conc_char = ifelse(drug %in% c("DNA-PK","PAO", "Mirin", "DMSO"), 
+                            "control", 
+                            ifelse(
+                              concentration == 100, 
+                              paste0(concentration, " nM"), 
+                              paste0(concentration, " µM"))),
          conc_char = factor(conc_char, 
-                            levels = c("100 nM", "1 µM", "10 µM"))) %>%
+                            levels = c("control", "100 nM", "1 µM", "10 µM")),
+         concentration = ifelse(drug %in% c("DNA-PK","PAO", "Mirin", "DMSO"), 
+                           0, concentration)) %>%
   select(-ctrl_mean, -bp, -bp_written) # remove this column
 ```
 
