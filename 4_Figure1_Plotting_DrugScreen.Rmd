@@ -16,6 +16,9 @@ output:
     toc_depth: 4
     toc_float:
       collapsed: false
+  pdf_document:
+    toc: yes
+    toc_depth: '4'
 ---
 
 *knitr document van Steensel lab*
@@ -536,7 +539,8 @@ ggplot(indel.data %>%
        aes(x = IPR, y = freqCut)) +
   geom_quasirandom_rast(aes(color = replicate), dodge.width = 0.75, raster.dpi = 600) +
   scale_color_manual(values = c(colors_drugs[8], colors_drugs[7])) +
-  theme_classic_lines_90()
+  theme_classic_lines_90() +
+  ylim(0,1)
 ```
 
 
@@ -564,7 +568,8 @@ ggplot(indel.data %>%
        aes(x = rep, y = freqCut)) +
   geom_quasirandom_rast(aes(color = replicate), dodge.width = 0.75, raster.dpi = 600) +
   scale_color_manual(values = c(colors_drugs[8], colors_drugs[7])) +
-  theme_classic_lines_90()
+  theme_classic_lines_90() +
+  ylim(0,1)
 ```
 
 
@@ -703,8 +708,8 @@ viab_eff_cor <- indel.data.nofilter %>%
 ggplot_custom(viab_eff_cor,
               aes(x = viab_norm_split, y = freqCut, color = sample)) +
   geom_point() +
-  geom_vline(xintercept = 0.50, color = "red") +
-  annotate("rect",xmin=0,xmax=0.50,ymin=-Inf,ymax=Inf, alpha=0.1, fill="red") +
+  geom_vline(xintercept = 0.25, color = "red") +
+  annotate("rect",xmin=0,xmax=0.25,ymin=-Inf,ymax=Inf, alpha=0.1, fill="red") +
   ylim(0, 1) +
   xlim(0, 1.5)
 
