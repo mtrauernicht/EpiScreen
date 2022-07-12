@@ -491,13 +491,14 @@ Some of these wells have very low reads, part is due to sequence quality as seen
 
 ```{r viability}
 viab_plot_tib = indel.statistics.tib %>%
-  distinct(drug, well, conc_char,
-           drug_plate, tech, plate,
+  distinct(drug, conc_char,
+           tech,
            replicate, target, viab_norm) %>%
   group_by(drug, conc_char, replicate) %>%
-  mutate(viab_var = var(viab_norm),
-         viab_mean = mean(viab_norm)) %>%
+  mutate(viab_var = var(viab_norm, na.rm = T),
+         viab_mean = mean(viab_norm, na.rm = T)) %>%
   select(-viab_norm) %>%
+  distinct() %>%
   pivot_wider(names_from = replicate, values_from = c(viab_mean, viab_var)) %>%
   filter(!is.na(conc_char)) %>%
   mutate(viab_diff = abs(viab_mean_E1504-viab_mean_E177)) %>%
