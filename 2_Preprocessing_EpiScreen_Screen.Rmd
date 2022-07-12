@@ -389,8 +389,8 @@ mutations.screen.dt <- mutations.stat.dt %>%
   # remove these colums
   dplyr::select(-mut.counts) %>%
   # Calculate new mean
-  mutate(viab_mean_if = ave(viab_norm_split_eff, drug, conc_char, replicate, FUN=function(x) mean(x, na.rm=T)),
-         viab_mean_pb = ave(viab_norm_split_bal, drug, conc_char, replicate, FUN=function(x) mean(x, na.rm=T)))
+  mutate(viab_mean_if = ave(viab_norm_split_eff, drug, conc_char, replicate, FUN = function(x) mean(x, na.rm=T)),
+         viab_mean_pb = ave(viab_norm_split_bal, drug, conc_char, replicate, FUN = function(x) mean(x, na.rm=T)))
 
 dim(mutations.screen.dt)
 
@@ -544,7 +544,7 @@ freqs_ratios_tib <- screen.indel.dt %>%
   filter(mutation == "0" & indel_freq_filter & viab_norm_split > viab_limit_eff) %>%
   dplyr::distinct(exp, barcode, freq_split) %>% 
   mutate(freqCut = 1 - freq_split,
-         freqCut_global = ave(freqCut, exp, FUN = mean),
+         freqCut_global = ave(freqCut, exp, FUN = function(x) mean(x, na.rm=T)),
          freqCut_max = ave(freqCut, exp, FUN = max)) %>%
   distinct(exp, barcode, freqCut, freqCut_global, freqCut_max) %>% 
   left_join(ratios_tib, by = c("exp", "barcode"))
@@ -737,22 +737,26 @@ dmso.eff <- screen.ratio.dt %>%
   filter(drug == "DMSO") %>%
   distinct('DMSO' = freqCut, barcode, replicate,
          tech, well, drug_plate) %>%
-  mutate(DMSO = ave(DMSO, barcode, replicate, tech, FUN = mean)) %>% # mean per technical replicate
+  mutate(DMSO = ave(DMSO, barcode, replicate, tech, FUN = function(x) mean(x, na.rm=T))) %>% # mean per technical replicate
   distinct(DMSO, barcode, replicate, tech)
 
 dmso.global <- screen.ratio.dt %>%
   distinct('DMSO_global' = freqCut_global, replicate, tech) %>%
-  mutate(DMSO_global = ave(DMSO_global, replicate, tech, FUN = mean)) %>%
+  mutate(DMSO_global = ave(DMSO_global, replicate, tech, FUN = function(x) mean(x, na.rm=T))) %>%
   distinct(DMSO_global, replicate, tech)
 
 screen.ratio.dt = left_join(screen.ratio.dt, dmso.eff) %>% left_join(dmso.global)
 
 screen.ratio.dt <- screen.ratio.dt %>%
   mutate(freqCut_norm = freqCut / DMSO,
-         freqCut_norm_global = freqCut_global / DMSO_global) %>%
+         freqCut_diff = freqCut - DMSO,
+         freqCut_norm_global = freqCut_global / DMSO_global,
+         freqCut_diff_global = freqCut_global - DMSO_global) %>%
   group_by(barcode, ID) %>% # group by ID and barcode for mean efficiency per well and barcode (remove technical replicates)
-  mutate(freqCut_norm_mean = mean(freqCut_norm),
-         freqCut_norm_global_mean = mean(freqCut_norm_global)) %>%
+  mutate(freqCut_norm_mean = mean(freqCut_norm, na.rm = TRUE),
+         freqCut_norm_global_mean = mean(freqCut_norm_global, na.rm = TRUE),
+         freqCut_diff_mean = mean(freqCut_diff, na.rm = TRUE),
+         freqCut_diff_global_mean = mean(freqCut_diff_global, na.rm = TRUE)) %>%
   ungroup()
 
 
@@ -767,9 +771,9 @@ dim(screen.ratio.dt)
 dmso.eff.score <- screen.ratio.dt %>%
   filter(drug == "DMSO") %>%
   dplyr::select('DMSO' = freqCut, well, barcode, replicate, tech, plate) %>%
-  mutate(DMSO = ave(DMSO, barcode, well, replicate, tech, plate, FUN = mean)) %>%
+  mutate(DMSO = ave(DMSO, barcode, well, replicate, tech, plate, FUN = function(x) mean(x, na.rm=T))) %>%
   distinct(barcode, replicate, tech, well, plate, DMSO) %>%
-  mutate(mean_DMSO = ave(DMSO, barcode, replicate, tech, FUN = mean), 
+  mutate(mean_DMSO = ave(DMSO, barcode, replicate, tech, FUN = function(x) mean(x, na.rm=T)), 
          sd_DMSO = ave(DMSO, barcode, replicate, tech, FUN = sd)) %>%
   dplyr::select(-DMSO, -well) %>%
   distinct() 
@@ -777,9 +781,9 @@ dmso.eff.score <- screen.ratio.dt %>%
 dmso.eff.score <- screen.ratio.dt %>%
     filter(drug == "DMSO") %>%
   distinct('DMSO_global' = freqCut_global, replicate, tech, well, plate) %>%
-  mutate(DMSO_global = ave(DMSO_global, replicate, tech, well, plate, FUN = mean)) %>%
+  mutate(DMSO_global = ave(DMSO_global, replicate, tech, well, plate, FUN = function(x) mean(x, na.rm=T))) %>%
   distinct(replicate, tech, well, plate, DMSO_global) %>%
-  mutate(mean_DMSO_global = ave(DMSO_global, replicate, tech, FUN = mean), 
+  mutate(mean_DMSO_global = ave(DMSO_global, replicate, tech, FUN = function(x) mean(x, na.rm=T)), 
          sd_DMSO_global = ave(DMSO_global, replicate, tech, FUN = sd)) %>%
   dplyr::select(-DMSO_global, -well) %>%
   distinct() %>% right_join(dmso.eff.score)
@@ -795,7 +799,7 @@ eff.zscore = screen.ratio.dt %>%
            mean_DMSO, sd_DMSO) %>%
   # And calculate the z-scores
   mutate(eff_zscore = (freqCut - mean_DMSO)/ sd_DMSO,
-         mean_eff_zscore = ave(eff_zscore, drug, conc_char, barcode, replicate, FUN = mean))
+         mean_eff_zscore = ave(eff_zscore, drug, conc_char, barcode, replicate, FUN = function(x) mean(x, na.rm=T)))
 
 
 # Combine the mean of the z-scores
@@ -814,7 +818,7 @@ eff.zscore.global = screen.ratio.dt %>%
            mean_DMSO_global, sd_DMSO_global) %>%
   # And calculate the z-scores
   mutate(eff_zscore_global = (freqCut_global - mean_DMSO_global)/ sd_DMSO_global) %>%
-  mutate(mean_eff_zscore_global = ave(eff_zscore_global, drug, conc_char, replicate, FUN = mean))
+  mutate(mean_eff_zscore_global = ave(eff_zscore_global, drug, conc_char, replicate, FUN = function(x) mean(x, na.rm=T)))
 
 # Combine the global z-scores
 eff.zscore.pooled.global.comb = eff.zscore.global %>% 
@@ -852,7 +856,7 @@ dmso.mmej.score <- screen.ratio.dt %>%
   ungroup() %>%
   distinct(barcode, replicate, tech, drug, well, plate, MMEJratio) %>%
   dplyr::select('DMSO' = MMEJratio, barcode, replicate, tech) %>%
-  mutate(mean_DMSO = ave(DMSO, barcode, replicate, tech, FUN = mean), 
+  mutate(mean_DMSO = ave(DMSO, barcode, replicate, tech, FUN = function(x) mean(x, na.rm=T)), 
          sd_DMSO = ave(DMSO, barcode, replicate, tech, FUN = sd)) %>%
   dplyr::select(-DMSO) %>%
   distinct()
@@ -864,7 +868,7 @@ screen.ratio.dt <- screen.ratio.dt %>%
   # And calculate the z-scores
   mutate(MMEJ_ratio_norm = MMEJratio / mean_DMSO) %>%
   mutate(MMEJ_zscore = (MMEJratio - mean_DMSO)/ sd_DMSO) %>%
-  mutate(MMEJ_zscore_mean = ave(MMEJ_zscore, drug, conc_char, replicate, barcode, FUN = mean)) %>%
+  mutate(MMEJ_zscore_mean = ave(MMEJ_zscore, drug, conc_char, replicate, barcode, FUN = function(x) mean(x, na.rm=T))) %>%
   dplyr::select(-mean_DMSO, -sd_DMSO)
 
 
@@ -873,9 +877,9 @@ dmso.mmej.score <- screen.ratio.dt %>%
   ungroup() %>%
   distinct(replicate, tech, drug, well, plate, MMEJratio) %>%
   filter(drug == "DMSO") %>%
-  mutate(MMEJratio = ave(MMEJratio, tech, drug, well, plate, FUN = mean)) %>%
+  mutate(MMEJratio = ave(MMEJratio, tech, drug, well, plate, FUN = function(x) mean(x, na.rm=T))) %>%
   dplyr::select('DMSO' = MMEJratio, replicate, tech) %>%
-  mutate(mean_DMSO = ave(DMSO, replicate, tech, FUN = mean), 
+  mutate(mean_DMSO = ave(DMSO, replicate, tech, FUN = function(x) mean(x, na.rm=T)), 
          sd_DMSO = ave(DMSO, replicate, tech, FUN = sd)) %>%
   dplyr::select(-DMSO) %>%
   distinct()
@@ -883,9 +887,9 @@ dmso.mmej.score <- screen.ratio.dt %>%
 screen.ratio.dt <- left_join(screen.ratio.dt, dmso.mmej.score, by = c("replicate", "tech"))
 
 screen.ratio.dt <- screen.ratio.dt %>%
-  mutate(MMEJ_ratio_global = ave(MMEJratio, drug, concentration, replicate, tech, FUN = mean)) %>%
+  mutate(MMEJ_ratio_global = ave(MMEJratio, drug, concentration, replicate, tech, FUN = function(x) mean(x, na.rm=T))) %>%
   mutate(MMEJ_zscore_global = (MMEJ_ratio_global - mean_DMSO)/ sd_DMSO) %>%
-  mutate(MMEJ_zscore_global_mean = ave(MMEJ_zscore_global, drug, conc_char, replicate, FUN = mean)) %>%
+  mutate(MMEJ_zscore_global_mean = ave(MMEJ_zscore_global, drug, conc_char, replicate, FUN = function(x) mean(x, na.rm=T))) %>%
   dplyr::select(-mean_DMSO, -sd_DMSO)
 ```
 
@@ -916,7 +920,7 @@ dmso.mmej.score <- screen.ratio.dt %>%
   ungroup() %>%
   distinct(barcode, replicate, tech, drug, well, plate, MMEJratio) %>%
   dplyr::select('DMSO' = MMEJratio, barcode, replicate, tech) %>%
-  mutate(mean_DMSO = ave(DMSO, barcode, replicate, tech, FUN = mean)) %>%
+  mutate(mean_DMSO = ave(DMSO, barcode, replicate, tech, FUN = function(x) mean(x, na.rm=T))) %>%
   dplyr::select(-DMSO) %>%
   distinct()
 
@@ -985,6 +989,7 @@ ratio.cols = c("replicate",
          "viab_mean_pb",
          "sample",
          "freqCut",
+         "freqCut_global",
          "freqCut_max",
          "freqMMEJ", 
          "freqNHEJ",
@@ -997,12 +1002,16 @@ ratio.cols = c("replicate",
          "freqCut_norm_global",
          "freqCut_norm_mean",
          "freqCut_norm_global_mean",
+         "freqCut_diff",
+         "freqCut_diff_global",
+         "freqCut_diff_mean",
+         "freqCut_diff_global_mean",
          "eff_zscore",
+         "eff_zscore_global",
          "mean_eff_zscore",
          "mean_eff_zscore_comb",
          "mean_eff_zscore_global_comb",
          "mean_eff_zscore_global",
-         "eff_zscore_global",
          "MMEJ_zscore",
          "MMEJ_zscore_mean",
          "MMEJ_zscore_global",
