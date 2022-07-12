@@ -1,0 +1,20 @@
+drug	pan_AurK	AurB	AurA	AurC	CDK	Flt3
+Alisertib	0	0	1	0	0	0
+Aurora A Inhibitor I	0	0	1	0	0	0
+Barasertib	0	1	0	0	0	0
+CCT129202	1	1	1	1	0	0
+CCT137690	1	1	1	1	0	0
+CYC116	0	1	1	0	0	0
+ENMD-2076	0	0	1	0	0	1
+Hesperadin	0	1	0	0	0	0
+JNJ-7706621	0	1	1	0	1	0
+KW-2449	0	0	1	0	0	1
+MK-5108	0	0	1	0	0	0
+MLN8054	0	0	1	0	0	0
+PHA-680632	1	1	1	1	0	0
+SNS-314 Mesylate	1	1	1	1	0	0
+ZM 447439	0	1	1	0	0	0
+AMG-900	1	1	1	1	0	0
+Danusertib	1	1	1	1	0	0
+TAK-901	0	1	1	0	0	0
+VX-680	1	1	1	1	0	1

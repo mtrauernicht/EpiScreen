@@ -1,0 +1,6 @@
+drug	PARP1	PARP2
+AG-14361	1	0
+PJ34	1	1
+PJ34 HCl	1	1
+Rucaparib	1	1
+BMN 673	1	1
