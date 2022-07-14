@@ -520,6 +520,10 @@ Mirin_data = viab_plot_tib %>% filter(drug == "Mirin")
 odd_data = viab_plot_tib %>% 
   filter(viab_diff > 0.20)
 
+drug_conc_odd = odd_data %>% 
+  mutate(viab_reproducibility = FALSE) %>% 
+  distinct(drug, conc_char, viab_reproducibility)
+
 control.colors <- c("PAO" = "red", "DMSO" = "yellow", "Mirin" = "brown", "Not reproducible" = "orange")
 
 
@@ -655,14 +659,16 @@ viab_plot_tib %<>%
               names_from = var, 
               values_from = value, 
               names_repair = "check_unique") %>%
-  unique()
+  unique() %>%
+  left_join(drug_conc_odd) %>% 
+  mutate(viab_reproducibility = ifelse(is.na(viab_reproducibility), TRUE, FALSE))
 
 filename <- SetFileName("Episcreen_Reads_Viab_Metadata", initials = initials, extension = "RDS")
 
 indel.statistics.tib %>%
   select(-reads_written, -n_tooshort,
          -index, -pat1, -barcode,  -pat2) %>%
-  left_join(viab_plot_tib) %>%
+  left_join(viab_plot_tib)  %>%
   write_rds(.,
             file = filename)
 ```
