@@ -341,6 +341,11 @@ labels <- indel.data.freq2 %>%
 indel.data.freq2 <- merge(indel.data.freq2, labels, all = T)
 indel.data.freq2$flag[is.na(indel.data.freq2$flag)] <- "FALSE"
 indel.data.freq2$drug <- gsub(" [(].*[)]", "", indel.data.freq2$drug) #shorten name of drug
+
+indel.data.freq2 %>% filter(mean_eff_pval_adj_global_comb < 0.05) %>% 
+  distinct(drug, conc_char, mean_eff_pval_adj_global_comb) %>% 
+  group_by(conc_char) %>% 
+  summarise(count = n())
 ```
 
 
@@ -356,13 +361,13 @@ Are there any target groups that are prone to changes in cutting efficiency?
 # C: Bar plot
 eff.data <- indel.data.freq %>%
   filter(sample == "Epigenetic Compound" & !is.na(mean_eff_zscore_global_comb)) %>%
-  distinct(mean_eff_zscore_global_comb, drug, target, conc_char, freqCut_diff_global ) %>%
-  mutate(freqCut_diff = ave(freqCut_diff_global, drug, conc_char, FUN = function(x) mean(x, na.rm = TRUE))) %>%
-  distinct() %>%
+  mutate(freqCut_diff_global_mean = ave(freqCut_diff_global_mean, 
+                                        drug, conc_char, FUN = function(x) mean(x, na.rm = TRUE))) %>%
+  distinct(mean_eff_zscore_global_comb, drug, target, conc_char, freqCut_diff_global_mean) %>%
   mutate(mean_eff_pval_global_comb = 2*pnorm(q = abs(mean_eff_zscore_global_comb), lower.tail = F)) %>%
   mutate(mean_eff_pval_adj_global_comb = p.adjust(mean_eff_pval_global_comb, method = 'fdr'),
-         sign = ifelse((freqCut_diff > 0.02 & mean_eff_pval_adj_global_comb < 0.05), "TIF_Increase", 
-                       ifelse((freqCut_diff < -0.02 & mean_eff_pval_adj_global_comb < 0.05), "TIF_Decrease", 
+         sign = ifelse((freqCut_diff_global_mean > 0.02 & mean_eff_pval_adj_global_comb < 0.05), "TIF_Increase", 
+                       ifelse((freqCut_diff_global_mean < -0.02 & mean_eff_pval_adj_global_comb < 0.05), "TIF_Decrease", 
                        "No_Change")),
          number = as.numeric(ave(target, target, sign, conc_char, FUN = length))) %>%
   distinct(conc_char, target, sign, number) %>%
@@ -379,15 +384,44 @@ ggplot(eff.data,
   scale_fill_manual(values = c("TIF_Decrease" = "#023FA5", "No_Change" = "#E2E2E2", "TIF_Increase" = "#8E063B")) +
   theme_pubr(border = T)
 # dev.off()
+
+eff.data %>% filter(sign != "No_Change") %>% distinct(target, conc_char, number) %>% group_by(conc_char) %>% summarise(count = sum(number))
 ```
 
 *Figure 2B: Number of compounds with significant changes in cutting efficiency per target group.*
 
 **Conclusion: Many HDACis have increased indel rates, especially at lower concentrations already. AURK and ERD inhibitors decrease efficiency at higher concentrations.**
+---
+## Rank
+
+```{r 2C Top TIF boosting, }
+indel.data %>% 
+    filter(conc_char != "control" & indel_freq_filter == T & viab_reproducibility == TRUE) %>%
+    distinct(drug, conc_char, mean_eff_zscore_global_comb, target) %>% 
+    arrange(desc(mean_eff_zscore_global_comb)) %>%
+    mutate(rank = seq(1:n())) %>%
+  filter(rank < 100) %>%
+  ggplot(., aes(rank, mean_eff_zscore_global_comb, color = target)) +
+  geom_point()  +
+  scale_color_manual(values = colors_targets) +
+  gghighlight(rank <= 10, label_key = drug) +
+  geom_hline(linetype = "dashed", yintercept = 1.96) +
+  scale_x_reverse(limits = c(100, 0)) +
+  ylab("Global combined TIF z-score")
+
+top_hits = indel.data  %>% 
+    filter(conc_char != "control" & indel_freq_filter == T & viab_reproducibility == TRUE) %>% 
+  distinct(drug, conc_char, mean_eff_zscore_global_comb, target) %>%
+    arrange(desc(mean_eff_zscore_global_comb)) %>% slice_head(n = 10) %>% distinct(drug, conc_char, target, mean_eff_zscore_global_comb) %>% 
+  mutate(rank = seq(1:n()),
+         drug = gsub(" [(].*[)]", "", drug),
+         drug_conc = paste(drug, conc_char, sep = " "))
+```
+
 
 ---
 
-## HDACi heatmap
+## 2D HDACi heatmap
 ```{r prepare data for heatmaps}
 # Set annotation for heatmap
 # viability
@@ -423,6 +457,10 @@ chrom_colors = c("Euchromatin" = "#EAEEE8",
 # colors <- brewer.pal(length(unique(barcode.annotation$cluster)), "Pastel2")
 # names(colors) <- unique(barcode.annotation$cluster)
 
+viab_colors = sequential_hcl(11, "Peach", rev = TRUE)
+names(viab_colors) = seq(0, 1, by = 0.1)
+
+
 annotation_colors_scr = list(
   chromatin = chrom_colors,
   target = c(HDAC="#60988D", HAT="#C6D0A8", Sirtuin="#8FCAAC",
@@ -433,7 +471,7 @@ annotation_colors_scr = list(
   clusters_drugs = sequential_hcl(7, "Plasma"),
   # viab_rep1 = c('#ffeee9', '#ffdcd4', '#ffcbbe', '#ffb8a8', '#fda693', '#f9947e', '#f4826a', '#ef6f56', '#e95b43', '#e24530'),
   # viab_rep2 = c('#ffeee9', '#ffdcd4', '#ffcbbe', '#ffb8a8', '#fda693', '#f9947e', '#f4826a', '#ef6f56', '#e95b43', '#e24530'),
-  viab = sequential_hcl(10, "Peach", rev = TRUE))
+  viab = viab_colors)
 
 
 
@@ -513,10 +551,8 @@ ordered_marks2 <- eff.data.heatmap2 %>%
 ordered_marks2 <- ordered_marks2$target
 
 annotation_colors_scr$target <- annotation_colors_scr$target[ordered_marks2]
-```
 
 
-```{r 2C TIF HDAC heatmap, warning = FALSE, fig.width= 12, fig.height=16}
 # Add cluster annotation
 clusters_drugs <- hclust(dist(eff.data.heatmap2), method = "complete")
 clusters_drugs <- cutree(tree = clusters_drugs, k = 7)
@@ -529,21 +565,58 @@ eff.data.heatmap2.clusters <- cbind(eff.data.heatmap2, clusters_drugs) %>%
 clusters_drugs <- eff.data.heatmap2.clusters %>%
   distinct(drug_conc, clusters_drugs)
 
-target_set <- target_set_drugs %>%
+target_set_all <- target_set_drugs %>%
   rownames_to_column("drug_conc") %>%
   left_join(clusters_drugs) %>%
   na.omit()
-rownames(target_set) <- target_set$drug_conc
-target <- target_set %>%
+rownames(target_set_all) <- target_set_all$drug_conc
+target_all <- target_set_all %>%
   dplyr::select(target, 
-                # clusters_drugs,
+                clusters_drugs,
                 conc_char, viab)
+```
 
+```{r 2D top hits heatmap, fig.width= 5, fig.height=6}
+eff.data.heatmap.top = top_hits %>%
+  left_join(eff.data.heatmap2)
+
+minmax_row = data.frame(conc_char = c(NA, NA), target = c(NA, NA), viab = c(0, 1), row.names = c("min", "max"))
+
+target_set <- top_hits %>% 
+  left_join(target_set_drugs) %>%
+  column_to_rownames("drug_conc") %>%
+  select(-drug, -rank) %>%
+  bind_rows(minmax_row)
+
+tophit_matrix = eff.data.heatmap.top %>%
+  column_to_rownames('drug_conc') %>%
+  select(contains('IPR')) %>%
+  t()
+
+plt3 = pheatmap(tophit_matrix,
+                border_color = F,
+                cellwidth = 8,
+                cellheight = 8,
+                breaks = myBreaks,
+                cluster_rows = F,
+                cluster_cols = T,
+                angle_col = 90,
+                na_col = "white",
+                main = 'efficiency change, all concentrations',
+                annotation_col = target_set,
+                annotation_row = chromatin,
+                color = diverge_hcl(palette_length, "Blue-Red"),
+                annotation_colors = annotation_colors_scr,
+                annotation_legend = T)
+```
+
+
+```{r 2E TIF HDAC heatmap, warning = FALSE, fig.width= 12, fig.height=16}
 HDAC_tib = read.table("rs20220708_HDAC_targets.txt", sep = "\t", fill = NA, header = T) %>%
   select(-target_main, -target_second) %>%
   as_tibble()
 
-cluster1 = target %>% filter(target == "HDAC") %>% rownames()
+cluster1 = target_all %>% filter(target == "HDAC") %>% rownames()
 cluster1 = cluster1[!grepl("Nullscript", cluster1)]
 
 eff.data.heatmap.cluster1 = eff.data.heatmap2 %>% 
@@ -600,13 +673,52 @@ plt3 = pheatmap(HDAC_matrix,
                 cutree_cols = 6)
 ```
 
+
+
+## Plot HDACi effects on different chromatin types
+```{r 2F HDACi in different clusters}
+chromatin_ipr <- chromatin %>%
+  rownames_to_column("IPR")
+
+eff.data.heatmap3 <- eff.data.heatmap.cluster1 %>%
+  pivot_longer(contains("IPR"), names_to = "IPR", values_to = "freqCut_dif")
+
+chromatin_effect <- merge(eff.data.heatmap3, chromatin_ipr) %>%
+  #filter(target == "HDAC") %>%
+  mutate(freqCut_dif = ave(freqCut_dif, drug, chromatin, conc_char, FUN = function(x) mean(x, na.rm = TRUE))) %>%
+  distinct(freqCut_dif, drug, chromatin, conc_char, target, cluster_HDAC)
+
+sigFunc = function(x){
+  if(x < 0.001){"***"} 
+  else if(x < 0.01){"**"}
+  else if(x < 0.05){"*"}
+  else{NA}}
+
+ggplot(chromatin_effect %>%
+         filter(target == "HDAC" & 
+                  cluster_HDAC != 6
+         ),
+       aes(x = chromatin, y = freqCut_dif, fill = chromatin)) +
+  geom_boxplot(outlier.shape = NA) +
+  geom_quasirandom() +
+  geom_signif(comparisons = combn(sort(unique(chromatin_effect$chromatin)), 2, simplify = F), 
+              map_signif_level=sigFunc, 
+              step_increase = 0.1) +
+  theme_classic_lines_45() +
+  scale_fill_manual(values = chrom_colors) +
+  theme(legend.position = "none") +
+  facet_wrap(~cluster_HDAC) +
+  ylab("Total indel frequency change") +
+  xlab("Chromatin cluster")
+```
+
 ## Aurora A vs. Aurora B
 
-```{r 2D TIF AurK inhibitor heatmap, warning = FALSE, fig.width= 12, fig.height=16}
+```{r 2G TIF AurK inhibitor heatmap, warning = FALSE, fig.width= 8, fig.height=10}
 AurK_tib = read.table("rs20220711_AurK_inhibitors.txt", sep = "\t", fill = NA, header = T) %>%
   as_tibble()
 
-cluster_AurK = target %>% filter(target == "Aurora Kinase") %>% rownames()
+cluster_AurK = target_all %>% filter(target == "Aurora Kinase") %>% rownames()
 
 eff.data.heatmap.aurK = eff.data.heatmap2 %>% 
   mutate(drug_conc = paste(drug, conc_char, sep = " ")) %>% 
@@ -664,7 +776,7 @@ plt3 = pheatmap(AurK_matrix,
 
 
 
-```{r 2E AurK inhib global effects}
+```{r 2H AurK inhib global effects, fig.width= 4.5, fig.height= 5}
 indel.data.freq2 %>%
   filter(target == "Aurora Kinase") %>%
   left_join(AurK_tib) %>%
@@ -674,7 +786,7 @@ indel.data.freq2 %>%
   ggplot(.,
          aes(y = -log10(mean_eff_pval_adj_global_comb), x = freqCut_mean, 
              color = AurK_Target)) +
-  geom_point(size = 2) +
+  geom_point(size = 3) +
   #geom_label_repel(data = indel.data.freq2 %>% filter(flag == "TRUE") %>% unique(), 
   #aes(label = drug)) +
   geom_hline(linetype = "dashed", yintercept = -log10(0.05)) +
@@ -692,7 +804,7 @@ indel.data.freq2 %>%
 
 ```
 
-```{r 2F AurA vs AurB inhibitors, fig.width= 3, fig.height= 3}
+```{r 2I AurA vs AurB inhibitors, fig.width= 3, fig.height= 3}
 viab_tib = indel.data %>% distinct(replicate, drug, conc_char, viab_mean) %>%
   group_by(drug, conc_char) %>%
   summarise(viab_mean = mean(viab_mean, na.rm = TRUE)) %>%
@@ -723,24 +835,6 @@ ggplot(aurora_df,
 ```
 
 
-```{r S2E PJ34 replicates, fig.width= 5, fig.height=4}
-PJ34_df <- indel.data %>%
-  filter(drug == "PJ34") %>%
-  distinct(drug, conc_char, replicate, tech, freqCut_diff, viab_mean) 
-
-ggplot(PJ34_df, 
-       aes(x = replicate, y = freqCut_diff, color = as.character(tech))) + 
-    geom_quasirandom(position=position_dodge(), aes(fill=viab_mean), shape = 21) +
-    # geom_signif(comparisons = combn(sort(unique(PJ34_df$replicate)), 2, simplify = F), 
-    #             map_signif_level=sigFunc, 
-    #             step_increase = 0.1) +
-    scale_fill_continuous_sequential(palette = "Peach", rev = TRUE) +
-    scale_color_manual(values= conc_colors) +
-    theme_classic_lines() +
-    ylab("TIF difference to Control") +
-    facet_grid(. ~ conc_char)
-```
-
 *Figure S2A: Correlation between cutting efficiency of significant hits.*
 
 **Conclusion: The correlation between 'strong' changers of efficiency is OK, not very good, but OK.**
@@ -750,26 +844,25 @@ Are the effects on cutting efficiency global or local? Can we plot all interesti
 ```{r S2A TIF heatmaps, warning = FALSE, fig.width = 20, fig.height = 10}
 # pdf(paste0(figure_out, "rs20220623_indelfrequency_heatmap_allconc.pdf"), width=20, height=8)
 plt1 = pheatmap(eff.data.heatmap2.clusters %>%
-                  arrange(target) %>%
+                  arrange(target_all) %>%
                   column_to_rownames('drug_conc') %>%
-                  dplyr::select(contains('IPR')) %>%
-                  t(),
+                  dplyr::select(contains('IPR')),
                 border_color = F,
                 cellwidth = 8,
                 cellheight = 8,
                 breaks = myBreaks,
-                cluster_rows = F,
-                cluster_cols = T,
+                cluster_cols = F,
+                cluster_rows = T,
                 angle_col = 90,
                 na_col = "white",
                 main = 'efficiency change, all concentrations',
-                annotation_col = target,
-                annotation_row = chromatin,
+                annotation_row = target_all,
+                annotation_col = chromatin,
                 # color = colorRampPalette(c("#e07a5f", "#e5e5e5", "#3d405b"))(palette_length),
                 color = diverge_hcl(palette_length, "Blue-Red"),
                 annotation_colors = annotation_colors_scr, 
                 annotation_legend = T,
-                cutree_cols = 7)
+                cutree_row = 7)
 ```
 
 ```{r S2A DMSO heatmap}
@@ -788,45 +881,8 @@ plt2 = pheatmap(dmso_freq %>%
 ```
 
 
-## Plot HDACi effects on different chromatin types
-```{r S2C HDACi in different clusters}
-chromatin_ipr <- chromatin %>%
-  rownames_to_column("IPR")
-
-eff.data.heatmap3 <- eff.data.heatmap.cluster1 %>%
-  pivot_longer(contains("IPR"), names_to = "IPR", values_to = "freqCut_dif")
-
-chromatin_effect <- merge(eff.data.heatmap3, chromatin_ipr) %>%
-  #filter(target == "HDAC") %>%
-  mutate(freqCut_dif = ave(freqCut_dif, drug, chromatin, conc_char, FUN = function(x) mean(x, na.rm = TRUE))) %>%
-  distinct(freqCut_dif, drug, chromatin, conc_char, target, cluster_HDAC)
-
-sigFunc = function(x){
-  if(x < 0.001){"***"} 
-  else if(x < 0.01){"**"}
-  else if(x < 0.05){"*"}
-  else{NA}}
-
-ggplot(chromatin_effect %>%
-         filter(target == "HDAC" & 
-                  cluster_HDAC != 6
-         ),
-       aes(x = chromatin, y = freqCut_dif, fill = chromatin)) +
-  geom_boxplot(outlier.shape = NA) +
-  geom_quasirandom() +
-  geom_signif(comparisons = combn(sort(unique(chromatin_effect$chromatin)), 2, simplify = F), 
-              map_signif_level=sigFunc, 
-              step_increase = 0.1) +
-  theme_classic_lines_45() +
-  scale_fill_manual(values = chrom_colors) +
-  theme(legend.position = "none") +
-  facet_wrap(~cluster_HDAC) +
-  ylab("Total indel frequency change") +
-  xlab("Chromatin cluster")
-```
-
 ## Plot postive regulator effects on different chromatin types (clusters 3, 4 and 5)
-```{r S2D chromatin effect per cluster}
+```{r S2B chromatin effect per cluster}
 chromatin_ipr <- chromatin %>%
   rownames_to_column("IPR")
 
@@ -839,7 +895,7 @@ chromatin_effect <- left_join(eff.data.heatmap3, chromatin_ipr) %>%
          drug_conc = paste(drug, conc_char, sep = " ")) %>%
   distinct(freqCut_dif, drug, chromatin, conc_char, target, drug_conc)
 
-clusters_drugs = target_set %>% filter(! clusters_drugs %in% c(2, 1, 6, 7))
+clusters_drugs = target_set_all %>% filter(clusters_drugs %in% c(3, 4))
 
 
 chromatin_effect <- left_join(clusters_drugs, chromatin_effect)
@@ -857,6 +913,24 @@ ggplot(chromatin_effect,
   facet_wrap(~ clusters_drugs, nrow = 1)
 ```
 
+
+```{r S2D PJ34 replicates, fig.width= 6, fig.height=4}
+PJ34_df <- indel.data %>%
+  filter(drug == "PJ34") %>%
+  distinct(drug, conc_char, replicate, tech, freqCut_diff, viab_mean) 
+
+ggplot(PJ34_df, 
+       aes(x = replicate, y = freqCut_diff, color = as.character(tech))) + 
+    geom_quasirandom(position=position_dodge(), aes(fill=viab_mean), shape = 21) +
+    # geom_signif(comparisons = combn(sort(unique(PJ34_df$replicate)), 2, simplify = F), 
+    #             map_signif_level=sigFunc, 
+    #             step_increase = 0.1) +
+    scale_fill_continuous_sequential(palette = "Peach", rev = TRUE) +
+    scale_color_manual(values= conc_colors) +
+    theme_classic_lines() +
+    ylab("TIF difference to Control") +
+    facet_grid(. ~ conc_char)
+```
 
 # Session Info
 ```{r}
