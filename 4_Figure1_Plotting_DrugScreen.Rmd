@@ -220,8 +220,7 @@ theme_classic_lines_45 <- function() {
 
 theme_classic_lines_90 <- function() {
   theme_pubr(border = T, legend = "top", x.text.angle = 90) +
-            theme(panel.grid.major = element_line(colour = "#adb5bd", size = 0.25),
-                  strip.background = element_rect(fill = "white", color = "white")
+            theme(strip.background = element_rect(fill = "white", color = "white")
             )
 }
 
@@ -231,11 +230,21 @@ colors_diverse <- c("#264653", "#9AC1AE", "#5D987B", "#f2cc8f", "#e76f51")
 # colors_drugs <- c("DMSO (neg control)" = "#65BFA4", "DNA-PKi (NHEJ control)" = "#8CA0C4", "drugs" = "#808184", "Mirin (MMEJ control)" = "#5D79AC")
 colors_drugs <- c("#FA8D62", "#65BFA4", "#8CA0C4", "#808184", "#F6D289", "#E5E5E5", "#ACACAC", "#737373")
 #colors_diverse <- c("#264653", "#2a9d8f", "#e9c46a", "#f4a261", "#e76f51") 
+## Chromatin groups
+group_colors = c("Euchromatin" = "#f7941d",
+                 "other-heterochromatin" = "#838687",
+                 "Triple Heterochromatin" = "#662d91",
+                 "H3K27me3" = "#d21f8a")
 
 ggplot_custom <- function(...) ggplot2::ggplot(...) + 
   scale_color_manual(values = colors_diverse) + 
   scale_fill_manual(values = colors_diverse)
 
+changeLevels <- function(object, column = "chr_r", levels = c(paste0("chr", 1:22), "chrX")) {
+  object[, column] <- as.character(object[, column])
+  object[, column] <- factor(object[, column], levels)
+  object
+}
 ```
 
 
@@ -247,10 +256,51 @@ in.dir = list.dirs(path = "/DATA/projects/DSBrepair/data/R") %>% .[grepl("episcr
 file = list.files(in.dir, pattern = "ratios", full.names = T) %>% tail(n = 1)
 indel.data <- readRDS(file)
 
+# Import data from preprocessing script
+in.dir = list.dirs(path = "/DATA/projects/DSBrepair/data/R") %>% .[grepl("episcreen", .)] %>% tail(n = 1)
+file.muts = list.files(in.dir, pattern = "mutations", full.names = T) %>% tail(n = 1)
+mutation.data <- readRDS(file.muts) %>% filter(IPR %in% c("IPR7", "IPR5"))
+
 # Complete data without exlcluding wells <0.5 viability (I need this for plotting)
 meta.viab.file = list.files(in.dir, full.names = T)  %>% .[grepl("Viab_Meta", .)] %>% tail(n = 1)
 indel.statistics.dt = readRDS(meta.viab.file) %>%
   dplyr::select(ID, drug, target, replicate, viability, conc_char, tech)
+
+
+
+chromatin <- readRDS(
+  "/DATA/usr/x.vergara/XV_ChIPIndels/XV20200902_DDR_RS_revision/XV20200902_DDR_RS_revision/data/xv20200915_DDR_data_CHIP.rds") %>% 
+  distinct(barcode, chromatin) %>%
+  left_join(distinct(indel.data, barcode))
+
+map_clones = read_table("/DATA/projects/DSBrepair/data/cl20220321_cured_mapping_clones.txt", col_names = c("chr", "start", "barcode", "clone")) %>%
+  filter(chr != "chrY" & clone == "RSTP2_5") %>%
+  mutate(chr = factor(chr, levels = c("chr1", "chr2", "chr3", "chr4", "chr5", 
+                                      "chr6", "chr7", "chr8", "chr9", "chr10", 
+                                      "chr11", "chr12", "chr13", "chr14", "chr15", 
+                                      "chr16", "chr17", "chr18", "chr19", "chr20", 
+                                      "chr21", "chr22", "chrX"))) %>%
+  left_join(chromatin) %>%
+  filter(barcode != "ACCCCTAAAGGCGCTG")
+
+chromsizes = read_table("/DATA/projects/DSBrepair/data/rs20220602_chromsizes_hg38_UCSC.txt", col_names = T) %>% 
+  filter(chr != "chrY") %>%
+  mutate(chr = factor(chr, levels = c("chr1", "chr2", "chr3", "chr4", "chr5", 
+                                      "chr6", "chr7", "chr8", "chr9", "chr10", 
+                                      "chr11", "chr12", "chr13", "chr14", "chr15", 
+                                      "chr16", "chr17", "chr18", "chr19", "chr20", 
+                                      "chr21", "chr22", "chrX")))
+
+centromeres = read_table("/DATA/projects/DSBrepair/git/EpiScreen/rs20220714_UCSC_centromeres_24501022.txt") %>%
+  group_by(chr) %>%
+  filter(chr != "chrY") %>%
+  mutate(chr = factor(chr, levels = c("chr1", "chr2", "chr3", "chr4", "chr5", 
+                                      "chr6", "chr7", "chr8", "chr9", "chr10", 
+                                      "chr11", "chr12", "chr13", "chr14", "chr15", 
+                                      "chr16", "chr17", "chr18", "chr19", "chr20", 
+                                      "chr21", "chr22", "chrX"))) %>%
+  summarise(start = min(start), # earliest start of centromere
+            end = max(end)) # furthest end of centromere
 ```
 
 ---
@@ -287,6 +337,27 @@ ggplot(targets,
 **Conclusion: Most drugs are HDACs, a lot of compounds do not really target chromatin directly.**
 
 ---
+```{r FigS1A chromideograms, fig.height=5, fig.width=6}
+ggplot() +
+  geom_segment(data = chromsizes,
+               aes(x = chr, xend = chr, y = 0, yend = start),
+               lineend = "round", color = "lightgrey", size = 7) +
+  geom_segment(data = map_clones,
+               aes(x = as.integer(chr) - 0.3, xend = as.integer(chr) + 0.3,
+                   y = start, yend = start, color = chromatin),
+               size = 3) +
+  geom_segment(data = centromeres,
+               aes(x = as.integer(chr) - 0.2, xend = as.integer(chr) + 0.2,
+                   y = start, yend = start),
+               size = 2) +
+  geom_segment(data = centromeres,
+               aes(x = as.integer(chr) - 0.2, xend = as.integer(chr) + 0.2,
+                   y = end, yend = end),
+               size = 2) +
+  theme_classic_lines_90() +
+  scale_color_manual(values = group_colors) + 
+  xlab("Chromosome")
+```
 
 ## C: Viability filtering
 How many drugs are filtered out because they are too toxic?
@@ -294,15 +365,18 @@ How many drugs are filtered out because they are too toxic?
 # C: Viability filtering
 indel.data %>% 
   filter(sample == "Epigenetic Compound") %>%
-  mutate(viab = ave(viab_mean, conc_char, drug, FUN = function(x) mean(x, na.rm = TRUE))) %>% # average the two replicates for plotting
-  distinct(conc_char, drug, viab, pathway_bal_filter) %>%
+  mutate(viab = ave(viab_mean, conc_char, drug, FUN = function(x) mean(x, na.rm = TRUE)),
+         filter_viab = ifelse(pathway_bal_filter, "Balance filter", 
+                              ifelse(indel_freq_filter,"TIF filter" , "Discarded")),
+         filter_viab = factor(filter_viab, levels = c("Discarded", "TIF filter" , "Balance filter"))) %>% # average the two replicates for plotting
+  distinct(conc_char, drug, viab, filter_viab) %>%
   ggplot_custom(.,
               aes(x = conc_char, y = viab)) +
-    geom_quasirandom(aes(fill = pathway_bal_filter), color = "black", shape = 21, size = 2) +
-    scale_fill_manual(values = c("#FA8D62", colors_diverse[1])) +
+    geom_quasirandom(aes(fill = filter_viab), color = "black", shape = 21, size = 2) +
     theme_pubr(border = T) +
   xlab("Concentration") +
-  ylab("Relative viability to control (DMSO)")
+  ylab("Relative viability to control (DMSO)")+ 
+  scale_fill_manual(values = hcl.colors(4, palette = "Lajolla", rev = F)[2:4])
 ```
 
 ***Figure 1C:*** *Mean viability for each compound at the three concentrations.Compounds that decreased viability by >50% in more than one technical replicate in one or both biological replicate were removed (marked in yellow).*
@@ -310,10 +384,47 @@ indel.data %>%
 **Conclusion: The higher the concentration, the more toxic the compounds are to the cells.**
 
 ---
+```{r}
+label_ratio <- filter(indel.data, IPR %in% c("IPR5", "IPR7"), drug == "DMSO") %>% 
+  group_by(IPR) %>%
+  summarise(MMEJratio = mean(MMEJratio),
+            freqCut = mean(freqCut)) %>%
+  mutate(label_efficiency = paste0("Total indel frequency = ", round(freqCut*100, 1),"%"), 
+         label_ratio = paste0("MMEJ ratio = ", round(MMEJratio, 2)),
+         label = IPR)
+
+bc_chrom_loc <- filter(analysis.mapped.integrations.df, barcode %in% barcodeset) %>% 
+  dplyr::select(barcode, seqname, start) %>% mutate(loc = paste0(seqname, ": ", start)) %>% 
+  left_join(NHEJratio, by = "barcode")
+
+bc_mut_tib <- trip_tib_mut %>% 
+  filter(barcode %in% barcodeset, 
+         mutation != "ssODN", 
+         drug == "-")  %>%
+  left_join(bc_chrom_loc, by = "barcode")
+
+loc_labels <- c(bc_chrom_loc$loc)
+names(loc_labels) <- c(bc_chrom_loc$label)
+
+bc_mut_tib %>% distinct(barcode, nexp)
+
+p <- ggplot(bc_mut_tib, 
+            aes(mutation, freq)) + 
+  geom_bar(stat = "identity", aes(fill = color)) + 
+  scale_fill_manual("legend", values = colores) + 
+  theme_bw() +
+  scale_y_continuous(name="frequency") +
+  scale_x_discrete(name="indel size", breaks = c("<-14", -7, 0, 1, ">2")) +
+  geom_errorbar(aes(ymin=freq-sd_freq, ymax=freq+sd_freq), width=.2,
+                position=position_dodge(.9)) 
+p + facet_wrap( ~ label, ncol = 3, labeller = labeller(label = loc_labels)) +
+  geom_text(aes(x = 7, y = .7, label = label_efficiency)) +
+  geom_text(aes(x = 7, y = .6, label = label_ratio))
+```
 
 ## D: Cutting efficiency per IPR
 How do the drugs impact cutting efficiency in general? Does the genomic location & concentration of the drugs matter?
-```{r 1DE TIF, warning = FALSE, fig.height=8, fig.width=10} 
+```{r 1DE TIF, warning = FALSE, fig.height=6, fig.width=3} 
 chromatin_tib <- readRDS(
   "/DATA/usr/x.vergara/XV_ChIPIndels/XV20200902_DDR_RS_revision/XV20200902_DDR_RS_revision/data/xv20200915_DDR_data_CHIP.rds") %>% 
   distinct(barcode, chromatin)
@@ -331,7 +442,7 @@ conc_colors = c("100 nM" = colors_drugs[7], "1 µM" = colors_drugs[4], "10 µM" 
 
 # D: Cutting efficiency per IPR
 CTRL.data = indel.data %>%
- filter(sample == "DMSO (neg control)" & indel_freq_filter == T) %>% 
+ filter(sample == "DMSO (neg control)" & indel_freq_filter == T & IPR %in% c("IPR7", "IPR5")) %>% 
   distinct(freqCut, IPR, drug, conc_char, tech, sample, replicate, 
            barcode, MMEJratio, MMEJ_zscore_comb, MMEJ_zscore_mean, mean_eff_zscore_comb,  plate, well) %>%
   mutate(sample_conc = sample,
@@ -341,7 +452,7 @@ CTRL.data = indel.data %>%
   select(-well, -tech)
 
 indel.data2 <- indel.data %>%
- filter(sample %in% c("Epigenetic Compound") & indel_freq_filter == T) %>%
+ filter(sample %in% c("Epigenetic Compound") & indel_freq_filter == T & IPR %in% c("IPR7", "IPR5")) %>%
   distinct(freqCut, IPR, drug, conc_char, tech, sample, replicate, 
            barcode, MMEJratio, MMEJ_zscore_comb, mean_eff_zscore_comb) %>%
   left_join(chromatin_tib) %>%
@@ -363,7 +474,7 @@ plt1 = indel.data2 %>%
   distinct(freqCut, drug, conc_char, IPR, chromatin, sample_conc) %>% 
   ggplot(.,
          aes(x = IPR, y = freqCut*100)) +
-  geom_quasirandom_rast(aes(color = sample_conc), dodge.width = 0.75, raster.dpi = 600, size = 0.5) +
+  geom_quasirandom_rast(aes(color = sample_conc), dodge.width = 0.75, raster.dpi = 300, size = 1) +
   scale_color_manual(values = conc_control_colors) +
   facet_wrap(~chromatin, scales = "free_x", nrow = 1) +
   theme_classic_lines_90() +
@@ -374,7 +485,7 @@ plt2 =  indel.data2 %>%
   mutate(sample_conc = factor(sample_conc, levels = sample_order)) %>%
   ggplot(.,
          aes(x = IPR, y = mean_eff_zscore_comb)) +
-  geom_quasirandom_rast(aes(color = sample_conc), dodge.width = 0.75, raster.dpi = 600, size = 0.5) +
+  geom_quasirandom_rast(aes(color = sample_conc), dodge.width = 0.75, raster.dpi = 300, size = 1) +
   scale_color_manual(values = conc_colors, guide=FALSE) +
   facet_wrap(~chromatin, scales = "free_x", nrow = 1) +
   geom_hline(linetype = "dashed", yintercept = 1.96) +
@@ -512,27 +623,83 @@ How well does the viability data correlate between the two biological replicates
 # A: Correlate viability data from the 2 replicates
 indel.data %>%
   filter(sample == "Epigenetic Compound") %>%
-  distinct(viab_mean, sample, replicate, conc_char, drug, pathway_bal_filter) %>%
+  mutate(filter_viab = ifelse(pathway_bal_filter, "Balance filter", 
+                              ifelse(indel_freq_filter,"TIF filter" , "Discarded")),
+         filter_viab = factor(filter_viab, levels = c("Discarded", "TIF filter" , "Balance filter"))) %>%
+  distinct(viab_mean, sample, replicate, conc_char, drug, viab_reproducibility,
+           filter_viab, indel_freq_filter, pathway_bal_filter) %>%
   pivot_wider(names_from = replicate, values_from = viab_mean) %>%
-  ggplot_custom(., aes(x = E177, y = E1504)) +
-  geom_point(aes(color = pathway_bal_filter), size = .4, stroke = NA) +
-  geom_smooth(method = "lm", color = colors_diverse[1]) +
+  ggplot(., aes(x = E177, y = E1504, color = filter_viab,  shape = viab_reproducibility)) +
+  geom_point(size = 3) +
+  scale_shape_manual(values=c(18, 16))+
+  geom_smooth(aes(group = 1), method = "lm", color = colors_diverse[1]) +
   # geom_segment(x = 0.5, xend = 0.5, y = 0.5, yend = 1.2, linetype = "dashed") +
   # geom_segment(x = 0.5, xend = 1.2, y = 0.5, yend = 0.5, linetype = "dashed") +
-  scale_color_manual(values = c(colors_diverse[4], colors_diverse[1])) +
-  facet_wrap(~conc_char) +
-  theme_classic_lines_90()
+  theme_classic_lines_90() +
+  scale_color_manual(values = hcl.colors(4, palette = "Lajolla", rev = F)[2:4]) +
+  facet_grid(. ~ conc_char)
+
 ```
 
 *Figure S1A: Correlation of the cell viability between the two biological replicates. Marked in yellow are the compounds that were removed from the analysis.*
 
 **Conclusion: Most drugs that were toxic in rep 1 were also toxic in rep 2, so the trends are similar. However, some drugs were especially more toxic in rep 2. These drugs were removed from the analysis.**
 
+
+## S1C: Correlation between viability and TIF
+Is lower viability causing a decrease in TIF? Can we justify our 0.50 viability cutoff based on the correlation between viability and TIF?
+
+```{r S1C TIF correlation with viability, warning=F, fig.height=5, fig.width=5}
+# F: Correlation between viability and MMEJ ratio
+# load indel data that has no filter on it.
+indel.data.nofilter <- readRDS("/DATA/usr/m.trauernicht/projects/EpiScreen/files_scripts/mt20220126_episcreen.RDS")
+
+viab_eff_cor <- indel.data.nofilter %>%
+  # filter(sample == "Epigenetic Compound") %>%
+  dplyr::distinct(viab_norm_split, freqCut, drug, replicate, conc_char, tech, sample) %>%
+  mutate(freqCut = ave(freqCut, drug, replicate, conc_char, tech, FUN = mean)) %>%
+  distinct()
+
+ggplot_custom(viab_eff_cor,
+              aes(x = viab_norm_split, y = freqCut, color = sample)) +
+  geom_point() +
+  geom_vline(xintercept = 0.25, color = "red") +
+  annotate("rect",xmin=0,xmax=0.25,ymin=-Inf,ymax=Inf, alpha=0.1, fill="red") +
+  ylim(0, 1) +
+  xlim(0, 1.5)
+
+indel.data  %>% 
+  filter(is.na(freqCut)) %>% # freqCut is NA if sample didn't pass filter for viability.
+  distinct(drug, conc_char) %>% # unique compound and concentration combination
+  pull(conc_char) %>% 
+  table() # count compounds per concentration that are removed
+```
+
+## S1D: Correlation between viability and MMEJ ratio
+Is lower viability causing a decrease in MMEJ? Can we justify our 0.50 viability cutoff based on the correlation between viability and MMEJ ratio?
+
+```{r S1D MMEJ ratio correlation with viability, warning=F, fig.height=5, fig.width=5}
+viab_mmej_cor <- indel.data.nofilter %>%
+  # filter(sample == "Epigenetic Compound") %>%
+  dplyr::distinct(viab_norm_split, MMEJratio, drug, replicate, conc_char, tech, sample) %>%
+  mutate(MMEJratio = ave(MMEJratio, drug, replicate, conc_char, tech, FUN = mean)) %>%
+  distinct()
+
+ggplot_custom(viab_mmej_cor,
+              aes(x = viab_norm_split, y = log2(MMEJratio), color = sample)) +
+  geom_point() +
+  geom_vline(xintercept = 0.50, color = "red") +
+  annotate("rect",xmin=0,xmax=0.50,ymin=-Inf,ymax=Inf, alpha=0.1, fill="red") +
+  scale_x_continuous(breaks = seq(0, 1, by = 0.25), limits = c(0.1, 1.2)) +
+  xlab("Normalised viability") +
+  ylab("MMEJ ratio (Log2)")
+```
+
 ---
 
-## S1C: Comparison between replicates of efficiency in DMSO
+## S1E: Comparison between replicates of efficiency in DMSO
 
-```{r S1C control distribution of indel rates across wells and replicates, warning = FALSE, fig.height=3, fig.width=5}
+```{r S1E control distribution of indel rates across wells and replicates, warning = FALSE, fig.height=3, fig.width=5}
 ggplot(indel.data %>%
          filter(drug == "DMSO") %>%
          dplyr::distinct(freqCut, IPR, exp, replicate),
@@ -544,9 +711,9 @@ ggplot(indel.data %>%
 ```
 
 
-## S1D: Comparison between replicates MMEJ ratio in DMSO
+## S1F: Comparison between replicates MMEJ ratio in DMSO
 
-```{r S1D control distribution of MMEJ ratio across wells and replicates, warning = FALSE, fig.height=3, fig.width=5}
+```{r S1F control distribution of MMEJ ratio across wells and replicates, warning = FALSE, fig.height=3, fig.width=5}
 ggplot(indel.data %>%
          filter(drug == "DMSO") %>%
          dplyr::distinct(MMEJratio, IPR, exp, replicate),
@@ -556,9 +723,9 @@ ggplot(indel.data %>%
   theme_classic_lines_90()
 ```
 
-## S1E: Comparison between technical replicates of efficiency in DMSO
+## S1G: Comparison between technical replicates of efficiency in DMSO
 
-```{r S1E comparison for mean indel rate across replicates, warning = FALSE, fig.height=3, fig.width=2}
+```{r S1G comparison for mean indel rate across replicates, warning = FALSE, fig.height=3, fig.width=2}
 ggplot(indel.data %>%
          filter(drug == "DMSO") %>%
          dplyr::distinct(freqCut, well, drug_plate, conc_char, tech, replicate) %>%
@@ -573,10 +740,10 @@ ggplot(indel.data %>%
 ```
 
 
-## S1F: Correlation between technical replicates MMEJ score
+## S1H: Correlation between technical replicates MMEJ score
 
 How well does the MMEJ score correlate between the six technical replicates?
-```{r S1F normalized MMEJ ratio correlation, warning = FALSE, fig.height=5, fig.width=5}
+```{r S1H normalized MMEJ ratio correlation, warning = FALSE, fig.height=5, fig.width=5}
 # B: Correlation between technical replicates MMEJ score
 techn_repl <- indel.data %>%
   filter(sample == "Epigenetic Compound") %>%
@@ -609,9 +776,9 @@ ggpairs(techn_repl %>% dplyr::select(contains("E1")),
 
 ---
 
-## S1G: Correlation between technical replicates efficiency
+## S1I: Correlation between technical replicates efficiency
 How well does the cutting efficiency correlate between the six technical replicates
-```{r S1G normalized TIF correlation, warning = FALSE, fig.height=5, fig.width=5}
+```{r S1I normalized TIF correlation, warning = FALSE, fig.height=5, fig.width=5}
 # C: Correlation between technical replicates efficiency
 techn_repl <- indel.data %>%
   filter(sample == "Epigenetic Compound") %>%
@@ -645,7 +812,7 @@ ggpairs(techn_repl %>% dplyr::select(contains("E1")),
 
 ## S1H: Correlation in MMEJ z-score between biological replicates
 How well does the MMEJ z-score correlate between the biologcial replicates before combining them?
-```{r S1H MMEJ z-score correlation, warning = FALSE}
+```{r S1H MMEJ z-score correlation, warning = FALSE, fig.height=5, fig.width=5}
 # D: Correlation between biological replicates MMEJ score
 biol_repl <- indel.data %>%
   filter(sample == "Epigenetic Compound") %>%
@@ -658,7 +825,9 @@ ggplot(biol_repl,
   geom_point() +
   geom_abline(lty = "twodash") +
   geom_smooth(method = "lm", color = "red", lty = "dashed") +
-  stat_cor(method = "pearson")
+  stat_cor(method = "pearson") +
+  xlab("Screen 2 MMEJ ratio z-score") +
+  ylab("Screen 1 MMEJ ratio z-score")
 ```
 
 
@@ -670,7 +839,7 @@ Conclusion: MMEJ z-scores correlate well.
 
 ## S1I: Correlation in cutting efficiencies between biological replicates
 How well does the cutting efficiency correlate between the biologcial replicates?
-```{r S1I TIF z-score correlation, warning = FALSE}
+```{r S1I TIF z-score correlation, warning = FALSE, fig.height=5, fig.width=5}
 # E: Correlation between biological replicates efficiency
 biol_repl <- indel.data %>%
   filter(sample == "Epigenetic Compound") %>%
@@ -683,64 +852,14 @@ ggplot(biol_repl,
   geom_point() +
   geom_abline(lty = "twodash") +
   geom_smooth(method = "lm", color = "red", lty = "dashed") +
-  stat_cor(method = "pearson")
+  stat_cor(method = "pearson") +
+  xlab("Screen 2 TIF z-score") +
+  ylab("Screen 1 TIF z-score")
 ```
 
 *Figure S1E: Correlation of the cutting efficiencies between the two biological replicates.*
 
 **Conclusion: Cutting efficiencies do not correlate well.**
-
-
-## S1J: Correlation between viability and TIF
-Is lower viability causing a decrease in TIF? Can we justify our 0.50 viability cutoff based on the correlation between viability and TIF?
-
-```{r S1J TIF correlation with viability, warning=F}
-# F: Correlation between viability and MMEJ ratio
-# load indel data that has no filter on it.
-indel.data.nofilter <- readRDS("/DATA/usr/m.trauernicht/projects/EpiScreen/files_scripts/mt20220126_episcreen.RDS")
-
-viab_eff_cor <- indel.data.nofilter %>%
-  # filter(sample == "Epigenetic Compound") %>%
-  dplyr::distinct(viab_norm_split, freqCut, drug, replicate, conc_char, tech, sample) %>%
-  mutate(freqCut = ave(freqCut, drug, replicate, conc_char, tech, FUN = mean)) %>%
-  distinct()
-
-ggplot_custom(viab_eff_cor,
-              aes(x = viab_norm_split, y = freqCut, color = sample)) +
-  geom_point() +
-  geom_vline(xintercept = 0.25, color = "red") +
-  annotate("rect",xmin=0,xmax=0.25,ymin=-Inf,ymax=Inf, alpha=0.1, fill="red") +
-  ylim(0, 1) +
-  xlim(0, 1.5)
-
-indel.data  %>% 
-  filter(is.na(freqCut)) %>% # freqCut is NA if sample didn't pass filter for viability.
-  distinct(drug, conc_char) %>% # unique compound and concentration combination
-  pull(conc_char) %>% 
-  table() # count compounds per concentration that are removed
-```
-
-## S1K: Correlation between viability and MMEJ ratio
-Is lower viability causing a decrease in MMEJ? Can we justify our 0.50 viability cutoff based on the correlation between viability and MMEJ ratio?
-
-```{r S1K MMEJ ratio correlation with viability, warning=F}
-viab_mmej_cor <- indel.data.nofilter %>%
-  # filter(sample == "Epigenetic Compound") %>%
-  dplyr::distinct(viab_norm_split, MMEJratio, drug, replicate, conc_char, tech, sample) %>%
-  mutate(MMEJratio = ave(MMEJratio, drug, replicate, conc_char, tech, FUN = mean)) %>%
-  distinct()
-
-ggplot_custom(viab_mmej_cor,
-              aes(x = viab_norm_split, y = log2(MMEJratio), color = sample)) +
-  geom_point() +
-  geom_vline(xintercept = 0.50, color = "red") +
-  annotate("rect",xmin=0,xmax=0.50,ymin=-Inf,ymax=Inf, alpha=0.1, fill="red") +
-  scale_x_continuous(breaks = seq(0, 1, by = 0.25), limits = c(0.1, 1.2)) +
-  xlab("Normalised viability") +
-  ylab("MMEJ ratio (Log2)")
-```
-
-
 
 ```{r export}
 # setwd("/DATA/usr/m.trauernicht/projects/EpiScreen/files_scripts/")
