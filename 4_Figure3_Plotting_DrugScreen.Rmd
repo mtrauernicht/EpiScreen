@@ -56,26 +56,24 @@ StartTime <-Sys.time()
 # 8-digit Date tag:
 Date <- substr(gsub("-","",Sys.time()),1,8) 
 # libraries:
-library(dplyr)
+library(tidyverse)
 library(outliers)
 library(ggplot2)
 library(ggbeeswarm)
 library(data.table)
-library(ggrepel)
+# library(ggrepel)
 library(GGally)
-library(DESeq2)
-library(gghighlight)
-library(platetools)
+# library(DESeq2)
+# library(gghighlight)
+# library(platetools)
 library(ggpubr)
-library(tidyr)
-library(Laurae)
-library(tibble)
+# library(Laurae)
 library(pheatmap)
 library(RColorBrewer)
-library(ggrastr)
-library(broom)
-library(ggsignif)
-library(rstatix)
+# # library(ggrastr)
+# library(broom)
+# library(ggsignif)
+# library(rstatix)
 ```
 
 ### Functions
@@ -335,11 +333,23 @@ theme_classic_lines_90 <- function() {
             )
 }
 
+theme_classic_lines_90_noborder <- function() {
+  theme_pubr(border = F, legend = "top", x.text.angle = 90) +
+            theme(strip.background = element_rect(fill = "white", color = "white")
+            )
+}
+
 theme_set(theme_classic_lines())
 
 colors_diverse <- c("#264653", "#9AC1AE", "#5D987B", "#f2cc8f", "#e76f51")
+# colors_drugs <- c("DMSO (neg control)" = "#65BFA4", "DNA-PKi (NHEJ control)" = "#8CA0C4", "drugs" = "#808184", "Mirin (MMEJ control)" = "#5D79AC")
 colors_drugs <- c("#FA8D62", "#65BFA4", "#8CA0C4", "#808184", "#F6D289", "#E5E5E5", "#ACACAC", "#737373")
 #colors_diverse <- c("#264653", "#2a9d8f", "#e9c46a", "#f4a261", "#e76f51") 
+## Chromatin groups
+group_colors = c("Euchromatin" = "#f7941d",
+                 "other-heterochromatin" = "#838687",
+                 "Triple Heterochromatin" = "#662d91",
+                 "H3K27me3" = "#d21f8a")
 
 ggplot_custom <- function(...) ggplot2::ggplot(...) + 
   scale_color_manual(values = colors_diverse) + 
@@ -352,7 +362,9 @@ ggplot_custom <- function(...) ggplot2::ggplot(...) +
 
 ```{r data import, echo = FALSE, warning = FALSE}
 # Import data from preprocessing script
-indel.data <- readRDS("/DATA/projects/DSBrepair/data/R/rs20220216_episcreen/rs20220216_episcreen_ratios.3.RDS")
+in.dir = list.dirs(path = "/DATA/projects/DSBrepair/data/R") %>% .[grepl("episcreen", .)] %>% tail(n = 1)
+file = list.files(in.dir, pattern = "ratios", full.names = T) %>% tail(n = 1)
+indel.data <- readRDS(file) %>% filter(pathway_bal_filter == TRUE & viab_reproducibility == TRUE)
 ```
 
 
@@ -363,7 +375,7 @@ Are the compounds (per concentration) that significantly alter the MMEJ score?
 ```{r warning = FALSE}
 # A: MMEJ-z-score per drug
 ggplot(indel.data %>%
-                filter(sample == "drug") %>%
+                filter(sample == "Epigenetic Compound") %>%
                 distinct(MMEJ_ratio_norm, drug, conc_char, MMEJ_zscore_global_comb) %>%
                 mutate(MMEJ_ratio_norm = ave(MMEJ_ratio_norm, drug, conc_char, FUN = mean)) %>%
                 distinct() %>%
@@ -377,7 +389,7 @@ ggplot(indel.data %>%
   geom_vline(linetype = "dashed", xintercept = log2(1.05)) +
   geom_vline(linetype = "dashed", xintercept = log2(0.95)) +
   scale_color_manual(values = c("#C2C2C2", "#3d405b", "#e07a5f")) +
-  facet_wrap(~conc_char, scales = "free") +
+  facet_wrap(~conc_char) +
   annotate("rect",xmin=log2(1.05),xmax=log2(0.95),ymin=-Inf,ymax=Inf, alpha=0.1, fill="black") +
   annotate("rect",xmin=-Inf,xmax=Inf,ymin=-Inf,ymax=-log10(0.05), alpha=0.1, fill="black")
 
@@ -393,7 +405,7 @@ dmso_freq <- indel.data %>%
 
 
 ggplot(indel.data %>%
-                filter(sample == "drug") %>%
+                filter(sample == "Epigenetic Compound") %>%
                 distinct(MMEJratio, drug, conc_char, MMEJ_zscore_global_comb) %>%
                 mutate(MMEJratio = ave(MMEJratio, drug, conc_char, FUN = mean)) %>%
                 distinct() %>%
@@ -419,7 +431,7 @@ aurora_targets <- data.frame("drug" = c("Alisertib","Aurora A Inhibitor I", "Bar
                              "A" = c("Yes", "Yes", "No", "Yes", "Yes", "Yes", "Yes", "No", "Yes", "Yes", "Yes", "Yes", "Yes", "Yes", "Yes"))
 
 ggplot(indel.data %>%
-                filter(sample == "drug") %>%
+                filter(sample == "Epigenetic Compound") %>%
                 filter(target == "Aurora Kinase") %>%
                 distinct(MMEJratio, drug, conc_char, MMEJ_zscore_global_comb) %>%
                 mutate(MMEJratio = ave(MMEJratio, drug, conc_char, FUN = mean)) %>%
@@ -456,7 +468,7 @@ Are there any target groups that are prone to changes in MMEJ ratio?
 ```{r warning = FALSE}
 # C: Bar plot
 eff.data <- indel.data %>%
-  filter(sample == "drug") %>%
+  filter(sample == "Epigenetic Compound") %>%
   distinct(MMEJ_zscore_global_comb, drug, target, conc_char, MMEJratio) %>%
   mutate(MMEJratio = ave(MMEJratio, drug, conc_char, FUN = mean)) %>%
   distinct() %>%
@@ -542,7 +554,7 @@ annotation_colors_scr$chromatin <- annotation_colors_scr$chromatin[ordered_marks
 # Generate heatmap: select top 15 drugs (highest change at any IPR) per concentration
 eff.data.heatmap <- indel.data %>%
   #filter(target != "Aurora Kinase") %>%
-  filter(sample == "drug") %>%
+  filter(sample == "Epigenetic Compound") %>%
   #filter(Mod(eff_zscore_pooled_global_comb) >= 1.645) %>%  # we could also choose to display all drugs that have significant global hits
   distinct(conc_char, drug, target, IPR, MMEJ_zscore_comb, MMEJ_ratio_norm) %>%
   mutate(MMEJ_ratio_norm = log2(ave(MMEJ_ratio_norm, drug, conc_char, IPR, FUN = mean))) %>%
@@ -702,7 +714,7 @@ pc1 <- corr_heatmap %>%
   distinct(drug, cor_h3k27me3, cor_dmso) %>%
   mutate(drug = gsub(" [(].*[)]", "", drug))
 
-col_order <- data.frame("drug" = p1$tree_col[["labels"]],
+col_order <- data.frame("Epigenetic Compound" = p1$tree_col[["labels"]],
                         "order" = p1$tree_col[["order"]])
 
 col_order2 <- col_order %>%
@@ -715,7 +727,7 @@ pc1 <- left_join(col_order2, pc1)
 breaks <- seq(-1,1,0.02)
 
 pheatmap(pc1%>%
-           column_to_rownames("drug") %>%
+           column_to_rownames("Epigenetic Compound") %>%
            t(),
          border_color = F,
          cellwidth = 8,
@@ -730,7 +742,7 @@ pc2 <- corr_heatmap %>%
   distinct(drug, cor_h3k27me3) %>%
   mutate(drug = gsub(" [(].*[)]", "", drug))
 
-col_order <- data.frame("drug" = p2$tree_col[["labels"]],
+col_order <- data.frame("Epigenetic Compound" = p2$tree_col[["labels"]],
                         "order" = p2$tree_col[["order"]])
 
 col_order2 <- col_order %>%
@@ -741,7 +753,7 @@ col_order2 <- col_order %>%
 pc2 <- left_join(col_order2, pc2)
 
 pheatmap(pc2 %>%
-           column_to_rownames("drug") %>%
+           column_to_rownames("Epigenetic Compound") %>%
            t(),
          border_color = F,
          cellwidth = 8,
@@ -757,7 +769,7 @@ pc3 <- corr_heatmap %>%
   mutate(drug = gsub(" [(].*[)]", "", drug))
 
 
-col_order <- data.frame("drug" = p3$tree_col[["labels"]],
+col_order <- data.frame("Epigenetic Compound" = p3$tree_col[["labels"]],
                         "order" = p3$tree_col[["order"]])
 
 col_order2 <- col_order %>%
@@ -769,7 +781,7 @@ pc3 <- left_join(col_order2, pc3)
 
 
 pheatmap(pc3 %>%
-           column_to_rownames("drug") %>%
+           column_to_rownames("Epigenetic Compound") %>%
            t(),
          border_color = F,
          cellwidth = 8,
@@ -828,7 +840,7 @@ Do the changes in MMEJ-ratio change correlate with changes in efficiency? Can MM
 for (i in unique(indel.data$target)) {
   
   x <- indel.data %>%
-    filter(sample == "drug") %>%
+    filter(sample == "Epigenetic Compound") %>%
     filter(target == i) %>%
     mutate(mean_eff_pval_global_comb = 2*pnorm(q = abs(mean_eff_zscore_global_comb), lower.tail = F)) %>%
     mutate(mean_eff_pval_adj_global_comb = p.adjust(mean_eff_pval_global_comb, method = 'fdr')) %>%
@@ -853,7 +865,7 @@ for (i in unique(indel.data$target)) {
 }
 
 ggplot_custom(indel.data %>%
-    filter(sample == "drug") %>%
+    filter(sample == "Epigenetic Compound") %>%
     filter(drug == "PCI-24781 (Abexinostat)", conc_char == "100 nM") %>%
     mutate(mean_eff_pval_global_comb = 2*pnorm(q = abs(mean_eff_zscore_global_comb), lower.tail = F)) %>%
     mutate(mean_eff_pval_adj_global_comb = p.adjust(mean_eff_pval_global_comb, method = 'fdr')) %>%
@@ -870,7 +882,7 @@ ggplot_custom(indel.data %>%
 
 
 eff_mmej_corr <- indel.data %>%
-  filter(sample == "drug") %>%
+  filter(sample == "Epigenetic Compound") %>%
   filter(abs(mean_eff_zscore_global_comb) > 4) %>%
   filter(abs(MMEJ_zscore_global_comb) > 4) %>%
   distinct(MMEJ_ratio_norm, freqCut_norm_mean, drug, conc_char, target, IPR) %>%

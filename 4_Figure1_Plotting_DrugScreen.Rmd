@@ -68,6 +68,7 @@ library(RColorBrewer)
 library(ggrastr)
 library(cowplot)
 library(ggpubr)
+library(scales)
 
 ## Select outdir
 out.dir = paste0("./figures/", Date, "/")
@@ -224,6 +225,12 @@ theme_classic_lines_90 <- function() {
             )
 }
 
+theme_classic_lines_90_noborder <- function() {
+  theme_pubr(border = F, legend = "top", x.text.angle = 90) +
+            theme(strip.background = element_rect(fill = "white", color = "white")
+            )
+}
+
 theme_set(theme_classic_lines())
 
 colors_diverse <- c("#264653", "#9AC1AE", "#5D987B", "#f2cc8f", "#e76f51")
@@ -235,6 +242,7 @@ group_colors = c("Euchromatin" = "#f7941d",
                  "other-heterochromatin" = "#838687",
                  "Triple Heterochromatin" = "#662d91",
                  "H3K27me3" = "#d21f8a")
+colors_pathways = c("wt" = "#808184", "other" = "black", "NHEJ" = "#e1251b", "MMEJ" = "#26419a", "SSTR" = "#007A4C")
 
 ggplot_custom <- function(...) ggplot2::ggplot(...) + 
   scale_color_manual(values = colors_diverse) + 
@@ -279,7 +287,8 @@ map_clones = read_table("/DATA/projects/DSBrepair/data/cl20220321_cured_mapping_
                                       "chr6", "chr7", "chr8", "chr9", "chr10", 
                                       "chr11", "chr12", "chr13", "chr14", "chr15", 
                                       "chr16", "chr17", "chr18", "chr19", "chr20", 
-                                      "chr21", "chr22", "chrX"))) %>%
+                                      "chr21", "chr22", "chrX")),
+         start = start / 1e6) %>%
   left_join(chromatin) %>%
   filter(barcode != "ACCCCTAAAGGCGCTG")
 
@@ -289,7 +298,8 @@ chromsizes = read_table("/DATA/projects/DSBrepair/data/rs20220602_chromsizes_hg3
                                       "chr6", "chr7", "chr8", "chr9", "chr10", 
                                       "chr11", "chr12", "chr13", "chr14", "chr15", 
                                       "chr16", "chr17", "chr18", "chr19", "chr20", 
-                                      "chr21", "chr22", "chrX")))
+                                      "chr21", "chr22", "chrX")),
+         start = start / 1e6)
 
 centromeres = read_table("/DATA/projects/DSBrepair/git/EpiScreen/rs20220714_UCSC_centromeres_24501022.txt") %>%
   group_by(chr) %>%
@@ -298,7 +308,9 @@ centromeres = read_table("/DATA/projects/DSBrepair/git/EpiScreen/rs20220714_UCSC
                                       "chr6", "chr7", "chr8", "chr9", "chr10", 
                                       "chr11", "chr12", "chr13", "chr14", "chr15", 
                                       "chr16", "chr17", "chr18", "chr19", "chr20", 
-                                      "chr21", "chr22", "chrX"))) %>%
+                                      "chr21", "chr22", "chrX")),
+         start = start / 1e6,
+         end = end / 1e6) %>%
   summarise(start = min(start), # earliest start of centromere
             end = max(end)) # furthest end of centromere
 ```
@@ -354,9 +366,10 @@ ggplot() +
                aes(x = as.integer(chr) - 0.2, xend = as.integer(chr) + 0.2,
                    y = end, yend = end),
                size = 2) +
-  theme_classic_lines_90() +
+  theme_classic_lines_90_noborder() +
   scale_color_manual(values = group_colors) + 
-  xlab("Chromosome")
+  xlab("Chromosome") + 
+  ylab("Position [Mb]")
 ```
 
 ## C: Viability filtering
@@ -384,42 +397,35 @@ indel.data %>%
 **Conclusion: The higher the concentration, the more toxic the compounds are to the cells.**
 
 ---
-```{r}
+```{r 1D Example BCs indel pattern, warning = FALSE, fig.height=4, fig.width=3}
 label_ratio <- filter(indel.data, IPR %in% c("IPR5", "IPR7"), drug == "DMSO") %>% 
   group_by(IPR) %>%
-  summarise(MMEJratio = mean(MMEJratio),
-            freqCut = mean(freqCut)) %>%
-  mutate(label_efficiency = paste0("Total indel frequency = ", round(freqCut*100, 1),"%"), 
-         label_ratio = paste0("MMEJ ratio = ", round(MMEJratio, 2)),
-         label = IPR)
+  summarise(MMEJratio_mean = mean(MMEJratio),
+            MMEJratio_sd = sd(MMEJratio),
+            freqCut_mean = mean(freqCut),
+            freqCut_sd = sd(freqCut)) %>%
+  mutate(label_efficiency = paste0("Total indel frequency = ", round(freqCut_mean*100, 1),"% ±", round(freqCut_sd*100, 1),"%"), 
+         label_ratio = paste0("MMEJ ratio = ", round(MMEJratio_mean, 2)," ±", round(MMEJratio_sd, 2)))
 
-bc_chrom_loc <- filter(analysis.mapped.integrations.df, barcode %in% barcodeset) %>% 
-  dplyr::select(barcode, seqname, start) %>% mutate(loc = paste0(seqname, ": ", start)) %>% 
-  left_join(NHEJratio, by = "barcode")
+bc_mut_tib_mean <- mutation.data %>% 
+  distinct(IPR, drug, freq_mean,freq_sd, color, mutation, type) %>%
+  filter(IPR %in% c("IPR5", "IPR7"), drug == "DMSO", type %in% c("core", "grouped_indel")) %>% 
+  left_join(label_ratio, by = "IPR")
 
-bc_mut_tib <- trip_tib_mut %>% 
-  filter(barcode %in% barcodeset, 
-         mutation != "ssODN", 
-         drug == "-")  %>%
-  left_join(bc_chrom_loc, by = "barcode")
-
-loc_labels <- c(bc_chrom_loc$loc)
-names(loc_labels) <- c(bc_chrom_loc$label)
-
-bc_mut_tib %>% distinct(barcode, nexp)
-
-p <- ggplot(bc_mut_tib, 
-            aes(mutation, freq)) + 
+ggplot(bc_mut_tib_mean, 
+       aes(mutation, freq_mean)) + 
   geom_bar(stat = "identity", aes(fill = color)) + 
-  scale_fill_manual("legend", values = colores) + 
+  # geom_quasirandom(data = bc_mut_tib, aes(mutation, freq_split, fill = color),  color = "black", shape = 21, ) + 
+  scale_fill_manual("legend", values = colors_pathways) + 
+  scale_color_manual("legend", values = colors_pathways) + 
   theme_bw() +
-  scale_y_continuous(name="frequency") +
-  scale_x_discrete(name="indel size", breaks = c("<-14", -7, 0, 1, ">2")) +
-  geom_errorbar(aes(ymin=freq-sd_freq, ymax=freq+sd_freq), width=.2,
-                position=position_dodge(.9)) 
-p + facet_wrap( ~ label, ncol = 3, labeller = labeller(label = loc_labels)) +
+  scale_y_continuous(name="frequency", labels = percent) +
+  scale_x_discrete(name="indel size", breaks = c("<-14", -7, 0, 1, ">2")) + 
+  facet_wrap( ~ IPR, ncol = 1) +
   geom_text(aes(x = 7, y = .7, label = label_efficiency)) +
-  geom_text(aes(x = 7, y = .6, label = label_ratio))
+  geom_text(aes(x = 7, y = .6, label = label_ratio)) + 
+  geom_errorbar(aes(ymin=freq_mean-freq_sd, ymax=freq_mean+freq_sd), width=.2,
+                position=position_dodge(.9)) 
 ```
 
 ## D: Cutting efficiency per IPR
@@ -486,7 +492,7 @@ plt2 =  indel.data2 %>%
   ggplot(.,
          aes(x = IPR, y = mean_eff_zscore_comb)) +
   geom_quasirandom_rast(aes(color = sample_conc), dodge.width = 0.75, raster.dpi = 300, size = 1) +
-  scale_color_manual(values = conc_colors, guide=FALSE) +
+  scale_color_manual(values = conc_colors, guide= "none") +
   facet_wrap(~chromatin, scales = "free_x", nrow = 1) +
   geom_hline(linetype = "dashed", yintercept = 1.96) +
   geom_hline(linetype = "dashed", yintercept = -1.96) +
