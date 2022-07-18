@@ -208,29 +208,63 @@ corColor <- function(data, mapping, color = I("black"), sizeRange = c(1, 3), ...
 
 theme_classic_lines <- function() {
   theme_pubr(border = T, legend = "top") +
-            theme(panel.grid.major = element_line(colour = "#adb5bd", size = 0.25),
-                  strip.background = element_rect(fill = "white", color = "white")
+            theme(panel.grid.major = element_line(colour = "#adb5bd", 
+                                                  size = 0.25),
+                  strip.background = element_rect(fill = "white", 
+                                                  color = "white")
             )
 }
 theme_classic_lines_45 <- function() {
-  theme_pubr(border = T, legend = "top", x.text.angle = 45) +
-            theme(panel.grid.major = element_line(colour = "#adb5bd", size = 0.25),
-                  strip.background = element_rect(fill = "white", color = "white")
+  theme_pubr(border = T, 
+             legend = "top", 
+             x.text.angle = 45) +
+            theme(panel.grid.major = element_line(colour = "#adb5bd", 
+                                                  size = 0.25),
+                  strip.background = element_rect(fill = "white", 
+                                                  color = "white")
             )
 }
 
 theme_classic_lines_90 <- function() {
-  theme_pubr(border = T, legend = "top", x.text.angle = 90) +
-            theme(strip.background = element_rect(fill = "white", color = "white")
-            )
+  theme_pubr(border = T, 
+             legend = "top", 
+             x.text.angle = 90) +
+    theme(strip.background = element_rect(fill = "white", 
+                                          color = "white")
+    )
 }
 
+theme_classic_lines_90_noborder <- function() {
+  theme_pubr(border = F, 
+             legend = "top", 
+             x.text.angle = 90) +
+    theme(strip.background = element_rect(fill = "white", 
+                                          color = "white")
+    )
+}
+
+<<<<<<< HEAD
 theme_classic_lines_90_noborder <- function() {
   theme_pubr(border = F, legend = "top", x.text.angle = 90) +
             theme(strip.background = element_rect(fill = "white", color = "white")
             )
 }
 
+=======
+
+theme_classic_nolines_90 <- function() {
+  theme_pubr(border = T, 
+             legend = "top", 
+             x.text.angle = 90,) +
+    theme(panel.grid.minor=element_blank(),
+          panel.grid.major=element_blank(),
+          strip.background = element_rect(fill = "white", 
+                                          color = "white")
+    )
+}
+
+
+>>>>>>> b55fd7ec8e6377114d8f6ec3b0b181ca26dec7ea
 theme_set(theme_classic_lines())
 
 colors_diverse <- c("#264653", "#9AC1AE", "#5D987B", "#f2cc8f", "#e76f51")
@@ -267,14 +301,15 @@ indel.data <- readRDS(file)
 # Import data from preprocessing script
 in.dir = list.dirs(path = "/DATA/projects/DSBrepair/data/R") %>% .[grepl("episcreen", .)] %>% tail(n = 1)
 file.muts = list.files(in.dir, pattern = "mutations", full.names = T) %>% tail(n = 1)
-mutation.data <- readRDS(file.muts) %>% filter(IPR %in% c("IPR7", "IPR5"))
+
+IPR_set = c("IPR5", "IPR7")
+
+mutation.data <- readRDS(file.muts) %>% filter(IPR %in% IPR_set)
 
 # Complete data without exlcluding wells <0.5 viability (I need this for plotting)
 meta.viab.file = list.files(in.dir, full.names = T)  %>% .[grepl("Viab_Meta", .)] %>% tail(n = 1)
 indel.statistics.dt = readRDS(meta.viab.file) %>%
   dplyr::select(ID, drug, target, replicate, viability, conc_char, tech)
-
-
 
 chromatin <- readRDS(
   "/DATA/usr/x.vergara/XV_ChIPIndels/XV20200902_DDR_RS_revision/XV20200902_DDR_RS_revision/data/xv20200915_DDR_data_CHIP.rds") %>% 
@@ -313,6 +348,7 @@ centromeres = read_table("/DATA/projects/DSBrepair/git/EpiScreen/rs20220714_UCSC
          end = end / 1e6) %>%
   summarise(start = min(start), # earliest start of centromere
             end = max(end)) # furthest end of centromere
+
 ```
 
 ---
@@ -350,7 +386,7 @@ ggplot(targets,
 
 ---
 ```{r FigS1A chromideograms, fig.height=5, fig.width=6}
-ggplot() +
+p1 = ggplot() +
   geom_segment(data = chromsizes,
                aes(x = chr, xend = chr, y = 0, yend = start),
                lineend = "round", color = "lightgrey", size = 7) +
@@ -369,7 +405,43 @@ ggplot() +
   theme_classic_lines_90_noborder() +
   scale_color_manual(values = group_colors) + 
   xlab("Chromosome") + 
+<<<<<<< HEAD
   ylab("Position [Mb]")
+=======
+  ylab("Position [Mb]") +
+  coord_flip()
+
+label_ratio <- filter(indel.data, IPR %in% IPR_set , drug == "DMSO") %>% 
+  group_by(IPR) %>%
+  summarise(MMEJratio_mean = mean(MMEJratio),
+            MMEJratio_sd = sd(MMEJratio),
+            freqCut_mean = mean(freqCut),
+            freqCut_sd = sd(freqCut)) %>%
+  mutate(label_efficiency = paste0("Total indel frequency = ", round(freqCut_mean*100, 1),"% ±", round(freqCut_sd*100, 1),"%"), 
+         label_ratio = paste0("MMEJ ratio = ", round(MMEJratio_mean, 2)," ±", round(MMEJratio_sd, 2)))
+
+bc_mut_tib_mean <- mutation.data %>% 
+  distinct(IPR, drug, freq_mean,freq_sd, color, mutation, type) %>%
+  filter(IPR %in% IPR_set , drug == "DMSO", type %in% c("core", "grouped_indel")) %>% 
+  left_join(label_ratio, by = "IPR")
+
+p2 = ggplot(bc_mut_tib_mean, 
+       aes(mutation, freq_mean)) + 
+  geom_bar(stat = "identity", aes(fill = color)) + 
+  # geom_quasirandom(data = bc_mut_tib, aes(mutation, freq_split, fill = color),  color = "black", shape = 21, ) + 
+  scale_fill_manual("legend", values = colors_pathways) + 
+  scale_color_manual("legend", values = colors_pathways) + 
+  scale_y_continuous(name="frequency", labels = percent) +
+  scale_x_discrete(name="indel size", breaks = c("<-14", -7, 0, 1, ">2")) + 
+  facet_wrap( ~ IPR, ncol = 1) +
+  geom_text(aes(x = 7, y = .7, label = label_efficiency)) +
+  geom_text(aes(x = 7, y = .6, label = label_ratio)) + 
+  geom_errorbar(aes(ymin=freq_mean-freq_sd, ymax=freq_mean+freq_sd), width=.2,
+                position=position_dodge(.9)) +
+  theme_classic_lines()
+
+plot_grid(p1, p2, nrow = 1, rel_widths = c(3, 2))
+>>>>>>> b55fd7ec8e6377114d8f6ec3b0b181ca26dec7ea
 ```
 
 ## C: Viability filtering
@@ -390,6 +462,7 @@ indel.data %>%
   xlab("Concentration") +
   ylab("Relative viability to control (DMSO)")+ 
   scale_fill_manual(values = hcl.colors(4, palette = "Lajolla", rev = F)[2:4])
+  
 ```
 
 ***Figure 1C:*** *Mean viability for each compound at the three concentrations.Compounds that decreased viability by >50% in more than one technical replicate in one or both biological replicate were removed (marked in yellow).*
@@ -397,6 +470,7 @@ indel.data %>%
 **Conclusion: The higher the concentration, the more toxic the compounds are to the cells.**
 
 ---
+<<<<<<< HEAD
 ```{r 1D Example BCs indel pattern, warning = FALSE, fig.height=4, fig.width=3}
 label_ratio <- filter(indel.data, IPR %in% c("IPR5", "IPR7"), drug == "DMSO") %>% 
   group_by(IPR) %>%
@@ -427,10 +501,12 @@ ggplot(bc_mut_tib_mean,
   geom_errorbar(aes(ymin=freq_mean-freq_sd, ymax=freq_mean+freq_sd), width=.2,
                 position=position_dodge(.9)) 
 ```
+=======
+>>>>>>> b55fd7ec8e6377114d8f6ec3b0b181ca26dec7ea
 
 ## D: Cutting efficiency per IPR
 How do the drugs impact cutting efficiency in general? Does the genomic location & concentration of the drugs matter?
-```{r 1DE TIF, warning = FALSE, fig.height=6, fig.width=3} 
+```{r 1DE TIF, warning = FALSE, fig.height=5, fig.width=3} 
 chromatin_tib <- readRDS(
   "/DATA/usr/x.vergara/XV_ChIPIndels/XV20200902_DDR_RS_revision/XV20200902_DDR_RS_revision/data/xv20200915_DDR_data_CHIP.rds") %>% 
   distinct(barcode, chromatin)
@@ -442,32 +518,32 @@ ordered_marks <- c("Euchromatin",
 
 chromatin_tib  = chromatin_tib %>% mutate(chromatin = factor(chromatin, levels = ordered_marks))
 
-conc_control_colors = c("DMSO (neg control)" = colors_drugs[2], "100 nM" = colors_drugs[7], "1 µM" = colors_drugs[4], "10 µM" = "#000000")
+conc_control_colors = c("CTRL" = colors_drugs[2], "100 nM" = colors_drugs[7], "1 µM" = colors_drugs[4], "10 µM" = "#000000")
 conc_colors = c("100 nM" = colors_drugs[7], "1 µM" = colors_drugs[4], "10 µM" = "#000000")
-
 
 # D: Cutting efficiency per IPR
 CTRL.data = indel.data %>%
- filter(sample == "DMSO (neg control)" & indel_freq_filter == T & IPR %in% c("IPR7", "IPR5")) %>% 
+ filter(sample == "DMSO (neg control)" & indel_freq_filter == T & IPR %in% IPR_set ) %>% 
   distinct(freqCut, IPR, drug, conc_char, tech, sample, replicate, 
            barcode, MMEJratio, MMEJ_zscore_comb, MMEJ_zscore_mean, mean_eff_zscore_comb,  plate, well) %>%
-  mutate(sample_conc = sample,
+  mutate(sample_conc = "CTRL",
          freqCut = ave(freqCut, well, plate, conc_char, IPR, FUN = function(x) mean(x, na.rm = TRUE)),
          MMEJratio = ave(MMEJratio, well, plate, conc_char, IPR, FUN = function(x) mean(x, na.rm = TRUE))) %>% 
   left_join(chromatin_tib) %>% 
   select(-well, -tech)
 
 indel.data2 <- indel.data %>%
- filter(sample %in% c("Epigenetic Compound") & indel_freq_filter == T & IPR %in% c("IPR7", "IPR5")) %>%
+ filter(sample %in% c("Epigenetic Compound") & indel_freq_filter == T & IPR %in% IPR_set ) %>%
   distinct(freqCut, IPR, drug, conc_char, tech, sample, replicate, 
            barcode, MMEJratio, MMEJ_zscore_comb, mean_eff_zscore_comb) %>%
   left_join(chromatin_tib) %>%
   mutate(freqCut = ave(freqCut, IPR, drug, conc_char, tech, replicate), 
          MMEJratio = ave(MMEJratio, IPR, drug, conc_char, tech, replicate),
-         sample_conc = as.character(conc_char))  %>%
+         sample_conc = as.character(conc_char),
+         IPR = factor(IPR, levels = IPR_set))  %>%
   distinct()
          
-sample_order <- c("DMSO (neg control)", "100 nM", "1 µM", "10 µM")
+sample_order <- c("CTRL", "100 nM", "1 µM", "10 µM")
 # indel.data2 <- indel.data2 %>%
 #   mutate(IPR = gsub("IPR", "", IPR))
 #ipr_order <- c("1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19")
@@ -479,27 +555,34 @@ plt1 = indel.data2 %>%
   mutate(sample_conc = factor(sample_conc, levels = sample_order)) %>%
   distinct(freqCut, drug, conc_char, IPR, chromatin, sample_conc) %>% 
   ggplot(.,
-         aes(x = IPR, y = freqCut*100)) +
+         aes(x = sample_conc, y = freqCut*100)) +
   geom_quasirandom_rast(aes(color = sample_conc), dodge.width = 0.75, raster.dpi = 300, size = 1) +
-  scale_color_manual(values = conc_control_colors) +
-  facet_wrap(~chromatin, scales = "free_x", nrow = 1) +
-  theme_classic_lines_90() +
+  scale_color_manual(values = conc_control_colors, guide = "none") +
+  facet_wrap(~ IPR, nrow = 2) +
+  ylim(0,100)  +
+  theme_classic_nolines_90() + 
   ylab("Total indel frequency [TIF]")
 
 plt2 =  indel.data2 %>%
   distinct(mean_eff_zscore_comb, drug, conc_char, IPR, chromatin, sample_conc) %>%
-  mutate(sample_conc = factor(sample_conc, levels = sample_order)) %>%
+  mutate(sample_conc = factor(sample_conc, levels = sample_order),
+         IPR = factor(IPR, levels = )) %>%
   ggplot(.,
-         aes(x = IPR, y = mean_eff_zscore_comb)) +
+         aes(x = sample_conc, y = mean_eff_zscore_comb)) +
   geom_quasirandom_rast(aes(color = sample_conc), dodge.width = 0.75, raster.dpi = 300, size = 1) +
+<<<<<<< HEAD
   scale_color_manual(values = conc_colors, guide= "none") +
   facet_wrap(~chromatin, scales = "free_x", nrow = 1) +
+=======
+  scale_color_manual(values = conc_colors, guide = "none") +
+  facet_wrap(~ IPR, nrow = 2) +
+>>>>>>> b55fd7ec8e6377114d8f6ec3b0b181ca26dec7ea
   geom_hline(linetype = "dashed", yintercept = 1.96) +
   geom_hline(linetype = "dashed", yintercept = -1.96) +
-  theme_classic_lines_90() +
+  theme_classic_nolines_90() + 
   ylab("TIF z-score")
 
-plot_grid(plt1, plt2, labels = c("D", "E"), nrow = 2)
+plot_grid(plt1, plt2, labels = c("D", "E"), ncol = 2)
 ```
 
 *Figure 1D: Compound-induced changes in cutting efficiency on the 19 genomic locations. The three probed concentrations are plotted next to each other.*
@@ -510,7 +593,7 @@ plot_grid(plt1, plt2, labels = c("D", "E"), nrow = 2)
 
 ## E: MMEJ score per IPR
 How do the drugs impact MMEJ score in general? Does the genomic location & concentration of the drugs matter?
-```{r 1FG MMEJ ratio, warning = FALSE, fig.height=8, fig.width=10}
+```{r 1FG MMEJ ratio, warning = FALSE, fig.height=5, fig.width=3}
 # E: MMEJ score per IPR
 plt1 = 
   indel.data2 %>%
@@ -518,26 +601,26 @@ plt1 =
   bind_rows(CTRL.data)   %>%
     mutate(sample_conc = factor(sample_conc, levels = sample_order)) %>%
   distinct(MMEJratio , drug, conc_char, IPR, chromatin, sample_conc) %>%
-  ggplot(., aes(x = IPR, y = MMEJratio)) +
+  ggplot(., aes(x = sample_conc, y = MMEJratio)) +
   geom_quasirandom_rast(aes(color = sample_conc), dodge.width = 0.75, raster.dpi = 600, size = 0.5) +
-  scale_color_manual(values = conc_control_colors) +
-  facet_wrap(~chromatin, scales = "free_x", nrow = 1) +
+  scale_color_manual(values = conc_control_colors, guide= "none") +
+  facet_wrap(~ IPR, nrow = 2) +
   #geom_hline(linetype = "dashed", yintercept = 1.96) +
-  #geom_hline(linetype = "dashed", yintercept = -1.96) +
-  theme_classic_lines_90()
+  #geom_hline(linetype = "dashed", yintercept = -1.96)   +
+  theme_classic_nolines_90()
 
 plt2 = indel.data2 %>%
         distinct(MMEJ_zscore_comb, drug, conc_char, IPR, chromatin, sample_conc) %>%
   ggplot(.,
-       aes(x = IPR, y = MMEJ_zscore_comb)) +
+       aes(x = sample_conc, y = MMEJ_zscore_comb)) +
   geom_quasirandom_rast(aes(color = sample_conc), dodge.width = 0.75, raster.dpi = 600, size = 0.5) +
-  scale_color_manual(values = conc_colors, guide=FALSE) +
-  facet_wrap(~chromatin, scales = "free_x", nrow = 1) +
+  scale_color_manual(values = conc_colors, guide= "none") +
+  facet_wrap(~ IPR, nrow = 2) +
   geom_hline(linetype = "dashed", yintercept = 1.96) +
   geom_hline(linetype = "dashed", yintercept = -1.96) +
-  theme_classic_lines_90()
+  theme_classic_nolines_90()
 
-plot_grid(plt1, plt2, labels = c("F", "G"), nrow = 2)
+plot_grid(plt1, plt2, labels = c("F", "G"), ncol = 2)
 ```
 
 *Figure 1E: Compound-induced changes in MMEJ score on the 19 genomic locations. The three probed concentrations are plotted next to each other.*
