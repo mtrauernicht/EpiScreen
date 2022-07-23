@@ -1,0 +1,188 @@
+---
+title: "FACS analysis"
+author: "Max Trauernicht"
+date: "`r format(Sys.time(), '%Y-%m-%d')`"
+output: 
+  html_document:
+    theme: journal #cerulean
+    highlight: monochrome
+    toc: true
+    toc_float: true
+    code_folding: show
+  editor_options:
+    chunk_output_type: console
+---
+
+# knitr document van Steensel lab
+
+# TRIP Clone identification
+
+# Introduction
+This script generates plots of FACS data. This way the effect of drugs on cell cycle will be visualized.
+In this particular experiment, all effective drugs that did lead to a change of +1/-7 ratio were subjected to FACS. 
+
+
+## Description of Data
+How to make a good rendering table: 
+```{r table1, echo=FALSE, message=FALSE, warnings=FALSE, results='asis'}
+tabl <- "
+| column1	|	column2	|	column3	|	
+|----|----|----|
+|1	|	2	|	3	|	
+|a	|	b	|	c	|	
+"
+cat(tabl) # output the table in a format good for HTML/PDF/docx conversion
+```
+
+# Data processing
+## Path, Libraries, Parameters and Useful Functions
+```{r setup}
+knitr::opts_chunk$set(echo = TRUE)
+StartTime <-Sys.time()
+
+# 8-digit Date tag:
+Date <- substr(gsub("-","",Sys.time()),1,8) 
+# libraries:
+library(tidyverse)
+library(maditr)
+library(ggplot2)
+```
+
+## Data import: data from 2 experiments is sampled in this analysis
+```{r}
+setwd("/DATA/usr/m.trauernicht/projects/EpiScreen/FACS/Data/")
+gfp.samples <- read.csv2("mt20190419_FlowJo_GFP.csv")
+lbr.samples <- read.csv2("mt20190419_LBR_FlowJo.csv")
+
+# Import data from experiment where I investigated cell cycle arrest in 5 candidate drugs
+five.drugs <- get(load("mt20190605_five.drugs"))
+```
+
+# Analysis
+
+## Bring dataframe in right format
+```{r}
+# Remove not needed rows
+gfp.samples <- gfp.samples[gfp.samples$Statistic != "",]
+lbr.samples <- lbr.samples[lbr.samples$Statistic != "",]
+
+# Remove not needed column
+gfp.samples <- gfp.samples[,-1]
+lbr.samples <- lbr.samples[,-1]
+
+# Rename column
+gfp.samples$Name <- gsub("[A-Z][1-9].fcs/Cells(.*?)", "\\1", gfp.samples$Name)
+lbr.samples$Name <- gsub("[A-Z][1-9].fcs/Cells(.*?)", "\\1", lbr.samples$Name)
+gfp.samples$Name <- gsub("[A-Z][1-9][0-9].fcs/Cells(.*?)", "\\1", gfp.samples$Name)
+lbr.samples$Name <- gsub("[A-Z][1-9][0-9].fcs/Cells(.*?)", "\\1", lbr.samples$Name)
+gfp.samples$Name <- gsub("/Single Cells", "\\1", gfp.samples$Name)
+lbr.samples$Name <- gsub("/Single Cells", "\\1", lbr.samples$Name)
+gfp.samples$Name <- gsub("/", "\\1", gfp.samples$Name)
+lbr.samples$Name <- gsub("/", "\\1", lbr.samples$Name)
+
+
+# Remove not needed rows
+gfp.samples <- gfp.samples[gfp.samples$Name != "",]
+lbr.samples <- lbr.samples[lbr.samples$Name != "",]
+
+# Make apopototic cells df
+gfp.samples$Statistic <- as.numeric(as.character(gfp.samples$Statistic))
+apoptotic.samples.gfp <- gfp.samples[gfp.samples$Name == "Apoptotic cells",]
+apoptotic.samples.gfp$drug <- paste0(apoptotic.samples.gfp$drug, "_", apoptotic.samples.gfp$conc)
+lbr.samples$Statistic <- as.numeric(as.character(lbr.samples$Statistic))
+apoptotic.samples.lbr <- lbr.samples[lbr.samples$Name == "Apoptotic cells",]
+apoptotic.samples.lbr$drug <- paste0(apoptotic.samples.lbr$drug, "_", apoptotic.samples.lbr$conc)
+
+# Look at which samples have highest apoptotic cell fractions
+ggplot(data = apoptotic.samples.gfp[apoptotic.samples.gfp$Statistic >= 10,], aes(x = reorder(drug, -Statistic), y = Statistic)) +
+  geom_bar(stat = "identity")+
+   theme(axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1, size = 10))+ 
+  ylab("Apoptotic cell population (%)") + xlab("Drug and concentration")+ labs(title = "Apoptotic cell population after drug treatment - GFP samples")
+
+ggplot(data = apoptotic.samples.lbr[apoptotic.samples.lbr$Statistic >= 10,], aes(x = reorder(drug, -Statistic), y = Statistic)) +
+  geom_bar(stat = "identity")+
+   theme(axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1, size = 10))+ 
+  ylab("Apoptotic cell population (%)") + xlab("Drug and concentration")+ labs(title = "Apoptotic cell population after drug treatment - LBR2 samples")
+
+
+# Remove data with low cell numbers 
+gfp.samples$cell.count <- ave(gfp.samples$X.Cells, gfp.samples$drug, gfp.samples$conc, gfp.samples$rep, FUN = function(x) sum(x))
+gfp.samples <- gfp.samples[gfp.samples$cell.count > 500,]
+gfp.samples <- gfp.samples [,-7]
+
+## Rearrange to wide format
+gfp.samples <- dcast(gfp.samples, drug + conc + rep ~ Name, value.var = "Statistic", fun.aggregate = mean)
+lbr.samples <- dcast(lbr.samples, drug + conc + rep ~ Name, value.var = "Statistic", fun.aggregate = mean)
+
+# Compute relative G2, G1 and S fraction
+for (i in gfp.samples$rep) {
+gfp.samples$sum.apo[gfp.samples$rep == i] <- gfp.samples$G1[gfp.samples$rep == i] + 
+  gfp.samples$S[gfp.samples$rep == i] + gfp.samples$G2[gfp.samples$rep == i] + 
+  gfp.samples$`Apoptotic cells`[gfp.samples$rep == i]
+}
+for (i in gfp.samples$rep) {
+gfp.samples$sum[gfp.samples$rep == i] <- gfp.samples$G1[gfp.samples$rep == i] + 
+  gfp.samples$S[gfp.samples$rep == i] + gfp.samples$G2[gfp.samples$rep == i] 
+}
+
+gfp.samples$G2 <- gfp.samples$G2 / gfp.samples$sum
+gfp.samples$G1 <- gfp.samples$G1 / gfp.samples$sum
+gfp.samples$S <- gfp.samples$S / gfp.samples$sum
+gfp.samples$`Apoptotic cells` <- gfp.samples$`Apoptotic cells` / gfp.samples$sum.apo
+gfp.samples <- gfp.samples[-8]
+gfp.samples$ID <- "GFP"
+
+for (i in lbr.samples$rep) {
+lbr.samples$sum.apo[lbr.samples$rep == i] <- lbr.samples$G1[lbr.samples$rep == i] + 
+  lbr.samples$S[lbr.samples$rep == i] + lbr.samples$G2[lbr.samples$rep == i] + 
+  lbr.samples$`Apoptotic cells`[lbr.samples$rep == i]
+}
+for (i in lbr.samples$rep) {
+lbr.samples$sum[lbr.samples$rep == i] <- lbr.samples$G1[lbr.samples$rep == i] + 
+  lbr.samples$S[lbr.samples$rep == i] + lbr.samples$G2[lbr.samples$rep == i] 
+}
+
+lbr.samples$G2 <- lbr.samples$G2 / lbr.samples$sum
+lbr.samples$G1 <- lbr.samples$G1 / lbr.samples$sum
+lbr.samples$S <- lbr.samples$S / lbr.samples$sum
+lbr.samples$`Apoptotic cells` <- lbr.samples$`Apoptotic cells` / lbr.samples$sum.apo
+lbr.samples <- lbr.samples[-8]
+lbr.samples$ID <- "LBR2"
+
+# Remove conditions with high apoptotic cell counts
+# gfp.samples <- gfp.samples[gfp.samples$`Apoptotic cells` < 0.10,]
+# lbr.samples <- lbr.samples[lbr.samples$`Apoptotic cells` < 0.10,]
+
+
+# Merge the two dfs
+all.samples.unfiltered <- rbind(lbr.samples, gfp.samples)
+all.samples.unfiltered <- melt(all.samples.unfiltered, id.vars = c("drug", "conc", "rep", "ID"))
+
+repl.filter = all.samples.unfiltered %>% group_by(drug, conc) %>% distinct(drug, conc, ID, rep) %>% count() %>% filter(n == 4) %>% distinct(drug, conc)
+all.samples = repl.filter %>% left_join(all.samples.unfiltered) %>% ungroup()  %>% 
+  filter(variable %in% c("G2", "S", "G1", "Apoptotic cells") & !is.na(value & drug != "PAO")) %>%
+  mutate(conc_char = ifelse(conc == "100nm", "100 nM", 
+                            ifelse(conc == "1um", "1 µM", "10 µM")),
+    drug_conc = paste0(drug, " ", conc_char)) %>%
+  group_by(drug_conc, drug, conc_char, variable, ID) %>%
+  summarise(SD = sd(value),
+    mean_value =  mean(value)) %>%
+  ungroup()
+```
+
+
+# Conclusion: Aurora kinases induce G2 arrest
+
+## Exporting potential data. 
+```{r}
+write_rds(all.samples, file = "FACS_set1.RDS")
+```
+
+# Session Info
+```{r}
+paste("Run time: ",format(Sys.time()-StartTime))
+getwd()
+date()
+sessionInfo()
+```
+
