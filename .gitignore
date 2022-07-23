@@ -1,4 +1,4 @@
-<<<<<<< HEAD
+# Folders
 .Rproj.user
 .Rhistory
 .RData
@@ -9,7 +9,7 @@ misc/
 Mapping_Clone5_9
 files_scripts/
 FACS/Data/
-=======
+
 ### Results ###
 *.html
 *.pdf
@@ -31,6 +31,9 @@ FACS/Data/
 # Session Data files
 *.RData
 *.Ruserdata
+
+# R data files
+*.RDS
 
 # Example code in package build process
 *-Ex.R
@@ -70,4 +73,3 @@ rsconnect/
 # R package: bookdown caching files
 /*_files/
 *.Rproj.user
->>>>>>> d33b494fb117bd21726c6f691654de1c86f27642
