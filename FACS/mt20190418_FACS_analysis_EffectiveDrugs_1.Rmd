@@ -145,6 +145,30 @@ ggplot() +
 
 ```
 
+
+# Statistics
+```{r}
+# Perform t-test
+t.test.samples <- t.test(all.samples2$value[all.samples2$variable == "G2" & 
+                                              all.samples2$ID == "LBR2" &
+                                               all.samples2$drug == "DMSO_10um"],
+                      all.samples2$value[all.samples2$variable == "G2" & 
+                                           all.samples2$ID == "LBR2" &
+                                               all.samples2$drug == 
+                                           "Scriptaid_1um"],
+                      alternative = "less")
+
+# Perform t-test from old 5 drugs data
+t.test.samples <- t.test(all.samples2$value[all.samples2$variable == "G2" & 
+                                              all.samples2$ID == "LBR2" &
+                                               all.samples2$drug == "DMSO_10um"],
+                      five.drugs$value[five.drugs$variable == "G2" & 
+                                           five.drugs$conc == "10um" &
+                                               five.drugs$drug == 
+                                           "LBR2_GSK-J4"],
+                      alternative = "less")
+```
+
 # Results
 ```{r}
 ```
