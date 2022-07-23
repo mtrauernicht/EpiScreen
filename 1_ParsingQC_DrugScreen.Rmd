@@ -161,7 +161,7 @@ indel.statistics.tib %<>% left_join(cell.viab.data) %>%
   mutate(viability = viability - min(viability)) %>%
   mutate(ctrl_mean = mean(viability[drug == "DMSO"]),
          viab_norm = viability / ctrl_mean,
-         conc_char = ifelse(drug %in% c("DNA-PK","PAO", "Mirin", "DMSO"), 
+         conc_char = ifelse(drug %in% c("DNA-PKi","PAO", "Mirin", "DMSO"), 
                             "control", 
                             ifelse(
                               concentration == 100, 
@@ -169,7 +169,7 @@ indel.statistics.tib %<>% left_join(cell.viab.data) %>%
                               paste0(concentration, " µM"))),
          conc_char = factor(conc_char, 
                             levels = c("control", "100 nM", "1 µM", "10 µM")),
-         concentration = ifelse(drug %in% c("DNA-PK","PAO", "Mirin", "DMSO"), 
+         concentration = ifelse(drug %in% c("DNA-PKi","PAO", "Mirin", "DMSO"), 
                            0, concentration)) %>%
   select(-ctrl_mean, -bp, -bp_written) # remove this column
 ```
