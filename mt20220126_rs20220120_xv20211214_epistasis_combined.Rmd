@@ -28,7 +28,7 @@ output:
 Clone 5 with ~18 sgRNA target site IPRs was cut and treated with 160 epigenetic drugs. The repair outcomes of that experiment will be visualized here. I previously processed the raw sequencing data, and calculated the repair outcomes. In this script, the main results plots will be generated.
 
 
-## Setup {.tabset}z
+## Setup {.tabset}
 
 <!-- little HTML script to do indentation of the table of contents -->
 <script>
