@@ -62,10 +62,9 @@ Mutations files : *genuine_mapped.table
 # Data importing and processing
 ## Path, Libraries, Parameters and Useful Functions
 
-```{r setup, message=FALSE, warnings=FALSE}
-
+```{r setup validation, message=FALSE, warnings=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
-Starttime <-Sys.time()
+StarttimeValidations <-Sys.time()
 
 # 6-digit Date tag:
 Date <- substr(gsub("-","",Sys.time()),1,8)
@@ -81,12 +80,15 @@ library(gtools)
 ## Select outdir
 out.dir = paste0("/DATA/projects/DSBrepair/data/R/rs", Date, "_episcreen/")
 dir.create(out.dir)
+
+# initials (for file export)
+initials = "rs"
 ``` 
 
 ## Custom functions
 Functions used
 
-```{r functions}
+```{r functions validations}
 MeanExperiments <- function(mutdt) {
   
   means = mutdt[, list(norm = mean(norm), # The mean of the normalized counts for all sequences.
@@ -117,19 +119,33 @@ MeanExperiments <- function(mutdt) {
   dt
 }
 
-SetFileName <- function(filename, initials) {
-  # Set filename with extension and initials to make filename with date integrated.
-  filename <- substitute(filename)
-  initials <- substitute(initials)
-  filename <- paste0(out.dir, initials, substr(gsub("-","",Sys.time()),1,8), filename)
-  filename
-}
+# serialNext = function(prefix, extension){
+#     i=0
+#     repeat {
+#        f = paste0(prefix, "_", i , ".", extension)
+#        if(!file.exists(f)){return(f)}
+#        i=i+1
+#      }
+#   }
+# 
+# SetFileName <- function(filename, initials, extension) {
+#   # Set filename with extension and initials to make filename with date integrated.
+#   filename <- substitute(filename)
+#   filename <- paste0(out.dir, "/", initials, substr(gsub("-","",Sys.time()),1,8), "_", filename)
+#   filename <- serialNext(filename, extension)
+#   filename
+# }
+# 
+# CallTrueBarcodes <- function(df) {
+#   df %<>% filter(barcode %in% barcodes.clone5)
+#   df
+# }
 ```
 
 ## Data import
 Data import from mapping. These files were generated on 30.09.2018, with a minimum of 500 reads per barcode in the mutation calling.
 
-```{r import}
+```{r import validation}
 # Import files in list and make individual tables
 # I use this if all the samples are good. Here however I do not use all the samples.
 file.list <- list.files("/DATA/projects/DSBrepair/data/rs20210628_EpiScreen/indelPCR_counts/",
@@ -181,7 +197,7 @@ clone5barcodes <- paste0(barcodes.list, ".clone5")
 # Data processing into large data table
 Set everything in a datafram that contains the barcodes, indel ratios, and efficiencies.
 ## extract data to list of data tables
-```{r indel data table list}
+```{r indel data table list validation}
 # To be able to setup the functions in a general way. This means in cases where we have A
 # and B samples.
 mut.list = mclapply(names(df.list), function(exp){
@@ -200,13 +216,13 @@ mut.list = mclapply(names(df.list), function(exp){
 
 
 ## list of mapped barcodes
-```{r generating mapped barcode list}
+```{r generating mapped barcode list validation}
 mapped_barcodes <- c(analysis.mapped.integrations.df$barcode, barcodes.list, clone5barcodes)
 ```
 
 
 ## Combining data tables and adding metadata
-```{r bind data tables}
+```{r bind data tables validation}
 mutations.dt = do.call(rbind, c(mut.list, fill = T))
 mutations.dt = mutations.dt[exp != "clone32_anoek"]
 dim(mutations.dt)
@@ -222,7 +238,7 @@ mutations.dt = mutations.dt[,list(count = sum(count)) , by=c("barcode","exp", "m
 dim(mutations.dt)
 ```
 ## Filtering out the artefacts and failed siRNA experiments
-```{r count the not_clear proportion of indels}
+```{r count the not_clear proportion of indels validation}
 notclear = mutations.dt %>% filter(mutation == "Inf") %>% pull(count) %>% sum()
 all = mutations.dt %>%  pull(count) %>% sum()
 notclear / all * 100
@@ -234,7 +250,7 @@ mutations.dt = mutations.dt[!mutation %in% c("Inf", "ssODN")]
 0.855% of all the reads that did have the constant sequences were more complex mutations and are discarded
 
 ## deciding cut off for with number of cells
-```{r cell count for cutoff determination}
+```{r cell count for cutoff determination validation}
 # bc_count.dt = mutationsmeta.dt[, list(sum_bc_reads = sum(count)), by=c("exp", 'barcode')]
 # # We used approximately 600,000 cells per experiment in the PCRs (by amount of gDNA used)
 # bc_count.dt = bc_count.dt[, cells:=(sum_bc_reads/sum(sum_bc_reads))*600000, by='exp']
@@ -300,7 +316,7 @@ mutations.dt = mutations.dt[!mutation %in% c("Inf", "ssODN")]
 
 ## apply cut off and filter for mapped barcodes
 
-```{r cut off and filter data}
+```{r cut off and filter data validation}
 dim(mutations.dt)
 bc_count.dt = mutations.dt[, list(sum_bc_reads = sum(count)), by=c("exp", 'barcode')]
 
@@ -320,7 +336,7 @@ complete.mutations.dt[, norm:=count/sum(count), by=exp,]
 ```
 
 
-```{r}
+```{r filer and cleanup validation}
 # Filter the barcodes that are mapped, discard the unmapped barcodes
 nonmappedmutations.dt = complete.mutations.dt[!barcode %in% mapped_barcodes]
 dim(mutations.dt)
@@ -357,7 +373,7 @@ I found out that some barcodes overlap in A and B but do not have the same integ
 # Processing
 ## Filtering
 Some low efficient experiments and some issues with clone5 artefacts in pooled experiments. 
-```{r filtering}
+```{r filtering validation}
 # There are some elements that will be filtered out, such as bad efficiency experiemnts, shifted barcodes, and infinite mutation calling.
 filtered.mutations.meta.dt <- complete.mutations.mapped.meta.dt %>%
   filter(!barcode %in% c("CATGAGTATTGGGACG.A", "CCCACCCAGCCCACGT.A", "TGTGTCAGTACTACCC.B", "CTCCAGCAGGACCATG.A")) %>%  # shifted barcode
@@ -370,7 +386,7 @@ dim(filtered.mutations.meta.dt)
 Most of the samples that have a higher average point mutation count are the negative control samples.
 
 
-```{r}
+```{r calculate ratios & freq validation}
 filtered.mutations.meta.dt[,freq := norm/sum(norm, na.rm = TRUE), 
                           by = c("barcode","exp")]
 
@@ -380,7 +396,7 @@ filtered.mutations.meta.dt[!mutation%in%c(0,NA),
 ```
 
 
-```{r}
+```{r, echo=FALSE}
 # filt.mutations.dt %>% group_by(barcode) %>% distinct(barcode, exp) %>%
 #   dplyr::count() %>%
 #   ggplot(aes(reorder(barcode, -n), n)) + geom_bar(stat = "identity") + 
@@ -400,7 +416,7 @@ filtered.mutations.meta.dt[!mutation%in%c(0,NA),
 # Average experiments
 ## Means 
 
-```{r mean replicates}
+```{r mean replicates validation}
 map.meta.mutations.dt = copy(filtered.mutations.meta.dt)
 dim(map.meta.mutations.dt)
 
@@ -459,7 +475,7 @@ setnames(mean.mutations.dt, old = "group", new = "exp")
 
 ## Merge means with singe experiments
 
-```{r merging all data}
+```{r merging all data validation}
 # Merge both single and mean data tables
 all.mutations.dt <- rbind(sep.mutations.dt, mean.mutations.dt)
 ```
@@ -467,13 +483,13 @@ all.mutations.dt <- rbind(sep.mutations.dt, mean.mutations.dt)
 # Calculating frequencies and ratios 
 
 ## Calcuate frequencies
-```{r calculate frequencies}
+```{r calculate frequencies validation}
 all.mutations.dt[,sum_reads:=sum(count, na.rm = TRUE) , by=c("exp")] # Get the sum of all the reads per exp
 ```
 
 
 ## formatting
-```{r conditions}
+```{r conditions validation}
 all.mutations.dt[, PCR_type := NULL] # remove PCR_type 
 setnames(all.mutations.dt, "No", "no") # rename No to no
 
@@ -491,7 +507,7 @@ setcolorder(all.mutations.dt, c("exp", "barcode", "nexp", "no", "exp_ID",
 
 # Combining large indels for plotting
 ## Combining large indels
-```{r large indels}
+```{r large indels validation}
 # Fix large deletions for every deletion above 25
 largedels <- as.character(seq(-130, -15))
 columnstokeep <- names(all.mutations.dt)[!names(all.mutations.dt) %in% c("count", "ratio_indels", "sd_ratio_indels", "freq", "sd_freq", "mutation", "norm", "sd_norm")]
@@ -548,7 +564,7 @@ We now have 3 data files that we can use for subsequent analysis.
 
 # Indel and pathway proportions
 We will not calculate the +1 / -7 ratios, we will count the proportion of "-7" / ("-7"  + "+1"). I want to have the total insertions, total deletions and efficiences.
-```{r calculate_ratios}
+```{r calculate_ratios validation}
 # Make all the sums, pct and ratios :
 tib_ratios = as_tibble(all.mutations.dt)# %>% filter(count != 0)
 
@@ -669,31 +685,31 @@ validation_ratios_tib = validation_indels_tib %>%
 
 ## Processed data export
 The files will be saved in the processed data folder.
-```{r export}
-# The ratios of the validations
-filename <- SetFileName("_episcreen_validation_ratios.RDS", "rs")
-saveRDS(validation_ratios_tib, file = filename)
-
-# The indels of the validations
-filename <- SetFileName("_episcreen_validation_indels.RDS", "rs")
+```{r export validation}
+# The mutations list that can be loaded for the indel spectra plots.
+filename <- SetFileName("validation_mutations", initials = initials, extension = "RDS")
 saveRDS(validation_indels_tib, file = filename)
+
+# The ratios list of the split technical replicates
+filename <- SetFileName("validation_ratios", initials = initials, extension = "RDS")
+saveRDS(validation_ratios_tib, file = filename)
 ```
 # Conclusions
 I"m happy with the output I"ve generated. I should still work on checking what the best amount of reads is that I need for correct correlations etc.
 
 
 # Bibliography
-```{r citations}
+```{r citations validation}
 cite_packages()
 ```
 
 
 # Session Info
-```{r session_info}
+```{r session_info validation}
 sessionInfo()
 getwd()
 date()
-paste("Run time: ",format(Sys.time()-Starttime))
-rm(list = ls(all.names = TRUE)) #will clear all objects includes hidden objects.
-gc() #free up memrory and report the memory usage.
+paste("Run time: ",format(Sys.time()-StarttimeValidations))
+# rm(list = ls(all.names = TRUE)) #will clear all objects includes hidden objects.
+# gc() #free up memrory and report the memory usage.
 ```

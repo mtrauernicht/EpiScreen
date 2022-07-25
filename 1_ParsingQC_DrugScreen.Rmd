@@ -24,19 +24,27 @@ Here we want to do a QC of the parsing of the mapping, the barcodes and mutation
 
 Pasted the result in a text editor and changes all `^ ` and changed the spaces to `\t`, removed the last total row, removed `.table` at the end and saved as text file. 
 I will export a bed file also containing the broad integrations for the generation of mean chip values over the integration sites. 
+```{r render processing pipeline}
+# Render Parsing QC
+render_processing = TRUE
+
+# Render Validation Processing
+render_validations = TRUE
+```
 
 
 # Data loading and processing 
 
 ## Path, Libraries, Parameters and Useful Functions  
 
-```{r message=FALSE}
+```{r libraries validations, message=FALSE}
 StartTime <-Sys.time()
 
 # 6-digit Date tag:
 Date <- substr(gsub("-","",Sys.time()),1,8) 
 
 # libraries:
+library(knitr)
 library(tidyverse)
 library(GenomicRanges)
 library(RColorBrewer)
@@ -66,7 +74,7 @@ initials = "rs"
 
 Functions used in this script:   
 
-```{r}
+```{r functions}
 MakeGranges <- function(x) {
   x$end_pos <- as.numeric(as.character(x$start_pos+3))
   colnames(x) <- c("name",
@@ -107,6 +115,11 @@ SetFileName <- function(filename, initials, extension) {
   filename <- paste0(out.dir, "/", initials, substr(gsub("-","",Sys.time()),1,8), "_", filename)
   filename <- serialNext(filename, extension)
   filename
+}
+
+CallTrueBarcodes <- function(df) {
+  df %<>% filter(barcode %in% barcodes.clone5)
+  df
 }
 ```
 
@@ -336,14 +349,6 @@ for (i in 1:18) {
 }
 ```
 
-## Cell viability checks
-We need to check how well the cell viability worked. If the controls are ok, if it was reproducible between experiments and if the viability can explain some of the missing reads.
-
-```{r}
-
-```
-
-
 ## Checking how many reads are written after the snakemake script per plate.
 ### Combined plates
 
@@ -452,7 +457,7 @@ for (i in seq(1, 18, 2)) {
 I these plots we see that a couple of plates have low percentage reads written generally - average ~ 50% reads written (E1504 plates 11 & 13) and some other plates have some sparse wells with 0 reads written (E1504 plates 1, 3, 7, 12, & 15) and one plates that has many wells that have pat1 missing (E1504 plate 2).
 
 ### Identification of the low reads written
-```{r}
+```{r low reads written}
 low_pct_reads_written = indel.statistics.tib %>%
   filter(r_written_pct < .7) %>% # filter for less than 50% reads written 
   mutate(pat1_missing = pat1 / reads, 
@@ -681,11 +686,25 @@ indel.statistics.tib %>%
 - E1504 plate 12 is missing a complete column. It also has very low reads, it seems that the robot made a mistake for that set and missed a whole column while pipetting PCR1. 
 
 
+```{r render processing scripts}
+# Render screen processing
+if(render_processing) {
+rmarkdown::render("2_Preprocessing_EpiScreen_Screen.Rmd")
+}
+
+# Render validations
+if(render_validations) {
+rmarkdown::render("2_Preprocessing_Validations.Rmd")
+}
+```
+
+
 # Session Info  
-```{r}
+```{r session info QC}
 sessionInfo()
 getwd()
 date()
 paste("Run time: ",format(Sys.time()-StartTime))
-
+rm(list = ls(all.names = TRUE)) #will clear all objects includes hidden objects.
+gc() #free up memrory and report the memory usage.
 ```

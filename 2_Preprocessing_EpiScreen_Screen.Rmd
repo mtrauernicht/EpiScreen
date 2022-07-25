@@ -47,19 +47,16 @@ Mutations files : *genuine_mapped.table
 ## Path, Libraries, Parameters and Useful Functions
 ```{r setup, message=FALSE, warnings=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
-StartTime <-Sys.time()
+StartTimeScreen <-Sys.time()
 
 # 6-digit Date tag:
 Date <- substr(gsub("-","",Sys.time()),1,8)
 ```
 
 ## Parameters
-```{r}
+```{r params screen}
 # initials (for file export)
 initials = "rs"
-
-# Render Parsing QC
-render_QC = TRUE
 
 # Viability (% of DMSO) for efficiency
 viab_limit_eff = 0.25
@@ -71,7 +68,7 @@ read_count_limit = 40
 ```
 
 
-```{r libraries}
+```{r libraries screen processing}
 # libraries:
 library(data.table)
 library(ggplot2)
@@ -88,11 +85,7 @@ library(tidyverse)
 library(ggbeeswarm)
 ```
 
-```{r run QC}
-if(render_QC) {
-rmarkdown::render("1_ParsingQC_DrugScreen.Rmd")
-}
-
+```{r outdir screen}
 ## Select outdir
 out.dir = list.dirs(path = "/DATA/projects/DSBrepair/data/R") %>% .[grepl("episcreen", .)] %>% tail(n = 1)
 in.dir = out.dir
@@ -103,35 +96,35 @@ dir.create(out.dir, showWarnings = FALSE)
 
 Functions used include all functions that have been used previously by Ruben (some of them might not be needed anymore, but are kept anyway). Functions 'CallTrueBarcodes' has been added by Max.
 
-```{r functions}
-serialNext = function(prefix, extension){
-    i=0
-    repeat {
-       f = paste0(prefix, "_", i , ".", extension)
-       if(!file.exists(f)){return(f)}
-       i=i+1
-     }
-  }
-
-SetFileName <- function(filename, initials, extension) {
-  # Set filename with extension and initials to make filename with date integrated.
-  filename <- substitute(filename)
-  filename <- paste0(out.dir, "/", initials, substr(gsub("-","",Sys.time()),1,8), "_", filename)
-  filename <- serialNext(filename, extension)
-  filename
-}
-
-CallTrueBarcodes <- function(df) {
-  df %<>% filter(barcode %in% barcodes.clone5)
-  df
-}
+```{r functions screen}
+# serialNext = function(prefix, extension){
+#     i=0
+#     repeat {
+#        f = paste0(prefix, "_", i , ".", extension)
+#        if(!file.exists(f)){return(f)}
+#        i=i+1
+#      }
+#   }
+# 
+# SetFileName <- function(filename, initials, extension) {
+#   # Set filename with extension and initials to make filename with date integrated.
+#   filename <- substitute(filename)
+#   filename <- paste0(out.dir, "/", initials, substr(gsub("-","",Sys.time()),1,8), "_", filename)
+#   filename <- serialNext(filename, extension)
+#   filename
+# }
+# 
+# CallTrueBarcodes <- function(df) {
+#   df %<>% filter(barcode %in% barcodes.clone5)
+#   df
+# }
 ```
 
 
 # Data import
 
 Data import from mapping, files were generated on 21.01.2019.
-```{r import}
+```{r import screen}
 # Import files in list and make individual tables
 # First list the files from the screen (E177 & 1504). The other will be processed in another script.
 file.list <- list.files("/DATA/projects/DSBrepair/data/rs20210628_EpiScreen/indelPCR_counts",
@@ -202,7 +195,7 @@ mut.list = mclapply(names(df.list), function(exp){
 ## Transform into data table and filtering
 Check how many reads are in general not clear or called as point mutations. 
 
-```{r indel dataframe}
+```{r indel dataframe screen}
 # Make a single data.table from the mutations list.
 mutations.prefilter.dt = do.call(rbind, c(mut.list, fill = T))
 dim(mutations.prefilter.dt) 
@@ -410,7 +403,7 @@ mutations.screen.dt[is.na(mutation), ]
 
 ## Pooling large indels for indel spectrum plotting
 
-```{r large indel pooling for indel plots}
+```{r large indel pooling for indel plots screen}
 # Fix large deletions for every deletion above 25 (we do not sequence deletions larger than 130 bp)
 largedels <- as.character(seq(-130, -15))
 
@@ -520,7 +513,7 @@ dim(screen.indel.dt)
 ```
 
 ## R cleanup
-```{r cleanup}
+```{r cleanup screen}
 rm(list = ls()[grep("^mutations", ls())])
 rm(list = ls()[grep("list$", ls())])
 rm(list = ls()[grep("large.indels.dt", ls())])
@@ -529,7 +522,7 @@ rm(list = ls()[grep("mutations.dt", ls())])
 
 ## Add identifiers and compute indel ratios
 
-```{r calculate_ratios}
+```{r calculate_ratios screen}
 # Calculate NHEJ/MMEJ ratios and efficiences
 ratios_tib <- screen.indel.dt %>%
   filter(mutation %in% c("1", "-7") & pathway_bal_filter & viab_norm_split > viab_limit_bal) %>%
@@ -954,7 +947,7 @@ screen.ratio.dt <- screen.ratio.dt %>%
 ```
 
 
-```{r combine z-scores}
+```{r combine z-scores screen}
 # Combine z-scores of the two biological replicates: stouffer's method = sum(z-scores)/sqrt(number_of_z-scores)
 zscores_comb <- screen.ratio.dt %>%
   distinct(MMEJ_zscore_mean, drug, conc_char, barcode) %>%
@@ -974,7 +967,7 @@ screen.ratio.dt <- left_join(screen.ratio.dt, zscores_comb_global)
 
 ```
 # Calculate Log2 fold change
-```{r}
+```{r log2 FC screen}
 dmso.mmej.score <- screen.ratio.dt %>%
   filter(drug == "DMSO") %>%
   ungroup() %>%
@@ -1090,7 +1083,7 @@ screen_ratios_tib =  screen.ratios.chrom.dt %>%
 
 
 ## Processed data export The files will be saved in the processed data folder.
-```{r export}
+```{r export screen}
 # The mutations list that can be loaded for the indel spectra plots.
 filename <- SetFileName("episcreen_mutations", initials = initials, extension = "RDS")
 saveRDS(screen.indels.chrom.dt, file = filename)
@@ -1100,20 +1093,21 @@ filename <- SetFileName("episcreen_ratios", initials = initials, extension = "RD
 saveRDS(screen_ratios_tib, file = filename)
 ```
 
+
 # Conclusions 
 Looks all fine! Now, we can generate indel plots and look in detail at the ratios.
 
 # Bibliography
-```{r citations}
+```{r citations screen}
 cite_packages()
 ```
 
 # Session Info
-```{r session_info}
+```{r session_info screen}
 sessionInfo()
 getwd()
 date()
-paste("Run time: ",format(Sys.time()-StartTime))
+paste("Run time: ",format(Sys.time()-StartTimeScreen))
 # rm(list = ls(all.names = TRUE)) #will clear all objects includes hidden objects.
 # gc() #free up memrory and report the memory usage.
 ```
