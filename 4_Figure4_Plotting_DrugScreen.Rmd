@@ -45,6 +45,7 @@ overflow-x: hidden;
 }
 ```
 ### Libraries
+### Libraries
 
 ```{r load_packages, results = 'hide', warning = FALSE, message = FALSE}
 knitr::opts_chunk$set(echo = TRUE)
@@ -53,23 +54,35 @@ StartTime <-Sys.time()
 # 8-digit Date tag:
 Date <- substr(gsub("-","",Sys.time()),1,8) 
 # libraries:
-library(dplyr)
+library(knitr)
+library(tidyverse)
 library(outliers)
 library(ggplot2)
 library(ggbeeswarm)
 library(data.table)
-library(ggrepel)
+# library(ggrepel)
 library(GGally)
-library(DESeq2)
-library(gghighlight)
-library(platetools)
+library(MASS)
+# library(DESeq2)
+# library(gghighlight)
+library(ggrepel)
+# library(platetools)
 library(ggpubr)
-library(tidyr)
-library(Laurae)
-library(tibble)
+# library(Laurae)
 library(pheatmap)
 library(RColorBrewer)
-library(ggrastr)
+# # library(ggrastr)
+library(broom)
+# library(ggsignif)
+# library(rstatix)
+library(colorspace)
+
+## Select outdir
+out.dir = paste0("./figures/", Date, "/")
+dir.create(out.dir)
+in.dir = list.dirs(path = "/DATA/projects/DSBrepair/data/R") %>% .[grepl("episcreen", .)] %>% tail(n = 1)
+opts_chunk$set(dev=c('png', 'pdf'), fig.path = file.path(out.dir))
+pdf.options(useDingbats = FALSE)
 ```
 
 ### Functions
@@ -78,67 +91,67 @@ library(ggrastr)
 
 p.adjust <- function(p, method = p.adjust.methods, n = length(p))
 {
-  ## Methods 'Hommel', 'BH', 'BY' and speed improvements
-  ## contributed by Gordon Smyth
-  method <- match.arg(method)
-  if(method == "fdr") method <- "BH"	# back compatibility
-  nm <- names(p)
-  p <- as.numeric(p)
-  p0 <- setNames(p, nm)
-  if(all(nna <- !is.na(p))) nna <- TRUE
-  p <- p[nna]
-  lp <- length(p)
-  # stopifnot(n >= lp)
-  if (n <= 1) return(p0)
-  if (n == 2 && method == "hommel") method <- "hochberg"
-  
-  p0[nna] <-
-    switch(method,
-           bonferroni = pmin(1, n * p),
-           holm = {
-             i <- seq_len(lp)
-             o <- order(p)
-             ro <- order(o)
-             pmin(1, cummax( (n - i + 1L) * p[o] ))[ro]
-           },
-           hommel = { ## needs n-1 >= 2 in for() below
-             if(n > lp) p <- c(p, rep.int(1, n-lp))
-             i <- seq_len(n)
-             o <- order(p)
-             p <- p[o]
-             ro <- order(o)
-             q <- pa <- rep.int( min(n*p/i), n)
-             for (j in (n-1):2) {
-               ij <- seq_len(n-j+1)
-               i2 <- (n-j+2):n
-               q1 <- min(j*p[i2]/(2:j))
-               q[ij] <- pmin(j*p[ij], q1)
-               q[i2] <- q[n-j+1]
-               pa <- pmax(pa,q)
-             }
-             pmax(pa,p)[if(lp < n) ro[1:lp] else ro]
-           },
-           hochberg = {
-             i <- lp:1L
-             o <- order(p, decreasing = TRUE)
-             ro <- order(o)
-             pmin(1, cummin( (n - i + 1L) * p[o] ))[ro]
-           },
-           BH = {
-             i <- lp:1L
-             o <- order(p, decreasing = TRUE)
-             ro <- order(o)
-             pmin(1, cummin( n / i * p[o] ))[ro]
-           },
-           BY = {
-             i <- lp:1L
-             o <- order(p, decreasing = TRUE)
-             ro <- order(o)
-             q <- sum(1L/(1L:n))
-             pmin(1, cummin(q * n / i * p[o]))[ro]
-           },
-           none = p)
-  p0
+    ## Methods 'Hommel', 'BH', 'BY' and speed improvements
+    ## contributed by Gordon Smyth
+    method <- match.arg(method)
+    if(method == "fdr") method <- "BH"	# back compatibility
+    nm <- names(p)
+    p <- as.numeric(p)
+    p0 <- setNames(p, nm)
+    if(all(nna <- !is.na(p))) nna <- TRUE
+    p <- p[nna]
+    lp <- length(p)
+    # stopifnot(n >= lp)
+    if (n <= 1) return(p0)
+    if (n == 2 && method == "hommel") method <- "hochberg"
+
+    p0[nna] <-
+	switch(method,
+	       bonferroni = pmin(1, n * p),
+	       holm = {
+		   i <- seq_len(lp)
+		   o <- order(p)
+		   ro <- order(o)
+		   pmin(1, cummax( (n - i + 1L) * p[o] ))[ro]
+	       },
+	       hommel = { ## needs n-1 >= 2 in for() below
+		   if(n > lp) p <- c(p, rep.int(1, n-lp))
+		   i <- seq_len(n)
+		   o <- order(p)
+		   p <- p[o]
+		   ro <- order(o)
+		   q <- pa <- rep.int( min(n*p/i), n)
+		   for (j in (n-1):2) {
+		       ij <- seq_len(n-j+1)
+		       i2 <- (n-j+2):n
+		       q1 <- min(j*p[i2]/(2:j))
+		       q[ij] <- pmin(j*p[ij], q1)
+		       q[i2] <- q[n-j+1]
+		       pa <- pmax(pa,q)
+		   }
+		   pmax(pa,p)[if(lp < n) ro[1:lp] else ro]
+	       },
+	       hochberg = {
+		   i <- lp:1L
+		   o <- order(p, decreasing = TRUE)
+		   ro <- order(o)
+		   pmin(1, cummin( (n - i + 1L) * p[o] ))[ro]
+	       },
+	       BH = {
+		   i <- lp:1L
+		   o <- order(p, decreasing = TRUE)
+		   ro <- order(o)
+		   pmin(1, cummin( n / i * p[o] ))[ro]
+	       },
+	       BY = {
+		   i <- lp:1L
+		   o <- order(p, decreasing = TRUE)
+		   ro <- order(o)
+		   q <- sum(1L/(1L:n))
+		   pmin(1, cummin(q * n / i * p[o]))[ro]
+	       },
+	       none = p)
+    p0
 }
 
 SetFileName <- function(filename, initials) {
@@ -152,27 +165,27 @@ SetFileName <- function(filename, initials) {
 # From Fede:
 # ggpairs custom functions
 corColor <- function(data, mapping, color = I("black"), sizeRange = c(1, 3), ...) {
-  
+
   x   <- eval_data_col(data, mapping$x)
   y   <- eval_data_col(data, mapping$y)
   r   <- cor(x, y)
   rt  <- format(r, digits = 3)
   tt  <- as.character(rt)
   cex <- max(sizeRange)
-  
+
   # helper function to calculate a useable size
   percent_of_range <- function(percent, range) {
     percent * diff(range) + min(range, na.rm = TRUE)
   }
-  
+
   # plot correlation coefficient
   p <- ggally_text(label = tt, mapping = aes(), xP = 0.5, yP = 0.5,
                    size = I(percent_of_range(cex * abs(r), sizeRange)), color = color, ...) +
     theme(panel.grid.minor=element_blank(),
           panel.grid.major=element_blank())
-  
+
   corColors <- RColorBrewer::brewer.pal(n = 7, name = "RdYlBu")[2:6]
-  
+
   if (r <= boundaries[1]) {
     corCol <- corColors[1]
   } else if (r <= boundaries[2]) {
@@ -184,156 +197,59 @@ corColor <- function(data, mapping, color = I("black"), sizeRange = c(1, 3), ...
   } else {
     corCol <- corColors[5]
   }
-  
+
   p <- p +
     theme(panel.background = element_rect(fill = corCol))
-  
+
   return(p)
 }
 
 
-# stat_smooth_func <- function(mapping = NULL, data = NULL,
-#                         geom = "smooth", position = "identity",
-#                         ...,
-#                         method = "auto",
-#                         formula = y ~ x,
-#                         se = TRUE,
-#                         n = 80,
-#                         span = 0.75,
-#                         fullrange = FALSE,
-#                         level = 0.95,
-#                         method.args = list(),
-#                         na.rm = FALSE,
-#                         show.legend = NA,
-#                         inherit.aes = TRUE,
-#                         xpos = NULL,
-#                         ypos = NULL) {
-#   layer(
-#     data = data,
-#     mapping = mapping,
-#     stat = StatSmoothFunc,
-#     geom = geom,
-#     position = position,
-#     show.legend = show.legend,
-#     inherit.aes = inherit.aes,
-#     params = list(
-#       method = method,
-#       formula = formula,
-#       se = se,
-#       n = n,
-#       fullrange = fullrange,
-#       level = level,
-#       na.rm = na.rm,
-#       method.args = method.args,
-#       span = span,
-#       xpos = xpos,
-#       ypos = ypos,
-#       ...
-#     )
-#   )
-# }
-# 
-# StatSmoothFunc <- ggproto("StatSmooth", Stat,
-#                       
-#                       setup_params = function(data, params) {
-#                         # Figure out what type of smoothing to do: loess for small datasets,
-#                         # gam with a cubic regression basis for large data
-#                         # This is based on the size of the _largest_ group.
-#                         if (identical(params$method, "auto")) {
-#                           max_group <- max(table(data$group))
-#                           
-#                           if (max_group < 1000) {
-#                             params$method <- "loess"
-#                           } else {
-#                             params$method <- "gam"
-#                             params$formula <- y ~ s(x, bs = "cs")
-#                           }
-#                         }
-#                         if (identical(params$method, "gam")) {
-#                           params$method <- mgcv::gam
-#                         }
-#                         
-#                         params
-#                       },
-#                       
-#                       compute_group = function(data, scales, method = "auto", formula = y~x,
-#                                                se = TRUE, n = 80, span = 0.75, fullrange = FALSE,
-#                                                xseq = NULL, level = 0.95, method.args = list(),
-#                                                na.rm = FALSE, xpos=NULL, ypos=NULL) {
-#                         if (length(unique(data$x)) < 2) {
-#                           # Not enough data to perform fit
-#                           return(data.frame())
-#                         }
-#                         
-#                         if (is.null(data$weight)) data$weight <- 1
-#                         
-#                         if (is.null(xseq)) {
-#                           if (is.integer(data$x)) {
-#                             if (fullrange) {
-#                               xseq <- scales$x$dimension()
-#                             } else {
-#                               xseq <- sort(unique(data$x))
-#                             }
-#                           } else {
-#                             if (fullrange) {
-#                               range <- scales$x$dimension()
-#                             } else {
-#                               range <- range(data$x, na.rm = TRUE)
-#                             }
-#                             xseq <- seq(range[1], range[2], length.out = n)
-#                           }
-#                         }
-#                         # Special case span because it's the most commonly used model argument
-#                         if (identical(method, "loess")) {
-#                           method.args$span <- span
-#                         }
-#                         
-#                         if (is.character(method)) method <- match.fun(method)
-#                         
-#                         base.args <- list(quote(formula), data = quote(data), weights = quote(weight))
-#                         model <- do.call(method, c(base.args, method.args))
-#                         
-#                         m = model
-#                         eq <- substitute(italic(y) == a + b %.% italic(x)*","~~italic(r)^2~"="~r2, 
-#                                          list(a = format(coef(m)[1], digits = 3), 
-#                                               b = format(coef(m)[2], digits = 3), 
-#                                               r2 = format(summary(m)$r.squared, digits = 3)))
-#                         func_string = as.character(as.expression(eq))
-#                         
-#                         if(is.null(xpos)) xpos = min(data$x)*0.9
-#                         if(is.null(ypos)) ypos = max(data$y)*0.9
-#                         data.frame(x=xpos, y=ypos, label=func_string)
-#                         
-#                       },
-#                       
-#                       required_aes = c("x", "y")
-# )
-
 theme_classic_lines <- function() {
-  theme_pubr(border = F, legend = "top") +
-    theme(panel.grid.major = element_line(colour = "#adb5bd", size = 0.25),
-          strip.background = element_rect(fill = "#ced4da")
-    )
+  theme_pubr(border = T, legend = "top") +
+            theme(panel.grid.major = element_line(colour = "#adb5bd", size = 0.25),
+                  strip.background = element_rect(fill = "white", color = "white")
+            )
 }
 theme_classic_lines_45 <- function() {
   theme_pubr(border = T, legend = "top", x.text.angle = 45) +
-    theme(panel.grid.major = element_line(colour = "#adb5bd", size = 0.25),
-          strip.background = element_rect(fill = "#ced4da")
-    )
+            theme(panel.grid.major = element_line(colour = "#adb5bd", size = 0.25),
+                  strip.background = element_rect(fill = "white", color = "white")
+            )
 }
 
 theme_classic_lines_90 <- function() {
   theme_pubr(border = T, legend = "top", x.text.angle = 90) +
-    theme(panel.grid.major = element_line(colour = "#adb5bd", size = 0.25),
-          strip.background = element_rect(fill = "#ced4da")
-    )
+            theme(panel.grid.major = element_line(colour = "#adb5bd", size = 0.25),
+                  strip.background = element_rect(fill = "white", color = "white")
+            )
+}
+
+theme_classic_lines_90_noborder <- function() {
+  theme_pubr(border = F, legend = "top", x.text.angle = 90) +
+            theme(strip.background = element_rect(fill = "white", color = "white")
+            )
 }
 
 theme_set(theme_classic_lines())
 
 colors_diverse <- c("#264653", "#9AC1AE", "#5D987B", "#f2cc8f", "#e76f51")
+# colors_drugs <- c("DMSO (neg control)" = "#65BFA4", "DNA-PKi (NHEJ control)" = "#8CA0C4", "drugs" = "#808184", "Mirin (MMEJ control)" = "#5D79AC")
 colors_drugs <- c("#FA8D62", "#65BFA4", "#8CA0C4", "#808184", "#F6D289", "#E5E5E5", "#ACACAC", "#737373")
 #colors_diverse <- c("#264653", "#2a9d8f", "#e9c46a", "#f4a261", "#e76f51") 
+## Chromatin groups
+group_colors = c("Euchromatin" = "#f7941d",
+                 "other-heterochromatin" = "#838687",
+                 "Triple Heterochromatin" = "#662d91",
+                 "H3K27me3" = "#d21f8a")
+
+colors_targets <-  c(HDAC="#60988D", HAT="#C6D0A8", Sirtuin="#8FCAAC",
+                     HMT="#FDCDAC", DNMT="#D69C81", `Histone Demethylase`="#FFF2AE",
+                     HIF="#E3DCD5", JAK="#C8D7E2", PIM="#9AB8C4", `Aurora Kinase`="#F4CAE4",
+                     PARP="#CB546F", `Epigenetic Reader Domain`= "#476D61", `DNA-PK`="#E07A43")
+
+conc_control_colors = c("CTRL" = colors_drugs[2], "100 nM" = colors_drugs[7], "1 µM" = colors_drugs[4], "10 µM" = "#000000")
+conc_colors = c("100 nM" = colors_drugs[7], "1 µM" = colors_drugs[4], "10 µM" = "#000000")
 
 ggplot_custom <- function(...) ggplot2::ggplot(...) + 
   scale_color_manual(values = colors_diverse) + 
@@ -346,40 +262,280 @@ ggplot_custom <- function(...) ggplot2::ggplot(...) +
 
 ```{r data import, echo = FALSE, warning = FALSE}
 # Import data from preprocessing script
-# validations_ratios = readRDS("/DATA/projects/DSBrepair/data/R/rs20220208_episcreen/rs20220208_episcreen_validation_ratios.RDS")
-# validations_indels = readRDS("/DATA/projects/DSBrepair/data/R/rs20220208_episcreen/rs20220208_episcreen_validation_indels.RDS")
-# screen_indels = readRDS("/DATA/projects/DSBrepair/data/R/rs20220211_episcreen/rs20220211_episcreen_mutations.RDS")
-screen_ratios = readRDS("/DATA/projects/DSBrepair/data/R/rs20220216_episcreen/rs20220216_episcreen_ratios.3.RDS")
+in.dir = list.dirs(path = "/DATA/projects/DSBrepair/data/R") %>% .[grepl("episcreen", .)] %>% tail(n = 1)
+file = list.files(in.dir, pattern = "episcreen_ratios", full.names = T) %>% tail(n = 1)
+indel.data <- readRDS(file) # %>% filter(pathway_bal_filter == TRUE & viab_reproducibility == TRUE)
 
-# Complete data without exlcluding wells <0.45 viability (I need this for plotting)
-viability.data = as.data.table(readRDS("/DATA/projects/DSBrepair/git/EpiScreen/files_scripts/rs20211221_Episcreen_Reads_Viab_Metadata.RDS")) %>%
-  dplyr::select(ID, drug, target, replicate, viability, conc_char, tech)
+# Import data from preprocessing validation script
+file.validation = list.files(in.dir, pattern = "validation_ratio", full.names = T) %>% tail(n = 1)
+indel.data.validation <- readRDS(file.validation)
 
-# Chromatin info
-chromatin.features.zs <- colnames(screen_ratios)[grepl("[.]zscore", colnames(screen_ratios))]
-chrom_data = screen_ratios %>% dplyr::select(IPR, all_of(chromatin.features.zs)) %>% distinct()
+chromatin.features <- colnames(indel.data)[grepl("[.]zscore", colnames(indel.data))]
+chrom_data = indel.data %>% dplyr::select(barcode, all_of(chromatin.features)) %>% distinct()  %>%
+  rename_with(., ~gsub(".zscore", "", .x))
 
-chromatin.features.zs
-# chromatin.feature.colors = c()
-
-# Figure out folder
-figure_out = "/DATA/projects/DSBrepair/scratch/episcreen/"
-
+chromatin.features.short = gsub(".zscore", "", chromatin.features)
 ```
 
+
+```{r}
+#data frame to save data
+mean_sd_fits <- tibble(term = NA, estimate = NA, std.error = NA, barcode = NA, rep = NA)
+
+
+# First calculate means and sd of the DMSO efficiency per replicate and barcode
+dmso.eff.score <- indel.data %>%
+  filter(drug == "DMSO") %>%
+  dplyr::select('DMSO' = MMEJratio, well, barcode, replicate, tech, plate) %>%
+  mutate(DMSO = ave(DMSO, well, replicate, tech, plate, FUN = function(x) mean(x, na.rm=T))) %>%
+  distinct(replicate, tech, well, plate, DMSO) %>% 
+  pull(DMSO) %>%
+  fitdistr(., "normal") %>% tidy()
+```
+```{r Compounds that affect the balance at all the sites}
+## Which compounds change the balance at all the sites in both screens?
+all_balance = indel.data %>% 
+  distinct(drug, conc_char, replicate, MMEJ_zscore_mean, target, 
+           barcode, viab_reproducibility, pathway_bal_filter) %>% 
+  filter(!is.na(MMEJ_zscore_mean) & 
+           !between(MMEJ_zscore_mean, -1.96, 1.96) & 
+           viab_reproducibility == T & 
+           pathway_bal_filter == T) %>% 
+  group_by(drug, conc_char, target) %>% 
+  count() %>% 
+  filter(n == 36) # 2 x 18
+  
+kable(all_balance)
+all_balance %>% ungroup() %>% distinct(drug, target)
+
+## Now with 16/18 (~ 90%) of the sites with an effect. Near global
+near_all_balance = indel.data %>% 
+  distinct(drug, conc_char, replicate, MMEJ_zscore_mean, target, 
+           barcode, viab_reproducibility, pathway_bal_filter) %>% 
+  filter(!is.na(MMEJ_zscore_mean) & 
+           !between(MMEJ_zscore_mean, -1.96, 1.96) & 
+           viab_reproducibility == T & 
+           pathway_bal_filter == T) %>% 
+  group_by(drug, conc_char, target) %>% 
+  count() %>% 
+  filter(n >= 32) # 2 x 16
+
+
+kable(near_all_balance)
+near_all_balance %>% ungroup() %>% distinct(drug, target)
+```
+
+## A: MMEJ-z-score per drug
+Are the compounds (per concentration) that significantly alter the MMEJ score?
+```{r warning = FALSE}
+# Plot raw MMEJ ratio
+dmso_bal <- indel.data %>%
+  filter(drug == "DMSO") %>%
+  dplyr::select('dmso_bal' = MMEJratio, IPR, replicate, tech, well, plate) %>%
+  group_by(replicate, tech, well, plate) %>%
+  summarise(dmso_bal = mean(dmso_bal)) %>%
+  ungroup() %>%
+  mutate(dmso_mean = mean(dmso_bal),
+         dsmo_sd = sd(dmso_bal)) %>%
+  distinct(dmso_mean, dsmo_sd)
+
+
+
+volcano.df = indel.data %>%
+  filter(sample == "Epigenetic Compound" & pathway_bal_filter == TRUE & viab_reproducibility == TRUE) %>%
+  distinct(MMEJratio, drug, conc_char, MMEJ_zscore_global_comb) %>%
+  mutate(GlobalMMEJratio = ave(MMEJratio, drug, conc_char, FUN = mean)) %>%
+  distinct() %>%
+  mutate(MMEJ_pval_global_comb = 2*pnorm(q = abs(MMEJ_zscore_global_comb), lower.tail = F)) %>%
+  left_join(near_all_balance) %>%
+  mutate(MMEJ_pval_adj_global_comb = log10(p.adjust(MMEJ_pval_global_comb, method = 'fdr')),
+         col_bal = ifelse(MMEJ_pval_adj_global_comb < 0.01 & 
+                            GlobalMMEJratio > (dmso_bal$dmso_mean + dmso_bal$dsmo_sd), "MMEJ increase", 
+                          ifelse(MMEJ_pval_adj_global_comb < 0.01 & 
+                                   GlobalMMEJratio < (dmso_bal$dmso_mean - dmso_bal$dsmo_sd), "NHEJ increase","blue"))) %>%
+  distinct(MMEJ_pval_adj_global_comb, GlobalMMEJratio, drug, conc_char, target, n, col_bal)
+
+
+ggplot(volcano.df, 
+       aes(y = MMEJ_pval_adj_global_comb, 
+           x = GlobalMMEJratio, 
+           color = col_bal)) +
+  geom_point() +
+  geom_hline(linetype = "dashed", yintercept = log10(0.01)) +
+  geom_vline(linetype = "solid", xintercept = (dmso_bal$dmso_mean)) +
+  geom_vline(linetype = "dashed", xintercept = (dmso_bal$dmso_mean + dmso_bal$dsmo_sd)) +
+  geom_vline(linetype = "dashed", xintercept = (dmso_bal$dmso_mean - dmso_bal$dsmo_sd)) +
+  scale_color_manual(values = c("#C2C2C2", "#3d405b", "#e07a5f")) +
+  facet_wrap(~conc_char) +
+  annotate("rect",
+           xmin=(dmso_bal$dmso_mean - dmso_bal$dsmo_sd),
+           xmax=(dmso_bal$dmso_mean + dmso_bal$dsmo_sd),
+           ymin=-Inf,ymax=Inf, alpha=0.1, fill="black") +
+  annotate("rect",
+           xmin=-Inf,
+           xmax=Inf,
+           ymin=-Inf,
+           ymax= -log10(0.01), 
+           alpha=0.1, 
+           fill="black") +
+  coord_flip() +
+  ylim(0, -300) + 
+  geom_label_repel(data = volcano.df, 
+                   aes(y = MMEJ_pval_adj_global_comb, 
+                       x = GlobalMMEJratio, 
+                       label = ifelse(n == 36, drug,'')),
+                   box.padding   = 1, 
+                   point.padding = 0.5,
+                   force = 210,
+                   segment.color = 'black', 
+                   inherit.aes = F) +
+  geom_label_repel(aes(label = ifelse(between(n, 32, 35), drug,'')),
+                   box.padding   = 1, 
+                   force = 110,
+                   point.padding = 0.5,
+                   segment.color = 'gray50') +
+  theme_classic()
+
+
+
+indel.data %>%
+  filter(sample == "Epigenetic Compound" & pathway_bal_filter == TRUE & viab_reproducibility == TRUE) %>%
+  distinct(MMEJratio, drug, conc_char, MMEJ_zscore_global_comb) %>%
+  mutate(GlobalMMEJratio = ave(MMEJratio, drug, conc_char, FUN = mean)) %>%
+  distinct() %>%
+  mutate(MMEJ_pval_global_comb = 2*pnorm(q = abs(MMEJ_zscore_global_comb), lower.tail = F)) %>%
+  mutate(MMEJ_pval_adj_global_comb = log10(p.adjust(MMEJ_pval_global_comb, method = 'fdr')),
+         col_bal = ifelse(MMEJ_pval_adj_global_comb < 0.01 & 
+                            GlobalMMEJratio > (dmso_bal$dmso_mean + dmso_bal$dsmo_sd), "green", 
+                          ifelse(MMEJ_pval_adj_global_comb < 0.01 & 
+                                   GlobalMMEJratio < (dmso_bal$dmso_mean - dmso_bal$dsmo_sd), "yellow","blue"))) %>%  
+  filter(col_bal != "blue") %>%
+  distinct(drug, conc_char)
+```
+
+
+*Figure 3A: Compound-induced change in MMEJ ratio of all tested compounds. Mean MMEJ z-score per drug & concentration.* 
+
+**Conclusion: Yes, there are a lot of interesting hits at all tested concentrations.**
+
+---
+
+## B: MMEJ ratio change per target group
+Are there any target groups that are prone to changes in MMEJ ratio?
+```{r warning = FALSE}
+# C: Bar plot
+eff.data <- indel.data %>%
+  filter(sample == "Epigenetic Compound") %>%
+  distinct(MMEJ_zscore_global_comb, drug, target, conc_char, MMEJratio) %>%
+  mutate(MMEJratio = ave(MMEJratio, drug, conc_char, FUN = mean)) %>%
+  distinct() %>%
+  mutate(MMEJ_pval_global_comb = 2*pnorm(q = abs(MMEJ_zscore_global_comb), lower.tail = F)) %>%
+  mutate(MMEJ_pval_adj_global_comb = p.adjust(MMEJ_pval_global_comb, method = 'fdr'))
+
+eff.data$sign <- "2_No"
+eff.data$sign[eff.data$MMEJratio > (dmso_bal$dmso_mean + dmso_bal$dsmo_sd) & eff.data$MMEJ_pval_adj_global_comb < 0.01] <- "1_Up"
+eff.data$sign[eff.data$MMEJratio < (dmso_bal$dmso_mean - dmso_bal$dsmo_sd) & eff.data$MMEJ_pval_adj_global_comb < 0.01] <- "0_Down"
+
+eff.data <- eff.data %>%
+  mutate(number = ave(target, target, sign, conc_char, FUN = length)) %>%
+  mutate(number = as.numeric(number)) %>%
+  distinct(conc_char, target, sign, number) %>%
+  spread(sign, number, fill = 0) %>%
+  mutate(fraction = (`1_Up` + `0_Down`) / (`2_No` + (`1_Up` + `0_Down`))) %>%
+  pivot_longer(`0_Down`:`2_No`, names_to = "sign", values_to = "number")
+
+
+ggplot(eff.data,
+              aes(y = reorder(target, number), x = number, fill = sign)) +
+  geom_bar(stat = "identity") +
+  facet_wrap(~conc_char)+
+  scale_fill_manual(values = c("#e07a5f", "#3d405b", "#C2C2C2")) +
+  theme_pubr(border = T)
+```
+
+*Figure 2B: Number of compounds with significant changes in MMEJ ratio per target group.*
+
+**Conclusion: Some target groups have more changes. But there are no groups significantly sticking out.**
+
+---
+```{r 2C Top TIF boosting, }
+indel.data %>% 
+    filter(conc_char != "control" & pathway_bal_filter == TRUE & viab_reproducibility == TRUE) %>%
+    distinct(drug, conc_char, MMEJ_zscore_global_mean, target) %>% 
+    arrange(desc(MMEJ_zscore_global_mean)) %>%
+    mutate(rank = seq(1:n())) %>%
+  filter(rank < 100) %>%
+  ggplot(., aes(rank, MMEJ_zscore_global_mean, color = target)) +
+  geom_point()  +
+  scale_color_manual(values = colors_targets) +
+  gghighlight(rank <= 10, label_key = drug) +
+  geom_hline(linetype = "dashed", yintercept = 1.96) +
+  scale_x_reverse(limits = c(100, 0)) +
+  ylab("Global combined MMEJ ratio z-score")
+
+top_hits = indel.data  %>% 
+    filter(conc_char != "control" & pathway_bal_filter == T & viab_reproducibility == TRUE) %>% 
+  distinct(drug, conc_char, MMEJ_zscore_global_mean, target) %>%
+    arrange(desc(MMEJ_zscore_global_mean)) %>% slice_head(n = 10) %>% distinct(drug, conc_char, target, MMEJ_zscore_global_mean) %>% 
+  mutate(rank = seq(1:n()),
+         drug = gsub(" [(].*[)]", "", drug),
+         drug_conc = paste(drug, conc_char, sep = " "))
+```
 
 ## Figure 1A
 ```{r}
+p1 = indel.data %>% 
+    filter(conc_char != "control" & pathway_bal_filter == TRUE & viab_reproducibility == TRUE , replicate == "E177") %>%
+    distinct(drug, conc_char, MMEJ_zscore_global, target) %>% 
+    arrange(desc(MMEJ_zscore_global)) %>%
+    mutate(rank = seq(1:n()),
+         drug = gsub(" [(].*[)]", "", drug),
+         drug_conc = paste(drug, conc_char, sep = " ")) %>%
+    filter(rank < 100) %>%
+    ggplot(., aes(rank, MMEJ_zscore_global, color = target)) +
+    geom_point()  +
+    scale_color_manual(values = colors_targets) +
+    gghighlight(rank <= 7, label_key = drug_conc) +
+    geom_hline(linetype = "dashed", yintercept = 1.96) +
+    scale_x_reverse(limits = c(100, 0)) +
+    ylab("Global MMEJ ratio z-score screen 1") +
+    theme_classic()
 
+p2 = indel.data %>% 
+    filter(conc_char != "control" & pathway_bal_filter == TRUE & viab_reproducibility == TRUE , replicate == "E1504") %>%
+    distinct(drug, conc_char, MMEJ_zscore_global, target) %>% 
+    arrange(desc(MMEJ_zscore_global)) %>%
+    mutate(rank = seq(1:n()),
+         drug = gsub(" [(].*[)]", "", drug),
+         drug_conc = paste(drug, conc_char, sep = " ")) %>%
+    filter(rank < 100) %>%
+    ggplot(., aes(rank, MMEJ_zscore_global, color = target)) +
+    geom_point()  +
+    scale_color_manual(values = colors_targets) +
+    gghighlight(rank <= 8, label_key = drug_conc) +
+    geom_hline(linetype = "dashed", yintercept = 1.96) +
+    scale_x_reverse(limits = c(100, 0)) +
+    ylab("Global MMEJ ratio z-score screen 2") +
+    theme_classic()
+
+plot_grid(p1, p2)
+  
+top_hits = indel.data  %>% 
+    filter(conc_char != "control" & pathway_bal_filter == T & viab_reproducibility == TRUE) %>% 
+  distinct(drug, conc_char, MMEJ_zscore_global, target, replicate) %>%
+    arrange(desc(MMEJ_zscore_global)) %>% slice_head(n = 10) %>% distinct(drug, conc_char, target, MMEJ_zscore_global, replicate) %>% 
+  mutate(rank = seq(1:n()),
+         drug = gsub(" [(].*[)]", "", drug),
+         drug_conc = paste(drug, conc_char, sep = " "))
 ```
 # Prepare data
+## Prepare data
 
-## Calculate FCances
 ```{r}
 # Data table and compute log2_ratio (This line needs to be adjusted)
-filtered_drug_conc = screen_ratios %>%
+filtered_drug_conc = indel.data %>%
   filter(abs(mean_eff_zscore_comb) > 2.58 | abs(MMEJ_zscore_comb) > 2.58 | drug == "DMSO") %>%
-  mutate(drug_conc = paste(drug, conc_char, sep = "_"),
+  mutate(drug_conc = paste(drug, conc_char,sep = " "),
          effect_on_indelrate = ifelse(abs(mean_eff_zscore_comb) > 2.58, TRUE, FALSE),
          effect_on_ratio = ifelse(abs(MMEJ_zscore_comb) > 2.58, TRUE, FALSE)) %>%
   distinct(drug, conc_char, drug_conc, effect_on_indelrate, effect_on_ratio) %>%
@@ -389,72 +545,66 @@ filtered_drug_conc = screen_ratios %>%
   distinct(drug, conc_char, drug_conc, effect_on_indelrate, effect_on_ratio)
 
 
-ratios_tib <- screen_ratios %>%
-  mutate(drug_conc_char = paste(drug, conc_char, sep = "_")) %>%
+ratios_tib <- indel.data %>%
+  mutate(drug_conc = paste(drug, conc_char, sep = " ")) %>%
   semi_join(filtered_drug_conc) %>%
-  distinct(NHEJratio, freqCut, drug, conc_char, target, IPR, barcode) %>%
-  mutate(NHEJratio = ave(NHEJratio, drug, conc_char, IPR, barcode, FUN = mean)) %>%
-  mutate(NHEJratio.log2 = log2(NHEJratio)) %>%
-  mutate(freqCut = (ave(freqCut, drug, conc_char, IPR, barcode, FUN = mean))) %>%
+  distinct(MMEJratio, freqCut, drug, conc_char, drug_conc, target, barcode) %>%
+  mutate(MMEJratio = ave(MMEJratio, drug, conc_char, barcode, FUN = mean)) %>%
+  mutate(MMEJratio.log2 = log2(MMEJratio)) %>%
+  mutate(freqCut = (ave(freqCut, drug, conc_char, barcode, FUN = mean))) %>%
   mutate(freqCut.log2 = log2(freqCut)) %>%
   distinct()
 
-dmso_ratios_tib <- screen_ratios %>%
+dmso_ratios_tib <- indel.data %>%
   filter(drug == "DMSO") %>%
-  distinct(NHEJratio, freqCut, IPR) %>%
-  mutate(DMSO.ratio = ave(NHEJratio, IPR, FUN = mean)) %>%
+  distinct(MMEJratio, freqCut, barcode) %>%
+  mutate(DMSO.ratio = ave(MMEJratio, barcode, FUN = mean)) %>%
   mutate(DMSO.ratio.log2 = log2(DMSO.ratio)) %>%
-  mutate(DMSO.freqCut = ave(freqCut, IPR, FUN = mean)) %>%
+  mutate(DMSO.freqCut = ave(freqCut, barcode, FUN = mean)) %>%
   mutate(DMSO.freqCut.log2 = log2(DMSO.freqCut)) %>%
-  dplyr::select(-NHEJratio, -freqCut) %>%
+  dplyr::select(-MMEJratio, -freqCut) %>%
   distinct()
 
-ratios_tib <- merge(ratios_tib, dmso_ratios_tib) %>% 
-  dplyr::group_by(IPR, drug, conc_char) %>% 
-  mutate(log2.FC.ratio = NHEJratio.log2 - DMSO.ratio.log2, 
-         log2.FC.freqCut = freqCut.log2 - DMSO.freqCut.log2) %>%
+ratios_tib <- merge(ratios_tib, dmso_ratios_tib)
+```
+
+The log2 distance ratio in our case is positive if it promotes NHEJ and negative if it promotes NHEJ
+
+
+# 2nd step check compute distances and plot them
+```{r}
+# Each replicate has a different value (compute differences by replicate)
+ratios_tib_dist <- ratios_tib %>% 
+  dplyr::group_by(barcode, drug, conc_char) %>% 
+  mutate(log2.dist.ratio = MMEJratio.log2 - DMSO.ratio.log2, 
+         log2.dist.freqCut = freqCut.log2 - DMSO.freqCut.log2) %>%
   left_join(chrom_data)
 ```
 
-The log2 FCance ratio in our case is positive if it promotes NHEJ and negative if it promotes NHEJ
 
-## Calculate slopes
+# Extract slopes for all genes
 ```{r}
 # Perform analysis across all features for three test genes
-ratios_tib %<>% mutate(drug_conc = paste(drug, conc_char, sep = "_"))
+ratios_tib_dist %<>% mutate(drug_conc = paste(drug, conc_char, sep = " ")) %>% 
+  filter(!is.na(MMEJratio))
 
 slope.protein.features <- tibble(drug_conc = NA, feature = NA,  term = NA, 
                                  indelrate = NA, p.value.indelrate = NA, 
                                  ratio = NA, p.value.ratio = NA)
 
-synergy_calc_tib = ratios_tib %>% ungroup() %>% select(log2.FC.freqCut, log2.FC.ratio, IPR, drug_conc, all_of(chromatin.features.zs))
-
-for (i in unique(synergy_calc_tib$drug_conc)) {
-  for (j in chromatin.features.zs) {
-    model_tib_if <- synergy_calc_tib %>% filter(!is.na(log2.FC.freqCut), drug_conc == i)
-    model_tib_pf <- synergy_calc_tib %>% filter(!is.na(log2.FC.ratio), drug_conc == i)
+for (i in unique(ratios_tib_dist$drug_conc)) {
+  for (j in chromatin.features.short) {
+    model_tib <- ratios_tib_dist %>% filter(drug_conc == i) 
     
     # Indel rates
-    model.indelrate.log2 = tibble(term = c("(Intercept)", "slope"), estimate  = NA, p.value = NA)
-
-    if (dim(model_tib_if)[1] != 0) {
-      
-    model.indelrate.log2 <- lm(formula = log2.FC.freqCut ~ unlist(model_tib_if[j]), 
-                               data = model_tib_if) %>% 
+    model.indelrate.log2 <- lm(formula = log2.dist.freqCut ~ unlist(model_tib[j]), 
+                               data = model_tib) %>% 
       tidy()
-    model.indelrate.log2[2, 1] <- "slope"
-    }   
-    
     
     # Pathway balance
-    model.ratio.log2 = tibble(term = c("(Intercept)", "slope"), estimate  = NA, p.value = NA)
-    if (dim(model_tib_pf)[1] != 0) {
-
-    model.ratio.log2 <- lm(formula = log2.FC.ratio ~ unlist(model_tib_pf[j]), 
-                           data = model_tib_pf) %>% 
+    model.ratio.log2 <- lm(formula = log2.dist.ratio ~ unlist(model_tib[j]), 
+                           data = model_tib) %>% 
       tidy()
-    model.ratio.log2[2, 1] <- "slope"
-    }    
     
     slope.protein.features <- slope.protein.features %>% 
       add_row(drug_conc = i, 
@@ -466,7 +616,7 @@ for (i in unique(synergy_calc_tib$drug_conc)) {
               p.value.indelrate = model.indelrate.log2 %>% 
                 pull(p.value),
               ratio = model.ratio.log2 %>% 
-                pull(estimate),
+                pull(estimate), 
               p.value.ratio = model.ratio.log2 %>% 
                 pull(p.value))
   }
@@ -474,371 +624,163 @@ for (i in unique(synergy_calc_tib$drug_conc)) {
 
 # Remove the 1st NA column
 slope.protein.features %<>% 
-  filter(!is.na(.)) %>%
+  filter(!is.na(feature)) %>%
   mutate(term = ifelse(term == "(Intercept)", "intercept", "slope"))
 ```
 
-## Filter the slop
-```{r synergy filtering}
+```{r}
+CCD_tib = ratios_tib_dist %>% select(barcode, drug_conc, log2.dist.freqCut, log2.dist.ratio, all_of(chromatin.features.short)) %>% ungroup()
+
+#Create an empty dt with CCDs of DDR proteins
+drug_conc_CCDs_dt <- tibble(var = NA, drug_conc = NA, num_comp = NA, r.squared = NA, adj.r.squared = NA,p.value = NA)
+# chrom_formula = as.formula(paste("y ~ ", paste(chromatin.features, collapse= "+")))
+
+for (i in unique(CCD_tib$drug_conc)){
+  for (j in c("log2.dist.freqCut", "log2.dist.ratio")) {
+    drug_conc_dt <- filter(CCD_tib, drug_conc == i)
+    # Run a model per drug_conc
+    set.seed(1)
+    chrom_formula = reformulate(chromatin.features.short, response = j)
+    PCR_model_DDR_test <- pcr(chrom_formula,
+                              data=drug_conc_dt , 
+                              validation="CV")
+    
+    pcr_pred <- predict(PCR_model_DDR_test, 
+                        drug_conc_dt, ncomp = 3)
+    
+    combined.dt <- tibble(measured = drug_conc_dt %>% pull(j), 
+                          predicted = as.numeric(pcr_pred))
+    
+    pred_vs_estim <- lm(formula = measured ~ predicted, 
+                        data = combined.dt) %>% 
+      glance()
+    
+    drug_conc_CCDs_dt <- drug_conc_CCDs_dt %>% 
+      add_row(var = j,
+              drug_conc = i, 
+              r.squared = pred_vs_estim %>% 
+                pull(r.squared), 
+              adj.r.squared = pred_vs_estim %>% 
+                pull(adj.r.squared), 
+              p.value = pred_vs_estim %>% 
+                pull(p.value))
+  }
+}
+
+#Correct model to adjust for multiple testing correction
+adj_p.value_KO_model <- drug_conc_CCDs_dt %>% 
+  dplyr::select(var, num_comp, p.value, drug_conc) %>% 
+  group_by(var) %>%
+  mutate(p.adj = p.adjust(p.value, method = "BH")) %>% 
+  dplyr::select(var, drug_conc,p.value,p.adj)
+
+signif_hits = adj_p.value_KO_model %>% filter(p.adj < 0.01) %>% 
+  distinct(drug_conc, var) %>% 
+  ungroup() %>% 
+  mutate(val = TRUE,
+         var = gsub("log2.dist", "signif", var)) %>%
+  pivot_wider(names_from = var, 
+              values_from = val, 
+              values_fill = FALSE) 
+```
+
+
+```{r epistasis filtering}
 # Calculate postition where the linear model crosses y = 0, we do this by -intercept / slope
-synergy_tib = slope.protein.features %>% 
+epistasis_tib = slope.protein.features %>% 
   distinct(drug_conc, term, feature, indelrate, ratio) %>% 
   pivot_wider(., names_from = term, values_from = c(indelrate, ratio)) %>%
-  mutate(x_intercept_indelrate = -indelrate_intercept / indelrate_slope,
+  mutate(feature = gsub(".zscore", "", feature),
+         x_intercept_indelrate = -indelrate_intercept / indelrate_slope,
          x_intercept_ratio = -ratio_intercept / ratio_slope)
 
-effect_compounds = ratios_tib %>%
+effect_compounds = ratios_tib_dist %>%
   group_by(drug_conc)  %>% 
-  mutate(indelrate_pos = sum(log2.FC.freqCut > 0),
+  mutate(indelrate_pos = sum(log2.dist.freqCut > 0),
          indelrate_effect = ifelse(indelrate_pos >= 17, "indel_rate_increase", 
                                    ifelse(indelrate_pos <= 1, "indel_rate_decrease", "mixed")),
-         ratio_pos = sum(log2.FC.ratio > 0),
+         ratio_pos = sum(log2.dist.ratio > 0),
          ratio_effect = ifelse(ratio_pos >= 17, "NHEJ_increase", 
                                ifelse(ratio_pos <= 1, "MMEJ_increase", "mixed"))) %>%
   distinct(drug_conc, indelrate_effect, ratio_effect) %>% 
   left_join(distinct(filtered_drug_conc, drug_conc, effect_on_indelrate, effect_on_ratio))
 
-p.vals = slope.protein.features %>% filter(term == "slope") %>% dplyr::select(-term, -indelrate , -ratio) %>% distinct()
 
-synergy_tib %<>% left_join(effect_compounds)  %>% 
-  left_join(p.vals) %>%
+epistasis_tib %<>% left_join(effect_compounds)  %>% 
+  left_join(signif_hits) %>%
   mutate(
     # x_intercept_indelrate = ifelse(p.value.indelrate < 0.05,
     #                                x_intercept_indelrate, NA),
     # x_intercept_ratio = ifelse(p.value.ratio < 0.05,
     #                            x_intercept_ratio, NA),
-    indelrate_slope_plot = ifelse(x_intercept_indelrate < 1 & effect_on_indelrate, indelrate_slope, NA),
-    ratio_slope_plot = ifelse(x_intercept_ratio < 1 & effect_on_ratio, ratio_slope, NA))  
+    indelrate_slope_plot = ifelse(x_intercept_indelrate < 1 & effect_on_indelrate & signif.freqCut, indelrate_slope, NA),
+    ratio_slope_plot = ifelse(x_intercept_ratio < 1 & effect_on_ratio & signif.ratio, ratio_slope, NA)) %>%
+  distinct(drug_conc, feature, indelrate_slope_plot, ratio_slope_plot)
 ```
 
 
-```{r processing for heatmaps}
-slope.features.tib <- synergy_tib %>% 
-  dplyr::select(drug_conc, ratio_slope_plot, indelrate_slope_plot, feature) %>%
-  group_by(drug_conc) %>%
-  mutate(count_ratio = sum(is.na(ratio_slope_plot)), 
-         count_rate = sum(is.na(indelrate_slope_plot)),
-         feature = gsub(".zscore", "", feature))
-
-all_compounds_pathway_synergy = slope.features.tib %>% 
-  dplyr::select(drug_conc, ratio_slope_plot, feature, count_rate) %>%
-  filter(count_rate != 25) %>% 
-  dplyr::select(-count_rate) %>%
-  group_by(feature, drug_conc) %>%
-  mutate(count_feature_rate = sum(ratio_slope_plot),
-         drug_conc = gsub("_", " ", drug_conc)) %>%
-  filter(count_feature_rate != 0) %>% # remove if 25x NA
-  dplyr::select(-count_feature_rate) %>%
-  reshape2::dcast(drug_conc ~ feature, value.var = "ratio_slope_plot", fill = 0) %>% 
-  column_to_rownames(var = "drug_conc") %>%
-  mutate_all(type.convert)
-
-all_compounds_indelrate_synergy = slope.features.tib %>% 
-  dplyr::select(drug_conc, indelrate_slope_plot, feature, count_rate) %>%
-  filter(count_rate != 25) %>% 
-  dplyr::select(-count_rate) %>%
-  group_by(feature, drug_conc) %>%
-  mutate(count_feature_rate = sum(indelrate_slope_plot),
-         drug_conc = gsub("_", " ", drug_conc)) %>%
-  filter(count_feature_rate != 0) %>% # remove if 25x NA
-  dplyr::select(-count_feature_rate) %>%
-  reshape2::dcast(drug_conc ~ feature, value.var = "indelrate_slope_plot", fill = 0) %>% 
-  column_to_rownames(var = "drug_conc") %>%
-  mutate_all(type.convert)
-```
-
-
-
-```{r heatmaps annotation}
-domains_c5 = screen_ratios %>% distinct(IPR, chromatin) %>% column_to_rownames(var = "IPR")
-domains_c5[c("IPR9", "IPR5", "IPR15"), ] <- "transcription"
-domains_c5[c("IPR3", "IPR19"), ] <- "euchromatin-regulation"
-domains_c5[c("IPR8", "IPR13", "IPR17"), ] <- "other"
-
-
-# colors <- brewer.pal(length(unique(IPR.annotation$cluster)), "Pastel2")
-# names(colors) <- unique(IPR.annotation$cluster)
-annotation_colors_scr = list(
-  target = c(HDAC="#60988D", HAT="#C6D0A8", Sirtuin="#8FCAAC",
-             HMT="#FDCDAC", DNMT="#D69C81", `Histone Demethylase`="#FFF2AE",
-             HIF="#E3DCD5", JAK="#C8D7E2", PIM="#9AB8C4", `Aurora Kinase`="#F4CAE4",
-             PARP="#CB546F", `Epigenetic Reader Domain`= "#476D61", 
-             `DNA-PK`="#E07A43", `Negative Control` = "gray50", MRN = "black"),
-  conc_char = c(`100 nM` = "#78BF84", `1 µM`  = "#1E9532", `10 µM` = "#0F4A19"),
-  chromatin = c(H3K27me3 = "#E5077E", `euchromatin-regulation` = "#FFE156", 
-  transcription = "#F08217", `late_replicating-LAD-H3K9me2` = "#4B235D", other = "#AFB5A6"),
-  group = c(insulator="#BD263D", repressive="#8D1B60", polycomb ="#D21F8A", euchromatin="#F7941D",
-                 transcribing="#8CC63F", HDAC="#BC5F04", accessibility='#FFFF00',
-                 methylation='#7CB4B8'))
-
-
-ordered_marks2 <- c("Negative Control", "MRN", "DNA-PK",
-                    "Epigenetic Reader Domain", "HDAC",  "Sirtuin", "HAT", 
-                    "Histone Demethylase", "HMT", "DNMT", 
-                    "HIF", "JAK", "PIM",
-                    "Aurora Kinase", "PARP")
-
-#Epistatic interaction colors
-slope.colors <- tibble(color = c("#8c510a", "#f5f5f5","#01665e"),label = c("negative","none","positive"), feature = "synergy")
-
-annotation_colors_scr$target <- annotation_colors_scr$target[ordered_marks2]
-
-clone5.matrix = screen_ratios %>% dplyr::select(IPR, ends_with(".zscore")) %>% 
-  setNames(., gsub(".zscore", "", names(.))) %>% 
-  distinct() %>%
+```{r prepare heatmaps, fig.width= 10, fig.height= 20}
+clone5.matrix = indel.data %>% 
+  dplyr::select(IPR, ends_with(".zscore")) %>% 
+  distinct() %>% 
+  rename_with(., ~gsub(".zscore", "", .x)) %>%
   column_to_rownames(var="IPR")
 
 clone5_map = hclust(dist(t(clone5.matrix)))
+clone5_map_ipr = dendextend::rotate(hclust(dist(clone5.matrix)), c(1:2,5:8,3:4, 15:14, 17, 16, 18 ,13,10:12,9))
+
+chromatin <- readRDS(
+  "/DATA/usr/x.vergara/XV_ChIPIndels/XV20200902_DDR_RS_revision/XV20200902_DDR_RS_revision/data/xv20200915_DDR_data_CHIP.rds") %>% 
+  distinct(barcode, chromatin) %>%
+  left_join(distinct(indel.data, barcode, IPR)) 
+
+chromatin <- chromatin %>%
+  filter(IPR != "<NA>") %>% 
+  dplyr::select(-barcode) %>%
+  column_to_rownames(var="IPR")
 
 # Set annotation for heatmap
+viab_drug = indel.data %>% filter(drug != "PAO") %>% 
+  mutate(drug = gsub(" [(].*[)]", "", drug),
+         drug_conc = paste(drug, conc_char, sep = " ")) %>% 
+  distinct(viab_mean, drug_conc, replicate) %>% group_by(drug_conc) %>%
+  summarise(viab = mean(viab_mean))
+
 # Row annotation: annotate drugs with the target group
-target <- screen_ratios %>% 
-  mutate(drug_conc = paste(drug, conc_char, sep = " ")) %>%
-  distinct(target, conc_char, drug_conc) %>% 
+target <- indel.data %>% 
+  # filter(!target %in% c("Negative Control", "MRN", "DNA-PK")) %>%
+  mutate(drug = gsub(" [(].*[)]", "", drug),
+         drug_conc = paste(drug, conc_char, sep = " ")) %>%
+  left_join(viab_drug) %>%
+  distinct(drug_conc, conc_char, target, viab) %>% 
   column_to_rownames(var="drug_conc")
 
-annotation_colors_scr$target <- annotation_colors_scr$target[ordered_marks2]
+TIF_IPR = indel.data %>% filter(drug == "DMSO") %>%
+  distinct(replicate, tech, freqCut,MMEJratio, IPR, well, plate) %>%
+  group_by(IPR) %>%
+  summarise(TIF = mean(freqCut),
+            MMEJratio = mean(MMEJratio))
 
-clustering = data.frame(row.names=c('LMNB1', 'late_replicating', 'H3K9me2',"H3K9me3",
-                                    'H3K27me3', 'EZH2', 'CTCF', 'SMC3',
-                                    'HDAC3', 'HDAC2', 'HDAC1', 'H3K4me1',
-                                    'H3K4me2', 'H3K4me3', 'H3K27ac',
-                                    'H4K5acK8ac', 'H2AFZ', 'DNAse', 'Dam', 'm5C',
-                                    'H3K79me2', 'TTseq', 'H3K36me3', 'POL2AS2',
-                                    'POL2'),
-                        group=factor(c(rep('repressive', 4), rep('polycomb',2 ), rep('insulator', 2),
-                                       rep('HDAC', 3), rep('euchromatin', 6),
-                                       rep('accessibility', 2), 'methylation',
-                                       rep('transcribing', 5)),
-                                     levels=c('transcribing', 'accessibility',
-                                              'methylation', 'euchromatin',
-                                              'HDAC', 'insulator','polycomb', 'repressive')))
-
-```
-
-
-# Figure Panels
-## Panel A - MMEJ ratio z-scores
-```{r all compounds pathway z-score}
-filtered_drug_conc_ratio = filtered_drug_conc %>% 
-  filter(effect_on_ratio) %>%
-  mutate(drug_conc = gsub("_", " ", drug_conc)) %>% 
-  pull(drug_conc)
-
-ratios_tib_screen = screen_ratios %>% 
-  mutate(drug_conc = paste(drug, conc_char, sep = " ")) %>% 
-  filter(drug_conc %in% filtered_drug_conc_ratio & 
-           drug != "DNA-PKi",
-         !is.na(MMEJ_zscore_comb)) %>%
-  distinct(IPR, MMEJ_zscore_comb, drug_conc, drug, conc_char) 
-
-mmejzscore_matrix = ratios_tib_screen %>%
-  distinct(drug_conc, IPR, MMEJ_zscore_comb) %>% 
-  pivot_wider(names_from = IPR, values_from = MMEJ_zscore_comb) %>%
-  column_to_rownames(var = "drug_conc")
-
-clone5_map_ipr_18 = hclust(dist(clone5.matrix))
-# clone5_map_ipr_19 = chip_clone5 %>% 
-#   select(-IPR, -group, -pool, -binsize, -ID) %>%
-#   column_to_rownames(var = "IPR") %>% 
-#   as.matrix() %>%
-#   FC() %>% 
-#   hclust()
-
-quant_breaks <- quantile(mmejzscore_matrix, c(.01,.99), na.rm = T) # change these numbers according to where you want to set the cutoff
-palette_length <- 1000
-
-breaks <- c(seq(quant_breaks[1], 
-                quant_breaks[1]/palette_length, 
-                length.out=ceiling(palette_length/2) + 1), 
-            seq(quant_breaks[2]/palette_length,  
-                quant_breaks[2], 
-                length.out=floor(palette_length/2)))
-
-colors = colorRampPalette(slope.colors %>% pull(color))(length(breaks))
-# colors[-which(breaks < -1.96 | breaks > 1.96 )] = "gray90"
-
-# 
-pdf(paste0(figure_out, "rs20220217_zscorepathwayratio_all.pdf"), width=10, height=20)
-
-pheatmap(mmejzscore_matrix[, clone5_map_ipr_18$labels],
-         border_color = F,
-         cellwidth = 8,
-         cellheight = 8,
-         cluster_cols = clone5_map_ipr_18,
-         breaks = breaks,
-         annotation_row = target,
-         main = "MMEJ z-scores per IPR and compound",
-         color = colors,
-         annotation_colors = annotation_colors_scr, annotation_legend = T,
-         annotation_col = domains_c5,
-         cutree_rows = 7)
-
-dev.off()
-
-# pdf(paste0(figure_out, "rs20220210_zscorepathwayratio_all.pdf"), width=10, height=20)
-# 
-# pheatmap(mmejzscore_matrix[, clone5_map_ipr_18$labels],
-#          border_color = F,
-#          cellwidth = 8,
-#          cellheight = 8,
-#          cluster_cols = clone5_map_ipr_18,
-#          breaks = breaks,
-#          annotation_row = target,
-#          main = "MMEJ z-scores of the synergy hits",
-#          color = colors,
-#          annotation_colors = annotation_colors_scr, annotation_legend = T,
-#          annotation_col = domains_c5,
-#          cutree_rows = 7)
-# 
-# dev.off()
-# 
-# pdf(paste0(figure_out, "rs20220210_zscorepathwayratio_all_autocluster.pdf"), width=10, height=20)
-# 
-# pheatmap(mmejzscore_matrix[, clone5_map_ipr_18$labels],
-#          border_color = F,
-#          cellwidth = 8,
-#          cellheight = 8,
-#          # cluster_cols = clone5_map_ipr_18,
-#          breaks = breaks,
-#          annotation_row = target,
-#          main = "MMEJ z-scores of the synergy hits",
-#          color = colors,
-#          annotation_colors = annotation_colors_scr, annotation_legend = T,
-#          annotation_col = domains_c5,
-#          cutree_rows = 7)
-# 
-# dev.off()
-```
-
-
-```{r all concentrations combined pathway}
-# giveNAs = which(is.na(as.matrix(FC(all_compounds_pathway_synergy))),arr.ind=TRUE)
-# unique(giveNAs)
-# 
-# tab = sort(table(c(giveNAs)),decreasing=TRUE)
-# checkNA = sapply(1:length(tab),function(i){
-# sum(is.na(as.matrix(FC(all_compounds_pathway_synergy[-as.numeric(names(tab[1:i])),]))))
-# })
-# rmv = names(tab)[1:min(which(checkNA==0))]
-
-# screen_ratios %>% dis
-all_compounds_pathway_synergy = all_compounds_pathway_synergy[!grepl("DNA-PK|Mirin|Null", rownames(all_compounds_pathway_synergy)), ]
-
-quant_breaks <- quantile(all_compounds_pathway_synergy, c(.01,.99), na.rm = T) # change these numbers according to where you want to set the cutoff
-palette_length <- 1000
-breaks <- c(seq(quant_breaks[1], 0, length.out=ceiling(palette_length/2) + 1), 
-            seq(quant_breaks[2]/palette_length, quant_breaks[2], length.out=floor(palette_length/2)))
-colors = colorRampPalette(slope.colors %>% pull(color))(length(breaks))
-colors[which(quant_breaks == 0)-1] = "gray90"
-
-
-pdf(paste0(figure_out, "rs20220217_synergy_pathwayratio_all.pdf"), width=10, height=13)
-
-pheatmap(all_compounds_pathway_synergy[, clone5_map$labels],
-         border_color = F,
-         cellwidth = 8,
-         cellheight = 8,
-         cluster_cols = clone5_map,
-         breaks = breaks,
-         annotation_row = target,
-         main = "Pathway balance slopes for all compounds with significant hit",
-         color = colors,
-         annotation_colors = annotation_colors_scr, annotation_legend = T,
-         annotation_col = clustering,
-         cutree_rows = 8)
-
-dev.off()
-
-############################# INDEL FREQUENCY ########################
-all_compounds_indelrate_synergy
-
-all_compounds_indelrate_synergy = all_compounds_indelrate_synergy[!grepl("DNA-PK|Mirin|Null", rownames(all_compounds_indelrate_synergy)), ]
-
-quant_breaks <- quantile(all_compounds_indelrate_synergy, c(.01,.99), na.rm = T) # change these numbers according to where you want to set the cutoff
-palette_length <- 1000
-breaks <- c(seq(quant_breaks[1], 0, length.out=ceiling(palette_length/2) + 1), 
-            seq(quant_breaks[2]/palette_length, quant_breaks[2], length.out=floor(palette_length/2)))
-colors = colorRampPalette(slope.colors %>% pull(color))(length(breaks))
-colors[which(quant_breaks == 0)-1] = "gray90"
-
-
-
-clone5_map_ipr_18 = hclust(dist(t(clone5.matrix)))
-clone5_map_ipr_18_labes =  clone5_map_ipr_18$labels[clone5_map_ipr_18$labels %in% colnames(all_compounds_indelrate_synergy)]
-
-pdf(paste0(figure_out, "rs20220217_synergy_indelfreq_all.pdf"), width=22, height=12)
-
-pheatmap(t(all_compounds_indelrate_synergy[, clone5_map_ipr_18_labes]),
-         border_color = F,
-         cellwidth = 8,
-         cellheight = 8,
-         cluster_rows = clone5_map,
-         breaks = breaks,
-         annotation_col = target,
-         main = "Indel frequency synergy for all compounds with significant hit",
-         color = colors,
-         annotation_colors = annotation_colors_scr, annotation_legend = T,
-         annotation_row = clustering,
-         cutree_cols = 9)
-dev.off()
-```
-
-
-# Panel B
-```{r}
-# Data table and compute log2_ratio (This line needs to be adjusted)
-filtered_drug_conc = screen_ratios %>%
-  filter(abs(MMEJ_zscore) > 1.96 | drug == "DMSO") %>%
-  mutate(drug_conc = paste(drug, conc_char, sep = "_"),
-         effect_on_ratio = ifelse(abs(MMEJ_zscore_comb) > 1.96, TRUE, FALSE)) %>%
-  distinct(drug, conc_char, drug_conc, effect_on_indelrate, effect_on_ratio) %>%
-  mutate(counts = ave(drug_conc, drug, conc_char, FUN = function(x) length(x)),
-         keep = ifelse(counts > 1 & !effect_on_indelrate | counts > 1 & !effect_on_ratio, FALSE, TRUE)) %>%
-  filter(keep) %>% 
-  distinct(drug, conc_char, drug_conc, effect_on_indelrate, effect_on_ratio)
-
-
-ratios_tib <- screen_ratios %>%
-  mutate(drug_conc_char = paste(drug, conc_char, sep = "_")) %>%
-  semi_join(filtered_drug_conc) %>%
-  distinct(NHEJratio, drug, conc_char, target, IPR) %>%
-  mutate(NHEJratio = ave(NHEJratio, drug, conc_char, IPR, FUN = mean)) %>%
-  mutate(NHEJratio.log2 = log2(NHEJratio)) %>%
-  distinct()
-
-dmso_ratios_tib <- screen_ratios %>%
-  filter(drug == "DMSO") %>%
-  distinct(NHEJratio, freqCut, IPR) %>%
-  mutate(DMSO.ratio = ave(NHEJratio, IPR, FUN = mean)) %>%
-  mutate(DMSO.ratio.log2 = log2(DMSO.ratio)) %>%
-  mutate(DMSO.freqCut = ave(freqCut, IPR, FUN = mean)) %>%
-  mutate(DMSO.freqCut.log2 = log2(DMSO.freqCut)) %>%
-  dplyr::select(-NHEJratio, -freqCut) %>%
-  distinct()
-
-ratios_tib <- merge(ratios_tib, dmso_ratios_tib) %>% 
-  dplyr::group_by(IPR, drug, conc_char) %>% 
-  mutate(log2.FC.ratio = NHEJratio.log2 - DMSO.ratio.log2, 
-         log2.FC.freqCut = freqCut.log2 - DMSO.freqCut.log2) %>%
-  left_join(chrom_data)
+chromatin_TIF = chromatin %>% rownames_to_column(var = "IPR") %>%
+  left_join(TIF_IPR) %>%
+  column_to_rownames("IPR")
 ```
 
 
 
 ```{r vorinostat synergy}
-vorinostat_ratios = validations_ratios %>% 
+vorinostat_ratios =  indel.data.validation %>% 
   filter(replicate == "mean" & plasmid == "LBR2" & pool == "AB") %>% 
-  distinct(IPR, drug, NHEJ_MMEJ , efficiency) %>% 
+  distinct(barcode, drug, NHEJ_MMEJ , efficiency) %>% 
   pivot_wider(names_from = drug, values_from = c(efficiency, NHEJ_MMEJ)) %>%
   mutate(diff_efficiency = efficiency_Vorinostat - efficiency_DMSO,
          ratio_efficiency = efficiency_Vorinostat/efficiency_DMSO,
          logFC_NHEJ_MMEJ = log2(NHEJ_MMEJ_Vorinostat / NHEJ_MMEJ_DMSO))  %>%
   filter(!is.na(logFC_NHEJ_MMEJ) & !is.na(ratio_efficiency) & !is.infinite(logFC_NHEJ_MMEJ))
   
-vorinostat_ratios %<>% left_join(unique(validations_ratios[, c(1, 42:75)]), by = "IPR") %>% distinct(IPR, .keep_all = TRUE)
+vorinostat_ratios %<>% left_join(unique(indel.data.validation[, c(1, 42:75)]), by = "barcode") %>% distinct(barcode, .keep_all = TRUE)
 
-chromatin.features <- colnames(validations_ratios)[42:65]
+chromatin.features <- colnames(indel.data.validation)[42:65]
 
 slope.vorinostat.features <- tibble(feature = NA,  term = NA, 
                                  ratio = NA, p.value = NA)
@@ -863,7 +805,7 @@ for (j in chromatin.features) {
 
 # Remove the 1st NA column
 slope.vorinostat.features %<>% 
-  filter(!is.na(.)) %>%
+  filter(!is.na(feature)) %>%
   mutate(term = ifelse(term == "(Intercept)", "intercept", "slope"))
 
 # Calculate postition where the linear model crosses y = 0, we do this by -intercept / slope
@@ -879,32 +821,36 @@ synergy_tib %>%
   filter(!is.na(ratio_slope_plot))
 
 
-pdf(paste0(figure_out, "rs20220210_vorinostat_synergy.pdf"), width=8, height=4)
+# pdf(paste0(figure_out, "rs20220210_vorinostat_synergy.pdf"), width=8, height=4)
 p1 = vorinostat_ratios %>% ggplot(., aes(H3K27me3, logFC_NHEJ_MMEJ)) + geom_point() + stat_cor() + geom_smooth(method = "lm") + theme_bw(base_size = 16)
 p2 = vorinostat_ratios %>% ggplot(., aes(EZH2, logFC_NHEJ_MMEJ)) + geom_point() + stat_cor() + geom_smooth(method = "lm") + theme_bw(base_size = 16)
 plot_grid(p1, p2)
-dev.off()
+# dev.off()
 ```
+
+
 
 ```{r}
 vorino_screen = ratios_tib %>% filter(drug == "Vorinostat (SAHA, MK0683)") %>% 
   ungroup() %>%
-  select(all_of(chromatin.features.zs), IPR, log2.FC.ratio, NHEJratio, DMSO.ratio) %>% 
+  dplyr::select(all_of(chromatin.features.short), barcode, log2.FC.ratio, NHEJratio, DMSO.ratio) %>% 
   dplyr::rename(screen_FC = log2.FC.ratio, DMSO_screen = DMSO.ratio) %>%
-  distinct(IPR, screen_FC, H3K27me3.zscore, NHEJratio, DMSO_screen)
+  distinct(barcode, screen_FC, H3K27me3, NHEJratio, DMSO_screen) %>%
+  filter(!is.na(screen_FC))
 
 vorino_pool_screen = vorinostat_ratios %>% 
-  mutate(IPR = gsub(".[AB]$", "", IPR)) %>% 
-  filter(IPR %in% vorino_screen$IPR) %>% 
-  distinct(IPR, logFC_NHEJ_MMEJ, H3K27me3, NHEJ_MMEJ_Vorinostat, NHEJ_MMEJ_DMSO) %>%
-  dplyr::rename(pool_FC = logFC_NHEJ_MMEJ, 
+  mutate(barcode = gsub(".[AB]$", "", barcode)) %>% 
+  filter(barcode %in% vorino_screen$barcode) %>% 
+  distinct(barcode, logFC_NHEJ_MMEJ, H3K27me3, NHEJ_MMEJ_Vorinostat, NHEJ_MMEJ_DMSO) %>%
+  dplyr::rename(H3K27me3_pool = H3K27me3,
+                pool_FC = logFC_NHEJ_MMEJ, 
                 NHEJratio_pool = NHEJ_MMEJ_Vorinostat, 
                 DMSO_pool = NHEJ_MMEJ_DMSO) %>%
   left_join(vorino_screen)
 
 ggplot(vorino_pool_screen, aes(pool_FC, screen_FC)) + geom_point() + stat_cor() + geom_smooth(method = "lm") + theme_bw(base_size = 16) + xlab("Log2 FC pool") + ylab("Log2 FC screen")
 
-ggplot(vorino_pool_screen, aes(H3K27me3, H3K27me3.zscore)) + geom_point() + stat_cor() + geom_smooth(method = "lm") + theme_bw(base_size = 16) + xlab("Log2 FC pool") + ylab("Log2 FC screen")
+ggplot(vorino_pool_screen, aes(H3K27me3_pool, H3K27me3)) + geom_point() + stat_cor() + geom_smooth(method = "lm") + theme_bw(base_size = 16) + xlab("Log2 FC pool") + ylab("Log2 FC screen")
 
 
 ggplot(vorino_pool_screen, aes(NHEJratio_pool, NHEJratio)) + geom_point() + stat_cor() + geom_smooth(method = "lm") + theme_bw(base_size = 16) + xlab("NHEJ/MMEJ pool") + ylab("NHEJ/MMEJ screen")
@@ -913,7 +859,8 @@ ggplot(vorino_pool_screen, aes(DMSO_pool, DMSO_screen)) + geom_point() + stat_co
 ```
 
 ```{r}
-FC_ttest = screen_ratios %>% 
+FC_ttest = indel.data %>% 
+  filter(pathway_bal_filter == T) %>%
   distinct(MMEJ_log2_FC, IPR, conc_char, drug, chromatin, replicate, tech) %>% 
   group_by(IPR, drug, conc_char) %>%
   do(tidy(t.test(.$MMEJ_log2_FC))) %>% 
@@ -925,7 +872,7 @@ FC_ttest = screen_ratios %>%
 
 
 ```{r}
-Vorino_rep_check = screen_ratios %>% 
+Vorino_rep_check = indel.data %>% 
   filter(drug == "Vorinostat (SAHA, MK0683)") %>% 
   distinct(MMEJ_log2_FC, MMEJ_zscore, IPR, tech, replicate, chromatin) %>% 
   mutate(tech_rep = paste(replicate, tech, sep = "_"))
@@ -940,9 +887,9 @@ p2 = ggplot(Vorino_rep_check, aes(IPR, MMEJ_zscore)) +
 plot_grid(p1, p2, ncol = 1)
 ```
 ```{r}
-screen_ratios %>% pull(drug) %>% unique() %>% .[grepl("MC-1293", .)]
+indel.data %>% pull(drug) %>% unique() %>% .[grepl("MC-1293", .)]
 
-Vorino_rep_check = screen_ratios %>% 
+Vorino_rep_check = indel.data %>% 
   filter(drug == "PCI-24781 (Abexinostat)") %>% 
   distinct(MMEJ_log2_FC, MMEJ_zscore, IPR, tech, replicate, chromatin) %>% 
   mutate(tech_rep = paste(replicate, tech, sep = "_"))
@@ -959,7 +906,7 @@ p2 = ggplot(Vorino_rep_check, aes(IPR, MMEJ_zscore)) +
 plot_grid(p1, p2, ncol = 1)
 
 
-Vorino_rep_check = screen_ratios %>% 
+Vorino_rep_check = indel.data %>% 
   filter(drug == "CI994 (Tacedinaline)") %>% 
   distinct(MMEJ_log2_FC, MMEJ_zscore, IPR, tech, replicate, chromatin) %>% 
   mutate(tech_rep = paste(replicate, tech, sep = "_"))
@@ -975,7 +922,7 @@ p2 = ggplot(Vorino_rep_check, aes(IPR, MMEJ_zscore)) +
 
 plot_grid(p1, p2, ncol = 1)
 
-Vorino_rep_check = screen_ratios %>% 
+Vorino_rep_check = indel.data %>% 
   filter(drug == "Scriptaid") %>% 
   distinct(MMEJ_log2_FC, MMEJ_zscore, IPR, tech, replicate, chromatin) %>% 
   mutate(tech_rep = paste(replicate, tech, sep = "_"))
@@ -991,7 +938,7 @@ p2 = ggplot(Vorino_rep_check, aes(IPR, MMEJ_zscore)) +
 
 plot_grid(p1, p2, ncol = 1)
 
-Vorino_rep_check = screen_ratios %>% 
+Vorino_rep_check = indel.data %>% 
   filter(drug == "Resminostat") %>% 
   distinct(MMEJ_log2_FC, MMEJ_zscore, IPR, tech, replicate, chromatin) %>% 
   mutate(tech_rep = paste(replicate, tech, sep = "_"))
@@ -1007,7 +954,7 @@ p2 = ggplot(Vorino_rep_check, aes(IPR, MMEJ_zscore)) +
 
 plot_grid(p1, p2, ncol = 1)
 
-Vorino_rep_check = screen_ratios %>% 
+Vorino_rep_check = indel.data %>% 
   filter(drug == "MC-1293") %>% 
   distinct(MMEJ_log2_FC, MMEJ_zscore, IPR, tech, replicate, chromatin) %>% 
   mutate(tech_rep = paste(replicate, tech, sep = "_"))
@@ -1025,13 +972,13 @@ plot_grid(p1, p2, ncol = 1)
 ```
 
 ```{r}
-screen_ratios %>% pull(drug) %>% unique() %>% .[grepl("MC-1293", .)]
+indel.data %>% pull(drug) %>% unique() %>% .[grepl("MC-1293", .)]
 
-HDAC_followup = screen_ratios %>% 
+HDAC_followup = indel.data %>% 
   filter(drug %in% c("PCI-24781 (Abexinostat)", "MC-1293", "Resminostat", "Scriptaid", 
                      "CI994 (Tacedinaline)", "PCI-24781 (Abexinostat)", "Vorinostat (SAHA, MK0683)")) %>% 
-  distinct(MMEJ_log2_FC, MMEJ_zscore_comb, IPR, chromatin, drug) %>% 
-  mutate(mean_MMEJ_FC = ave(MMEJ_log2_FC, IPR, drug, FUN = mean)) %>%
+  distinct(MMEJ_log2_FC, MMEJ_zscore_comb, IPR, chromatin, drug, conc_char) %>% 
+  mutate(mean_MMEJ_FC = ave(MMEJ_log2_FC, IPR, conc_char, drug, FUN = mean)) %>%
   distinct(mean_MMEJ_FC, MMEJ_zscore_comb, IPR, chromatin, drug)
 
 p1 = ggplot(HDAC_followup, aes(IPR, mean_MMEJ_FC)) + 
@@ -1048,7 +995,7 @@ plot_grid(p1, p2, ncol = 1)
 
 
 ```{r}
-Vorino_rep_check = screen_ratios %>% 
+Vorino_rep_check = indel.data %>% 
   filter(target == "HDAC") %>% 
   distinct(MMEJ_log2_FC, MMEJ_zscore, IPR, tech, replicate, chromatin) %>% 
   mutate(tech_rep = paste(replicate, tech, sep = "_"))
@@ -1070,16 +1017,16 @@ GSK_BIX_molcell_tib <- readRDS("/DATA/projects/DSBrepair/data/R/rs20210311/RSTP2
                          "mean_RSTP2_2000_LBR2_GSK126_64")) 
 
 GSK_fc = GSK_BIX_molcell_tib %>% 
-  distinct(IPR, drug, NHEJ, MMEJ) %>%
+  distinct(barcode, drug, NHEJ, MMEJ) %>%
   mutate(NHEJ_MMEJ = NHEJ/MMEJ) %>%
-  select(-NHEJ, -MMEJ) %>%
+  dplyr::select(-NHEJ, -MMEJ) %>%
   pivot_wider(values_from = NHEJ_MMEJ, names_from = drug) %>%
   filter(complete.cases(.)) %>%
   mutate(logFC_GSK= log2(GSK126 / DMSO_GSK))  %>%
   filter(!is.na(logFC_GSK) & !is.infinite(logFC_GSK)) %>%
-  select(IPR, logFC_GSK)
+  dplyr::select(barcode, logFC_GSK)
   
-chrom_data_pool = GSK_BIX_molcell_tib %>% select(IPR, all_of(chromatin.features)) %>% distinct()
+chrom_data_pool = GSK_BIX_molcell_tib %>% dplyr::select(barcode, all_of(chromatin.features)) %>% distinct()
 
 GSK_fc %<>% left_join(chrom_data_pool)
 
@@ -1107,7 +1054,7 @@ for (j in chromatin.features) {
 
 # Remove the 1st NA column
 slope.compound.features %<>% 
-  filter(!is.na(.)) %>%
+  filter(!is.na(feature)) %>%
   mutate(term = ifelse(term == "(Intercept)", "intercept", "slope"))
 
 # Calculate postition where the linear model crosses y = 0, we do this by -intercept / slope
@@ -1125,20 +1072,13 @@ synergy_tib_filtered = synergy_tib %>%
 synergy_tib_filtered
 
 
-pdf(paste0(figure_out, "rs20220210_GSK_schepetal.pdf"), width=8, height=4)
+# pdf(paste0(figure_out, "rs20220210_GSK_schepetal.pdf"), width=8, height=4)
 p1 = GSK_fc %>% ggplot(., aes(H3K27me3, logFC_GSK)) + geom_point() + stat_cor() + geom_smooth(method = "lm") + theme_bw(base_size = 16)
 p2 = GSK_fc  %>% ggplot(., aes(EZH2, logFC_GSK)) + geom_point() + stat_cor() + geom_smooth(method = "lm") + theme_bw(base_size = 16)
 plot_grid(p1, p2)
-dev.off()
+# dev.off()
 ```
 
-
-
-```{r export}
-setwd("/DATA/usr/m.trauernicht/projects/EpiScreen/files_scripts/")
-filename <- SetFileName("_screen_ratios", "mt")
-save(screen_ratios, file = filename)
-```
 
 # Session Info
 ```{r}
