@@ -232,8 +232,7 @@ colors_drugs <- c("#FA8D62", "#65BFA4", "#8CA0C4", "#808184", "#F6D289", "#E5E5E
 colors_targets <-  c(HDAC="#60988D", HAT="#C6D0A8", Sirtuin="#8FCAAC",
                      HMT="#FDCDAC", DNMT="#D69C81", `Histone Demethylase`="#FFF2AE",
                      HIF="#E3DCD5", JAK="#C8D7E2", PIM="#9AB8C4", `Aurora Kinase`="#F4CAE4",
-                     PARP="#CB546F", `Epigenetic Reader Domain`= "#476D61", `DNA-PK`="#E07A43"
-)
+                     PARP="#CB546F", `Epigenetic Reader Domain`= "#476D61", `DNA-PK`="#E07A43")
 
 conc_colors = c("100 nM" = colors_drugs[7], "1 µM" = colors_drugs[4], "10 µM" = "#000000")
 

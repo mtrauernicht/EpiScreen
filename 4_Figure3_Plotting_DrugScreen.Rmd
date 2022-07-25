@@ -379,139 +379,6 @@ file = list.files(in.dir, pattern = "ratios", full.names = T) %>% tail(n = 1)
 indel.data <- readRDS(file) # %>% filter(pathway_bal_filter == TRUE & viab_reproducibility == TRUE)
 ```
 
-
-
-
-## A: MMEJ-z-score per drug
-Are the compounds (per concentration) that significantly alter the MMEJ score?
-```{r warning = FALSE}
-# A: MMEJ-z-score per drug
-ggplot(indel.data %>%
-                filter(sample == "Epigenetic Compound") %>%
-                distinct(MMEJ_ratio_norm, drug, conc_char, MMEJ_zscore_global_comb) %>%
-                mutate(MMEJ_ratio_norm = ave(MMEJ_ratio_norm, drug, conc_char, FUN = mean)) %>%
-                distinct() %>%
-                mutate(MMEJ_pval_global_comb = 2*pnorm(q = abs(MMEJ_zscore_global_comb), lower.tail = F)) %>%
-                mutate(MMEJ_pval_adj_global_comb = p.adjust(MMEJ_pval_global_comb, method = 'fdr')),
-              aes(y = -log10(MMEJ_pval_adj_global_comb), x = log2(MMEJ_ratio_norm), 
-                  color = ifelse(MMEJ_pval_adj_global_comb < 0.05 & MMEJ_ratio_norm > 1.05, "green", 
-                               ifelse(MMEJ_pval_adj_global_comb < 0.05 & MMEJ_ratio_norm < 0.95, "yellow","blue")))) +
-  geom_point() +
-  geom_hline(linetype = "dashed", yintercept = -log10(0.05)) +
-  geom_vline(linetype = "dashed", xintercept = log2(1.05)) +
-  geom_vline(linetype = "dashed", xintercept = log2(0.95)) +
-  scale_color_manual(values = c("#C2C2C2", "#3d405b", "#e07a5f")) +
-  facet_wrap(~conc_char) +
-  annotate("rect",xmin=log2(1.05),xmax=log2(0.95),ymin=-Inf,ymax=Inf, alpha=0.1, fill="black") +
-  annotate("rect",xmin=-Inf,xmax=Inf,ymin=-Inf,ymax=-log10(0.05), alpha=0.1, fill="black")
-
-# Plot raw MMEJ ratio
-dmso_bal <- indel.data %>%
-  filter(drug == "DMSO") %>%
-  dplyr::select('dmso_bal' = MMEJratio, IPR) %>%
-  mutate(max_dmso_bal = ave(dmso_bal, IPR, FUN = mean),
-         dmso_bal = mean(dmso_bal)) %>%
-  mutate(max_dmso_bal = max(max_dmso_bal)) %>%
-  #mutate(max_dmso_bal = max_dmso_bal - dmso_bal) %>%
-  distinct(dmso_bal, max_dmso_bal)
-
-
-ggplot(indel.data %>%
-                filter(sample == "Epigenetic Compound") %>%
-                distinct(MMEJratio, drug, conc_char, MMEJ_zscore_global_comb) %>%
-                mutate(MMEJratio = ave(MMEJratio, drug, conc_char, FUN = mean)) %>%
-                distinct() %>%
-                mutate(MMEJ_pval_global_comb = 2*pnorm(q = abs(MMEJ_zscore_global_comb), lower.tail = F)) %>%
-                mutate(MMEJ_pval_adj_global_comb = p.adjust(MMEJ_pval_global_comb, method = 'fdr')),
-              aes(y = -log10(MMEJ_pval_adj_global_comb), x = MMEJratio, 
-                  color = ifelse(MMEJ_pval_adj_global_comb < 0.05 & MMEJratio > (dmso_bal$dmso_bal + 0.02), "green", 
-                               ifelse(MMEJ_pval_adj_global_comb < 0.05 & MMEJratio < (dmso_bal$dmso_bal - 0.02), "yellow","blue")))) +
-  geom_point() +
-  geom_hline(linetype = "dashed", yintercept = -log10(0.05)) +
-  geom_vline(linetype = "dashed", xintercept = (dmso_bal$dmso_bal + 0.02)) +
-  geom_vline(linetype = "dashed", xintercept = (dmso_bal$dmso_bal - 0.02)) +
-  scale_color_manual(values = c("#C2C2C2", "#3d405b", "#e07a5f")) +
-  facet_wrap(~conc_char) +
-  annotate("rect",xmin=(dmso_bal$dmso_bal - 0.02),xmax=(dmso_bal$dmso_bal + 0.02),ymin=-Inf,ymax=Inf, alpha=0.1, fill="black") +
-  annotate("rect",xmin=-Inf,xmax=Inf,ymin=-Inf,ymax=-log10(0.05), alpha=0.1, fill="black") +
-  coord_flip()
-
-aurora_targets <- data.frame("drug" = c("Alisertib","Aurora A Inhibitor I", "Barasertib","CCT129202", "CCT137690", "CYC116",
-                                        "ENMD-2076","Hesperadin","JNJ-7706621","KW-2449","MK-5108","MLN8054","PHA-680632","SNS-314 Mesylate","ZM 447439"),
-                             "A_B" = c("A", "A", "B", "A+B", "A+B","A+B", "A", "B", "A+B", "A", "A", "A", "A", "A+B", "A+B"),
-                             "B" = c("No", "No", "Yes", "Yes", "Yes", "Yes", "No", "Yes", "Yes", "No", "No", "No", "No", "Yes", "Yes"),
-                             "A" = c("Yes", "Yes", "No", "Yes", "Yes", "Yes", "Yes", "No", "Yes", "Yes", "Yes", "Yes", "Yes", "Yes", "Yes"))
-
-ggplot(indel.data %>%
-                filter(sample == "Epigenetic Compound") %>%
-                filter(target == "Aurora Kinase") %>%
-                distinct(MMEJratio, drug, conc_char, MMEJ_zscore_global_comb) %>%
-                mutate(MMEJratio = ave(MMEJratio, drug, conc_char, FUN = mean)) %>%
-                distinct() %>%
-                mutate(MMEJ_pval_global_comb = 2*pnorm(q = abs(MMEJ_zscore_global_comb), lower.tail = F)) %>%
-                mutate(MMEJ_pval_adj_global_comb = p.adjust(MMEJ_pval_global_comb, method = 'fdr')) %>%
-         mutate(drug = gsub(" [(].*[)]", "", drug)) %>%
-         left_join(aurora_targets),
-              aes(y = -log10(MMEJ_pval_adj_global_comb), x = MMEJratio,
-                  color = A_B)) +
-  geom_point(size = 2) +
-  #geom_label_repel(data = indel.data.freq2 %>% filter(flag == "TRUE") %>% unique(), 
-                   #aes(label = drug)) +
-  geom_hline(linetype = "dashed", yintercept = -log10(0.05)) +
-  geom_vline(linetype = "dashed", xintercept = (dmso_bal$dmso_bal + 0.02)) +
-  geom_vline(linetype = "dashed", xintercept = (dmso_bal$dmso_bal - 0.02)) +
-  #geom_vline(linetype = "twodash", xintercept = unique(indel.data.freq$max_dmso_bal))+
-  scale_color_manual(values = c("#6d6875", "#b5838d", "#ffb4a2")) +
-  #facet_wrap(~conc_char) +
-  #annotate("rect",xmin=(dmso_bal$dmso_bal + 0.02),xmax=unique(indel.data.freq$max_dmso_bal),ymin=-log10(0.05),ymax=Inf, alpha=0.1, fill="#e07a5f") +
-  #annotate("rect",xmin=unique(indel.data.freq$max_dmso_bal),xmax=Inf,ymin=-Inf,ymax=Inf, alpha=0.25, fill="black") +
-  #annotate("rect",xmin=-Inf,xmax=(dmso_bal$dmso_bal - 0.02),ymin=-log10(0.05),ymax=Inf, alpha=0.1, fill="#3d405b") +
-  coord_flip()
-```
-
-*Figure 3A: Compound-induced change in MMEJ ratio of all tested compounds. Mean MMEJ z-score per drug & concentration.* 
-
-**Conclusion: Yes, there are a lot of interesting hits at all tested concentrations.**
-
----
-
-## B: MMEJ ratio change per target group
-Are there any target groups that are prone to changes in MMEJ ratio?
-```{r warning = FALSE}
-# C: Bar plot
-eff.data <- indel.data %>%
-  filter(sample == "Epigenetic Compound") %>%
-  distinct(MMEJ_zscore_global_comb, drug, target, conc_char, MMEJratio) %>%
-  mutate(MMEJratio = ave(MMEJratio, drug, conc_char, FUN = mean)) %>%
-  distinct() %>%
-  mutate(MMEJ_pval_global_comb = 2*pnorm(q = abs(MMEJ_zscore_global_comb), lower.tail = F)) %>%
-  mutate(MMEJ_pval_adj_global_comb = p.adjust(MMEJ_pval_global_comb, method = 'fdr'))
-
-eff.data$sign <- "2_No"
-eff.data$sign[eff.data$MMEJratio > (dmso_bal$dmso_bal + 0.02) & eff.data$MMEJ_pval_adj_global_comb < 0.05] <- "1_Up"
-eff.data$sign[eff.data$MMEJratio < (dmso_bal$dmso_bal - 0.02) & eff.data$MMEJ_pval_adj_global_comb < 0.05] <- "0_Down"
-
-eff.data <- eff.data %>%
-  mutate(number = ave(target, target, sign, conc_char, FUN = length)) %>%
-  mutate(number = as.numeric(number)) %>%
-  distinct(conc_char, target, sign, number) %>%
-  spread(sign, number, fill = 0) %>%
-  mutate(fraction = (`1_Up` + `0_Down`) / (`2_No` + (`1_Up` + `0_Down`))) %>%
-  pivot_longer(`0_Down`:`2_No`, names_to = "sign", values_to = "number")
-
-
-ggplot(eff.data,
-              aes(y = reorder(target, number), x = number, fill = sign)) +
-  geom_bar(stat = "identity") +
-  facet_wrap(~conc_char)+
-  scale_fill_manual(values = c("#e07a5f", "#3d405b", "#C2C2C2")) +
-  theme_pubr(border = T)
-```
-
-*Figure 2B: Number of compounds with significant changes in MMEJ ratio per target group.*
-
-**Conclusion: Some target groups have more changes. But there are no groups significantly sticking out.**
-
 ---
 
 ## C: MMEJ ratio heatmap: drug vs genomic location
@@ -704,8 +571,39 @@ plt1 = pheatmap(balance.data.heatmap2.clusters %>%
 ```
 
 
-```{r, echo = FALSE}
 
+```{r Aurora Kinase, echo = FALSE}
+aurora_targets <- data.frame("drug" = c("Alisertib","Aurora A Inhibitor I", "Barasertib","CCT129202", "CCT137690", "CYC116",
+                                        "ENMD-2076","Hesperadin","JNJ-7706621","KW-2449","MK-5108","MLN8054","PHA-680632","SNS-314 Mesylate","ZM 447439"),
+                             "A_B" = c("A", "A", "B", "A+B", "A+B","A+B", "A", "B", "A+B", "A", "A", "A", "A", "A+B", "A+B"),
+                             "B" = c("No", "No", "Yes", "Yes", "Yes", "Yes", "No", "Yes", "Yes", "No", "No", "No", "No", "Yes", "Yes"),
+                             "A" = c("Yes", "Yes", "No", "Yes", "Yes", "Yes", "Yes", "No", "Yes", "Yes", "Yes", "Yes", "Yes", "Yes", "Yes"))
+
+ggplot(indel.data %>%
+                filter(sample == "Epigenetic Compound") %>%
+                filter(target == "Aurora Kinase") %>%
+                distinct(MMEJratio, drug, conc_char, MMEJ_zscore_global_comb) %>%
+                mutate(MMEJratio = ave(MMEJratio, drug, conc_char, FUN = mean)) %>%
+                distinct() %>%
+                mutate(MMEJ_pval_global_comb = 2*pnorm(q = abs(MMEJ_zscore_global_comb), lower.tail = F)) %>%
+                mutate(MMEJ_pval_adj_global_comb = p.adjust(MMEJ_pval_global_comb, method = 'fdr')) %>%
+         mutate(drug = gsub(" [(].*[)]", "", drug)) %>%
+         left_join(aurora_targets),
+              aes(y = -log10(MMEJ_pval_adj_global_comb), x = MMEJratio,
+                  color = A_B)) +
+  geom_point(size = 2) +
+  #geom_label_repel(data = indel.data.freq2 %>% filter(flag == "TRUE") %>% unique(), 
+                   #aes(label = drug)) +
+  geom_hline(linetype = "dashed", yintercept = -log10(0.05)) +
+  geom_vline(linetype = "dashed", xintercept = (dmso_bal$dmso_bal + 0.02)) +
+  geom_vline(linetype = "dashed", xintercept = (dmso_bal$dmso_bal - 0.02)) +
+  #geom_vline(linetype = "twodash", xintercept = unique(indel.data.freq$max_dmso_bal))+
+  scale_color_manual(values = c("#6d6875", "#b5838d", "#ffb4a2")) +
+  #facet_wrap(~conc_char) +
+  #annotate("rect",xmin=(dmso_bal$dmso_bal + 0.02),xmax=unique(indel.data.freq$max_dmso_bal),ymin=-log10(0.05),ymax=Inf, alpha=0.1, fill="#e07a5f") +
+  #annotate("rect",xmin=unique(indel.data.freq$max_dmso_bal),xmax=Inf,ymin=-Inf,ymax=Inf, alpha=0.25, fill="black") +
+  #annotate("rect",xmin=-Inf,xmax=(dmso_bal$dmso_bal - 0.02),ymin=-log10(0.05),ymax=Inf, alpha=0.1, fill="#3d405b") +
+  coord_flip()
 ```
 
 
