@@ -275,10 +275,10 @@ clustering = data.frame(row.names=c('LMNB1', 'late_replicating', 'H3K9me2', 'H3K
 ```{r}
 # Data table and compute log2_ratio (This line needs to be adjusted)
 filtered_drug_conc = indel.data %>%
-  filter(abs(mean_eff_zscore_comb) > 1.96 | abs(MMEJ_zscore_comb) > 1.96 | drug == "DMSO") %>%
+  filter(abs(mean_eff_zscore_comb) > 2.58 | abs(MMEJ_zscore_comb) > 2.58 | drug == "DMSO") %>%
   mutate(drug_conc = paste(drug, conc_char,sep = " "),
-         effect_on_indelrate = ifelse(abs(mean_eff_zscore_comb) > 1.96, TRUE, FALSE),
-         effect_on_ratio = ifelse(abs(MMEJ_zscore_comb) > 1.96, TRUE, FALSE)) %>%
+         effect_on_indelrate = ifelse(abs(mean_eff_zscore_comb) > 2.58, TRUE, FALSE),
+         effect_on_ratio = ifelse(abs(MMEJ_zscore_comb) > 2.58, TRUE, FALSE)) %>%
   distinct(drug, conc_char, drug_conc, effect_on_indelrate, effect_on_ratio) %>%
   mutate(counts = ave(drug_conc, drug, conc_char, FUN = function(x) length(x)),
          keep = ifelse(counts > 1 & !effect_on_indelrate | counts > 1 & !effect_on_ratio, FALSE, TRUE)) %>%
@@ -415,7 +415,7 @@ adj_p.value_KO_model <- drug_conc_CCDs_dt %>%
   mutate(p.adj = p.adjust(p.value, method = "BH")) %>% 
   dplyr::select(var, drug_conc,p.value,p.adj)
 
-signif_hits = adj_p.value_KO_model %>% filter(p.adj < 0.05) %>% 
+signif_hits = adj_p.value_KO_model %>% filter(p.adj < 0.01) %>% 
   distinct(drug_conc, var) %>% 
   ungroup() %>% 
   mutate(val = TRUE,
@@ -520,7 +520,7 @@ all_compounds_epistasis = epistasis_tib %>%
 quant_breaks <- quantile(all_compounds_epistasis, c(.01,.99), na.rm = T)
 palette_length <- 100
 breaks <- c(seq(quant_breaks[1], 0, length.out=ceiling(palette_length/2) + 1), 
-            seq(quant_breaks[2]/palette_length, quant_breaks[2], length.out=floor(palette_length/2)))
+            seq(-quant_breaks[1]/palette_length, -quant_breaks[1], length.out=floor(palette_length/2)))
 colors = colorRampPalette(slope.colors %>% pull(color))(length(breaks))
 colors[which(quant_breaks == 0)-1] = "gray90"
 
@@ -562,7 +562,7 @@ for (i in targets) {
     quant_breaks <- quantile(mmej_synergy_matrix, c(.01,.99), na.rm = T) 
     palette_length <- 100
     breaks <- c(seq(quant_breaks[1], 0, length.out=ceiling(palette_length/2) + 1), 
-                seq(quant_breaks[2]/palette_length, quant_breaks[2], length.out=floor(palette_length/2)))
+                seq(-quant_breaks[1]/palette_length, -quant_breaks[1], length.out=floor(palette_length/2)))
     slope.colors.temp = slope.colors
     if(all(mmej_synergy_matrix <= 0)) {
       breaks <- c(seq(quant_breaks[1], 0, length.out=ceiling(palette_length)))
@@ -576,15 +576,14 @@ for (i in targets) {
     colors[which(quant_breaks == 0)-1] = "gray90"
     
     # heatmap
-    p = pheatmap(mmej_synergy_matrix,
+    p = pheatmap(mmej_synergy_matrix[, TRIP_chrom_clust$labels],
                  border_color = F,
                  cellwidth = 8,
                  cellheight = 8,
                  cluster_rows = cluster_rows,
+                 cluster_cols = TRIP_chrom_clust,
                  breaks = breaks,
-                 # cluster_cols = TRIP_chrom_clust,
                  annotation_row = target_ctrl,
-                 
                  clustering_method = "ward.D",
                  main = paste("Chromatin synergies - MMEJ ratio per target :" , i, sep = " "),
                  color = colors,
@@ -616,7 +615,7 @@ breaks <- breaks <- c(seq(quant_breaks[1], -1,
                           -quant_breaks[1], 
                           length.out=floor(palette_length/2)))
 colors = colorRampPalette(slope.colors %>% pull(color))(length(breaks))
-colors[-which(breaks < -1.96 | breaks > 1.96 )] = "gray90"
+colors[-which(breaks < -2.58 | breaks > 2.58 )] = "gray90"
 
 pheatmap(mmejzscore_matrix[, clone5_map_ipr$labels],
          border_color = F,
@@ -627,7 +626,7 @@ pheatmap(mmejzscore_matrix[, clone5_map_ipr$labels],
          annotation_row = target_ctrl,
          
          clustering_method = "ward.D",
-         main = "Z-score - MMEJ ratio all",
+         main = "Z-score [< 0.01 p.val] - MMEJ ratio all",
          color = colors,
          annotation_colors = annotation_colors_scr, 
          annotation_legend = T,
@@ -670,7 +669,7 @@ for (i in targets) {
                  clustering_method = "ward.D",
                  breaks = breaks,
                  annotation_row = target_ctrl,
-                 main = paste("Z-score - MMEJ ratio per target :" , i, sep = " "),
+                 main = paste("Z-score [< 0.01 p.val] - MMEJ ratio per target :" , i, sep = " "),
                  color = colors,
                  annotation_colors = annotation_colors_scr, 
                  annotation_legend = T,
@@ -786,7 +785,7 @@ breaks <- breaks <- c(seq(quant_breaks[1], -1,
                           quant_breaks[2], 
                           length.out=floor(palette_length/2)))
 colors = colorRampPalette(slope.colors %>% pull(color))(length(breaks))
-colors[-which(breaks < -1.96 | breaks > 1.96 )] = "gray90"
+colors[-which(breaks < -2.58 | breaks > 2.58 )] = "gray90"
 
 pheatmap(mmejzscore_matrix[, clone5_map_ipr$labels],
          border_color = F,
@@ -795,7 +794,7 @@ pheatmap(mmejzscore_matrix[, clone5_map_ipr$labels],
          breaks = breaks,
          cluster_cols = clone5_map_ipr,
          annotation_row = target_ctrl,
-         main = "Z-score - TIF all",
+         main = "Z-score [< 0.01 p.val] - TIF all",
          color = colors,
          annotation_colors = annotation_colors_scr, 
          annotation_legend = T,
@@ -806,6 +805,10 @@ pheatmap(mmejzscore_matrix[, clone5_map_ipr$labels],
 targets = target %>% 
   pull(target) %>% 
   unique()
+
+HDAC_tib = read.table("rs20220708_HDAC_targets.txt", sep = "\t", fill = NA, header = T) %>%
+  select(-target_main, -target_second) %>%
+  as_tibble()
 
 for (i in targets) {
   target_drugs = rownames(filter(target, target %in% i))
@@ -836,7 +839,7 @@ for (i in targets) {
                  cluster_rows = cluster_rows,
                  breaks = breaks,
                  annotation_row = target_ctrl,
-                 main = paste("Z-score - TIF per target :" , i, sep = " "),
+                 main = paste("Z-score [< 0.01 p.val] - TIF per target :" , i, sep = " "),
                  color = colors,
                  annotation_colors = annotation_colors_scr, annotation_legend = T,
                  annotation_col = chromatin_TIF)
