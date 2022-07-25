@@ -380,7 +380,7 @@ ggplot(targets,
 **Conclusion: Most drugs are HDACs, a lot of compounds do not really target chromatin directly.**
 
 ---
-```{r FigS1A chromideograms, fig.height=5, fig.width=6}
+```{r Fig2A chromideograms, fig.height=5, fig.width=6}
 p1 = ggplot() +
   geom_segment(data = chromsizes,
                aes(x = chr, xend = chr, y = 0, yend = start),
