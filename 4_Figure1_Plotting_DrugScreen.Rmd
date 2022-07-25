@@ -638,6 +638,18 @@ chrom_tib = chrom_tib %>% rename_at(all_of(oldnames), ~ newnames)
 
 chrom_matrix = chrom_tib %>% select(-barcode) %>% column_to_rownames(., var = "IPR") %>% t()
 
+clone5_map_ipr = dendextend::rotate(hclust(dist(chrom_matrix)), c(1:2,5:8,3:4, 15:14, 17, 16, 18 ,13,10:12,9))
+
+
+# Feature clustering based on whole TRIP pool
+TRIP_chrom_tib <- readRDS('/DATA/projects/DSBrepair/data/R/cl20201026_ChIP_zscore_selection.RDS') %>% 
+  # Same for the TRIP chromatin features
+  select(-HDAC1, -HDAC2)
+
+TRIP_chrom = TRIP_chrom_tib %>% select(-binsize, -pool) %>% column_to_rownames("ID")
+# make clustering with some column rotation for better visualisation
+TRIP_chrom_clust = dendextend::rotate(hclust(dist(t(TRIP_chrom))), c(3:1, 6:4, 9:10, 14, 16, 15, 13:11, 7:8, 17:18, 20:23, 19))
+
 ## Chromatin groups
 group_colors = c("Euchromatin" = "#f7941d",
                  "other-heterochromatin" = "#838687",
@@ -685,10 +697,14 @@ breaks.chip <- c(seq(-quant_breaks[2], 0, length.out=ceiling(palette_length/2) +
 
 colors = colorRampPalette(rev(brewer.pal(n = 11, name="RdBu")))(palette_length)
 
-pheatmap(chrom_matrix, annotation_row=clustering,
+pheatmap(chrom_matrix[TRIP_chrom_clust$labels,], 
+         annotation_row=clustering,
          annotation_colors=list(chromatin=group_colors, group=feature_fill),
-         color = colors, breaks = breaks.chip,
-         annotation_col = domain_matrix)
+         color = colors, 
+         breaks = breaks.chip,
+         annotation_col = domain_matrix,
+         cluster_cols = clone5_map_ipr,
+         cluster_rows = TRIP_chrom_clust)
 ```
 
 
