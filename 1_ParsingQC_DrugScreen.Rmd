@@ -523,7 +523,7 @@ DMSO_data = viab_plot_tib %>% filter(drug == "DMSO")
 Mirin_data = viab_plot_tib %>% filter(drug == "Mirin")
 
 odd_data = viab_plot_tib %>% 
-  filter(viab_diff > 0.20)
+  filter(viab_diff > 0.25)
 
 drug_conc_odd = odd_data %>% 
   mutate(viab_reproducibility = FALSE) %>% 
