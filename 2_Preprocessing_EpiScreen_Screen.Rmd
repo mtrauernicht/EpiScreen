@@ -866,14 +866,12 @@ mean.TIF.zscore.comb = TIF.zscore %>% distinct(drug, conc_char, barcode, replica
                                     FUN = function(x) sum(x)/sqrt(length(x))),
          sum_sign = ave(zscore_TIF, drug, conc_char, barcode, replicate,
                                     FUN = function(x) length(table(sign(x)))),
-         filter_zscore_comb_tech = ifelse(sum_sign == 1, TRUE, FALSE),
+         filter_zscore_TIF_comb_tech = ifelse(sum_sign == 1, TRUE, FALSE),
          zscore_TIF_comb_rep = ave(zscore_TIF, drug, conc_char, barcode,
                                     FUN = function(x) sum(x)/sqrt(length(x))),
          sum_sign_comb = ave(zscore_TIF, drug, conc_char, barcode,
                                     FUN = function(x) length(table(sign(x)))),
-         filter_zscore_comb_rep = ifelse(sum_sign_comb == 1, TRUE, FALSE),
-         zscore_TIF_comb_tech = ifelse(filter_zscore_comb_tech, zscore_TIF_comb_tech, NA),
-         zscore_TIF_comb_rep = ifelse(filter_zscore_comb_rep, zscore_TIF_comb_rep, NA)) %>%
+         filter_zscore_TIF_comb_rep = ifelse(sum_sign_comb == 1, TRUE, FALSE)) %>%
   dplyr::select(-sum_sign, -sum_sign_comb)
 
 TIF.zscore %<>% left_join(mean.TIF.zscore.comb)
@@ -893,21 +891,23 @@ TIF.zscore.global.comb = TIF.zscore %>% distinct(drug, conc_char, barcode, repli
                                     FUN = function(x) sum(x)/sqrt(length(x))),
          sum_sign = ave(zscore_TIF_global, drug, conc_char, barcode, replicate,
                                     FUN = function(x) length(table(sign(x)))),
-         filter_global_zscore_comb_tech = ifelse(sum_sign == 1, TRUE, FALSE),
+         filter_zscore_TIF_global_comb_tech = ifelse(sum_sign == 1, TRUE, FALSE),
          zscore_TIF_global_comb_rep = ave(zscore_TIF_global, drug, conc_char, barcode,
                                     FUN = function(x) sum(x)/sqrt(length(x))),
          sum_sign_comb = ave(zscore_TIF_global, drug, conc_char, barcode,
                                     FUN = function(x) length(table(sign(x)))),
-         filter_global_zscore_comb_rep = ifelse(sum_sign_comb == 1, TRUE, FALSE),
-         zscore_TIF_global_comb_tech = ifelse(filter_global_zscore_comb_tech, zscore_TIF_global_comb_tech, NA),
-         zscore_TIF_global_comb_rep = ifelse(filter_global_zscore_comb_rep, zscore_TIF_global_comb_rep, NA))
+         filter_zscore_TIF_global_comb_rep = ifelse(sum_sign_comb == 1, TRUE, FALSE))
 
 TIF.zscore.global %<>% left_join(TIF.zscore.global.comb)
 
 TIF.zscore %<>% left_join(TIF.zscore.global) %>% 
   dplyr::select(barcode, replicate, plate, tech, well, drug, conc_char, 
-                zscore_TIF, zscore_TIF_comb_tech, zscore_TIF_comb_rep,
-                zscore_TIF_global, zscore_TIF_global_comb_tech, zscore_TIF_global_comb_rep)
+                zscore_TIF, 
+                zscore_TIF_comb_tech, filter_zscore_TIF_comb_tech,
+                zscore_TIF_comb_rep, filter_zscore_TIF_comb_rep,
+                zscore_TIF_global, 
+                zscore_TIF_global_comb_tech, filter_zscore_TIF_global_comb_tech,
+                zscore_TIF_global_comb_rep, filter_zscore_TIF_global_comb_rep)
 ```
 
 # Pathway ratio z-score calculation
@@ -999,14 +999,12 @@ mean.bal.zscore.comb = bal.zscore %>% distinct(drug, conc_char, barcode, replica
                                     FUN = function(x) sum(x)/sqrt(length(x))),
          sum_sign = ave(zscore_bal, drug, conc_char, barcode, replicate,
                                     FUN = function(x) length(table(sign(x)))),
-         filter_zscore_comb_tech = ifelse(sum_sign == 1, TRUE, FALSE),
+         filter_zscore_bal_comb_tech = ifelse(sum_sign == 1, TRUE, FALSE),
          zscore_bal_comb_rep = ave(zscore_bal, drug, conc_char, barcode,
                                     FUN = function(x) sum(x)/sqrt(length(x))),
          sum_sign_comb = ave(zscore_bal, drug, conc_char, barcode,
                                     FUN = function(x) length(table(sign(x)))),
-         filter_zscore_comb_rep = ifelse(sum_sign_comb == 1, TRUE, FALSE),
-         zscore_bal_comb_tech = ifelse(filter_zscore_comb_tech, zscore_bal_comb_tech, NA),
-         zscore_bal_comb_rep = ifelse(filter_zscore_comb_rep, zscore_bal_comb_rep, NA)) %>%
+         filter_zscore_bal_comb_rep = ifelse(sum_sign_comb == 1, TRUE, FALSE)) %>%
   dplyr::select(-sum_sign, -sum_sign_comb)
 
 bal.zscore %<>% left_join(mean.bal.zscore.comb)
@@ -1026,21 +1024,23 @@ bal.zscore.global.comb = bal.zscore %>% distinct(drug, conc_char, barcode, repli
                                     FUN = function(x) sum(x)/sqrt(length(x))),
          sum_sign = ave(zscore_bal_global, drug, conc_char, barcode, replicate,
                                     FUN = function(x) length(table(sign(x)))),
-         filter_global_zscore_comb_tech = ifelse(sum_sign == 1, TRUE, FALSE),
+         filter_zscore_bal_global_comb_tech = ifelse(sum_sign == 1, TRUE, FALSE),
          zscore_bal_global_comb_rep = ave(zscore_bal_global, drug, conc_char, barcode,
                                     FUN = function(x) sum(x)/sqrt(length(x))),
          sum_sign_comb = ave(zscore_bal_global, drug, conc_char, barcode,
                                     FUN = function(x) length(table(sign(x)))),
-         filter_global_zscore_comb_rep = ifelse(sum_sign_comb == 1, TRUE, FALSE),
-         zscore_bal_global_comb_tech = ifelse(filter_global_zscore_comb_tech, zscore_bal_global_comb_tech, NA),
-         zscore_bal_global_comb_rep = ifelse(filter_global_zscore_comb_rep, zscore_bal_global_comb_rep, NA))
+         filter_zscore_bal_global_comb_rep = ifelse(sum_sign_comb == 1, TRUE, FALSE))
 
 bal.zscore.global %<>% left_join(bal.zscore.global.comb)
 
 bal.zscore %<>% left_join(bal.zscore.global) %>% 
   dplyr::select(barcode, replicate, plate, tech, well, drug, conc_char, MMEJratio_norm,
-                zscore_bal, zscore_bal_comb_tech, zscore_bal_comb_rep,
-                zscore_bal_global, zscore_bal_global_comb_tech, zscore_bal_global_comb_rep)
+                zscore_bal, 
+                zscore_bal_comb_tech, filter_zscore_bal_comb_tech,
+                zscore_bal_comb_rep, filter_zscore_bal_comb_rep,
+                zscore_bal_global, 
+                zscore_bal_global_comb_tech, filter_zscore_bal_global_comb_tech,
+                zscore_bal_global_comb_rep, filter_zscore_bal_global_comb_rep)
 ```
 
 
@@ -1169,17 +1169,17 @@ ratio.cols = c("replicate",
                "freqCut_diff_mean",
                "freqCut_diff_global_mean",
                "zscore_TIF", 
-               "zscore_TIF_comb_tech", 
-               "zscore_TIF_comb_rep",
+               "zscore_TIF_comb_tech", "filter_zscore_TIF_comb_tech",
+               "zscore_TIF_comb_rep", "filter_zscore_TIF_comb_rep",
                "zscore_TIF_global", 
-               "zscore_TIF_global_comb_tech",
-               "zscore_TIF_global_comb_rep",
+               "zscore_TIF_global_comb_tech", "filter_zscore_TIF_global_comb_tech",
+               "zscore_TIF_global_comb_rep", "filter_zscore_TIF_global_comb_rep",
                "zscore_bal", 
-               "zscore_bal_comb_tech", 
-               "zscore_bal_comb_rep",
+               "zscore_bal_comb_tech", "filter_zscore_bal_comb_tech",
+               "zscore_bal_comb_rep", "filter_zscore_bal_comb_rep",
                "zscore_bal_global", 
-               "zscore_bal_global_comb_tech",
-               "zscore_bal_global_comb_rep",
+               "zscore_bal_global_comb_tech", "filter_zscore_bal_global_comb_tech",
+               "zscore_bal_global_comb_rep" , "filter_zscore_bal_global_comb_rep",
                "MMEJ_log2_FC")
 
 screen_ratios_tib =  screen.ratios.chrom.dt %>% 
