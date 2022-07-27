@@ -292,6 +292,7 @@ dmso.eff.score <- indel.data %>%
   pull(DMSO) %>%
   fitdistr(., "normal") %>% tidy()
 ```
+
 ```{r Compounds that affect the balance at all the sites}
 ## Which compounds change the balance at all the sites in both screens?
 all_balance = indel.data %>% 

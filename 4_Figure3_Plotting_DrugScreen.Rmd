@@ -38,7 +38,6 @@ Clone 5 with ~18 sgRNA target site IPRs was cut and treated with 160 epigenetic 
         num_ul = $(this).parentsUntil('#TOC').length;
         $(this).css({'text-indent': num_ul * 10, 'padding-left': 0});
       });
-
     });
 </script>
 
@@ -375,7 +374,7 @@ ggplot_custom <- function(...) ggplot2::ggplot(...) +
 ```{r data import, echo = FALSE, warning = FALSE}
 # Import data from preprocessing script
 in.dir = list.dirs(path = "/DATA/projects/DSBrepair/data/R") %>% .[grepl("episcreen", .)] %>% tail(n = 1)
-file = list.files(in.dir, pattern = "ratios", full.names = T) %>% tail(n = 1)
+file = list.files(in.dir, pattern = "episcreen_ratios", full.names = T) %>% tail(n = 1)
 indel.data <- readRDS(file) # %>% filter(pathway_bal_filter == TRUE & viab_reproducibility == TRUE)
 ```
 
