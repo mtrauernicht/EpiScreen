@@ -967,9 +967,36 @@ plt3 = pheatmap(AurK_matrix[clone5_map_ipr$labels, ],
                 cutree_cols = 4)
 ```
 
+```{r 2H AurK inhib global effects, fig.width= 4.5, fig.height= 5}
+CTRL.mean = dmso.eff.score$estimate[1]
+CTRL.SD = dmso.eff.score$estimate[2]
+
+indel.data.freq2 %>%
+  filter(target == "Aurora Kinase") %>%
+  left_join(AurK_tib) %>%
+  filter(!is.na(mean_eff_pval_global_comb)) %>%
+  mutate(AurK_Target = ifelse((AurB == 1 & AurA == 0), "B", ifelse(
+    (AurB == 0 & AurA == 1), "A", "A+B"))) %>%
+  ggplot(.,
+         aes(y = -log10(mean_eff_pval_adj_global_comb), x = freqCut_mean, 
+             color = AurK_Target)) +
+  geom_point(size = 3) +
+  #geom_label_repel(data = indel.data.freq2 %>% filter(flag == "TRUE") %>% unique(), 
+  #aes(label = drug)) +
+  geom_hline(linetype = "dashed", yintercept = -log10(0.01)) +
+  geom_vline(linetype = "solid", xintercept = (CTRL.mean)) +
+  geom_vline(linetype = "dashed", xintercept = (CTRL.mean + CTRL.SD)) +
+  geom_vline(linetype = "dashed", xintercept = (CTRL.mean - CTRL.SD)) +
+  #geom_vline(linetype = "twodash", xintercept = unique(indel.data.freq$max_dmso_freq))+
+  scale_color_manual(values = c("#6d6875", "#b5838d", "#ffb4a2")) +
+  scale_x_continuous(labels = scales::percent) +
+  coord_flip() +
+  theme_classic_lines_90()
+```
 
 ```{r 2I AurA vs AurB inhibitors, fig.width= 3, fig.height= 4}
-viab_tib = indel.data %>% distinct(replicate, drug, conc_char, viab_mean) %>%
+viab_tib = indel.data %>% filter(viab_reproducibility & indel_freq_filter & cor_TIF_filter) %>% 
+  distinct(replicate, drug, conc_char, viab_mean) %>%
   group_by(drug, conc_char) %>%
   summarise(viab_mean = mean(viab_mean, na.rm = TRUE)) %>%
   mutate(drug = gsub(" [(].*[)]", "", drug))
@@ -983,6 +1010,7 @@ aurora_df <- eff.data.heatmap2 %>%
   distinct() 
 
 aurora_df <- merge(aurora_df, AurK_tib) %>%
+  filter(!is.na(viab_mean)) %>%
   mutate(AurK_Target = ifelse((AurB == 1 & AurA == 0), "B", ifelse(
     (AurB == 0 & AurA == 1), "A", "A+B")))
 
@@ -1039,8 +1067,65 @@ ggplot(chromatin_effect,
 
 
 ```{r}
+indel.data %>% filter(filter_zscore_TIF_global_comb_rep, viab_mean > 0.75 & freqCut_diff_global < -0.08)
 
 ```
+# What is causing a decrease that is not directly due to viability change?
+## Figure 2E
+```{r 2C Top TIF boosting, }
+indel.data %>% 
+  filter(conc_char != "control" & indel_freq_filter & viab_reproducibility & cor_TIF_filter) %>%
+  distinct(drug, conc_char, zscore_TIF_global_comb_rep , target, viab_reproducibility) %>% 
+  arrange(zscore_TIF_global_comb_rep) %>%
+  mutate(rank = seq(1:n()),
+         drug = gsub(" [(].*[)]", "", drug),
+         drug_conc = paste(drug, conc_char, sep = " ")) %>%
+  filter(rank < 100) %>%
+  ggplot(., aes(rank, zscore_TIF_global_comb_rep , color = target)) +
+  geom_point()  +
+  scale_color_manual(values = colors_targets) +
+  gghighlight(rank <= 10, label_key = drug_conc) +
+  geom_hline(linetype = "dashed", yintercept = -2.58) +
+  xlim(0, 100) +
+  ylab("Global combined TIF z-score") +
+  theme_classic2()
+
+bottom_hits = indel.data  %>% 
+  filter(conc_char != "control" & indel_freq_filter & viab_reproducibility & cor_TIF_filter) %>% 
+  distinct(drug, conc_char, zscore_TIF_global_comb_rep , target) %>%
+  arrange(zscore_TIF_global_comb_rep) %>% 
+  slice_head(n = 10) %>% 
+  distinct(drug, conc_char, target, zscore_TIF_global_comb_rep ) %>% 
+  mutate(rank = seq(1:n()),
+         drug = gsub(" [(].*[)]", "", drug),
+         drug_conc = paste(drug, conc_char, sep = " "))
+```
+
+```{r}
+indel.data %>% mutate(drug = gsub(" [(].*[)]", "", drug),
+         drug_conc = paste(drug, conc_char, sep = " ")) %>% 
+  filter(drug_conc %in% bottom_hits$drug_conc) %>%
+  distinct(zscore_TIF_global_comb_rep, viab_mean, drug_conc, target, freqCut_diff_global_mean) %>%
+  mutate(viab = ave(viab_mean, drug_conc, target, FUN = mean),
+         TIF_diff = ave(freqCut_diff_global_mean, drug_conc, target,  FUN = mean)) %>%
+  # group_by(drug_conc, target) %>%
+  # summarise(viab_mean = mean(viab_mean),
+  #           freqCut_diff_global_mean = mean(freqCut_diff_global_mean)) %>%
+  ggplot(., aes(viab_mean, freqCut_diff_global_mean, color = target, alpha = 0.8)) +
+  geom_point(size = 3) +
+  scale_x_continuous(labels = scales::percent) +
+  scale_y_continuous(labels = scales::percent) +
+  geom_point(aes(viab, TIF_diff, color = target, alpha = 1), size = 4) +
+  geom_line(aes(group = drug_conc)) +
+  scale_color_manual(values = 
+                       annotation_colors_scr$target[names(annotation_colors_scr$target) %in%
+                                                      unique(bottom_hits$target)]) +
+  theme_classic2(base_size = 16) +
+  ylab("Global TIF change") +
+  xlab("Viability compared to control")
+```
+
+
 
 
 ```{r S2D PJ34 replicates, fig.width= 6, fig.height=4}
