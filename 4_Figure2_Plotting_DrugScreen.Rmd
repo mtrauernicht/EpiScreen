@@ -683,16 +683,7 @@ eff.data <- indel.data.freq %>%
   distinct(IPR, zscore_TIF_global_comb_rep , filter_zscore_TIF_global_comb_rep, 
            zscore_TIF_comb_rep , filter_zscore_TIF_comb_rep, 
            drug, target, conc_char, freqCut_diff_global_mean) %>%
-  mutate(mean_eff_pval_global_comb = 2*pnorm(q = abs(zscore_TIF_global_comb_rep ), lower.tail = F),
-         mean_eff_pval_adj_global_comb = p.adjust(mean_eff_pval_global_comb, method = 'fdr'),
-         sign_global = ifelse((mean_eff_pval_adj_global_comb < 0.01 & 
-                                 filter_zscore_TIF_global_comb_rep &
-                                 zscore_TIF_global_comb_rep > 2.58), "TIF_Increase", 
-                              ifelse((mean_eff_pval_adj_global_comb < 0.01 &
-                                        filter_zscore_TIF_global_comb_rep &
-                                 zscore_TIF_global_comb_rep < -2.58), "TIF_Decrease", 
-                                     "No_Change")),
-         mean_eff_pval_comb = 2*pnorm(q = abs(zscore_TIF_comb_rep ), lower.tail = F),
+  mutate(mean_eff_pval_comb = 2*pnorm(q = abs(zscore_TIF_comb_rep ), lower.tail = F),
          mean_eff_pval_adj_comb = p.adjust(mean_eff_pval_comb, method = 'fdr'),
          sign_local = ifelse((mean_eff_pval_adj_comb < 0.01 & 
                                 filter_zscore_TIF_comb_rep &
@@ -701,6 +692,8 @@ eff.data <- indel.data.freq %>%
                                        filter_zscore_TIF_global_comb_rep &
                                  zscore_TIF_comb_rep < -2.58), "TIF_Decrease", 
                                     "No_Change"))) %>%
+  group_by(drug, conc_char) %>%
+  mutate(sign_global = ifelse(length(table(sign_local) == 1),  names(table(sign_local)), "No_Change")) %>%
   distinct(IPR, drug, conc_char, target, sign_local, sign_global)
 
 global.effects = eff.data %>%
@@ -716,7 +709,7 @@ local.effects = eff.data %>%
   pivot_wider(names_from = sign_local, values_from = n, values_fill = 0) %>%
   mutate(No_Change = No_Change - TIF_Increase - TIF_Decrease) %>%
   dplyr::rename(Local_TIF_Increase = TIF_Increase, Local_TIF_Decrease = TIF_Decrease) %>% 
-  pivot_longer(cols = No_Change:Local_TIF_Decrease, values_to = "n", names_to = "sign_global")
+  pivot_longer(cols = No_Change:Local_TIF_Increase, values_to = "n", names_to = "sign_global")
 
 target_effects = global.effects %>% 
   filter(sign_global != "No_Change") %>%
