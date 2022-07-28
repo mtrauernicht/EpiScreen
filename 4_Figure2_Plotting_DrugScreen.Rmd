@@ -1102,6 +1102,13 @@ bottom_hits = indel.data  %>%
 ```
 
 ```{r}
+all_compounds_lowerTIF = indel.data %>% mutate(drug = gsub(" [(].*[)]", "", drug),
+         drug_conc = paste(drug, conc_char, sep = " ")) %>% 
+  distinct(zscore_TIF_global_comb_rep, viab_mean, drug_conc, target, freqCut_diff_global_mean) %>%
+  mutate(viab = ave(viab_mean, drug_conc, target, FUN = mean),
+         TIF_diff = ave(freqCut_diff_global_mean, drug_conc, target,  FUN = mean)) %>%
+  distinct(target, drug_conc, TIF_diff, viab)
+
 indel.data %>% mutate(drug = gsub(" [(].*[)]", "", drug),
          drug_conc = paste(drug, conc_char, sep = " ")) %>% 
   filter(drug_conc %in% bottom_hits$drug_conc) %>%
@@ -1113,6 +1120,7 @@ indel.data %>% mutate(drug = gsub(" [(].*[)]", "", drug),
   #           freqCut_diff_global_mean = mean(freqCut_diff_global_mean)) %>%
   ggplot(., aes(viab_mean, freqCut_diff_global_mean, color = target, alpha = 0.8)) +
   geom_point(size = 3) +
+  geom_point(data = all_compounds_lowerTIF, aes(viab, TIF_diff, color = "gray70", alpha = 0.8)) +
   scale_x_continuous(labels = scales::percent) +
   scale_y_continuous(labels = scales::percent) +
   geom_point(aes(viab, TIF_diff, color = target, alpha = 1), size = 4) +
