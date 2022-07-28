@@ -76,6 +76,7 @@ library(broom)
 # library(ggsignif)
 # library(rstatix)
 library(colorspace)
+library(analogue)
 
 ## Select outdir
 out.dir = paste0("./figures/", Date, "/")
@@ -296,10 +297,10 @@ dmso.eff.score <- indel.data %>%
 ```{r Compounds that affect the balance at all the sites}
 ## Which compounds change the balance at all the sites in both screens?
 all_balance = indel.data %>% 
-  distinct(drug, conc_char, replicate, MMEJ_zscore_mean, target, 
+  distinct(drug, conc_char, replicate, zscore_bal_comb_rep, target, 
            barcode, viab_reproducibility, pathway_bal_filter) %>% 
-  filter(!is.na(MMEJ_zscore_mean) & 
-           !between(MMEJ_zscore_mean, -1.96, 1.96) & 
+  filter(!is.na(zscore_bal_comb_rep) & 
+           !between(zscore_bal_comb_rep, -1.96, 1.96) & 
            viab_reproducibility == T & 
            pathway_bal_filter == T) %>% 
   group_by(drug, conc_char, target) %>% 
@@ -311,10 +312,10 @@ all_balance %>% ungroup() %>% distinct(drug, target)
 
 ## Now with 16/18 (~ 90%) of the sites with an effect. Near global
 near_all_balance = indel.data %>% 
-  distinct(drug, conc_char, replicate, MMEJ_zscore_mean, target, 
+  distinct(drug, conc_char, replicate, zscore_bal_comb_rep, target, 
            barcode, viab_reproducibility, pathway_bal_filter) %>% 
-  filter(!is.na(MMEJ_zscore_mean) & 
-           !between(MMEJ_zscore_mean, -1.96, 1.96) & 
+  filter(!is.na(zscore_bal_comb_rep) & 
+           !between(zscore_bal_comb_rep, -1.96, 1.96) & 
            viab_reproducibility == T & 
            pathway_bal_filter == T) %>% 
   group_by(drug, conc_char, target) %>% 
@@ -344,10 +345,10 @@ dmso_bal <- indel.data %>%
 
 volcano.df = indel.data %>%
   filter(sample == "Epigenetic Compound" & pathway_bal_filter == TRUE & viab_reproducibility == TRUE) %>%
-  distinct(MMEJratio, drug, conc_char, MMEJ_zscore_global_comb) %>%
+  distinct(MMEJratio, drug, conc_char, zscore_bal_global_comb_rep) %>%
   mutate(GlobalMMEJratio = ave(MMEJratio, drug, conc_char, FUN = mean)) %>%
   distinct() %>%
-  mutate(MMEJ_pval_global_comb = 2*pnorm(q = abs(MMEJ_zscore_global_comb), lower.tail = F)) %>%
+  mutate(MMEJ_pval_global_comb = 2*pnorm(q = abs(zscore_bal_global_comb_rep), lower.tail = F)) %>%
   left_join(near_all_balance) %>%
   mutate(MMEJ_pval_adj_global_comb = log10(p.adjust(MMEJ_pval_global_comb, method = 'fdr')),
          col_bal = ifelse(MMEJ_pval_adj_global_comb < 0.01 & 
@@ -394,18 +395,17 @@ ggplot(volcano.df,
                    box.padding   = 1, 
                    force = 110,
                    point.padding = 0.5,
-                   segment.color = 'gray50') +
-  theme_classic()
+                   segment.color = 'gray50') 
 
 
 
 indel.data %>%
   filter(sample == "Epigenetic Compound" & pathway_bal_filter == TRUE & viab_reproducibility == TRUE) %>%
-  distinct(MMEJratio, drug, conc_char, MMEJ_zscore_global_comb) %>%
+  distinct(MMEJratio, drug, conc_char, zscore_bal_global_comb_rep) %>%
   mutate(GlobalMMEJratio = ave(MMEJratio, drug, conc_char, FUN = mean)) %>%
   distinct() %>%
-  mutate(MMEJ_pval_global_comb = 2*pnorm(q = abs(MMEJ_zscore_global_comb), lower.tail = F)) %>%
-  mutate(MMEJ_pval_adj_global_comb = log10(p.adjust(MMEJ_pval_global_comb, method = 'fdr')),
+  mutate(zscore_bal_global_comb_rep = 2*pnorm(q = abs(zscore_bal_global_comb_rep), lower.tail = F)) %>%
+  mutate(MMEJ_pval_adj_global_comb = log10(p.adjust(zscore_bal_global_comb_rep, method = 'fdr')),
          col_bal = ifelse(MMEJ_pval_adj_global_comb < 0.01 & 
                             GlobalMMEJratio > (dmso_bal$dmso_mean + dmso_bal$dsmo_sd), "green", 
                           ifelse(MMEJ_pval_adj_global_comb < 0.01 & 
@@ -427,10 +427,10 @@ Are there any target groups that are prone to changes in MMEJ ratio?
 # C: Bar plot
 eff.data <- indel.data %>%
   filter(sample == "Epigenetic Compound") %>%
-  distinct(MMEJ_zscore_global_comb, drug, target, conc_char, MMEJratio) %>%
+  distinct(zscore_bal_global_comb_rep, drug, target, conc_char, MMEJratio) %>%
   mutate(MMEJratio = ave(MMEJratio, drug, conc_char, FUN = mean)) %>%
   distinct() %>%
-  mutate(MMEJ_pval_global_comb = 2*pnorm(q = abs(MMEJ_zscore_global_comb), lower.tail = F)) %>%
+  mutate(MMEJ_pval_global_comb = 2*pnorm(q = abs(zscore_bal_global_comb_rep), lower.tail = F)) %>%
   mutate(MMEJ_pval_adj_global_comb = p.adjust(MMEJ_pval_global_comb, method = 'fdr'))
 
 eff.data$sign <- "2_No"
@@ -450,8 +450,7 @@ ggplot(eff.data,
        aes(y = reorder(target, number), x = number, fill = sign)) +
   geom_bar(stat = "identity") +
   facet_wrap(~conc_char)+
-  scale_fill_manual(values = c("#e07a5f", "#3d405b", "#C2C2C2")) +
-  theme_pubr(border = T)
+  scale_fill_manual(values = c("#e07a5f", "#3d405b", "#C2C2C2")) 
 ```
 
 *Figure 2B: Number of compounds with significant changes in MMEJ ratio per target group.*
@@ -462,15 +461,15 @@ ggplot(eff.data,
 ```{r 2C Top TIF boosting, , fig.width = 12, fig.height = 10}
 rank_dt = indel.data %>% 
   filter(drug != "DMSO" & pathway_bal_filter == TRUE & viab_reproducibility == TRUE) %>%
-  distinct(drug, conc_char, MMEJ_zscore_global_comb , target) %>% 
-  arrange(desc(MMEJ_zscore_global_comb )) %>%
+  distinct(drug, conc_char, zscore_bal_global_comb_rep , target) %>% 
+  arrange(desc(zscore_bal_global_comb_rep )) %>%
   mutate(rank = seq(1:n()),
          drug = gsub(" [(].*[)]", "", drug),
          drug_conc = paste(drug, conc_char, sep = " "))
 
 p1 = rank_dt %>% 
   # filter(rank < 100 ) %>%
-  ggplot(., aes(rank, MMEJ_zscore_global_comb )) +
+  ggplot(., aes(rank, zscore_bal_global_comb_rep )) +
   geom_point()  +
   scale_color_manual(values = colors_targets) +
   geom_label_repel(aes(label = ifelse(drug == "DNA-PKi", drug_conc,'')),
@@ -485,7 +484,7 @@ p1 = rank_dt %>%
 
 p2 = rank_dt %>%
   filter(rank <= 100 & drug != "DNA-PKi") %>%
-  ggplot(., aes(rank, MMEJ_zscore_global_comb , color = target)) +
+  ggplot(., aes(rank, zscore_bal_global_comb_rep , color = target)) +
   geom_point()  +
   scale_color_manual(values = colors_targets) +
   gghighlight(rank <= 8, label_key = drug_conc) +
@@ -498,7 +497,7 @@ maxrank = rank_dt %>% nrow()
 
 p3 = rank_dt %>%
   filter(rank > nrow(.)-100) %>%
-  ggplot(., aes(rank, MMEJ_zscore_global_comb , color = target)) +
+  ggplot(., aes(rank, zscore_bal_global_comb_rep , color = target)) +
   geom_point()  +
   scale_color_manual(values = colors_targets) +
   gghighlight(rank > maxrank-10, label_key = drug_conc) +
@@ -514,8 +513,8 @@ plot_grid(p1, left_col_zoom, labels = c('A', ''), label_size = 12, ncol = 2, rel
 
 top_hits = indel.data  %>% 
   filter(conc_char != "control" & pathway_bal_filter == T & viab_reproducibility == TRUE) %>% 
-  distinct(drug, conc_char, MMEJ_zscore_global_comb , target) %>%
-  arrange(desc(MMEJ_zscore_global_comb )) %>% slice_head(n = 10) %>% distinct(drug, conc_char, target, MMEJ_zscore_global_comb ) %>% 
+  distinct(drug, conc_char, zscore_bal_global_comb_rep , target) %>%
+  arrange(desc(zscore_bal_global_comb_rep )) %>% slice_head(n = 10) %>% distinct(drug, conc_char, target, zscore_bal_global_comb_rep ) %>% 
   mutate(rank = seq(1:n()),
          drug = gsub(" [(].*[)]", "", drug),
          drug_conc = paste(drug, conc_char, sep = " "))
@@ -525,10 +524,10 @@ top_hits = indel.data  %>%
 ```{r}
 # Data table and compute log2_ratio (This line needs to be adjusted)
 filtered_drug_conc = indel.data %>%
-  filter(abs(mean_eff_zscore_comb) > 2.58 | abs(MMEJ_zscore_comb) > 2.58 | drug == "DMSO") %>%
+  filter(abs(zscore_TIF_comb_rep) > 2.58 | abs(zscore_TIF_comb_rep) > 2.58 | drug == "DMSO") %>%
   mutate(drug_conc = paste(drug, conc_char,sep = " "),
-         effect_on_indelrate = ifelse(abs(mean_eff_zscore_comb) > 2.58, TRUE, FALSE),
-         effect_on_ratio = ifelse(abs(MMEJ_zscore_comb) > 2.58, TRUE, FALSE)) %>%
+         effect_on_indelrate = ifelse(abs(zscore_TIF_comb_rep) > 2.58, TRUE, FALSE),
+         effect_on_ratio = ifelse(abs(zscore_bal_comb_rep) > 2.58, TRUE, FALSE)) %>%
   distinct(drug, conc_char, drug_conc, effect_on_indelrate, effect_on_ratio) %>%
   mutate(counts = ave(drug_conc, drug, conc_char, FUN = function(x) length(x)),
          keep = ifelse(counts > 1 & !effect_on_indelrate | counts > 1 & !effect_on_ratio, FALSE, TRUE)) %>%
@@ -620,7 +619,7 @@ slope.protein.features %<>%
 ```
 
 ```{r}
-CCD_tib = ratios_tib_dist %>% select(barcode, drug_conc, log2.dist.freqCut, log2.dist.ratio, all_of(chromatin.features.short)) %>% ungroup()
+CCD_tib = ratios_tib_dist %>% dplyr::select(barcode, drug_conc, log2.dist.freqCut, log2.dist.ratio, all_of(chromatin.features.short)) %>% ungroup()
 
 #Create an empty dt with CCDs of DDR proteins
 drug_conc_CCDs_dt <- tibble(var = NA, drug_conc = NA, num_comp = NA, r.squared = NA, adj.r.squared = NA,p.value = NA)

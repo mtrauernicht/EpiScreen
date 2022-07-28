@@ -462,8 +462,8 @@ balance.data <- indel.data %>%
   #filter(target != "Aurora Kinase") %>%
   filter(sample == "Epigenetic Compound") %>% 
   filter(pathway_bal_filter == TRUE & viab_reproducibility == TRUE) %>%
-  #filter(Mod(MMEJ_zscore_comb) >= 2.58) %>%  # we can choose to display all drugs that have significant global hits
-  distinct(conc_char, drug, target, IPR, MMEJ_zscore_comb, MMEJ_log2_FC, replicate, tech)
+  #filter(Mod(zscore_bal_comb_rep) >= 2.58) %>%  # we can choose to display all drugs that have significant global hits
+  distinct(conc_char, drug, target, IPR, zscore_bal_comb_rep, MMEJ_log2_FC, replicate, tech)
 
 dmso_bal <- indel.data %>%
   filter(drug == "DMSO") %>%
@@ -478,7 +478,7 @@ balance.data.heatmap <- balance.data %>%
   mutate(MMEJ_log2_FC_mean = ave(MMEJ_log2_FC, IPR, FUN = function(x) mean(x, na.rm = TRUE)),
          ## Select drugs that have a large effect size in at least one location 
          ## (some drugs might have a small global effect size, but large local)
-         p_value = 2*pnorm(q = abs(MMEJ_zscore_comb), lower.tail = F),
+         p_value = 2*pnorm(q = abs(zscore_bal_comb_rep), lower.tail = F),
          # Adjust p value for false discovery rate
          adj_pvalue = p.adjust(p_value, method = 'fdr'),
          # Pick the smallest per compound & concentration
@@ -581,10 +581,10 @@ aurora_targets <- data.frame("drug" = c("Alisertib","Aurora A Inhibitor I", "Bar
 ggplot(indel.data %>%
                 filter(sample == "Epigenetic Compound") %>%
                 filter(target == "Aurora Kinase") %>%
-                distinct(MMEJratio, drug, conc_char, MMEJ_zscore_global_comb) %>%
+                distinct(MMEJratio, drug, conc_char, zscore_bal_global_comb_rep) %>%
                 mutate(MMEJratio = ave(MMEJratio, drug, conc_char, FUN = mean)) %>%
                 distinct() %>%
-                mutate(MMEJ_pval_global_comb = 2*pnorm(q = abs(MMEJ_zscore_global_comb), lower.tail = F)) %>%
+                mutate(MMEJ_pval_global_comb = 2*pnorm(q = abs(zscore_bal_global_comb_rep), lower.tail = F)) %>%
                 mutate(MMEJ_pval_adj_global_comb = p.adjust(MMEJ_pval_global_comb, method = 'fdr')) %>%
          mutate(drug = gsub(" [(].*[)]", "", drug)) %>%
          left_join(aurora_targets),
@@ -609,7 +609,7 @@ ggplot(indel.data %>%
 ## Visualisation
 ```{r, fig.width = 8, fig.height = 4}
 # rmarkdown::render("3_Processing_FACS.Rmd")
-all.samples = readRDS("FACS_set1.RDS")
+all.samples = readRDS("/DATA/projects/DSBrepair/git/EpiScreen/FACS_set1.RDS")
 
 vadj.G2 = all.samples %>% filter(variable %in% c("G2", "S", "G1")) %>% group_by(drug_conc, ID) %>% summarise(vadj = sum(mean_value)) %>% mutate(variable = "G1")
 vadj.S = all.samples %>% filter(variable %in% c("S", "G1")) %>% group_by(drug_conc, ID) %>% summarise(vadj = sum(mean_value)) %>% mutate(variable = "S")
@@ -697,19 +697,19 @@ for (i in unique(indel.data$target)[-1]) {
   x <- indel.data %>%
     filter(sample == "Epigenetic Compound") %>%
     filter(target == i) %>%
-    mutate(mean_eff_pval_global_comb = 2*pnorm(q = abs(mean_eff_zscore_global_comb), lower.tail = F)) %>%
+    mutate(mean_eff_pval_global_comb = 2*pnorm(q = abs(zscore_TIF_global_comb_rep), lower.tail = F)) %>%
     mutate(mean_eff_pval_adj_global_comb = p.adjust(mean_eff_pval_global_comb, method = 'fdr')) %>%
     filter(mean_eff_pval_adj_global_comb < 0.01) %>%
-    distinct(MMEJ_ratio_norm, freqCut_norm_mean, drug, conc_char, target, IPR) %>%
-    mutate(MMEJ_ratio_norm = log2(ave(MMEJ_ratio_norm, drug, conc_char, IPR, FUN = function(x) mean(x, na.rm=T)))) %>%
+    distinct(MMEJratio_norm, freqCut_norm_mean, drug, conc_char, target, IPR) %>%
+    mutate(MMEJratio_norm = log2(ave(MMEJratio_norm, drug, conc_char, IPR, FUN = function(x) mean(x, na.rm=T)))) %>%
     mutate(freqCut_norm_mean = log2(ave(freqCut_norm_mean, drug, conc_char, IPR, FUN = function(x) mean(x, na.rm=T)))) %>%
     distinct() %>%
     mutate(drug_conc = paste(drug, conc_char, sep = "_")) %>%
-    filter(!is.na(MMEJ_ratio_norm))
+    filter(!is.na(MMEJratio_norm))
   
   if (length(unique(x$drug_conc)) > 1) {
   p<- ggplot(x ,
-       aes(x = MMEJ_ratio_norm, y = freqCut_norm_mean)) +
+       aes(x = MMEJratio_norm, y = freqCut_norm_mean)) +
   geom_point() +
   geom_smooth(method = "lm") +
   facet_wrap(~drug_conc) +
@@ -723,14 +723,14 @@ for (i in unique(indel.data$target)[-1]) {
 ggplot_custom(indel.data %>%
     filter(sample == "Epigenetic Compound") %>%
     filter(drug == "PCI-24781 (Abexinostat)", conc_char == "100 nM") %>%
-    mutate(mean_eff_pval_global_comb = 2*pnorm(q = abs(mean_eff_zscore_global_comb), lower.tail = F)) %>%
+    mutate(mean_eff_pval_global_comb = 2*pnorm(q = abs(zscore_TIF_global_comb_rep), lower.tail = F)) %>%
     mutate(mean_eff_pval_adj_global_comb = p.adjust(mean_eff_pval_global_comb, method = 'fdr')) %>%
     filter(mean_eff_pval_adj_global_comb < 0.001) %>%
-    distinct(MMEJ_ratio_norm, freqCut_norm_mean, drug, conc_char, target, IPR) %>%
-    mutate(MMEJ_ratio_norm = log2(ave(MMEJ_ratio_norm, drug, conc_char, IPR, FUN = function(x) mean(x, na.rm=T)))) %>%
+    distinct(MMEJratio_norm, freqCut_norm_mean, drug, conc_char, target, IPR) %>%
+    mutate(MMEJratio_norm = log2(ave(MMEJratio_norm, drug, conc_char, IPR, FUN = function(x) mean(x, na.rm=T)))) %>%
     mutate(freqCut_norm_mean = log2(ave(freqCut_norm_mean, drug, conc_char, IPR, FUN = function(x) mean(x, na.rm=T)))) %>%
     mutate(drug_conc = paste(drug, conc_char, sep = "_")),
-    aes(x = MMEJ_ratio_norm, y = freqCut_norm_mean)) +
+    aes(x = MMEJratio_norm, y = freqCut_norm_mean)) +
   geom_point() +
   geom_smooth(method = "lm") +
   stat_cor(method = "spearman") +
@@ -739,16 +739,16 @@ ggplot_custom(indel.data %>%
 
 eff_mmej_corr <- indel.data %>%
   filter(sample == "Epigenetic Compound") %>%
-  filter(abs(mean_eff_zscore_global_comb) > 4) %>%
-  filter(abs(MMEJ_zscore_global_comb) > 4) %>%
-  distinct(MMEJ_ratio_norm, freqCut_norm_mean, drug, conc_char, target, IPR) %>%
-  mutate(MMEJ_ratio_norm = log2(ave(MMEJ_ratio_norm, drug, conc_char, IPR, FUN = function(x) mean(x, na.rm=T)))) %>%
+  filter(abs(zscore_TIF_global_comb_rep) > 4) %>%
+  filter(abs(zscore_bal_global_comb_rep) > 4) %>%
+  distinct(MMEJratio_norm, freqCut_norm_mean, drug, conc_char, target, IPR) %>%
+  mutate(MMEJratio_norm = log2(ave(MMEJratio_norm, drug, conc_char, IPR, FUN = function(x) mean(x, na.rm=T)))) %>%
   mutate(freqCut_norm_mean = log2(ave(freqCut_norm_mean, drug, conc_char, IPR, FUN = function(x) mean(x, na.rm=T)))) %>%
   mutate(drug_conc = paste(drug, conc_char, sep = "_")) %>%
   mutate(slope = NA, term = NA, p.value = NA)
 
 for (i in unique(eff_mmej_corr$drug_conc)) {
-    model.correlation <- lm(formula = MMEJ_ratio_norm ~ freqCut_norm_mean, 
+    model.correlation <- lm(formula = MMEJratio_norm ~ freqCut_norm_mean, 
                                data = eff_mmej_corr[eff_mmej_corr$drug_conc == i,]) %>% 
       tidy()
     
@@ -771,7 +771,7 @@ eff_mmej_corr_heatmap <- eff_mmej_corr %>%
   filter(term != "(Intercept)") %>%
   mutate(p.value = p.adjust(p.value, method = "fdr")) %>%
   #filter(p.value < 0.05) %>%
-  dplyr::select(-term, -IPR, -freqCut_norm_mean, -MMEJ_ratio_norm) %>%
+  dplyr::select(-term, -IPR, -freqCut_norm_mean, -MMEJratio_norm) %>%
   distinct()
 
 ggplot_custom(eff_mmej_corr_heatmap %>%
@@ -787,8 +787,8 @@ ggplot_custom(eff_mmej_corr_heatmap %>%
 eff_mmej_corr_heatmap_plot <- indel.data %>%
   mutate(drug_conc = paste(drug, conc_char, sep = "_")) %>%
   filter(drug_conc %in% eff_mmej_corr_heatmap$drug_conc) %>%
-  distinct(MMEJ_ratio_norm, freqCut_norm_mean, drug_conc, conc_char, target, IPR) %>%
-  mutate(MMEJ_ratio_norm = log2(ave(MMEJ_ratio_norm, drug_conc, IPR, FUN = function(x) mean(x, na.rm=T)))) %>%
+  distinct(MMEJratio_norm, freqCut_norm_mean, drug_conc, conc_char, target, IPR) %>%
+  mutate(MMEJratio_norm = log2(ave(MMEJratio_norm, drug_conc, IPR, FUN = function(x) mean(x, na.rm=T)))) %>%
   mutate(freqCut_norm_mean = log2(ave(freqCut_norm_mean, drug_conc, IPR, FUN = function(x) mean(x, na.rm=T)))) %>%
   distinct()
 
@@ -801,7 +801,7 @@ eff_mmej_corr_heatmap_plot <- eff_mmej_corr_heatmap_plot %>%
          filter(target %in% c("HDAC", "Aurora Kinase", "Epigenetic Reader Domain"))
 
 ggplot(eff_mmej_corr_heatmap_plot,
-       aes(x = MMEJ_ratio_norm, y = freqCut_norm_mean, group = drug_conc)) +
+       aes(x = MMEJratio_norm, y = freqCut_norm_mean, group = drug_conc)) +
   geom_abline(linetype = "twodash") +
   geom_vline(xintercept = 0) +
   geom_hline(yintercept = 0) +
