@@ -462,7 +462,7 @@ balance.data <- indel.data %>%
   #filter(target != "Aurora Kinase") %>%
   filter(sample == "Epigenetic Compound") %>% 
   filter(pathway_bal_filter == TRUE & viab_reproducibility == TRUE) %>%
-  #filter(Mod(zscore_bal_comb_rep) >= 2.58) %>%  # we can choose to display all drugs that have significant global hits
+  filter(abs(zscore_bal_global_comb_rep) >= 2.58) %>%  # we can choose to display all drugs that have significant global hits
   distinct(conc_char, drug, target, IPR, zscore_bal_comb_rep, MMEJ_log2_FC, replicate, tech)
 
 dmso_bal <- indel.data %>%
@@ -484,7 +484,7 @@ balance.data.heatmap <- balance.data %>%
          # Pick the smallest per compound & concentration
          min_score = min(adj_pvalue)) %>%
   # filter for adjusted p.val < 0.001 so we keep compounds with at least one signif effect.
-  filter(min_score < 0.01) %>%
+  filter(min_score < 0.000000000000001) %>%
   distinct(drug, target, conc_char, MMEJ_log2_FC_mean, IPR) %>%
   ungroup()
 
@@ -611,9 +611,9 @@ ggplot(indel.data %>%
 # rmarkdown::render("3_Processing_FACS.Rmd")
 all.samples = readRDS("/DATA/projects/DSBrepair/git/EpiScreen/FACS_set1.RDS")
 
-vadj.G2 = all.samples %>% filter(variable %in% c("G2", "S", "G1")) %>% group_by(drug_conc, ID) %>% summarise(vadj = sum(mean_value)) %>% mutate(variable = "G1")
+vadj.G2 = all.samples %>% filter(variable %in% c("G2", "S", "G1")) %>% group_by(drug_conc, ID) %>% summarise(vadj = sum(mean_value)) %>% mutate(variable = "G2")
 vadj.S = all.samples %>% filter(variable %in% c("S", "G1")) %>% group_by(drug_conc, ID) %>% summarise(vadj = sum(mean_value)) %>% mutate(variable = "S")
-vadj.G1 = all.samples %>% filter(variable %in% c("G1")) %>% group_by(drug_conc, ID) %>% summarise(vadj = sum(mean_value)) %>% mutate(variable = "G2")
+vadj.G1 = all.samples %>% filter(variable %in% c("G1")) %>% group_by(drug_conc, ID) %>% summarise(vadj = sum(mean_value)) %>% mutate(variable = "G1")
 
 vadj.tib = rbind(vadj.G1, vadj.S, vadj.G2)
 
@@ -630,15 +630,27 @@ all.samples.plot = all.samples  %>%
          ID = gsub("GFP", "-sgRNA", ID))
 
 
+aurk.inhibitors <- c("Alisertib 100 nM", "Aurora A Inhibitor I 1 µM", "Barasertib 1 µM", "CYC116 1 µM", "SNS-314 Mesylate 10 µM")
 
-all.samples.plot %>% filter(target %in% c("Aurora Kinase")) %>%
-ggplot(., aes(y = mean_value, x = ID, fill = variable)) +
+all.samples.plot %>% filter(drug_conc %in% c("DMSO 10 µM", aurk.inhibitors), ID == "LBR2") %>%
+  mutate(drug_conc = factor(drug_conc, levels = c("DMSO 10 µM", aurk.inhibitors))) %>%
+  ggplot(., aes(y = mean_value, x = drug_conc, fill = variable)) +
   geom_bar(stat="identity") + 
-   geom_errorbar(aes(ymin = vadj-SD, ymax = vadj+SD, color = variable), width = 0.2)+
+  geom_errorbar(aes(ymin = vadj-SD, ymax = vadj+SD, color = variable), width = 0.2, size = 1.5)+
+  labs(title = "cell cycle arrest upon treatment with Aurora Kinase inhibitors") +
+  scale_fill_manual(values = c("grey80","grey60","grey40")) +
+  scale_color_manual(values = c("grey80","grey60","grey40")) +
+  theme_pubr(border = T, x.text.angle = 45)
+
+all.samples.plot %>% filter(!target %in% c("Aurora Kinase"), ID == "LBR2") %>%
+ggplot(., aes(y = mean_value, x = drug_conc, fill = variable)) +
+  geom_bar(stat="identity") + 
+   geom_errorbar(aes(ymin = vadj-SD, ymax = vadj+SD, color = variable), width = 0.2, size = 1.5)+
   labs(title = "cell cycle arrest upon treatment with Aurora Kinase inhibitors", 
        x = "GFP/LBR2 transfection", y = "G1, S, and G2 fractions") + 
-  scale_fill_manual(values = c("#DED89C","#BF7538","#749075"))+
-  facet_wrap(~ drug_conc, nrow = 1)
+  scale_fill_manual(values = c("grey80","grey60","grey40")) +
+  scale_color_manual(values = c("grey40","grey60","grey80")) +
+  theme_pubr(border = T, x.text.angle = 45)
 ```
 
 ```{r, fig.width = 4, fig.height = 4}
