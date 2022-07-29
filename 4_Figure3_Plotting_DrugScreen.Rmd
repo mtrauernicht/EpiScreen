@@ -380,6 +380,110 @@ indel.data <- readRDS(file) # %>% filter(pathway_bal_filter == TRUE & viab_repro
 
 ---
 
+
+## Rank plot MMEJ score
+
+```{r}
+indel.data %>% 
+  filter(conc_char != "control" & pathway_bal_filter & viab_reproducibility & cor_bal_filter) %>%
+  distinct(drug, conc_char, zscore_bal_global_comb_rep , target, viab_reproducibility) %>% 
+  arrange(zscore_bal_global_comb_rep) %>%
+  mutate(rank = seq(1:n()),
+         drug = gsub(" [(].*[)]", "", drug),
+         drug_conc = paste(drug, conc_char, sep = " ")) %>%
+  filter(rank < 100) %>%
+  ggplot(., aes(rank, zscore_bal_global_comb_rep , color = target)) +
+  geom_point()  +
+  scale_color_manual(values = colors_targets) +
+  gghighlight(rank <= 10, label_key = drug_conc) +
+  geom_hline(linetype = "dashed", yintercept = -2.58) +
+  xlim(0, 100) +
+  ylab("Global combined MMEJ ratio z-score")
+
+bottom_hits = indel.data  %>% 
+  filter(conc_char != "control" & pathway_bal_filter & viab_reproducibility & cor_bal_filter) %>%
+  distinct(drug, conc_char, zscore_bal_global_comb_rep , target) %>%
+  arrange(zscore_bal_global_comb_rep) %>% 
+  slice_head(n = 10) %>% 
+  distinct(drug, conc_char, target, zscore_bal_global_comb_rep ) %>% 
+  mutate(rank = seq(1:n()),
+         drug = gsub(" [(].*[)]", "", drug),
+         drug_conc = paste(drug, conc_char, sep = " "))
+```
+
+
+## Bar plot: effect sizes MMEJ z-score per target group
+
+```{r}
+# C: Bar plot
+indel.data.bal <- indel.data %>%
+  filter((sample == "Epigenetic Compound" | drug == "DMSO") & 
+           pathway_bal_filter & viab_reproducibility &
+           cor_bal_filter & !is.na(MMEJratio)) %>%
+  distinct(IPR, drug, conc_char, sample, target, viab_mean, replicate,
+           MMEJratio_global, MMEJratio, IPR,
+           zscore_bal_global_comb_rep , filter_zscore_bal_global_comb_rep, 
+           zscore_bal_comb_rep , filter_zscore_bal_comb_rep) %>%
+  filter(!(viab_mean < 0.5)) %>%
+  mutate(MMEJratio_mean = ave(MMEJratio_global, drug, conc_char))
+
+
+bal.data <- indel.data.bal %>%
+  filter(sample == "Epigenetic Compound") %>%
+  distinct(IPR, zscore_bal_global_comb_rep , filter_zscore_bal_global_comb_rep, 
+           zscore_bal_comb_rep , filter_zscore_bal_comb_rep, 
+           drug, target, conc_char) %>%
+  mutate(mean_eff_pval_comb = 2*pnorm(q = abs(zscore_bal_comb_rep ), lower.tail = F),
+         mean_eff_pval_adj_comb = p.adjust(mean_eff_pval_comb, method = 'fdr'),
+         sign_local = ifelse((mean_eff_pval_adj_comb < 0.01 & 
+                                filter_zscore_bal_comb_rep &
+                                 zscore_bal_comb_rep > 2.58), "MMEJbal_increase", 
+                             ifelse((mean_eff_pval_adj_comb < 0.01 &
+                                       filter_zscore_bal_global_comb_rep &
+                                 zscore_bal_comb_rep < -2.58), "MMEJbal_decrease", 
+                                    "No_Change"))) %>%
+  group_by(drug, conc_char) %>%
+  mutate(no_change_n = length(table(sign_local))) %>%
+  mutate(sign_global = ifelse(no_change_n == 1,  names(table(sign_local)), "No_Change")) %>%
+  distinct(IPR, drug, conc_char, target, sign_local, sign_global)
+
+global.effects = bal.data %>%
+  distinct(drug, conc_char, target, sign_global) %>%
+  group_by(target, sign_global, conc_char) %>% 
+  count()
+
+local.effects = bal.data %>% 
+  filter(sign_global == "No_Change") %>% 
+  distinct(drug, conc_char, target, sign_local) %>%
+  group_by(target, sign_local, conc_char) %>% 
+  count() %>% 
+  pivot_wider(names_from = sign_local, values_from = n, values_fill = 0) %>%
+  mutate(No_Change = No_Change - MMEJbal_increase - MMEJbal_decrease) %>%
+  dplyr::rename(Local_MMEJbal_increase = MMEJbal_increase, Local_MMEJbal_decrease = MMEJbal_decrease) %>% 
+  pivot_longer(cols = No_Change:Local_MMEJbal_decrease, values_to = "n", names_to = "sign_global")
+
+target_effects = global.effects %>% 
+  filter(sign_global != "No_Change") %>%
+  rbind(local.effects) %>%
+  mutate(sign_global = factor(sign_global, levels = c(c("MMEJbal_decrease", "Local_MMEJbal_decrease", "No_Change","Local_MMEJbal_increase", "MMEJbal_increase"))))
+
+ggplot(target_effects,
+       aes(y = reorder(target, n), x = n, fill = sign_global)) +
+  geom_bar(stat = "identity") +
+  facet_wrap(~conc_char)+
+  scale_fill_manual(values = c("MMEJbal_decrease" = "#023FA5", "Local_MMEJbal_decrease" = "#A1A6C8", "No_Change" = "#E2E2E2","Local_MMEJbal_increase" = "#CA9CA4", "MMEJbal_increase" = "#8E063B")) +
+  theme_pubr(border = T)
+
+target_effects %>% filter(sign_global != "No_Change") %>% distinct(target, conc_char, n) %>% group_by(conc_char) %>% summarise(count = sum(n))
+```
+
+
+
+
+
+
+
+
 ## C: MMEJ ratio heatmap: drug vs genomic location
 
 ## 2D HDACi heatmap
@@ -461,7 +565,7 @@ iprs <- as.character(iprs)
 balance.data <- indel.data %>%
   #filter(target != "Aurora Kinase") %>%
   filter(sample == "Epigenetic Compound") %>% 
-  filter(pathway_bal_filter == TRUE & viab_reproducibility == TRUE) %>%
+  filter(pathway_bal_filter == TRUE & viab_reproducibility == TRUE & cor_bal_filter) %>%
   filter(abs(zscore_bal_global_comb_rep) >= 2.58) %>%  # we can choose to display all drugs that have significant global hits
   distinct(conc_char, drug, target, IPR, zscore_bal_comb_rep, MMEJ_log2_FC, replicate, tech)
 
@@ -484,7 +588,7 @@ balance.data.heatmap <- balance.data %>%
          # Pick the smallest per compound & concentration
          min_score = min(adj_pvalue)) %>%
   # filter for adjusted p.val < 0.001 so we keep compounds with at least one signif effect.
-  filter(min_score < 0.000000000000001) %>%
+  filter(min_score < 0.0000000000001) %>%
   distinct(drug, target, conc_char, MMEJ_log2_FC_mean, IPR) %>%
   ungroup()
 
@@ -559,7 +663,7 @@ plt1 = pheatmap(balance.data.heatmap2.clusters %>%
                 cluster_rows = T,
                 angle_col = 90,
                 na_col = "white",
-                main = 'efficiency change, all concentrations',
+                main = 'MMEJ z-score change, all concentrations',
                 annotation_row = target_all,
                 annotation_col = chromatin,
                 # color = colorRampPalette(c("#e07a5f", "#e5e5e5", "#3d405b"))(palette_length),
@@ -642,14 +746,16 @@ all.samples.plot %>% filter(drug_conc %in% c("DMSO 10 µM", aurk.inhibitors), ID
   scale_color_manual(values = c("grey80","grey60","grey40")) +
   theme_pubr(border = T, x.text.angle = 45)
 
+other_drugs <- unique(all.samples.plot$drug_conc[all.samples.plot$drug_conc != "DMSO 10 µM" & all.samples.plot$target != "Aurora Kinase"])
 all.samples.plot %>% filter(!target %in% c("Aurora Kinase"), ID == "LBR2") %>%
+mutate(drug_conc = factor(drug_conc, levels = c("DMSO 10 µM", other_drugs))) %>%
 ggplot(., aes(y = mean_value, x = drug_conc, fill = variable)) +
   geom_bar(stat="identity") + 
    geom_errorbar(aes(ymin = vadj-SD, ymax = vadj+SD, color = variable), width = 0.2, size = 1.5)+
   labs(title = "cell cycle arrest upon treatment with Aurora Kinase inhibitors", 
        x = "GFP/LBR2 transfection", y = "G1, S, and G2 fractions") + 
   scale_fill_manual(values = c("grey80","grey60","grey40")) +
-  scale_color_manual(values = c("grey40","grey60","grey80")) +
+  scale_color_manual(values = c("grey80","grey60","grey40")) +
   theme_pubr(border = T, x.text.angle = 45)
 ```
 

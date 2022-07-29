@@ -67,10 +67,10 @@ viab_limit_bal = 0.50
 read_count_limit = 40
 
 # minimal correlation for TIF between screens:
-TIF_cor = 0.8
+TIF_cor = 0.7
 
 # minimal correlation for MMEJ score between screens:
-bal_cor = 0.8
+bal_cor = 0.7
 ```
 
 
