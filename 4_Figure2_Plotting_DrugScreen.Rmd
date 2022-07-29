@@ -384,7 +384,7 @@ iprs <- as.character(iprs)
 eff.data <- indel.data %>%
   #filter(target != "Aurora Kinase") %>%
   filter(sample == "Epigenetic Compound", indel_freq_filter, viab_reproducibility) %>%
-  #filter(Mod(mean_eff_zscore_comb) >= 2.58) %>%  # we can choose to display all drugs that have significant global hits
+  filter(abs(zscore_TIF_global_comb_rep) >= 2.58) %>%  # we can choose to display all drugs that have significant global hits
   distinct(conc_char, drug, target, IPR, zscore_TIF_comb_rep, freqCut, replicate, tech, filter_zscore_TIF_comb_rep)
 
 dmso_eff <- indel.data %>%
@@ -408,7 +408,7 @@ eff.data.heatmap <- eff.data %>%
          # Pick the smallest per compound & concentration
          min_score = min(adj_pvalue)) %>%
   # filter for adjusted p.val < 0.001 so we keep compounds with at least one signif effect.
-  filter(min_score < 0.001) %>%
+  filter(min_score < 0.0000000001) %>%
   distinct(drug, target, conc_char, freqCut_dif, IPR) %>%
   ungroup()
 

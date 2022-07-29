@@ -64,7 +64,7 @@ library(data.table)
 # library(ggrepel)
 library(GGally)
 # library(DESeq2)
-# library(gghighlight)
+library(gghighlight)
 # library(platetools)
 library(ggpubr)
 # library(Laurae)
@@ -359,6 +359,11 @@ group_colors = c("Euchromatin" = "#f7941d",
                  "Triple Heterochromatin" = "#662d91",
                  "H3K27me3" = "#d21f8a")
 
+colors_targets <-  c(HDAC="#60988D", HAT="#C6D0A8", Sirtuin="#8FCAAC",
+                     HMT="#FDCDAC", DNMT="#D69C81", `Histone Demethylase`="#FFF2AE",
+                     HIF="#E3DCD5", JAK="#C8D7E2", PIM="#9AB8C4", `Aurora Kinase`="#F4CAE4",
+                     PARP="#CB546F", `Epigenetic Reader Domain`= "#476D61", `DNA-PK`="#E07A43")
+
 conc_control_colors = c("CTRL" = colors_drugs[2], "100 nM" = colors_drugs[7], "1 µM" = colors_drugs[4], "10 µM" = "#000000")
 conc_colors = c("100 nM" = colors_drugs[7], "1 µM" = colors_drugs[4], "10 µM" = "#000000")
 
@@ -372,10 +377,10 @@ ggplot_custom <- function(...) ggplot2::ggplot(...) +
 ### Data import
 
 ```{r data import, echo = FALSE, warning = FALSE}
-# Import data from preprocessing script
-in.dir = list.dirs(path = "/DATA/projects/DSBrepair/data/R") %>% .[grepl("episcreen", .)] %>% tail(n = 1)
-file = list.files(in.dir, pattern = "episcreen_ratios", full.names = T) %>% tail(n = 1)
-indel.data <- readRDS(file) # %>% filter(pathway_bal_filter == TRUE & viab_reproducibility == TRUE)
+# # Import data from preprocessing script
+# in.dir = list.dirs(path = "/DATA/projects/DSBrepair/data/R") %>% .[grepl("episcreen", .)] %>% tail(n = 1)
+# file = list.files(in.dir, pattern = "episcreen_ratios", full.names = T) %>% tail(n = 1)
+indel.data <- readRDS("/DATA/usr/m.trauernicht/projects/EpiScreen/data/episcreen_ratios_mt20220729.RDS") # %>% filter(pathway_bal_filter == TRUE & viab_reproducibility == TRUE)
 ```
 
 ---
@@ -471,8 +476,7 @@ ggplot(target_effects,
        aes(y = reorder(target, n), x = n, fill = sign_global)) +
   geom_bar(stat = "identity") +
   facet_wrap(~conc_char)+
-  scale_fill_manual(values = c("MMEJbal_decrease" = "#023FA5", "Local_MMEJbal_decrease" = "#A1A6C8", "No_Change" = "#E2E2E2","Local_MMEJbal_increase" = "#CA9CA4", "MMEJbal_increase" = "#8E063B")) +
-  theme_pubr(border = T)
+  scale_fill_manual(values = c("MMEJbal_decrease" = "#023FA5", "Local_MMEJbal_decrease" = "#A1A6C8", "No_Change" = "#E2E2E2","Local_MMEJbal_increase" = "#CA9CA4", "MMEJbal_increase" = "#8E063B")) 
 
 target_effects %>% filter(sign_global != "No_Change") %>% distinct(target, conc_char, n) %>% group_by(conc_char) %>% summarise(count = sum(n))
 ```
@@ -588,7 +592,7 @@ balance.data.heatmap <- balance.data %>%
          # Pick the smallest per compound & concentration
          min_score = min(adj_pvalue)) %>%
   # filter for adjusted p.val < 0.001 so we keep compounds with at least one signif effect.
-  filter(min_score < 0.0000000000001) %>%
+  filter(min_score < 0.000000000000000000001) %>% # This is ridiculously low, but I use this to fine-tune how many drugs to display
   distinct(drug, target, conc_char, MMEJ_log2_FC_mean, IPR) %>%
   ungroup()
 
