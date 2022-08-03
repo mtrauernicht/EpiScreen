@@ -1065,9 +1065,9 @@ indel.data %>% filter(filter_zscore_TIF_global_comb_rep, viab_mean > 0.75 & freq
 ```
 # What is causing a decrease that is not directly due to viability change?
 ## Figure 2E
-```{r 2C Top TIF boosting, }
+```{r 2C Top TIF inhibiting}
 indel.data %>% 
-  filter(conc_char != "control" & indel_freq_filter & viab_reproducibility & cor_TIF_filter) %>%
+  filter(conc_char != "control" & pathway_bal_filter & viab_reproducibility & cor_TIF_filter) %>%
   distinct(drug, conc_char, zscore_TIF_global_comb_rep , target, viab_reproducibility) %>% 
   arrange(zscore_TIF_global_comb_rep) %>%
   mutate(rank = seq(1:n()),
@@ -1084,7 +1084,7 @@ indel.data %>%
   theme_classic2()
 
 bottom_hits = indel.data  %>% 
-  filter(conc_char != "control" & indel_freq_filter & viab_reproducibility & cor_TIF_filter) %>% 
+  filter(conc_char != "control" & pathway_bal_filter & viab_reproducibility & cor_TIF_filter) %>% 
   distinct(drug, conc_char, zscore_TIF_global_comb_rep , target) %>%
   arrange(zscore_TIF_global_comb_rep) %>% 
   slice_head(n = 10) %>% 
@@ -1095,7 +1095,9 @@ bottom_hits = indel.data  %>%
 ```
 
 ```{r}
-all_compounds_lowerTIF = indel.data %>% mutate(drug = gsub(" [(].*[)]", "", drug),
+all_compounds_lowerTIF = indel.data %>% 
+  filter(conc_char != "control" & indel_freq_filter & viab_reproducibility & cor_TIF_filter) %>% 
+  mutate(drug = gsub(" [(].*[)]", "", drug),
          drug_conc = paste(drug, conc_char, sep = " ")) %>% 
   distinct(zscore_TIF_global_comb_rep, viab_mean, drug_conc, target, freqCut_diff_global_mean) %>%
   mutate(viab = ave(viab_mean, drug_conc, target, FUN = mean),
@@ -1122,6 +1124,8 @@ indel.data %>% mutate(drug = gsub(" [(].*[)]", "", drug),
                        annotation_colors_scr$target[names(annotation_colors_scr$target) %in%
                                                       unique(bottom_hits$target)]) +
   theme_classic2(base_size = 16) +
+  geom_vline(xintercept = 0.50, color = "red", linetype="dotted") +
+  annotate("rect",xmin=0,xmax=0.50,ymin=-Inf,ymax=Inf, alpha=0.05, fill="red") +
   ylab("Global TIF change") +
   xlab("Viability compared to control")
 ```
@@ -1147,6 +1151,76 @@ ggplot(PJ34_df,
   facet_grid(. ~ conc_char)
 
 PJ34_df %>% 
+  pivot_wider(names_from = replicate, values_from = c(freqCut_diff, viab_mean, freqCut)) %>%
+  ggplot_custom(.,
+                aes(x = freqCut_diff_E1504*100, y = freqCut_diff_E177*100)) +
+  geom_point() +
+  geom_abline(lty = "twodash") +
+  geom_smooth(method = "lm", color = "red", lty = "dashed") +
+  stat_cor(method = "pearson") +
+  xlab("TIF difference to Control E1504") +
+  ylab("TIF difference to Contro E177")  +
+  facet_grid(. ~ conc_char)
+
+PJ34_df <- indel.data %>%
+  filter(drug == "PJ34") %>%
+  distinct(drug, conc_char, replicate, tech,MMEJratio , MMEJ_log2_FC, viab_mean, barcode) 
+
+ggplot(PJ34_df, 
+       aes(x = replicate, y = MMEJ_log2_FC, color = as.character(tech))) + 
+  geom_quasirandom(position=position_dodge(), aes(fill=viab_mean), shape = 21) +
+  # geom_signif(comparisons = combn(sort(unique(PJ34_df$replicate)), 2, simplify = F), 
+  #             map_signif_level=sigFunc, 
+  #             step_increase = 0.1) +
+  scale_fill_continuous_sequential(palette = "Peach", rev = TRUE) +
+  scale_color_manual(values= conc_colors) +
+  theme_classic_lines() +
+  ylab("MMEJ FC to Control") +
+  facet_grid(. ~ conc_char)
+
+PJ34_df %>% 
+  pivot_wider(names_from = replicate, values_from = c(MMEJ_log2_FC, viab_mean, MMEJratio)) %>%
+  ggplot_custom(.,
+                aes(x = MMEJ_log2_FC_E1504, y = MMEJ_log2_FC_E177)) +
+  geom_point() +
+  geom_abline(lty = "twodash") +
+  geom_smooth(method = "lm", color = "red", lty = "dashed") +
+  stat_cor(method = "pearson") +
+  xlab("MMEJ FC to Control E1504") +
+  ylab("MMEJ FC to Contro E177")  +
+  facet_grid(. ~ conc_char)
+
+PJ34_df %>% 
+  pivot_wider(names_from = replicate, values_from = c(MMEJ_log2_FC, viab_mean, MMEJratio)) %>%
+  ggplot_custom(.,
+                aes(x = MMEJratio_E1504, y = MMEJratio_E177)) +
+  geom_point() +
+  geom_abline(lty = "twodash") +
+  geom_smooth(method = "lm", color = "red", lty = "dashed") +
+  stat_cor(method = "pearson") +
+  xlab("MMEJ to Control E1504") +
+  ylab("MMEJ to Contro E177")  +
+  facet_grid(. ~ conc_char)
+
+
+
+PCI24781_df <- indel.data %>%
+  filter(drug == "PCI-24781 (Abexinostat)") %>%
+  distinct(drug, conc_char, replicate, tech,freqCut , freqCut_diff, viab_mean, barcode) 
+
+ggplot(PCI24781_df, 
+       aes(x = replicate, y = freqCut_diff, color = as.character(tech))) + 
+  geom_quasirandom(position=position_dodge(), aes(fill=viab_mean), shape = 21) +
+  # geom_signif(comparisons = combn(sort(unique(PJ34_df$replicate)), 2, simplify = F), 
+  #             map_signif_level=sigFunc, 
+  #             step_increase = 0.1) +
+  scale_fill_continuous_sequential(palette = "Peach", rev = TRUE) +
+  scale_color_manual(values= conc_colors) +
+  theme_classic_lines() +
+  ylab("TIF difference to Control") +
+  facet_grid(. ~ conc_char)
+
+PCI24781_df %>% 
   pivot_wider(names_from = replicate, values_from = c(freqCut_diff, viab_mean, freqCut)) %>%
   ggplot_custom(.,
                 aes(x = freqCut_diff_E1504*100, y = freqCut_diff_E177*100)) +

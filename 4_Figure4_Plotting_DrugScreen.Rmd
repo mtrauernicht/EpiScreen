@@ -425,32 +425,64 @@ indel.data %>%
 Are there any target groups that are prone to changes in MMEJ ratio?
 ```{r warning = FALSE}
 # C: Bar plot
-eff.data <- indel.data %>%
+indel.data.bal <- indel.data %>%
+  filter((sample == "Epigenetic Compound" | drug == "DMSO") & 
+           pathway_bal_filter & viab_reproducibility &
+           cor_bal_filter & !is.na(MMEJratio)) %>%
+  distinct(IPR, drug, conc_char, sample, target, viab_mean, replicate,
+           MMEJratio_global, MMEJratio, IPR,
+           zscore_bal_global_comb_rep , filter_zscore_bal_global_comb_rep, 
+           zscore_bal_comb_rep , filter_zscore_bal_comb_rep) %>%
+  filter(!(viab_mean < 0.5)) %>%
+  mutate(MMEJratio_mean = ave(MMEJratio_global, drug, conc_char))
+
+
+bal.data <- indel.data.bal %>%
   filter(sample == "Epigenetic Compound") %>%
-  distinct(zscore_bal_global_comb_rep, drug, target, conc_char, MMEJratio) %>%
-  mutate(MMEJratio = ave(MMEJratio, drug, conc_char, FUN = mean)) %>%
-  distinct() %>%
-  mutate(MMEJ_pval_global_comb = 2*pnorm(q = abs(zscore_bal_global_comb_rep), lower.tail = F)) %>%
-  mutate(MMEJ_pval_adj_global_comb = p.adjust(MMEJ_pval_global_comb, method = 'fdr'))
+  distinct(IPR, zscore_bal_global_comb_rep , filter_zscore_bal_global_comb_rep, 
+           zscore_bal_comb_rep , filter_zscore_bal_comb_rep, 
+           drug, target, conc_char) %>%
+  mutate(mean_eff_pval_comb = 2*pnorm(q = abs(zscore_bal_comb_rep ), lower.tail = F),
+         mean_eff_pval_adj_comb = p.adjust(mean_eff_pval_comb, method = 'fdr'),
+         sign_local = ifelse((mean_eff_pval_adj_comb < 0.01 & 
+                                filter_zscore_bal_comb_rep &
+                                 zscore_bal_comb_rep > 2.58), "MMEJbal_increase", 
+                             ifelse((mean_eff_pval_adj_comb < 0.01 &
+                                       filter_zscore_bal_global_comb_rep &
+                                 zscore_bal_comb_rep < -2.58), "MMEJbal_decrease", 
+                                    "No_Change"))) %>%
+  group_by(drug, conc_char) %>%
+  mutate(no_change_n = length(table(sign_local))) %>%
+  mutate(sign_global = ifelse(no_change_n == 1,  names(table(sign_local)), "No_Change")) %>%
+  distinct(IPR, drug, conc_char, target, sign_local, sign_global)
 
-eff.data$sign <- "2_No"
-eff.data$sign[eff.data$MMEJratio > (dmso_bal$dmso_mean + dmso_bal$dsmo_sd) & eff.data$MMEJ_pval_adj_global_comb < 0.01] <- "1_Up"
-eff.data$sign[eff.data$MMEJratio < (dmso_bal$dmso_mean - dmso_bal$dsmo_sd) & eff.data$MMEJ_pval_adj_global_comb < 0.01] <- "0_Down"
+global.effects = bal.data %>%
+  distinct(drug, conc_char, target, sign_global) %>%
+  group_by(target, sign_global, conc_char) %>% 
+  count()
 
-eff.data <- eff.data %>%
-  mutate(number = ave(target, target, sign, conc_char, FUN = length)) %>%
-  mutate(number = as.numeric(number)) %>%
-  distinct(conc_char, target, sign, number) %>%
-  spread(sign, number, fill = 0) %>%
-  mutate(fraction = (`1_Up` + `0_Down`) / (`2_No` + (`1_Up` + `0_Down`))) %>%
-  pivot_longer(`0_Down`:`2_No`, names_to = "sign", values_to = "number")
+local.effects = bal.data %>% 
+  filter(sign_global == "No_Change") %>% 
+  distinct(drug, conc_char, target, sign_local) %>%
+  group_by(target, sign_local, conc_char) %>% 
+  count() %>% 
+  pivot_wider(names_from = sign_local, values_from = n, values_fill = 0) %>%
+  mutate(No_Change = No_Change - MMEJbal_increase - MMEJbal_decrease) %>%
+  dplyr::rename(Local_MMEJbal_increase = MMEJbal_increase, Local_MMEJbal_decrease = MMEJbal_decrease) %>% 
+  pivot_longer(cols = No_Change:Local_MMEJbal_decrease, values_to = "n", names_to = "sign_global")
 
+target_effects = global.effects %>% 
+  filter(sign_global != "No_Change") %>%
+  rbind(local.effects) %>%
+  mutate(sign_global = factor(sign_global, levels = c(c("MMEJbal_decrease", "Local_MMEJbal_decrease", "No_Change","Local_MMEJbal_increase", "MMEJbal_increase"))))
 
-ggplot(eff.data,
-       aes(y = reorder(target, number), x = number, fill = sign)) +
+ggplot(target_effects,
+       aes(y = reorder(target, n), x = n, fill = sign_global)) +
   geom_bar(stat = "identity") +
   facet_wrap(~conc_char)+
-  scale_fill_manual(values = c("#e07a5f", "#3d405b", "#C2C2C2")) 
+  scale_fill_manual(values = c("MMEJbal_decrease" = "#023FA5", "Local_MMEJbal_decrease" = "#A1A6C8", "No_Change" = "#E2E2E2","Local_MMEJbal_increase" = "#CA9CA4", "MMEJbal_increase" = "#8E063B")) 
+
+target_effects %>% filter(sign_global != "No_Change") %>% distinct(target, conc_char, n) %>% group_by(conc_char) %>% summarise(count = sum(n))
 ```
 
 *Figure 2B: Number of compounds with significant changes in MMEJ ratio per target group.*

@@ -865,12 +865,12 @@ mean.TIF.zscore.comb = TIF.zscore %>% distinct(drug, conc_char, barcode, replica
   mutate(zscore_TIF_comb_tech = ave(zscore_TIF, drug, conc_char, barcode, replicate,
                                     FUN = function(x) sum(x)/sqrt(length(x))),
          sum_sign = ave(zscore_TIF, drug, conc_char, barcode, replicate,
-                                    FUN = function(x) length(table(sign(x)))),
+                        FUN = function(x) length(table(sign(x)))),
          filter_zscore_TIF_comb_tech = ifelse(sum_sign == 1, TRUE, FALSE),
          zscore_TIF_comb_rep = ave(zscore_TIF, drug, conc_char, barcode,
-                                    FUN = function(x) sum(x)/sqrt(length(x))),
+                                   FUN = function(x) sum(x)/sqrt(length(x))),
          sum_sign_comb = ave(zscore_TIF, drug, conc_char, barcode,
-                                    FUN = function(x) length(table(sign(x)))),
+                             FUN = function(x) length(table(sign(x)))),
          filter_zscore_TIF_comb_rep = ifelse(sum_sign_comb == 1, TRUE, FALSE)) %>%
   dplyr::select(-sum_sign, -sum_sign_comb)
 
@@ -888,14 +888,14 @@ TIF.zscore.global = TIF_zscore_calc %>%
 TIF.zscore.global.comb = TIF.zscore %>% distinct(drug, conc_char, barcode, replicate, zscore_TIF_global) %>%
   filter(!is.na(zscore_TIF_global)) %>%
   mutate(zscore_TIF_global_comb_tech = ave(zscore_TIF_global, drug, conc_char, barcode, replicate,
-                                    FUN = function(x) sum(x)/sqrt(length(x))),
+                                           FUN = function(x) sum(x)/sqrt(length(x))),
          sum_sign = ave(zscore_TIF_global, drug, conc_char, barcode, replicate,
-                                    FUN = function(x) length(table(sign(x)))),
+                        FUN = function(x) length(table(sign(x)))),
          filter_zscore_TIF_global_comb_tech = ifelse(sum_sign == 1, TRUE, FALSE),
          zscore_TIF_global_comb_rep = ave(zscore_TIF_global, drug, conc_char, barcode,
-                                    FUN = function(x) sum(x)/sqrt(length(x))),
+                                          FUN = function(x) sum(x)/sqrt(length(x))),
          sum_sign_comb = ave(zscore_TIF_global, drug, conc_char, barcode,
-                                    FUN = function(x) length(table(sign(x)))),
+                             FUN = function(x) length(table(sign(x)))),
          filter_zscore_TIF_global_comb_rep = ifelse(sum_sign_comb == 1, TRUE, FALSE))
 
 TIF.zscore.global %<>% left_join(TIF.zscore.global.comb)
@@ -998,12 +998,12 @@ mean.bal.zscore.comb = bal.zscore %>% distinct(drug, conc_char, barcode, replica
   mutate(zscore_bal_comb_tech = ave(zscore_bal, drug, conc_char, barcode, replicate,
                                     FUN = function(x) sum(x)/sqrt(length(x))),
          sum_sign = ave(zscore_bal, drug, conc_char, barcode, replicate,
-                                    FUN = function(x) length(table(sign(x)))),
+                        FUN = function(x) length(table(sign(x)))),
          filter_zscore_bal_comb_tech = ifelse(sum_sign == 1, TRUE, FALSE),
          zscore_bal_comb_rep = ave(zscore_bal, drug, conc_char, barcode,
-                                    FUN = function(x) sum(x)/sqrt(length(x))),
+                                   FUN = function(x) sum(x)/sqrt(length(x))),
          sum_sign_comb = ave(zscore_bal, drug, conc_char, barcode,
-                                    FUN = function(x) length(table(sign(x)))),
+                             FUN = function(x) length(table(sign(x)))),
          filter_zscore_bal_comb_rep = ifelse(sum_sign_comb == 1, TRUE, FALSE)) %>%
   dplyr::select(-sum_sign, -sum_sign_comb)
 
@@ -1021,14 +1021,14 @@ bal.zscore.global = bal_zscore_calc %>%
 bal.zscore.global.comb = bal.zscore %>% distinct(drug, conc_char, barcode, replicate, zscore_bal_global) %>%
   filter(!is.na(zscore_bal_global)) %>%
   mutate(zscore_bal_global_comb_tech = ave(zscore_bal_global, drug, conc_char, barcode, replicate,
-                                    FUN = function(x) sum(x)/sqrt(length(x))),
+                                           FUN = function(x) sum(x)/sqrt(length(x))),
          sum_sign = ave(zscore_bal_global, drug, conc_char, barcode, replicate,
-                                    FUN = function(x) length(table(sign(x)))),
+                        FUN = function(x) length(table(sign(x)))),
          filter_zscore_bal_global_comb_tech = ifelse(sum_sign == 1, TRUE, FALSE),
          zscore_bal_global_comb_rep = ave(zscore_bal_global, drug, conc_char, barcode,
-                                    FUN = function(x) sum(x)/sqrt(length(x))),
+                                          FUN = function(x) sum(x)/sqrt(length(x))),
          sum_sign_comb = ave(zscore_bal_global, drug, conc_char, barcode,
-                                    FUN = function(x) length(table(sign(x)))),
+                             FUN = function(x) length(table(sign(x)))),
          filter_zscore_bal_global_comb_rep = ifelse(sum_sign_comb == 1, TRUE, FALSE))
 
 bal.zscore.global %<>% left_join(bal.zscore.global.comb)
@@ -1079,11 +1079,23 @@ cor_filter = screen.ratio.dt %>% dplyr::select(barcode, replicate, tech, drug, c
   pivot_wider(names_from = replicate, values_from = c(freqCut, MMEJscore)) %>%
   summarise(cor_TIF = cor(freqCut_E1504, freqCut_E177, use = "pairwise.complete.obs"),
             cor_bal = cor(MMEJscore_E1504, MMEJscore_E177, use = "pairwise.complete.obs")) %>%
-  mutate(cor_TIF_filter = ifelse(cor_TIF < TIF_cor, FALSE, TRUE),
-         cor_bal_filter = ifelse(cor_bal < bal_cor, FALSE, TRUE))
+  mutate(cor_TIF_filter = ifelse(is.na(cor_TIF), FALSE, 
+                                 ifelse(cor_TIF >= TIF_cor, TRUE, 
+                                        FALSE)),
+         cor_bal_filter = ifelse(is.na(cor_bal), FALSE, 
+                                 ifelse(cor_bal >= bal_cor, TRUE, 
+                                        FALSE)))
 
 screen.ratio.dt = screen.ratio.dt %>% left_join(cor_filter)
 ```
+## Fix filters
+Some filters have NA, these need to be changed to FALSE. 
+```{r fix some filters}
+screen.ratio.dt = screen.ratio.dt %>% 
+  mutate(across(.cols = contains("filter"), 
+                ~ replace(., is.na(.), FALSE)))
+```
+
 
 # Data export
 
