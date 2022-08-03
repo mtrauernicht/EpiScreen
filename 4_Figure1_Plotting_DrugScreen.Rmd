@@ -810,15 +810,15 @@ How well does the MMEJ score correlate between the six technical replicates?
 # B: Correlation between technical replicates MMEJ score
 techn_repl <- indel.data %>%
   filter(sample == "Epigenetic Compound" & pathway_bal_filter == T & viab_reproducibility == T) %>%
-  dplyr::distinct(MMEJratio_norm, drug, tech, replicate, conc_char, sample) %>%
-  mutate(MMEJratio_norm = log2(ave(MMEJratio_norm, drug, tech, replicate, conc_char, FUN = mean))) %>%
+  dplyr::distinct(MMEJ_log2_FC, drug, tech, replicate, conc_char, sample) %>%
+  mutate(MMEJ_log2_FC = ave(MMEJ_log2_FC, drug, tech, replicate, conc_char, FUN = mean)) %>%
   unique() %>%
   mutate(rep = paste(replicate, tech, sep = "_")) %>%
   dplyr::select(-replicate, -tech) %>%
-  spread(rep, MMEJratio_norm) %>%
+  spread(rep, MMEJ_log2_FC) %>%
   na.omit()
 
-boundaries <- c(0.7,0.75,0.8,0.85)
+boundaries <- c(0.6,0.7,0.8,0.90)
 ggpairs(techn_repl %>% dplyr::select(contains("E1")),
         upper = list(continuous = corColor),
         lower = list(continuous = function(data, mapping, ...) {
