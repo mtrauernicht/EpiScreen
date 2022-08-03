@@ -408,7 +408,7 @@ eff.data.heatmap <- eff.data %>%
          # Pick the smallest per compound & concentration
          min_score = min(adj_pvalue)) %>%
   # filter for adjusted p.val < 0.001 so we keep compounds with at least one signif effect.
-  filter(min_score < 0.0000000001) %>%
+  filter(min_score < 0.00001) %>%
   distinct(drug, target, conc_char, freqCut_dif, IPR) %>%
   ungroup()
 
@@ -1162,45 +1162,6 @@ PJ34_df %>%
   ylab("TIF difference to Contro E177")  +
   facet_grid(. ~ conc_char)
 
-PJ34_df <- indel.data %>%
-  filter(drug == "PJ34") %>%
-  distinct(drug, conc_char, replicate, tech,MMEJratio , MMEJ_log2_FC, viab_mean, barcode) 
-
-ggplot(PJ34_df, 
-       aes(x = replicate, y = MMEJ_log2_FC, color = as.character(tech))) + 
-  geom_quasirandom(position=position_dodge(), aes(fill=viab_mean), shape = 21) +
-  # geom_signif(comparisons = combn(sort(unique(PJ34_df$replicate)), 2, simplify = F), 
-  #             map_signif_level=sigFunc, 
-  #             step_increase = 0.1) +
-  scale_fill_continuous_sequential(palette = "Peach", rev = TRUE) +
-  scale_color_manual(values= conc_colors) +
-  theme_classic_lines() +
-  ylab("MMEJ FC to Control") +
-  facet_grid(. ~ conc_char)
-
-PJ34_df %>% 
-  pivot_wider(names_from = replicate, values_from = c(MMEJ_log2_FC, viab_mean, MMEJratio)) %>%
-  ggplot_custom(.,
-                aes(x = MMEJ_log2_FC_E1504, y = MMEJ_log2_FC_E177)) +
-  geom_point() +
-  geom_abline(lty = "twodash") +
-  geom_smooth(method = "lm", color = "red", lty = "dashed") +
-  stat_cor(method = "pearson") +
-  xlab("MMEJ FC to Control E1504") +
-  ylab("MMEJ FC to Contro E177")  +
-  facet_grid(. ~ conc_char)
-
-PJ34_df %>% 
-  pivot_wider(names_from = replicate, values_from = c(MMEJ_log2_FC, viab_mean, MMEJratio)) %>%
-  ggplot_custom(.,
-                aes(x = MMEJratio_E1504, y = MMEJratio_E177)) +
-  geom_point() +
-  geom_abline(lty = "twodash") +
-  geom_smooth(method = "lm", color = "red", lty = "dashed") +
-  stat_cor(method = "pearson") +
-  xlab("MMEJ to Control E1504") +
-  ylab("MMEJ to Contro E177")  +
-  facet_grid(. ~ conc_char)
 
 
 
