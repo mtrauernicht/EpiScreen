@@ -717,38 +717,84 @@ ggplot(indel.data %>%
 ## Visualisation
 ```{r, fig.width = 8, fig.height = 4}
 # rmarkdown::render("3_Processing_FACS.Rmd")
-all.samples = readRDS("/DATA/projects/DSBrepair/git/EpiScreen/FACS_set1.RDS")
+all.samples = read_csv2("/DATA/usr/m.trauernicht/projects/EpiScreen/FACS/Data/mt20220802_facs_all_drugs.csv")
 
-vadj.G2 = all.samples %>% filter(variable %in% c("G2", "S", "G1")) %>% group_by(drug_conc, ID) %>% summarise(vadj = sum(mean_value)) %>% mutate(variable = "G2")
-vadj.S = all.samples %>% filter(variable %in% c("S", "G1")) %>% group_by(drug_conc, ID) %>% summarise(vadj = sum(mean_value)) %>% mutate(variable = "S")
-vadj.G1 = all.samples %>% filter(variable %in% c("G1")) %>% group_by(drug_conc, ID) %>% summarise(vadj = sum(mean_value)) %>% mutate(variable = "G1")
+all.samples <- all.samples %>%
+  mutate(drug_conc = paste(drug, conc, sep = "_")) %>%
+  mutate(drug_conc_exp = paste(drug, conc, exp, sep = "_")) %>%
+  mutate(mean_value = ave(value, drug_conc, variable, exp, FUN = mean)) %>%
+  mutate(SD = ave(value, drug_conc, variable, exp, FUN = sd)) %>%
+  filter(variable == "G2") %>%
+  dplyr::select(-variable) %>%
+  na.omit() %>%
+  mutate(pval = "")
 
-vadj.tib = rbind(vadj.G1, vadj.S, vadj.G2)
+pval_list <- list()
+for (i in unique(all.samples$drug_conc_exp)) {
+  if (all.samples$exp[all.samples$drug_conc_exp == i] == "five_drugs") {
+    all.samples$pval[all.samples$drug_conc_exp == i] <- t.test(all.samples$value[all.samples$drug_conc == "DMSO_10um" & all.samples$exp == "five_drugs"], all.samples$value[all.samples$drug_conc_exp == i])$p.value
+  } else {
+    all.samples$pval[all.samples$drug_conc_exp == i] <- t.test(all.samples$value[all.samples$drug_conc == "DMSO_10um" & all.samples$exp == "effective_drugs"], all.samples$value[all.samples$drug_conc_exp == i])$p.value
+  }
+}
 
-all.samples.plot = all.samples  %>% 
-  as_tibble() %>% 
-  filter(variable != "Apoptotic cells") %>% 
-  left_join(vadj.tib) %>%
-  left_join(target_set_drugs) %>%
-  mutate(variable = factor(variable, levels = c("G2", "S", "G1")),
-         target = ifelse(drug == "CX-6258", "PIM",
-                         ifelse(drug == "DMSO", "Vehicle",
-                                ifelse(drug == "DZNeP", "HMT",
-                                       ifelse(drug == "Suramin", "Sirtuin",target)))),
-         ID = gsub("GFP", "-sgRNA", ID))
+target_set_drugs2 <- target_set_drugs %>% distinct(drug, target)
 
+all.samples <- all.samples %>%
+  dplyr::select(-value) %>%
+  mutate(pval_adj = p.adjust(pval, method = "fdr")) %>%
+  left_join(target_set_drugs2) %>%
+  distinct()
 
-aurk.inhibitors <- c("Alisertib 100 nM", "Aurora A Inhibitor I 1 µM", "Barasertib 1 µM", "CYC116 1 µM", "SNS-314 Mesylate 10 µM")
+# vadj.G2 = all.samples %>% filter(variable %in% c("G2", "S", "G1")) %>% group_by(drug_conc) %>% summarise(vadj = sum(mean_value)) %>% mutate(variable = "G2")
+# vadj.S = all.samples %>% filter(variable %in% c("S", "G1")) %>% group_by(drug_conc) %>% summarise(vadj = sum(mean_value)) %>% mutate(variable = "S")
+# vadj.G1 = all.samples %>% filter(variable %in% c("G1")) %>% group_by(drug_conc) %>% summarise(vadj = sum(mean_value)) %>% mutate(variable = "G1")
+# 
+# vadj.tib = rbind(vadj.G1, vadj.S, vadj.G2)
+# 
+# all.samples.plot = all.samples  %>% 
+#   as_tibble() %>% 
+#   filter(variable != "Apoptotic cells") %>% 
+#   left_join(vadj.tib) %>%
+#   left_join(target_set_drugs) %>%
+#   mutate(variable = factor(variable, levels = c("G2", "S", "G1")),
+#          target = ifelse(drug == "CX-6258", "PIM",
+#                          ifelse(drug == "DMSO", "Vehicle",
+#                                 ifelse(drug == "DZNeP", "HMT",
+#                                        ifelse(drug == "Suramin", "Sirtuin",target)))),
+#          ID = gsub("GFP", "-sgRNA", ID))
+# 
+# 
+# aurk.inhibitors <- c("Alisertib 100 nM", "Aurora A Inhibitor I 1 µM", "Barasertib 1 µM", "CYC116 1 µM", "SNS-314 Mesylate 10 µM")
+# 
+# all.samples.plot %>% filter(drug_conc %in% c("DMSO 10 µM", aurk.inhibitors), ID == "LBR2") %>%
+#   mutate(drug_conc = factor(drug_conc, levels = c("DMSO 10 µM", aurk.inhibitors))) %>%
+#   ggplot(., aes(y = mean_value, x = drug_conc, fill = variable)) +
+#   geom_bar(stat="identity") + 
+#   geom_errorbar(aes(ymin = vadj-SD, ymax = vadj+SD, color = variable), width = 0.2, size = 1.5)+
+#   labs(title = "cell cycle arrest upon treatment with Aurora Kinase inhibitors") +
+#   scale_fill_manual(values = c("grey80","grey60","grey40")) +
+#   scale_color_manual(values = c("grey80","grey60","grey40")) +
+#   theme_pubr(border = T, x.text.angle = 45)
 
-all.samples.plot %>% filter(drug_conc %in% c("DMSO 10 µM", aurk.inhibitors), ID == "LBR2") %>%
-  mutate(drug_conc = factor(drug_conc, levels = c("DMSO 10 µM", aurk.inhibitors))) %>%
-  ggplot(., aes(y = mean_value, x = drug_conc, fill = variable)) +
-  geom_bar(stat="identity") + 
-  geom_errorbar(aes(ymin = vadj-SD, ymax = vadj+SD, color = variable), width = 0.2, size = 1.5)+
-  labs(title = "cell cycle arrest upon treatment with Aurora Kinase inhibitors") +
-  scale_fill_manual(values = c("grey80","grey60","grey40")) +
-  scale_color_manual(values = c("grey80","grey60","grey40")) +
-  theme_pubr(border = T, x.text.angle = 45)
+all.samples %>%
+  ggplot(., aes(y = mean_value, x = conc, color = target)) +
+  geom_line()+
+  geom_pointrange(aes(ymin=mean_value, ymax=mean_value+SD)
+                  #, position = position_dodge(width = 0.1)
+                  ) +
+  geom_hline(yintercept = 0.08419397, lty = "dashed") + 
+  ylim(0,0.7) +
+  gghighlight(pval < 0.05, label_key = drug_conc) +
+  scale_color_manual(values = colors_targets) 
+
+all.samples %>%
+  ggplot(., aes(y = mean_value, x = conc, color = target)) +
+  geom_quasirandom() +
+ #geom_hline(yintercept = 0.08419397, lty = "dashed") + 
+  ylim(0,0.7) +
+  gghighlight(pval < 0.05 & mean_value > 0.2, label_key = drug_conc) +
+  scale_color_manual(values = colors_targets) 
 
 other_drugs <- unique(all.samples.plot$drug_conc[all.samples.plot$drug_conc != "DMSO 10 µM" & all.samples.plot$target != "Aurora Kinase"])
 all.samples.plot %>% filter(!target %in% c("Aurora Kinase"), ID == "LBR2") %>%
@@ -773,6 +819,74 @@ ggplot(., aes(y = mean_value, x = ID, fill = variable)) +
        x = "GFP/LBR2 transfection", y = "G1, S, and G2 fractions") + 
   scale_fill_manual(values = c("#DED89C","#BF7538","#749075"))
 ```
+
+
+## HDACi only heatmap
+```{r}
+HDAC_tib = read.table("rs20220708_HDAC_targets.txt", sep = "\t", fill = NA, header = T) %>%
+  dplyr::select(-target_main, -target_second) %>%
+  as_tibble()
+
+cluster1 = target_all %>% filter(target == "HDAC") %>% rownames()
+cluster1 = cluster1[!grepl("Nullscript", cluster1)]
+
+eff.data.heatmap.cluster1 = balance.data.heatmap2 %>% 
+  mutate(drug_conc = paste(drug, conc_char, sep = " ")) %>% 
+  filter(drug_conc %in% cluster1)
+
+# Add cluster annotation
+cluster_HDAC <- hclust(dist(eff.data.heatmap.cluster1), method = "complete")
+cluster_HDAC <- cutree(tree = cluster_HDAC, k = 3)
+cluster_HDAC <- data.frame(cluster_HDAC)
+
+eff.data.heatmap.cluster1 <- cbind(eff.data.heatmap.cluster1, cluster_HDAC) %>% 
+  as_tibble()
+
+cluster_HDAC <- eff.data.heatmap.cluster1 %>%
+  distinct(drug_conc, cluster_HDAC)
+
+target.cluster1 <- target_set_drugs %>%
+  rownames_to_column("drug_conc") %>%
+  left_join(HDAC_tib) %>%
+  left_join(cluster_HDAC) %>%
+  filter(!is.na(cluster_HDAC)) %>%
+  replace(is.na(.), 0)
+
+rownames(target.cluster1) <- target.cluster1$drug_conc
+target.cluster1 <- target.cluster1 %>%
+  dplyr::select(cluster_HDAC, conc_char, pan_HDAC, HDAC1,HDAC2, HDAC3,
+                HDAC4, HDAC6, HDAC8, HDAC10, viab)
+
+target.cluster1
+
+HDAC_matrix = eff.data.heatmap.cluster1 %>%
+  arrange(target.cluster1) %>%
+  column_to_rownames('drug_conc') %>%
+  dplyr::select(contains('IPR')) %>%
+  t()
+
+# pdf(paste0(figure_out, "rs20220623_indelfrequency_heatmap_HDAC.pdf"), width=16, height=8)
+plt3 = pheatmap(HDAC_matrix[clone5_map_ipr$labels,],
+                border_color = F,
+                cellwidth = 8,
+                cellheight = 8,
+                breaks = myBreaks,
+                cluster_rows = clone5_map_ipr,
+                cluster_cols = T,
+                angle_col = 90,
+                na_col = "white",
+                main = 'MMEJ z-score change, all concentrations',
+                annotation_col = target.cluster1,
+                annotation_row = chromatin,
+                color = diverge_hcl(palette_length, "Blue-Red"),
+                annotation_colors = annotation_colors_scr,
+                annotation_legend = T,
+                cutree_cols = 3)
+```
+
+
+
+
 
 ## Plot HDAC inhibitor effects on different chromatin types
 ```{r, fig.width = 4, fig.height = 4}
