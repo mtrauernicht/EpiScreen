@@ -354,7 +354,7 @@ centromeres = read_table("/DATA/projects/DSBrepair/git/EpiScreen/rs20220714_UCSC
 # Main figures
 ## 1A: Clone 5 heatmap of chromatin values
 What is the chromatin environment of each IPR?
-```{r S1A clone 5 heatmap, warning = FALSE, fig.height=6, fig.width=8}
+```{r 1A clone 5 heatmap, warning = FALSE, fig.height=6, fig.width=8}
 domain_dt <- readRDS(
   "/DATA/usr/x.vergara/XV_ChIPIndels/XV20200902_DDR_RS_revision/XV20200902_DDR_RS_revision/data/xv20200915_DDR_data_CHIP.rds") %>% 
   distinct(barcode, chromatin)
@@ -439,7 +439,7 @@ pheatmap(t(clone5.matrix)[TRIP_chrom_clust$labels, ],
 ```
 
 ## 1B: Ideogram and example
-```{r Fig2B chromideograms, fig.height=5, fig.width=6}
+```{r 1B chromideograms, fig.height=5, fig.width=6}
 p1 = ggplot() +
   geom_segment(data = chromsizes,
                aes(x = chr, xend = chr, y = 0, yend = start),
@@ -529,7 +529,7 @@ ggplot(targets,
 
 ## 1E TIF changes per IPR
 How do the drugs impact cutting efficiency in general? Does the genomic location & concentration of the drugs matter?
-```{r 1DE TIF, warning = FALSE, fig.height=5, fig.width=6} 
+```{r 1EG TIF, warning = FALSE, fig.height=5, fig.width=6} 
 chromatin_tib <- readRDS(
   "/DATA/usr/x.vergara/XV_ChIPIndels/XV20200902_DDR_RS_revision/XV20200902_DDR_RS_revision/data/xv20200915_DDR_data_CHIP.rds") %>% 
   distinct(barcode, chromatin)
@@ -620,7 +620,7 @@ plot_grid(plt1, plt2, labels = c("E", "G"), ncol = 2)
 
 ## 1F: MMEJ score per IPR
 How do the drugs impact MMEJ score in general? Does the genomic location & concentration of the drugs matter?
-```{r 1F MMEJ ratio, warning = FALSE, fig.height=5, fig.width=6}
+```{r 1FH MMEJ ratio, warning = FALSE, fig.height=5, fig.width=6}
 # E: MMEJ score per IPR
 plt1 = 
   indel.data2 %>%
@@ -759,42 +759,16 @@ ggplot_custom(viab_mmej_cor,
 ```
 
 
+## S1E: Comparison between technical replicates of efficiency in DMSO
 
-## S1E: Comparison between replicates of efficiency in DMSO
-
-```{r S1E control distribution of indel rates across wells and replicates, warning = FALSE, fig.height=3, fig.width=5}
-ggplot(indel.data %>%
-         filter(drug == "DMSO") %>%
-         dplyr::distinct(freqCut, IPR, exp, replicate),
-       aes(x = IPR, y = freqCut)) +
-  geom_quasirandom_rast(aes(color = replicate), dodge.width = 0.75, raster.dpi = 600) +
-  scale_color_manual(values = c(colors_drugs[8], colors_drugs[7])) +
-  theme_classic_lines_90() +
-  ylim(0,1)
-```
-
-
-## S1F: Comparison between replicates MMEJ ratio in DMSO
-
-```{r S1F control distribution of MMEJ ratio across wells and replicates, warning = FALSE, fig.height=3, fig.width=5}
-ggplot(indel.data %>%
-         filter(drug == "DMSO") %>%
-         dplyr::distinct(MMEJratio, IPR, exp, replicate),
-       aes(x = IPR, y = MMEJratio)) +
-  geom_quasirandom_rast(aes(color = replicate), dodge.width = 0.75, raster.dpi = 600) +
-  scale_color_manual(values = c(colors_drugs[8], colors_drugs[7])) +
-  theme_classic_lines_90()
-```
-
-## S1G: Comparison between technical replicates of efficiency in DMSO
-
-```{r S1G comparison for mean indel rate across replicates, warning = FALSE, fig.height=3, fig.width=2}
-ggplot(indel.data %>%
+```{r S1E comparison for mean indel rate across replicates, warning = FALSE, fig.height=3, fig.width=2}
+indel.data %>%
          filter(drug == "DMSO") %>%
          dplyr::distinct(freqCut, well, drug_plate, conc_char, tech, replicate) %>%
          mutate(freqCut = ave(freqCut, well, drug_plate, conc_char, tech, replicate, FUN = mean)) %>%
          distinct() %>%
-         mutate(rep = paste(replicate, "tech", tech, sep = "_")),
+         mutate(rep = paste(replicate, "tech", tech, sep = "_")) %>%
+  ggplot(.,
        aes(x = rep, y = freqCut)) +
   geom_quasirandom_rast(aes(color = replicate), dodge.width = 0.75, raster.dpi = 600) +
   scale_color_manual(values = c(colors_drugs[8], colors_drugs[7])) +
@@ -802,11 +776,73 @@ ggplot(indel.data %>%
   ylim(0,1)
 ```
 
+## S1F: Comparison between replicates of efficiency in DMSO
 
-## S1H: Correlation between technical replicates MMEJ score
+```{r S1F control distribution of indel rates across wells and replicates, warning = FALSE, fig.height=3, fig.width=5}
+
+indel.data %>%
+  filter(drug == "DMSO") %>%
+  mutate(IPR = factor(IPR, levels = clone5_map_ipr$labels[clone5_map_ipr$order])) %>%
+  dplyr::distinct(freqCut, IPR, exp, replicate) %>%
+  ggplot(.,
+         aes(x = IPR, y = freqCut)) +
+  geom_quasirandom_rast(aes(color = replicate), dodge.width = 0.75, raster.dpi = 600) +
+  scale_color_manual(values = c(colors_drugs[8], colors_drugs[7])) +
+  theme_classic_lines_90() +
+  ylim(0,1)
+```
+
+
+## S1G: Comparison between replicates MMEJ ratio in DMSO
+
+```{r S1G control distribution of MMEJ ratio across wells and replicates, warning = FALSE, fig.height=3, fig.width=5}
+indel.data %>%
+  filter(drug == "DMSO") %>%
+  dplyr::distinct(MMEJratio, IPR, exp, replicate) %>%
+  mutate(IPR = factor(IPR, levels = clone5_map_ipr$labels[clone5_map_ipr$order])) %>%
+  ggplot(.,
+         aes(x = IPR, y = MMEJratio)) +
+  geom_quasirandom_rast(aes(color = replicate), dodge.width = 0.75, raster.dpi = 600) +
+  scale_color_manual(values = c(colors_drugs[8], colors_drugs[7])) +
+  theme_classic_lines_90()
+```
+## S1H: Combined TIF z-scores per IPR per concentration
+
+```{r S1H TIF zscores per IPR, warning = FALSE, fig.height=3, fig.width=5}
+zscore_dt = indel.data %>%
+  filter(sample %in% c("Epigenetic Compound") & indel_freq_filter) %>%
+  distinct(freqCut, IPR, drug, conc_char, tech, sample, replicate, 
+           barcode, zscore_bal_comb_rep, zscore_TIF_comb_rep) %>%
+  mutate(sample_conc = factor(conc_char, levels = sample_order),
+         IPR = factor(IPR, levels = clone5_map_ipr$labels[clone5_map_ipr$order]))
+
+ggplot(zscore_dt,
+         aes(x = IPR, y = zscore_TIF_comb_rep, color = sample_conc)) +
+  geom_quasirandom_rast(aes(color = sample_conc), dodge.width = 0.75, raster.dpi = 300, size = 1) +
+  scale_color_manual(values = conc_colors, guide = "none") +
+  geom_hline(linetype = "dashed", yintercept = 2.58) +
+  geom_hline(linetype = "dashed", yintercept = -2.58) +
+  theme_classic_nolines_90() + 
+  ylab("TIF z-score")
+```
+
+## S1I: Combined balance z-scores per IPR per concentration
+
+```{r S1I bal zscore per IPR, warning = FALSE, fig.height=3, fig.width=5}
+  ggplot(zscore_dt,
+         aes(x = IPR, y = zscore_bal_comb_rep, color = sample_conc)) +
+  geom_quasirandom_rast(aes(color = sample_conc), dodge.width = 0.75, raster.dpi = 300, size = 1) +
+  scale_color_manual(values = conc_colors, guide = "none") +
+  geom_hline(linetype = "dashed", yintercept = 2.58) +
+  geom_hline(linetype = "dashed", yintercept = -2.58) +
+  theme_classic_nolines_90() + 
+  ylab("TIF z-score")
+```
+
+## S1J: Correlation between technical replicates MMEJ score
 
 How well does the MMEJ score correlate between the six technical replicates?
-```{r S1H normalized MMEJ ratio correlation, warning = FALSE, fig.height=5, fig.width=5}
+```{r S1J normalized MMEJ ratio correlation, warning = FALSE, fig.height=5, fig.width=5}
 # B: Correlation between technical replicates MMEJ score
 techn_repl <- indel.data %>%
   filter(sample == "Epigenetic Compound" & pathway_bal_filter == T & viab_reproducibility == T) %>%
@@ -839,9 +875,9 @@ ggpairs(techn_repl %>% dplyr::select(contains("E1")),
 
 
 
-## S1I: Correlation between technical replicates efficiency
+## S1K: Correlation between technical replicates efficiency
 How well does the cutting efficiency correlate between the six technical replicates
-```{r S1I normalized TIF correlation, warning = FALSE, fig.height=5, fig.width=5}
+```{r S1K normalized TIF correlation, warning = FALSE, fig.height=5, fig.width=5}
 # C: Correlation between technical replicates efficiency
 techn_repl <- indel.data %>%
   filter(sample == "Epigenetic Compound" & 
@@ -875,9 +911,9 @@ ggpairs(techn_repl %>% dplyr::select(contains("E1")),
 
 
 
-## S1H: Correlation in MMEJ z-score between biological replicates
+## S1L-O: Correlation in MMEJ z-score between biological replicates
 How well does the MMEJ z-score correlate between the biologcial replicates before combining them?
-```{r S1H MMEJ z-score correlation, warning = FALSE, fig.height=5, fig.width=5}
+```{r S1LMNO MMEJ z-score correlation, warning = FALSE, fig.height=5, fig.width=5}
 # D: Correlation between biological replicates MMEJ score
 biol_repl_TIF <- indel.data %>%
   filter(sample == "Epigenetic Compound" & 
