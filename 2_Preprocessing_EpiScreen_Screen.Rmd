@@ -988,7 +988,8 @@ bal_zscore_calc = screen.ratio.dt %>%
 # Calculate IPR z-scores per technical replicate
 bal.zscore = bal_zscore_calc %>%
   # And calculate the z-scores
-  mutate(MMEJratio_norm = MMEJratio / mean_DMSO,
+  mutate(MMEJ_FC = MMEJratio / mean_DMSO,
+         MMEJ_log2_FC = log2(MMEJ_FC),
          zscore_bal = (MMEJratio - mean_DMSO) / sd_DMSO,
          zscore_bal_global = (MMEJratio_global - mean_DMSO_global) / sd_DMSO_global)
 
@@ -1009,6 +1010,21 @@ mean.bal.zscore.comb = bal.zscore %>% distinct(drug, conc_char, barcode, replica
 
 bal.zscore %<>% left_join(mean.bal.zscore.comb)
 ```
+
+```{r}
+# Double check correlation between replicates
+cormat <- dmso.TIF.score %>% dplyr::select(-sd_DMSO) %>% 
+  pivot_wider(names_from = c(replicate, tech), values_from = mean_DMSO) %>%
+  column_to_rownames(var = "barcode") %>% cor %>% round(.,2)
+cormat
+
+# Double check correlation between replicates
+cormat <- dmso.bal.score %>% dplyr::select(-sd_DMSO) %>% 
+  pivot_wider(names_from = c(replicate, tech), values_from = mean_DMSO) %>%
+  column_to_rownames(var = "barcode") %>% cor %>% round(.,2)
+cormat
+```
+
 
 ### Calculate the global balance z-scores
 ```{r calculate global balance z-scores}
@@ -1034,7 +1050,7 @@ bal.zscore.global.comb = bal.zscore %>% distinct(drug, conc_char, barcode, repli
 bal.zscore.global %<>% left_join(bal.zscore.global.comb)
 
 bal.zscore %<>% left_join(bal.zscore.global) %>% 
-  dplyr::select(barcode, replicate, plate, tech, well, drug, conc_char, MMEJratio_norm,
+  dplyr::select(barcode, replicate, plate, tech, well, drug, conc_char, MMEJ_FC, MMEJ_log2_FC,
                 zscore_bal, 
                 zscore_bal_comb_tech, filter_zscore_bal_comb_tech,
                 zscore_bal_comb_rep, filter_zscore_bal_comb_rep,
@@ -1051,26 +1067,6 @@ screen.ratio.dt <- screen.ratio.dt %>%
   left_join(bal.zscore)
 ```
 
-
-# Calculate Log2 fold change
-```{r log2 FC screen}
-dmso.mmej.score <- screen.ratio.dt %>%
-  filter(drug == "DMSO") %>%
-  ungroup() %>%
-  distinct(barcode, replicate, tech, drug, well, plate, MMEJratio) %>%
-  dplyr::select('DMSO' = MMEJratio, barcode, replicate, tech) %>%
-  mutate(mean_DMSO = ave(DMSO, barcode, replicate, tech, FUN = function(x) mean(x, na.rm=T))) %>%
-  dplyr::select(-DMSO) %>%
-  distinct()
-
-screen.ratio.dt %<>% left_join(dmso.mmej.score) %>% mutate(MMEJ_log2_FC = log2(MMEJratio/mean_DMSO)) %>% dplyr::select(-mean_DMSO)
-
-# Double check correlation between replicates
-cormat <- dmso.mmej.score %>% pivot_wider(names_from = c(replicate, tech), values_from = mean_DMSO) %>%
-  column_to_rownames(var = "barcode") %>% cor %>% round(.,2)
-cormat
-```
-
 # Data reproducibility
 ## Make filter for feqCut and MMEJratio reproducibility between screens
 ```{r check for data reproducibility}
@@ -1079,15 +1075,16 @@ cor_filter = screen.ratio.dt %>% dplyr::select(barcode, replicate, tech, drug, c
   pivot_wider(names_from = replicate, values_from = c(freqCut, MMEJscore)) %>%
   summarise(cor_TIF = cor(freqCut_E1504, freqCut_E177, use = "pairwise.complete.obs"),
             cor_bal = cor(MMEJscore_E1504, MMEJscore_E177, use = "pairwise.complete.obs")) %>%
-  mutate(cor_TIF_filter = ifelse(is.na(cor_TIF), FALSE, 
-                                 ifelse(cor_TIF >= TIF_cor, TRUE, 
-                                        FALSE)),
-         cor_bal_filter = ifelse(is.na(cor_bal), FALSE, 
-                                 ifelse(cor_bal >= bal_cor, TRUE, 
-                                        FALSE)))
+  mutate(cor_TIF_filter = ifelse(cor_TIF >= TIF_cor, TRUE, 
+                                        FALSE),
+         cor_bal_filter = ifelse(cor_bal >= bal_cor, TRUE, 
+                                        FALSE))
 
 screen.ratio.dt = screen.ratio.dt %>% left_join(cor_filter)
 ```
+
+
+
 ## Fix filters
 Some filters have NA, these need to be changed to FALSE. 
 ```{r fix some filters}
@@ -1167,7 +1164,8 @@ ratio.cols = c("replicate",
                "MMEJratio_mean", 
                "MMEJratio_global",
                "MMEJratio_global_mean",
-               "MMEJratio_norm",
+               "MMEJ_FC",
+               "MMEJ_log2_FC",
                "NHEJratio",
                "MMEJscore",
                "MMEJscore_mean", 
@@ -1191,8 +1189,7 @@ ratio.cols = c("replicate",
                "zscore_bal_comb_rep", "filter_zscore_bal_comb_rep",
                "zscore_bal_global", 
                "zscore_bal_global_comb_tech", "filter_zscore_bal_global_comb_tech",
-               "zscore_bal_global_comb_rep" , "filter_zscore_bal_global_comb_rep",
-               "MMEJ_log2_FC")
+               "zscore_bal_global_comb_rep" , "filter_zscore_bal_global_comb_rep")
 
 screen_ratios_tib =  screen.ratios.chrom.dt %>% 
   dplyr::select(all_of(c(ratio.cols, chrom_colnames))) %>%
