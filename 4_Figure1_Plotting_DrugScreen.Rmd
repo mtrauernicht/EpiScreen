@@ -844,7 +844,9 @@ How well does the cutting efficiency correlate between the six technical replica
 ```{r S1I normalized TIF correlation, warning = FALSE, fig.height=5, fig.width=5}
 # C: Correlation between technical replicates efficiency
 techn_repl <- indel.data %>%
-  filter(sample == "Epigenetic Compound" & indel_freq_filter == T & viab_reproducibility == T) %>%
+  filter(sample == "Epigenetic Compound" & 
+           indel_freq_filter == T & 
+           viab_reproducibility == T) %>%
   dplyr::distinct(freqCut_norm, drug, conc_char, replicate, tech) %>%
   mutate(freqCut_norm = log2(ave(freqCut_norm, drug, conc_char, replicate, tech, FUN = mean))) %>%
   distinct() %>%
@@ -877,14 +879,32 @@ ggpairs(techn_repl %>% dplyr::select(contains("E1")),
 How well does the MMEJ z-score correlate between the biologcial replicates before combining them?
 ```{r S1H MMEJ z-score correlation, warning = FALSE, fig.height=5, fig.width=5}
 # D: Correlation between biological replicates MMEJ score
-biol_repl <- indel.data %>%
-  filter(sample == "Epigenetic Compound" & viab_reproducibility == TRUE) %>%
-  dplyr::distinct(filter_zscore_bal_global_comb_rep, filter_zscore_TIF_global_comb_rep, filter_zscore_TIF_global_comb_rep, filter_zscore_bal_global_comb_rep, drug, replicate, conc_char, sample, ) %>%
-  pivot_wider(names_from = replicate, values_from =  c(filter_zscore_bal_global_comb_rep, filter_zscore_TIF_global_comb_rep)) %>%
+biol_repl_TIF <- indel.data %>%
+  filter(sample == "Epigenetic Compound" & 
+           viab_reproducibility == TRUE & 
+           cor_TIF_filter & 
+           !is.na(zscore_TIF_global_comb_tech)) %>%
+  dplyr::distinct(zscore_TIF_global_comb_tech, 
+                  filter_zscore_TIF_global_comb_rep, 
+                  drug, replicate, conc_char) %>%
+  pivot_wider(names_from = replicate, 
+              values_from = zscore_TIF_global_comb_tech) %>%
   na.omit()
 
-p1 = ggplot_custom(biol_repl,
-       aes(x = filter_zscore_TIF_global_comb_rep_E1504, y = filter_zscore_TIF_global_comb_rep_E177)) +
+biol_repl_bal <- indel.data %>%
+  filter(sample == "Epigenetic Compound" & 
+           viab_reproducibility == TRUE & 
+           cor_bal_filter & 
+           !is.na(zscore_bal_global_comb_tech)) %>%
+  dplyr::distinct(zscore_bal_global_comb_tech, 
+                  filter_zscore_bal_global_comb_rep, 
+                  drug, replicate, conc_char) %>%
+  pivot_wider(names_from = replicate, 
+              values_from = zscore_bal_global_comb_tech) %>%
+  na.omit()
+
+p1 = ggplot_custom(biol_repl_TIF,
+       aes(x = E1504, y = E177)) +
   geom_point() +
   geom_abline(lty = "twodash") +
   geom_smooth(method = "lm", color = "red", lty = "dashed") +
@@ -892,8 +912,8 @@ p1 = ggplot_custom(biol_repl,
   xlab("Screen 2 TIF ratio z-score") +
   ylab("Screen 1 TIF ratio z-score")
 
-p2 = ggplot_custom(biol_repl,
-       aes(x = filter_zscore_bal_global_comb_rep_E1504, y = filter_zscore_bal_global_comb_rep_E177)) +
+p2 = ggplot_custom(biol_repl_bal,
+       aes(x = E1504, y = E177)) +
   geom_point() +
   geom_abline(lty = "twodash") +
   geom_smooth(method = "lm", color = "red", lty = "dashed") +
@@ -902,8 +922,8 @@ p2 = ggplot_custom(biol_repl,
   ylab("Screen 1 MMEJ ratio z-score")
   
 p3 = ggplot_custom(
-  filter(biol_repl, filter_zscore_TIF_global_comb_rep),
-       aes(x = filter_zscore_TIF_global_comb_rep_E1504, y = filter_zscore_TIF_global_comb_rep_E177)) +
+  filter(biol_repl_TIF, filter_zscore_TIF_global_comb_rep),
+       aes(x = E1504, y = E177)) +
   geom_point() +
   geom_abline(lty = "twodash") +
   geom_smooth(method = "lm", color = "red", lty = "dashed") +
@@ -912,8 +932,8 @@ p3 = ggplot_custom(
   ylab("Screen 1 TIF ratio z-score filtered")
   
 p4 = ggplot_custom(
-  filter(biol_repl, filter_zscore_bal_global_comb_rep),
-       aes(x = filter_zscore_bal_global_comb_rep_E1504, y = filter_zscore_bal_global_comb_rep_E177)) +
+  filter(biol_repl_bal, filter_zscore_bal_global_comb_rep),
+       aes(x = E1504, y = E177)) +
   geom_point() +
   geom_abline(lty = "twodash") +
   geom_smooth(method = "lm", color = "red", lty = "dashed") +
@@ -930,27 +950,6 @@ plot_grid(p1, p2, p3, p4, ncol = 2, nrow = 2, labels = c("L", "M", "N", "O"))
 *Figure S1D: Correlation of the MMEJ z-scores between the two biological replicates.*
 
 Conclusion: MMEJ z-scores correlate well.
-
-
-## S1I: Correlation in cutting efficiencies between biological replicates
-How well does the cutting efficiency correlate between the biologcial replicates?
-```{r S1I TIF z-score correlation, warning = FALSE, fig.height=5, fig.width=5}
-# E: Correlation between biological replicates efficiency
-biol_repl <- indel.data %>%
-  filter(sample == "Epigenetic Compound" & viab_reproducibility == TRUE) %>%
-  dplyr::distinct(filter_zscore_TIF_global_comb_rep, drug, replicate, conc_char, sample) %>%
-  spread(replicate, filter_zscore_TIF_global_comb_rep) %>%
-  na.omit()
-
-ggplot_custom(biol_repl,
-       aes(x = E1504, y = E177)) +
-  geom_point() +
-  geom_abline(lty = "twodash") +
-  geom_smooth(method = "lm", color = "red", lty = "dashed") +
-  stat_cor(method = "pearson") +
-  xlab("Screen 2 TIF z-score") +
-  ylab("Screen 1 TIF z-score")
-```
 
 *Figure S1E: Correlation of the cutting efficiencies between the two biological replicates.*
 
