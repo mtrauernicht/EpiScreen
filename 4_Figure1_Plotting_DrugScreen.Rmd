@@ -529,7 +529,7 @@ ggplot(targets,
 
 ## 1E TIF changes per IPR
 How do the drugs impact cutting efficiency in general? Does the genomic location & concentration of the drugs matter?
-```{r 1EG TIF, warning = FALSE, fig.height=5, fig.width=6} 
+```{r 1EG TIF, warning = FALSE, fig.height=5, fig.width=8} 
 chromatin_tib <- readRDS(
   "/DATA/usr/x.vergara/XV_ChIPIndels/XV20200902_DDR_RS_revision/XV20200902_DDR_RS_revision/data/xv20200915_DDR_data_CHIP.rds") %>% 
   distinct(barcode, chromatin)
@@ -579,7 +579,7 @@ plt1 = indel.data2 %>%
   distinct(freqCut, drug, conc_char, IPR, chromatin, sample_conc) %>% 
   ggplot(.,
          aes(x = sample_conc, y = freqCut*100)) +
-  geom_quasirandom_rast(aes(color = sample_conc), dodge.width = 0.75, raster.dpi = 300, size = 1) +
+  geom_quasirandom_rast(aes(color = sample_conc), dodge.width = 0.75, raster.dpi = 300, size = 2) +
   scale_color_manual(values = conc_control_colors, guide = "none") +
   facet_wrap(IPR ~ ., nrow = 1) +
   ylim(0,100)  +
@@ -592,7 +592,7 @@ plt2 =  indel.data2 %>%
          IPR = factor(IPR, levels = )) %>%
   ggplot(.,
          aes(x = sample_conc, y = zscore_TIF_comb_rep)) +
-  geom_quasirandom_rast(aes(color = sample_conc), dodge.width = 0.75, raster.dpi = 300, size = 1) +
+  geom_quasirandom_rast(aes(color = sample_conc), dodge.width = 0.75, raster.dpi = 300, size = 2) +
   scale_color_manual(values = conc_colors, guide = "none") +
   facet_wrap(IPR ~ ., nrow = 1) +
   geom_hline(linetype = "dashed", yintercept = 2.58) +
@@ -620,7 +620,7 @@ plot_grid(plt1, plt2, labels = c("E", "G"), ncol = 2)
 
 ## 1F: MMEJ score per IPR
 How do the drugs impact MMEJ score in general? Does the genomic location & concentration of the drugs matter?
-```{r 1FH MMEJ ratio, warning = FALSE, fig.height=5, fig.width=6}
+```{r 1FH MMEJ ratio, warning = FALSE, fig.height=5, fig.width=8}
 # E: MMEJ score per IPR
 plt1 = 
   indel.data2 %>%
@@ -629,7 +629,7 @@ plt1 =
   mutate(sample_conc = factor(sample_conc, levels = sample_order)) %>%
   distinct(MMEJratio , drug, conc_char, IPR, chromatin, sample_conc) %>%
   ggplot(., aes(x = sample_conc, y = MMEJratio)) +
-  geom_quasirandom_rast(aes(color = sample_conc), dodge.width = 0.75, raster.dpi = 600, size = 0.5) +
+  geom_quasirandom_rast(aes(color = sample_conc), dodge.width = 0.75, raster.dpi = 300, size = 2) +
   scale_color_manual(values = conc_control_colors, guide= "none") +
   facet_wrap(IPR ~ ., nrow = 1) +
   #geom_hline(linetype = "dashed", yintercept = 2.58) +
@@ -641,7 +641,7 @@ plt2 = indel.data2 %>%
     mutate(sample_conc = factor(sample_conc, levels = sample_order)) %>%
   ggplot(.,
          aes(x = sample_conc, y = zscore_bal_comb_rep)) +
-  geom_quasirandom_rast(aes(color = sample_conc), dodge.width = 0.75, raster.dpi = 600, size = 0.5) +
+  geom_quasirandom_rast(aes(color = sample_conc), dodge.width = 0.75, raster.dpi = 300, size = 2) +
   scale_color_manual(values = conc_colors, guide= "none") +
   facet_wrap(IPR ~ ., nrow = 1) +
   geom_hline(linetype = "dashed", yintercept = 2.58) +
@@ -808,7 +808,7 @@ indel.data %>%
 ```
 ## S1H: Combined TIF z-scores per IPR per concentration
 
-```{r S1H TIF zscores per IPR, warning = FALSE, fig.height=3, fig.width=5}
+```{r S1H TIF zscores per IPR, warning = FALSE, fig.height=3, fig.width=8}
 zscore_dt = indel.data %>%
   filter(sample %in% c("Epigenetic Compound") & indel_freq_filter) %>%
   distinct(freqCut, IPR, drug, conc_char, tech, sample, replicate, 
@@ -828,7 +828,7 @@ ggplot(zscore_dt,
 
 ## S1I: Combined balance z-scores per IPR per concentration
 
-```{r S1I bal zscore per IPR, warning = FALSE, fig.height=3, fig.width=5}
+```{r S1I bal zscore per IPR, warning = FALSE, fig.height=3, fig.width=8}
   ggplot(zscore_dt,
          aes(x = IPR, y = zscore_bal_comb_rep, color = sample_conc)) +
   geom_quasirandom_rast(aes(color = sample_conc), dodge.width = 0.75, raster.dpi = 300, size = 1) +
