@@ -583,30 +583,35 @@ aurora_targets <- data.frame("drug" = c("Alisertib","Aurora A Inhibitor I", "Bar
                              "B" = c("No", "No", "Yes", "Yes", "Yes", "Yes", "No", "Yes", "Yes", "No", "No", "No", "No", "Yes", "Yes"),
                              "A" = c("Yes", "Yes", "No", "Yes", "Yes", "Yes", "Yes", "No", "Yes", "Yes", "Yes", "Yes", "Yes", "Yes", "Yes"))
 
-ggplot(indel.data %>%
-                filter(sample == "Epigenetic Compound") %>%
-                filter(target == "Aurora Kinase") %>%
-                distinct(MMEJratio, drug, conc_char, zscore_bal_global_comb_rep) %>%
-                mutate(MMEJratio = ave(MMEJratio, drug, conc_char, FUN = mean)) %>%
-                distinct() %>%
-                mutate(MMEJ_pval_global_comb = 2*pnorm(q = abs(zscore_bal_global_comb_rep), lower.tail = F)) %>%
-                mutate(MMEJ_pval_adj_global_comb = p.adjust(MMEJ_pval_global_comb, method = 'fdr')) %>%
-         mutate(drug = gsub(" [(].*[)]", "", drug)) %>%
-         left_join(aurora_targets),
-              aes(y = -log10(MMEJ_pval_adj_global_comb), x = MMEJratio,
-                  color = A_B)) +
-  geom_point(size = 2) +
+mean_dmso_bal <- indel.data %>%
+  filter(drug == "DMSO") %>%
+  dplyr::select('dmso_bal' = MMEJratio_global, IPR) %>%
+  summarize(mean = mean(dmso_bal),
+            sd = sd(dmso_bal))
+
+indel.data %>%
+  filter(sample == "Epigenetic Compound" & target == "Aurora Kinase" & viab_reproducibility & pathway_bal_filter) %>%
+  distinct(MMEJratio_global_mean, drug, conc_char, zscore_bal_global_comb_rep) %>%
+  mutate(MMEJratio_global_mean = ave(MMEJratio_global_mean, drug, conc_char, FUN = mean)) %>%
+  distinct() %>%
+  mutate(drug = gsub(" [(].*[)]", "", drug),
+         MMEJ_pval_global_comb = 2*pnorm(q = abs(zscore_bal_global_comb_rep), lower.tail = F),
+         MMEJ_pval_adj_global_comb = -log10(p.adjust(MMEJ_pval_global_comb, method = 'fdr')),
+         # There are some big outlyers, lets just put them at the edge of the plot, significant = significant.
+         MMEJ_pval_adj_global_comb = ifelse(MMEJ_pval_adj_global_comb > 150, 150, MMEJ_pval_adj_global_comb)) %>%
+  left_join(aurora_targets) %>%
+  ggplot(.,
+         aes(y = MMEJ_pval_adj_global_comb, x = MMEJratio_global_mean,
+             color = A_B, size = conc_char)) +
+  geom_point() +
   #geom_label_repel(data = indel.data.freq2 %>% filter(flag == "TRUE") %>% unique(), 
-                   #aes(label = drug)) +
+  #aes(label = drug)) +
   geom_hline(linetype = "dashed", yintercept = -log10(0.05)) +
-  geom_vline(linetype = "dashed", xintercept = (dmso_bal$dmso_bal + 0.02)) +
-  geom_vline(linetype = "dashed", xintercept = (dmso_bal$dmso_bal - 0.02)) +
+  geom_vline(linetype = "dashed", xintercept = (mean_dmso_bal$mean + mean_dmso_bal$sd)) +
+  geom_vline(linetype = "dashed", xintercept = (mean_dmso_bal$mean - mean_dmso_bal$sd)) +
   #geom_vline(linetype = "twodash", xintercept = unique(indel.data.freq$max_dmso_bal))+
   scale_color_manual(values = c("#6d6875", "#b5838d", "#ffb4a2")) +
-  #facet_wrap(~conc_char) +
-  #annotate("rect",xmin=(dmso_bal$dmso_bal + 0.02),xmax=unique(indel.data.freq$max_dmso_bal),ymin=-log10(0.05),ymax=Inf, alpha=0.1, fill="#e07a5f") +
-  #annotate("rect",xmin=unique(indel.data.freq$max_dmso_bal),xmax=Inf,ymin=-Inf,ymax=Inf, alpha=0.25, fill="black") +
-  #annotate("rect",xmin=-Inf,xmax=(dmso_bal$dmso_bal - 0.02),ymin=-log10(0.05),ymax=Inf, alpha=0.1, fill="#3d405b") +
+  coord_cartesian(xlim = c(0, 150)) +
   coord_flip()
 ```
 
@@ -626,12 +631,24 @@ all.samples <- all.samples %>%
   na.omit() %>%
   mutate(pval = "")
 
+all.samples = all.samples %>%
+  group_by(drug, conc, variable, exp) %>%
+  summarise(mean_value = mean(value),
+            sd_value = sd(value))
+
+all.samples.G2 = all.samples %>%
+  filter(variable == "G2")
+
+
+
 pval_list <- list()
 for (i in unique(all.samples$drug_conc_exp)) {
   if (all.samples$exp[all.samples$drug_conc_exp == i] == "five_drugs") {
-    all.samples$pval[all.samples$drug_conc_exp == i] <- t.test(all.samples$value[all.samples$drug_conc == "DMSO_10um" & all.samples$exp == "five_drugs"], all.samples$value[all.samples$drug_conc_exp == i])$p.value
+    all.samples$pval[all.samples$drug_conc_exp == i] <- t.test(all.samples$value[all.samples$drug_conc == "DMSO_10um" & all.samples$exp == "five_drugs"], 
+                                                               all.samples$value[all.samples$drug_conc_exp == i])$p.value
   } else {
-    all.samples$pval[all.samples$drug_conc_exp == i] <- t.test(all.samples$value[all.samples$drug_conc == "DMSO_10um" & all.samples$exp == "effective_drugs"], all.samples$value[all.samples$drug_conc_exp == i])$p.value
+    all.samples$pval[all.samples$drug_conc_exp == i] <- t.test(all.samples$value[all.samples$drug_conc == "DMSO_10um" & all.samples$exp == "effective_drugs"], 
+                                                               all.samples$value[all.samples$drug_conc_exp == i])$p.value
   }
 }
 
