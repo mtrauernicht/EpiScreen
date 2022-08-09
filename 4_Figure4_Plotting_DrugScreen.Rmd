@@ -279,6 +279,194 @@ chromatin.features.short = gsub(".zscore", "", chromatin.features)
 ```
 
 
+## 2D HDACi heatmap
+```{r prepare data for heatmaps}
+# Set annotation for heatmap
+# viability
+viab_drug = indel.data %>% filter(drug != "PAO") %>% mutate(drug = gsub(" [(].*[)]", "", drug),
+                                                            drug_conc = paste(drug, conc_char, sep = " ")) %>% distinct(viab_mean, drug_conc, replicate) %>% group_by(drug_conc) %>%
+  summarise(viab = mean(viab_mean))
+# Row annotation: annotate drugs with the target group
+target_set_drugs <- indel.data %>% 
+  filter(!target %in% c("Negative Control", "MRN", "DNA-PK")) %>%
+  mutate(drug = gsub(" [(].*[)]", "", drug),
+         drug_conc = paste(drug, conc_char, sep = " ")) %>%
+  left_join(viab_drug) %>%
+  distinct(drug, drug_conc, conc_char, target, viab) %>% 
+  column_to_rownames(var="drug_conc")
+
+
+chromatin <- readRDS(
+  "/DATA/usr/x.vergara/XV_ChIPIndels/XV20200902_DDR_RS_revision/XV20200902_DDR_RS_revision/data/xv20200915_DDR_data_CHIP.rds") %>% 
+  distinct(barcode, chromatin) %>%
+  left_join(distinct(indel.data, barcode, IPR)) 
+# chromatin$IPR[is.na(chromatin$IPR)] <- "IPR1"
+chromatin <- chromatin %>%
+  filter(IPR != "<NA>") %>% 
+  dplyr::select(-barcode) %>%
+  column_to_rownames(var="IPR")
+
+# Change colors of annotations
+chrom_colors = c("Euchromatin" = "#EAEEE8",
+                 "other-heterochromatin" = "#a5a58d",  
+                 "H3K27me3" = "#CAD6C2", 
+                 "Triple Heterochromatin" = "#6b705c")
+
+# colors <- brewer.pal(length(unique(barcode.annotation$cluster)), "Pastel2")
+# names(colors) <- unique(barcode.annotation$cluster)
+
+viab_colors = sequential_hcl(11, "Peach", rev = TRUE)
+names(viab_colors) = seq(0, 1, by = 0.1)
+
+
+annotation_colors_scr = list(
+  chromatin = chrom_colors,
+  target = c(HDAC="#60988D", HAT="#C6D0A8", Sirtuin="#8FCAAC",
+             HMT="#FDCDAC", DNMT="#D69C81", `Histone Demethylase`="#FFF2AE",
+             HIF="#E3DCD5", JAK="#C8D7E2", PIM="#9AB8C4", `Aurora Kinase`="#F4CAE4",
+             PARP="#CB546F", `Epigenetic Reader Domain`= "#476D61", `DNA-PK`="#E07A43"),
+  conc_char = conc_colors,
+  clusters_drugs = sequential_hcl(7, "Plasma"),
+  # viab_rep1 = c('#ffeee9', '#ffdcd4', '#ffcbbe', '#ffb8a8', '#fda693', '#f9947e', '#f4826a', '#ef6f56', '#e95b43', '#e24530'),
+  # viab_rep2 = c('#ffeee9', '#ffdcd4', '#ffcbbe', '#ffb8a8', '#fda693', '#f9947e', '#f4826a', '#ef6f56', '#e95b43', '#e24530'),
+  viab = viab_colors)
+
+
+
+# Order the annotation legend
+ordered_marks <- c("Euchromatin", 
+                   "H3K27me3", 
+                   "other-heterochromatin",  
+                   "Triple Heterochromatin")
+
+annotation_colors_scr$chromatin <- annotation_colors_scr$chromatin[ordered_marks]
+
+# Order IPRs by their starting MMEJ_log2_FC value
+dmso_bal <- indel.data %>%
+  filter(drug == "DMSO") %>%
+  distinct(IPR, MMEJ_log2_FC) %>%
+  mutate(MMEJ_log2_FC = ave(MMEJ_log2_FC, IPR, FUN = function(x) mean(x, na.rm = TRUE))*100) %>%
+  dplyr::select('dmso_bal' = MMEJ_log2_FC, IPR) %>%
+  distinct() %>%
+  arrange(desc(dmso_bal))
+
+iprs <- dmso_bal$IPR
+iprs <- as.character(iprs)
+
+
+# Generate heatmap: select top drugs (highest change at any IPR) per concentration
+balance.data <- indel.data %>%
+  #filter(target != "Aurora Kinase") %>%
+  filter(sample == "Epigenetic Compound") %>% 
+  filter(pathway_bal_filter == TRUE & viab_reproducibility == TRUE & cor_bal_filter) %>%
+  filter(abs(zscore_bal_global_comb_rep) >= 2.58) %>%  # we can choose to display all drugs that have significant global hits
+  distinct(conc_char, drug, target, IPR, zscore_bal_comb_rep, MMEJ_log2_FC, replicate, tech)
+
+dmso_bal <- indel.data %>%
+  filter(drug == "DMSO") %>%
+  dplyr::select('dmso_bal' = MMEJ_log2_FC , IPR) %>%
+  mutate(dmso_bal = ave(dmso_bal, IPR, FUN = function(x) mean(x, na.rm = TRUE))) %>%
+  distinct()
+
+balance.data.heatmap <- balance.data %>%
+  # left_join(dmso_bal) %>%
+  group_by(drug, conc_char) %>%
+  # ave to add IPR grouping level to calculate mean of the replicates
+  mutate(MMEJ_log2_FC_mean = ave(MMEJ_log2_FC, IPR, FUN = function(x) mean(x, na.rm = TRUE)),
+         ## Select drugs that have a large effect size in at least one location 
+         ## (some drugs might have a small global effect size, but large local)
+         p_value = 2*pnorm(q = abs(zscore_bal_comb_rep), lower.tail = F),
+         # Adjust p value for false discovery rate
+         adj_pvalue = p.adjust(p_value, method = 'fdr'),
+         # Pick the smallest per compound & concentration
+         min_score = min(adj_pvalue)) %>%
+  # filter for adjusted p.val < 0.001 so we keep compounds with at least one signif effect.
+  filter(min_score < 0.000000000000000000001) %>% # This is ridiculously low, but I use this to fine-tune how many drugs to display
+  distinct(drug, target, conc_char, MMEJ_log2_FC_mean, IPR) %>%
+  ungroup()
+
+
+# replace -Inf with minimal value of the table.
+min.value = min(balance.data.heatmap$MMEJ_log2_FC_mean[is.finite(balance.data.heatmap$MMEJ_log2_FC_mean)])
+
+balance.data.heatmap2 <- balance.data.heatmap %>%
+  mutate(MMEJ_log2_FC_mean = ifelse(is.infinite(MMEJ_log2_FC_mean), min.value, MMEJ_log2_FC_mean)) %>%
+  spread(IPR, MMEJ_log2_FC_mean) %>%
+  filter(!is.nan(IPR3))
+
+balance.data.heatmap2 <- balance.data.heatmap2[,c("drug", "target", "conc_char", iprs)]
+balance.data.heatmap2$drug <- gsub(" [(].*[)]", "", balance.data.heatmap2$drug) #shorten name of drug
+
+
+breaks <- quantile(unlist(balance.data.heatmap2 %>% 
+                            dplyr::select(contains('IPR'))), c(.05,.95), na.rm = T) # change these numbers according to where you want to set the cutoff
+palette_length <- 100
+
+myBreaks <- c(seq(breaks[1], 0, length.out=ceiling(palette_length/2) + 1), 
+              seq(-breaks[1]/palette_length, -breaks[1], length.out=floor(palette_length/2)))
+
+
+# myBreaks <- c(seq(-0.5, 0, length.out=ceiling(palette_length/2) + 1), 
+#               seq(0.5/palette_length, 0.5, length.out=floor(palette_length/2)))
+
+ordered_marks2 <- balance.data.heatmap2 %>% 
+  dplyr::select(target) %>%
+  distinct() %>%
+  arrange(target)
+
+ordered_marks2 <- ordered_marks2$target
+
+annotation_colors_scr$target <- annotation_colors_scr$target[ordered_marks2]
+
+
+# Add cluster annotation
+clusters_drugs <- hclust(dist(balance.data.heatmap2), method = "complete")
+clusters_drugs <- cutree(tree = clusters_drugs, k = 7)
+clusters_drugs <- data.frame(clusters_drugs)
+
+balance.data.heatmap2.clusters <- cbind(balance.data.heatmap2, clusters_drugs) %>% 
+  as_tibble() %>%
+  mutate(drug_conc = paste(drug, conc_char, sep = " "))
+
+clusters_drugs <- balance.data.heatmap2.clusters %>%
+  distinct(drug_conc, clusters_drugs)
+
+target_set_all <- target_set_drugs %>%
+  rownames_to_column("drug_conc") %>%
+  left_join(clusters_drugs) %>%
+  na.omit()
+rownames(target_set_all) <- target_set_all$drug_conc
+target_all <- target_set_all %>%
+  dplyr::select(target, 
+                clusters_drugs,
+                conc_char, viab)
+```
+
+```{r S2A TIF heatmaps, warning = FALSE, fig.width = 10, fig.height = 20}
+# pdf(paste0(figure_out, "rs20220623_indelfrequency_heatmap_allconc.pdf"), width=20, height=8)
+plt1 = pheatmap(balance.data.heatmap2.clusters %>%
+                  arrange(target_all) %>%
+                  column_to_rownames('drug_conc') %>%
+                  dplyr::select(contains('IPR')),
+                border_color = F,
+                cellwidth = 8,
+                cellheight = 8,
+                breaks = myBreaks,
+                cluster_cols = T,
+                cluster_rows = T,
+                angle_col = 90,
+                na_col = "white",
+                main = 'MMEJ z-score change, all concentrations',
+                annotation_row = target_all,
+                annotation_col = chromatin,
+                # color = colorRampPalette(c("#e07a5f", "#e5e5e5", "#3d405b"))(palette_length),
+                color = diverge_hcl(palette_length, "Blue-Red"),
+                annotation_colors = annotation_colors_scr, 
+                annotation_legend = T,
+                cutree_row = 7)
+```
+
+
 ```{r}
 #data frame to save data
 mean_sd_fits <- tibble(term = NA, estimate = NA, std.error = NA, barcode = NA, rep = NA)
@@ -492,8 +680,8 @@ target_effects %>% filter(sign_global != "No_Change") %>% distinct(target, conc_
 ---
 ```{r 2C Top TIF boosting, , fig.width = 12, fig.height = 10}
 rank_dt = indel.data %>% 
-  filter(drug != "DMSO" & pathway_bal_filter == TRUE & viab_reproducibility == TRUE) %>%
-  distinct(drug, conc_char, zscore_bal_global_comb_rep , target) %>% 
+  filter(drug != "DMSO" & pathway_bal_filter & viab_reproducibility, filter_zscore_bal_global_comb_rep) %>%
+  distinct(drug, conc_char, zscore_bal_global_comb_rep , target, cor_bal, cor_bal_filter) %>% 
   arrange(desc(zscore_bal_global_comb_rep )) %>%
   mutate(rank = seq(1:n()),
          drug = gsub(" [(].*[)]", "", drug),
@@ -539,9 +727,7 @@ p3 = rank_dt %>%
   ylab("Global combined MMEJ ratio z-score")
 
 
-left_col_zoom <- plot_grid(p2, p3, labels = c('B', 'C'), label_size = 12, ncol = 1)
-
-plot_grid(p1, left_col_zoom, labels = c('A', ''), label_size = 12, ncol = 2, rel_widths = c(3, 2))
+plot_grid(p1, p2, p3, labels = c('A', 'B', 'C'), label_size = 12, ncol = 3)
 
 top_hits = indel.data  %>% 
   filter(conc_char != "control" & pathway_bal_filter == T & viab_reproducibility == TRUE) %>% 
@@ -1100,6 +1286,394 @@ p2 = GSK_fc  %>% ggplot(., aes(EZH2, logFC_GSK)) + geom_point() + stat_cor() + g
 plot_grid(p1, p2)
 # dev.off()
 ```
+
+
+```{r testing}
+test_drug_short = "PJ34"
+
+drug_df <- indel.data %>%
+  mutate(drug = gsub(" [(].*[)]", "", drug)) %>%
+  filter(drug == test_drug_short) %>%
+  # distinct(drug, conc_char, replicate, tech,MMEJratio , MMEJ_log2_FC, viab_mean, barcode)  
+  distinct(replicate, tech, conc_char, 
+           zscore_bal_global, 
+           zscore_bal_global_comb_tech, 
+           zscore_bal_global_comb_rep, 
+           filter_zscore_bal_global_comb_tech,
+           filter_zscore_bal_global_comb_rep)
+drug_df
+
+p1 = drug_df %>% 
+  pivot_wider(names_from = replicate, values_from = c(MMEJ_log2_FC, viab_mean, MMEJratio)) %>%
+  ggplot_custom(.,
+                aes(x = MMEJ_log2_FC_E1504, y = MMEJ_log2_FC_E177)) +
+  geom_point() +
+  geom_abline(lty = "twodash") +
+  geom_smooth(method = "lm", color = "red", lty = "dashed") +
+  stat_cor(method = "pearson") +
+  xlab("MMEJ FC to Control E1504") +
+  ylab("MMEJ FC to Contro E177")  +
+  facet_grid(. ~ conc_char)
+
+p2 = drug_df %>% 
+  pivot_wider(names_from = replicate, values_from = c(MMEJ_log2_FC, viab_mean, MMEJratio)) %>%
+  ggplot_custom(.,
+                aes(x = MMEJratio_E1504, y = MMEJratio_E177)) +
+  geom_point() +
+  geom_abline(lty = "twodash") +
+  geom_smooth(method = "lm", color = "red", lty = "dashed") +
+  stat_cor(method = "pearson") +
+  xlab("MMEJ ratio E1504") +
+  ylab("MMEJ ratio E177")  +
+  facet_grid(. ~ conc_char)
+plot_grid(p1, p2, nrow = 2)
+```
+
+
+## Cell cycle analysis
+```{r, fig.width = 8, fig.height = 4, eval = FALSE}
+# rmarkdown::render("3_Processing_FACS.Rmd")
+all.samples = read_csv2("/DATA/usr/m.trauernicht/projects/EpiScreen/FACS/Data/mt20220802_facs_all_drugs.csv")
+
+all.samples <- all.samples %>%
+  mutate(drug_conc = paste(drug, conc, sep = "_")) %>%
+  mutate(drug_conc_exp = paste(drug, conc, exp, sep = "_")) %>%
+  mutate(mean_value = ave(value, drug_conc, variable, exp, FUN = mean)) %>%
+  mutate(SD = ave(value, drug_conc, variable, exp, FUN = sd)) %>%
+  filter(variable == "G2") %>%
+  dplyr::select(-variable) %>%
+  na.omit() %>%
+  mutate(pval = "")
+# 
+# all.samples = all.samples %>%
+#   group_by(drug, conc, variable, exp) %>%
+#   summarise(mean_value = mean(value),
+#             sd_value = sd(value))
+
+
+pval_list <- list()
+for (i in unique(all.samples$drug_conc_exp)) {
+  if (all.samples$exp[all.samples$drug_conc_exp == i] == "five_drugs") {
+    all.samples$pval[all.samples$drug_conc_exp == i] <- t.test(all.samples$value[all.samples$drug_conc == "DMSO_10um" & all.samples$exp == "five_drugs"], 
+                                                               all.samples$value[all.samples$drug_conc_exp == i])$p.value
+  } else {
+    all.samples$pval[all.samples$drug_conc_exp == i] <- t.test(all.samples$value[all.samples$drug_conc == "DMSO_10um" & all.samples$exp == "effective_drugs"], 
+                                                               all.samples$value[all.samples$drug_conc_exp == i])$p.value
+  }
+}
+
+target_set_drugs2 <- target_set_drugs %>% distinct(drug, target)
+
+all.samples <- all.samples %>%
+  dplyr::select(-value) %>%
+  mutate(pval_adj = p.adjust(pval, method = "fdr")) %>%
+  left_join(target_set_drugs2) %>%
+  distinct()
+
+# vadj.G2 = all.samples %>% filter(variable %in% c("G2", "S", "G1")) %>% group_by(drug_conc) %>% summarise(vadj = sum(mean_value)) %>% mutate(variable = "G2")
+# vadj.S = all.samples %>% filter(variable %in% c("S", "G1")) %>% group_by(drug_conc) %>% summarise(vadj = sum(mean_value)) %>% mutate(variable = "S")
+# vadj.G1 = all.samples %>% filter(variable %in% c("G1")) %>% group_by(drug_conc) %>% summarise(vadj = sum(mean_value)) %>% mutate(variable = "G1")
+# 
+# vadj.tib = rbind(vadj.G1, vadj.S, vadj.G2)
+# 
+# all.samples.plot = all.samples  %>% 
+#   as_tibble() %>% 
+#   filter(variable != "Apoptotic cells") %>% 
+#   left_join(vadj.tib) %>%
+#   left_join(target_set_drugs) %>%
+#   mutate(variable = factor(variable, levels = c("G2", "S", "G1")),
+#          target = ifelse(drug == "CX-6258", "PIM",
+#                          ifelse(drug == "DMSO", "Vehicle",
+#                                 ifelse(drug == "DZNeP", "HMT",
+#                                        ifelse(drug == "Suramin", "Sirtuin",target)))),
+#          ID = gsub("GFP", "-sgRNA", ID))
+# 
+# 
+# aurk.inhibitors <- c("Alisertib 100 nM", "Aurora A Inhibitor I 1 µM", "Barasertib 1 µM", "CYC116 1 µM", "SNS-314 Mesylate 10 µM")
+# 
+# all.samples.plot %>% filter(drug_conc %in% c("DMSO 10 µM", aurk.inhibitors), ID == "LBR2") %>%
+#   mutate(drug_conc = factor(drug_conc, levels = c("DMSO 10 µM", aurk.inhibitors))) %>%
+#   ggplot(., aes(y = mean_value, x = drug_conc, fill = variable)) +
+#   geom_bar(stat="identity") + 
+#   geom_errorbar(aes(ymin = vadj-SD, ymax = vadj+SD, color = variable), width = 0.2, size = 1.5)+
+#   labs(title = "cell cycle arrest upon treatment with Aurora Kinase inhibitors") +
+#   scale_fill_manual(values = c("grey80","grey60","grey40")) +
+#   scale_color_manual(values = c("grey80","grey60","grey40")) +
+#   theme_pubr(border = T, x.text.angle = 45)
+
+all.samples %>%
+  ggplot(., aes(y = mean_value, x = conc, color = target)) +
+  geom_line()+
+  geom_pointrange(aes(ymin=mean_value, ymax=mean_value+SD)
+                  #, position = position_dodge(width = 0.1)
+                  ) +
+  geom_hline(yintercept = 0.08419397, lty = "dashed") + 
+  ylim(0,0.7) +
+  gghighlight(pval < 0.05, label_key = drug_conc) +
+  scale_color_manual(values = colors_targets) 
+
+all.samples %>%
+  ggplot(., aes(y = mean_value, x = conc, color = target)) +
+  geom_quasirandom() +
+ #geom_hline(yintercept = 0.08419397, lty = "dashed") + 
+  ylim(0,0.7) +
+  gghighlight(pval < 0.05 & mean_value > 0.2, label_key = drug_conc) +
+  scale_color_manual(values = colors_targets) 
+
+other_drugs <- unique(all.samples.plot$drug_conc[all.samples.plot$drug_conc != "DMSO 10 µM" & all.samples.plot$target != "Aurora Kinase"])
+all.samples.plot %>% filter(!target %in% c("Aurora Kinase"), ID == "LBR2") %>%
+mutate(drug_conc = factor(drug_conc, levels = c("DMSO 10 µM", other_drugs))) %>%
+ggplot(., aes(y = mean_value, x = drug_conc, fill = variable)) +
+  geom_bar(stat="identity") + 
+   geom_errorbar(aes(ymin = vadj-SD, ymax = vadj+SD, color = variable), width = 0.2, size = 1.5)+
+  labs(title = "cell cycle arrest upon treatment with Aurora Kinase inhibitors", 
+       x = "GFP/LBR2 transfection", y = "G1, S, and G2 fractions") + 
+  scale_fill_manual(values = c("grey80","grey60","grey40")) +
+  scale_color_manual(values = c("grey80","grey60","grey40")) +
+  theme_pubr(border = T, x.text.angle = 45)
+```
+
+```{r, fig.width = 4, fig.height = 4}
+# Barplot of each drug next to each other
+all.samples.plot %>% filter(target %in% c("Vehicle")) %>%
+ggplot(., aes(y = mean_value, x = ID, fill = variable)) +
+  geom_bar(stat="identity") + 
+   geom_errorbar(aes(ymin = vadj-SD, ymax = vadj+SD, color = variable), width = 0.2)+
+  labs(title = "Cll cycle distribution in control setting", 
+       x = "GFP/LBR2 transfection", y = "G1, S, and G2 fractions") + 
+  scale_fill_manual(values = c("#DED89C","#BF7538","#749075"))
+```
+
+
+## HDACi only heatmap
+```{r}
+HDAC_tib = read.table("rs20220708_HDAC_targets.txt", sep = "\t", fill = NA, header = T) %>%
+  dplyr::select(-target_main, -target_second) %>%
+  as_tibble()
+
+cluster1 = target_all %>% filter(target == "HDAC") %>% rownames()
+cluster1 = cluster1[!grepl("Nullscript", cluster1)]
+
+eff.data.heatmap.cluster1 = balance.data.heatmap2 %>% 
+  mutate(drug_conc = paste(drug, conc_char, sep = " ")) %>% 
+  filter(drug_conc %in% cluster1)
+
+# Add cluster annotation
+cluster_HDAC <- hclust(dist(eff.data.heatmap.cluster1), method = "complete")
+cluster_HDAC <- cutree(tree = cluster_HDAC, k = 3)
+cluster_HDAC <- data.frame(cluster_HDAC)
+
+eff.data.heatmap.cluster1 <- cbind(eff.data.heatmap.cluster1, cluster_HDAC) %>% 
+  as_tibble()
+
+cluster_HDAC <- eff.data.heatmap.cluster1 %>%
+  distinct(drug_conc, cluster_HDAC)
+
+target.cluster1 <- target_set_drugs %>%
+  rownames_to_column("drug_conc") %>%
+  left_join(HDAC_tib) %>%
+  left_join(cluster_HDAC) %>%
+  filter(!is.na(cluster_HDAC)) %>%
+  replace(is.na(.), 0)
+
+rownames(target.cluster1) <- target.cluster1$drug_conc
+target.cluster1 <- target.cluster1 %>%
+  dplyr::select(cluster_HDAC, conc_char, pan_HDAC, HDAC1,HDAC2, HDAC3,
+                HDAC4, HDAC6, HDAC8, HDAC10, viab)
+
+target.cluster1
+
+HDAC_matrix = eff.data.heatmap.cluster1 %>%
+  arrange(target.cluster1) %>%
+  column_to_rownames('drug_conc') %>%
+  dplyr::select(contains('IPR')) %>%
+  t()
+
+# pdf(paste0(figure_out, "rs20220623_indelfrequency_heatmap_HDAC.pdf"), width=16, height=8)
+plt3 = pheatmap(HDAC_matrix[clone5_map_ipr$labels,],
+                border_color = F,
+                cellwidth = 8,
+                cellheight = 8,
+                breaks = myBreaks,
+                cluster_rows = clone5_map_ipr,
+                cluster_cols = T,
+                angle_col = 90,
+                na_col = "white",
+                main = 'MMEJ z-score change, all concentrations',
+                annotation_col = target.cluster1,
+                annotation_row = chromatin,
+                color = diverge_hcl(palette_length, "Blue-Red"),
+                annotation_colors = annotation_colors_scr,
+                annotation_legend = T,
+                cutree_cols = 3)
+```
+
+
+
+
+
+## Plot HDAC inhibitor effects on different chromatin types
+```{r, fig.width = 4, fig.height = 4}
+chromatin_ipr <- chromatin %>%
+  rownames_to_column("IPR")
+
+balance.data.heatmap3 <- balance.data.heatmap2 %>%
+  pivot_longer(contains("IPR"), names_to = "IPR", values_to = "MMEJ_ratio_norm")
+
+chromatin_effect <- merge(balance.data.heatmap3, chromatin_ipr) %>%
+  #filter(target == "HDAC") %>%
+  mutate(MMEJ_ratio_norm = ave(MMEJ_ratio_norm, drug, chromatin, conc_char, FUN = mean)) %>%
+  distinct(MMEJ_ratio_norm, drug, chromatin, conc_char, target)
+
+sigFunc = function(x){
+  if(x < 0.001){"***"} 
+  else if(x < 0.01){"**"}
+  else if(x < 0.05){"*"}
+  else{NA}}
+
+ggplot(chromatin_effect %>%
+         filter(target == "HDAC"),
+              aes(x = chromatin, y = MMEJ_ratio_norm, fill = chromatin)) +
+  geom_boxplot(outlier.shape = NA) +
+  geom_quasirandom() +
+  geom_signif(comparisons = combn(sort(unique(chromatin_effect$chromatin)), 2, simplify = F), 
+              map_signif_level=sigFunc, 
+              step_increase = 0.1) +
+  theme_classic_lines_45() +
+  scale_fill_manual(values = chrom_colors) +
+  theme(legend.position = "none") +
+  facet_wrap(~target)
+```
+
+
+
+
+## D: Correlation of MMEJ-ratio z-score with Efficiency z-score
+Do the changes in MMEJ-ratio change correlate with changes in efficiency? Can MMEJ changes be explained by opened up/closed chromatin?
+
+```{r, fig.width = 8, fig.height = 8,  warning = F}
+for (i in unique(indel.data$target)[-1]) {
+  
+  x <- indel.data %>%
+    filter(sample == "Epigenetic Compound") %>%
+    filter(target == i) %>%
+    mutate(mean_eff_pval_global_comb = 2*pnorm(q = abs(zscore_TIF_global_comb_rep), lower.tail = F)) %>%
+    mutate(mean_eff_pval_adj_global_comb = p.adjust(mean_eff_pval_global_comb, method = 'fdr')) %>%
+    filter(mean_eff_pval_adj_global_comb < 0.01) %>%
+    distinct(MMEJratio_norm, freqCut_norm_mean, drug, conc_char, target, IPR) %>%
+    mutate(MMEJratio_norm = log2(ave(MMEJratio_norm, drug, conc_char, IPR, FUN = function(x) mean(x, na.rm=T)))) %>%
+    mutate(freqCut_norm_mean = log2(ave(freqCut_norm_mean, drug, conc_char, IPR, FUN = function(x) mean(x, na.rm=T)))) %>%
+    distinct() %>%
+    mutate(drug_conc = paste(drug, conc_char, sep = "_")) %>%
+    filter(!is.na(MMEJratio_norm))
+  
+  if (length(unique(x$drug_conc)) > 1) {
+  p<- ggplot(x ,
+       aes(x = MMEJratio_norm, y = freqCut_norm_mean)) +
+  geom_point() +
+  geom_smooth(method = "lm") +
+  facet_wrap(~drug_conc) +
+  stat_cor(method = "spearman") +
+  ggtitle(paste("efficiency vs. mmej-ratio per target group", i))
+  
+  print(p)
+  }
+}
+
+ggplot_custom(indel.data %>%
+    filter(sample == "Epigenetic Compound") %>%
+    filter(drug == "PCI-24781 (Abexinostat)", conc_char == "100 nM") %>%
+    mutate(mean_eff_pval_global_comb = 2*pnorm(q = abs(zscore_TIF_global_comb_rep), lower.tail = F)) %>%
+    mutate(mean_eff_pval_adj_global_comb = p.adjust(mean_eff_pval_global_comb, method = 'fdr')) %>%
+    filter(mean_eff_pval_adj_global_comb < 0.001) %>%
+    distinct(MMEJratio_norm, freqCut_norm_mean, drug, conc_char, target, IPR) %>%
+    mutate(MMEJratio_norm = log2(ave(MMEJratio_norm, drug, conc_char, IPR, FUN = function(x) mean(x, na.rm=T)))) %>%
+    mutate(freqCut_norm_mean = log2(ave(freqCut_norm_mean, drug, conc_char, IPR, FUN = function(x) mean(x, na.rm=T)))) %>%
+    mutate(drug_conc = paste(drug, conc_char, sep = "_")),
+    aes(x = MMEJratio_norm, y = freqCut_norm_mean)) +
+  geom_point() +
+  geom_smooth(method = "lm") +
+  stat_cor(method = "spearman") +
+  ggtitle("efficiency vs. mmej-ratio per target group")
+
+
+eff_mmej_corr <- indel.data %>%
+  filter(sample == "Epigenetic Compound") %>%
+  filter(abs(zscore_TIF_global_comb_rep) > 4) %>%
+  filter(abs(zscore_bal_global_comb_rep) > 4) %>%
+  distinct(MMEJratio_norm, freqCut_norm_mean, drug, conc_char, target, IPR) %>%
+  mutate(MMEJratio_norm = log2(ave(MMEJratio_norm, drug, conc_char, IPR, FUN = function(x) mean(x, na.rm=T)))) %>%
+  mutate(freqCut_norm_mean = log2(ave(freqCut_norm_mean, drug, conc_char, IPR, FUN = function(x) mean(x, na.rm=T)))) %>%
+  mutate(drug_conc = paste(drug, conc_char, sep = "_")) %>%
+  mutate(slope = NA, term = NA, p.value = NA)
+
+for (i in unique(eff_mmej_corr$drug_conc)) {
+    model.correlation <- lm(formula = MMEJratio_norm ~ freqCut_norm_mean, 
+                               data = eff_mmej_corr[eff_mmej_corr$drug_conc == i,]) %>% 
+      tidy()
+    
+    eff_mmej_corr$slope[eff_mmej_corr$drug_conc == i] <- 
+      model.correlation$estimate
+    
+    eff_mmej_corr$term[eff_mmej_corr$drug_conc == i] <- 
+      model.correlation$term
+    
+    eff_mmej_corr$p.value[eff_mmej_corr$drug_conc == i] <- 
+      model.correlation$p.value
+}
+
+
+
+```
+
+```{r, fig.width = 4, fig.height = 4}
+eff_mmej_corr_heatmap <- eff_mmej_corr %>%
+  filter(term != "(Intercept)") %>%
+  mutate(p.value = p.adjust(p.value, method = "fdr")) %>%
+  #filter(p.value < 0.05) %>%
+  dplyr::select(-term, -IPR, -freqCut_norm_mean, -MMEJratio_norm) %>%
+  distinct()
+
+ggplot_custom(eff_mmej_corr_heatmap %>%
+                mutate(mean_slope = ave(slope, target, FUN = function(x) mean(x, na.rm=T))),
+              aes(x = reorder(target, slope), y = slope)) +
+  geom_boxplot(alpha = 0.4, outlier.shape = NA) +
+  geom_quasirandom(aes(color = ifelse(p.value < 0.05, "green", "black"))) +
+  theme_classic_lines_90()
+
+```
+
+```{r, fig.width = 4, fig.height = 4}
+eff_mmej_corr_heatmap_plot <- indel.data %>%
+  mutate(drug_conc = paste(drug, conc_char, sep = "_")) %>%
+  filter(drug_conc %in% eff_mmej_corr_heatmap$drug_conc) %>%
+  distinct(MMEJratio_norm, freqCut_norm_mean, drug_conc, conc_char, target, IPR) %>%
+  mutate(MMEJratio_norm = log2(ave(MMEJratio_norm, drug_conc, IPR, FUN = function(x) mean(x, na.rm=T)))) %>%
+  mutate(freqCut_norm_mean = log2(ave(freqCut_norm_mean, drug_conc, IPR, FUN = function(x) mean(x, na.rm=T)))) %>%
+  distinct()
+
+pval <- eff_mmej_corr_heatmap %>%
+  distinct(drug_conc, p.value, slope)
+
+eff_mmej_corr_heatmap_plot <- merge(eff_mmej_corr_heatmap_plot, pval)
+
+eff_mmej_corr_heatmap_plot <- eff_mmej_corr_heatmap_plot %>%
+         filter(target %in% c("HDAC", "Aurora Kinase", "Epigenetic Reader Domain"))
+
+ggplot(eff_mmej_corr_heatmap_plot,
+       aes(x = MMEJratio_norm, y = freqCut_norm_mean, group = drug_conc)) +
+  geom_abline(linetype = "twodash") +
+  geom_vline(xintercept = 0) +
+  geom_hline(yintercept = 0) +
+  geom_point(alpha = 0.1, aes(color = ifelse(p.value < 0.05 & slope < -0.1, "green", 
+                                                       ifelse(p.value < 0.05 & slope > 0.1, "yellow","blue")))) +
+  geom_smooth(method = "lm", se = F, aes(color = ifelse(p.value < 0.05 & slope < -0.1, "green", 
+                                                       ifelse(p.value < 0.05 & slope > 0.1, "yellow","blue")))) +
+  facet_wrap(~target, nrow = 3) +
+  ggtitle("efficiency vs. mmej-ratio per target group") +
+  scale_color_manual(values = c("#C2C2C2", "#3d405b", "#e07a5f")) 
+```
+
 
 
 # Session Info
