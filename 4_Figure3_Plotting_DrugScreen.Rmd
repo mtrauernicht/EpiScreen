@@ -616,6 +616,11 @@ ggplot(indel.data %>%
 # rmarkdown::render("3_Processing_FACS.Rmd")
 all.samples = read_csv2("/DATA/usr/m.trauernicht/projects/EpiScreen/FACS/Data/mt20220802_facs_all_drugs.csv")
 
+all.samples$drug[all.samples$drug == "AZ-960"] <- "AZ 960"
+all.samples$drug[all.samples$drug == "Suramin"] <- "Suramin·6Na"
+all.samples$drug[all.samples$drug == "CX-6258"] <- "CX-6258 HCl"
+all.samples$drug[all.samples$drug == "DZNeP"] <- "3-Deazaneplanocin A"
+
 all.samples <- all.samples %>%
   mutate(drug_conc = paste(drug, conc, sep = "_")) %>%
   mutate(drug_conc_exp = paste(drug, conc, exp, sep = "_")) %>%
@@ -625,6 +630,16 @@ all.samples <- all.samples %>%
   dplyr::select(-variable) %>%
   na.omit() %>%
   mutate(pval = "")
+
+dmso.samples <- all.samples %>%
+  filter(drug_conc == "DMSO_10um") %>%
+  mutate(mean_value = ave(mean_value, drug_conc_exp, FUN = mean)) %>%
+  distinct('mean_value_dmso' = mean_value, exp)
+
+all.samples <- merge(all.samples, dmso.samples, by = "exp", all = T) %>%
+  mutate(value = value / mean_value_dmso) %>%
+  mutate(mean_value = ave(value, drug_conc, exp, FUN = mean)) %>%
+  mutate(SD = ave(value, drug_conc, exp, FUN = sd))
 
 pval_list <- list()
 for (i in unique(all.samples$drug_conc_exp)) {
@@ -686,12 +701,17 @@ all.samples %>%
   scale_color_manual(values = colors_targets) 
 
 all.samples %>%
-  ggplot(., aes(y = mean_value, x = conc, color = target)) +
-  geom_quasirandom() +
- #geom_hline(yintercept = 0.08419397, lty = "dashed") + 
-  ylim(0,0.7) +
-  gghighlight(pval < 0.05 & mean_value > 0.2, label_key = drug_conc) +
-  scale_color_manual(values = colors_targets) 
+  distinct(drug_conc_exp, target, mean_value, pval, drug, drug_conc) %>%
+  mutate(pval = -log10(as.numeric(pval))) %>%
+  filter(drug != "DMSO", drug != "PAO") %>%
+  ggplot(., aes(y = log2(mean_value), x = target, 
+                fill = target, size = pval, 
+                color = ifelse(pval > -log10(0.05), "black", "white"))) +
+  geom_point(shape = 21) +
+  #gghighlight(mean_value > 2, label_key = drug_conc) +
+  scale_fill_manual(values = colors_targets) +
+  scale_color_manual(values = c("black", "white")) +
+  theme_classic_lines_45()
 
 other_drugs <- unique(all.samples.plot$drug_conc[all.samples.plot$drug_conc != "DMSO 10 µM" & all.samples.plot$target != "Aurora Kinase"])
 all.samples.plot %>% filter(!target %in% c("Aurora Kinase"), ID == "LBR2") %>%
