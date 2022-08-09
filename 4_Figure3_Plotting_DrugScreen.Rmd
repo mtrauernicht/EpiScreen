@@ -32,18 +32,18 @@ Clone 5 with ~18 sgRNA target site IPRs was cut and treated with 160 epigenetic 
 
 <!-- little HTML script to do indentation of the table of contents -->
 <script>
-    $(document).ready(function() {
-      $items = $('div#TOC li');
-      $items.each(function(idx) {
-        num_ul = $(this).parentsUntil('#TOC').length;
-        $(this).css({'text-indent': num_ul * 10, 'padding-left': 0});
-      });
-    });
+$(document).ready(function() {
+  $items = $('div#TOC li');
+  $items.each(function(idx) {
+    num_ul = $(this).parentsUntil('#TOC').length;
+    $(this).css({'text-indent': num_ul * 10, 'padding-left': 0});
+  });
+});
 </script>
 
 ```{css, echo = FALSE}
 div.sourceCode {
-  overflow-x: hidden;
+overflow-x: hidden;
 }
 ```
 ### Libraries
@@ -848,7 +848,15 @@ indel.data <- readRDS(file) # %>% filter(pathway_bal_filter == TRUE & viab_repro
 file = list.files(in.dir, pattern = "validation_ratios", full.names = T) %>% tail(n = 1)
 indel.validation.data <- readRDS(file) # %>% filter(pathway_bal_filter == TRUE & viab_reproducibility == TRUE)
 
-RSTP2_IndelRatios_Chromatin_2kb <- readRDS("~/DSBrepair/data/R/rs20210311/RSTP2_IndelRatios_Chromatin_2kb.RDS") 
+# List chromatin name columns from this table
+chromatin_cols = colnames(indel.validation.data)[42:75]
+# Import data from DSB TRIP paper
+RSTP2_IndelRatios_Chromatin_2kb <- readRDS("~/DSBrepair/data/R/rs20210311/RSTP2_IndelRatios_Chromatin_2kb.RDS") %>% 
+  filter(replicate == "mean" & drug %in% c("DMSO_GSK", "GSK126") & plasmid == "LBR2") %>%
+  dplyr::select(barcode, drug, MMEJ, NHEJ, efficiency, all_of(chromatin_cols)) %>%
+  distinct() %>%
+  mutate(MMEJ_NHEJ = MMEJ/NHEJ) %>%
+  dplyr::select(-NHEJ, -MMEJ)
 ```
 
 ---
@@ -1014,7 +1022,7 @@ eff.data.heatmap2$drug <- gsub(" [(].*[)]", "", eff.data.heatmap2$drug) #shorten
 
 
 ## Visualisation
-```{r, fig.width = 8, fig.height = 4}
+```{r, fig.width = 8, fig.height = 4, eval = FALSE}
 # rmarkdown::render("3_Processing_FACS.Rmd")
 all.samples = read_csv2("/DATA/usr/m.trauernicht/projects/EpiScreen/FACS/Data/mt20220802_facs_all_drugs.csv")
 
@@ -1128,7 +1136,7 @@ ggplot(., aes(y = mean_value, x = drug_conc, fill = variable)) +
   theme_pubr(border = T, x.text.angle = 45)
 ```
 
-```{r, fig.width = 4, fig.height = 4}
+```{r, fig.width = 4, fig.height = 4, eval = FALSE}
 # Barplot of each drug next to each other
 all.samples.plot %>% filter(target %in% c("Vehicle")) %>%
 ggplot(., aes(y = mean_value, x = ID, fill = variable)) +
@@ -1502,10 +1510,20 @@ for (i in targets) {
 # Vorinostat & GSK126 validations
 
 ```{r}
-indel.validation.data
-vorinostat_ratios = indel.validation.data %>% 
-  filter(replicate == "mean" & plasmid == "LBR2", drug %in% c("DMSO", "Vorinostat"), sum_bc_reads > 1000) %>% 
-  distinct(barcode, drug, MMEJ_NHEJ, efficiency) %>% 
+vorinostat_validation = indel.validation.data %>% 
+  filter(replicate == "mean" & plasmid == "LBR2", drug %in% c("DMSO", "Vorinostat"), sum_bc_reads > 1000)%>% 
+  dplyr::select(barcode, drug, MMEJ_NHEJ, efficiency, all_of(chromatin_cols)) %>%
+  distinct() 
+
+barcde_all_reps_vorino = vorinostat_validation %>% 
+  distinct(barcode, drug) %>% 
+  group_by(barcode) %>%
+  summarise(bccount = n()) %>% 
+  filter(bccount == 2) %>%
+  pull(barcode)
+
+vorinostat_ratios = vorinostat_validation  %>% 
+  filter(barcode %in% barcde_all_reps_vorino) %>%
   pivot_wider(names_from = drug, values_from = c(efficiency, MMEJ_NHEJ)) %>%
   mutate(diff_TIF = efficiency_Vorinostat - efficiency_DMSO,
          ratio_TIF = efficiency_Vorinostat/efficiency_DMSO,
@@ -1513,38 +1531,29 @@ vorinostat_ratios = indel.validation.data %>%
          diff_MMEJ_NHEJ = MMEJ_NHEJ_Vorinostat - MMEJ_NHEJ_DMSO,
          ratio_MMEJ_NHEJ = MMEJ_NHEJ_Vorinostat/MMEJ_NHEJ_DMSO,
          log2_FC_MMEJ_NHEJ = log2(ratio_MMEJ_NHEJ)) 
-  
-vorinostat_ratios %<>% left_join(unique(indel.validation.data[, c(1, 42:75)]), by = "barcode") %>% distinct(barcode, .keep_all = TRUE)
-
 
 barcde_all_reps_gsk = RSTP2_IndelRatios_Chromatin_2kb %>% 
-  filter(replicate == "mean" & drug %in% c("DMSO_GSK", "GSK126") & plasmid == "LBR2") %>%
-  distinct(barcode, replicate, drug) %>% 
+  distinct(barcode, drug) %>% 
   group_by(barcode) %>%
   summarise(bccount = n()) %>% 
   filter(bccount == 2) %>%
   pull(barcode)
 
 GSK_ratios = RSTP2_IndelRatios_Chromatin_2kb %>% 
-  filter(replicate == "mean" & drug %in% c("DMSO_GSK", "GSK126") & plasmid == "LBR2" & barcode %in% barcde_all_reps_gsk) %>%
-  distinct(barcode, drug, MMEJ_MMEJNHEJ , efficiency) %>% 
-  pivot_wider(names_from = drug, values_from = c(efficiency, MMEJ_MMEJNHEJ )) %>%
+  filter(barcode %in% barcde_all_reps_gsk) %>%
+  # distinct(barcode, drug, MMEJ_NHEJ , efficiency) %>% 
+  pivot_wider(names_from = drug, values_from = c(efficiency, MMEJ_NHEJ)) %>%
   mutate(diff_TIF = efficiency_GSK126 - efficiency_DMSO_GSK,
          ratio_TIF = efficiency_GSK126/efficiency_DMSO_GSK,
          log2_FC_TIF = log2(ratio_TIF),
-         diff_MMEJ_MMEJNHEJ = MMEJ_MMEJNHEJ_GSK126 - MMEJ_MMEJNHEJ_DMSO_GSK,
-         ratio_MMEJ_MMEJNHEJ = MMEJ_MMEJNHEJ_GSK126/MMEJ_MMEJNHEJ_DMSO_GSK,
-         log2_FC_MMEJ_MMEJNHEJ = log2(ratio_MMEJ_MMEJNHEJ)) 
-  
-Chromdata = unique(RSTP2_IndelRatios_Chromatin_2kb[, c(3, 55:88)])
-
-GSK_ratios %<>% left_join(Chromdata , by = "barcode") %>% distinct(barcode, .keep_all = TRUE)
-
+         diff_MMEJ_NHEJ = MMEJ_NHEJ_GSK126 - MMEJ_NHEJ_DMSO_GSK,
+         ratio_MMEJ_NHEJ = MMEJ_NHEJ_GSK126/MMEJ_NHEJ_DMSO_GSK,
+         log2_FC_MMEJ_NHEJ = log2(ratio_MMEJ_NHEJ))
 ```
 
 ```{r}
 ## Vorinostat
-chrom.mods.cols <- seq(grep("log2_FC_MMEJ_NHEJ", names(vorinostat_ratios))+1, grep("H3K27me3_domain", names(vorinostat_ratios))-1)
+chrom.mods.cols <- seq(grep("CTCF", names(vorinostat_ratios)), grep("H3K27me3_domain", names(vorinostat_ratios))-1)
 
 vorinostat.hist.corr <- CorrelationDFMean(vorinostat_ratios, "log2_FC_TIF", targets = chrom.mods.cols) %>%
   arrange(corr) %>% pull(rowname) %>% factor(.,levels = .)
@@ -1554,7 +1563,7 @@ lims = 1
 CorrelationPlotMean(vorinostat_ratios, "log2_FC_TIF", targets = vorinostat.hist.corr, title = "with log2 FC TIF after Vorinostat treatment")
 
 ## GSK126
-chrom.mods.cols <- seq(grep("log2_FC_MMEJ_MMEJNHEJ", names(GSK_ratios))+1, grep("H3K27me3_domain", names(GSK_ratios))-1)
+chrom.mods.cols <- seq(grep("CTCF", names(GSK_ratios)), grep("H3K27me3_domain", names(GSK_ratios))-1)
 
 GSK.hist.corr <- CorrelationDFMean(GSK_ratios, "log2_FC_TIF", targets = chrom.mods.cols) %>%
   arrange(corr) %>% pull(rowname) %>% factor(.,levels = .)
@@ -1566,7 +1575,7 @@ CorrelationPlotMean(GSK_ratios, "log2_FC_TIF", targets = GSK.hist.corr, title = 
 
 ```{r}
 ## Vorinostat
-chrom.mods.cols <- seq(grep("log2_FC_MMEJ_NHEJ", names(vorinostat_ratios))+1, grep("H3K27me3_domain", names(vorinostat_ratios))-1)
+chrom.mods.cols <- seq(grep("CTCF", names(vorinostat_ratios)), grep("H3K27me3_domain", names(vorinostat_ratios))-1)
 
 vorinostat.hist.corr <- CorrelationDFMean(vorinostat_ratios, "log2_FC_MMEJ_NHEJ", targets = chrom.mods.cols) %>%
   arrange(corr) %>% pull(rowname) %>% factor(.,levels = .)
@@ -1576,14 +1585,14 @@ lims = 1
 CorrelationPlotMean(vorinostat_ratios, "log2_FC_MMEJ_NHEJ", targets = vorinostat.hist.corr, title = "with log2 FC balance after Vorinostat treatment")
 
 ## GSK126
-chrom.mods.cols <- seq(grep("log2_FC_MMEJ_MMEJNHEJ", names(GSK_ratios))+1, grep("H3K27me3_domain", names(GSK_ratios))-1)
+chrom.mods.cols <- seq(grep("CTCF", names(GSK_ratios)), grep("H3K27me3_domain", names(GSK_ratios))-1)
 
-GSK.hist.corr <- CorrelationDFMean(GSK_ratios, "log2_FC_MMEJ_MMEJNHEJ", targets = chrom.mods.cols) %>%
+GSK.hist.corr <- CorrelationDFMean(GSK_ratios, "log2_FC_MMEJ_NHEJ", targets = chrom.mods.cols) %>%
   arrange(corr) %>% pull(rowname) %>% factor(.,levels = .)
 
 lims = 1
 
-CorrelationPlotMean(GSK_ratios, "log2_FC_MMEJ_MMEJNHEJ", targets = GSK.hist.corr, title = "with log2 FC balance after GSK126 treatment")
+CorrelationPlotMean(GSK_ratios, "log2_FC_MMEJ_NHEJ", targets = GSK.hist.corr, title = "with log2 FC balance after GSK126 treatment")
 ```
 
 ```{r Vorino upset, fig.height=5, fig.width=7}
@@ -1685,7 +1694,7 @@ domains = paste0(domain_levels, '_domain')
 
 GSK.dt = GSK_ratios %>%
   filter(!is.na(diff_TIF)) %>%
-  dplyr::select(barcode, diff_TIF, log2_FC_MMEJ_MMEJNHEJ, ratio_MMEJ_MMEJNHEJ, log2_FC_TIF, domains) %>%
+  dplyr::select(barcode, diff_TIF, log2_FC_MMEJ_NHEJ, ratio_MMEJ_NHEJ, log2_FC_TIF, domains) %>%
   distinct(barcode, .keep_all = TRUE) %>%
   data.table()
 
@@ -1709,9 +1718,9 @@ opt_df = get_combinations(domain_levels)
 p1 = plot_comb_grid_beeswarm(GSK.dt, opt_df,
                         domain_levels, 'diff_TIF', min_count = 10, y_plabel=c(-.25, .25))
 p1 = plot_comb_grid_beeswarm(GSK.dt, opt_df,
-                        domain_levels, 'ratio_MMEJ_MMEJNHEJ', min_count = 10, y_plabel=c(-2, 2))
+                        domain_levels, 'ratio_MMEJ_NHEJ', min_count = 10, y_plabel=c(-2, 2))
 p1 = plot_comb_grid_beeswarm(GSK.dt, opt_df,
-                        domain_levels, 'log2_FC_MMEJ_MMEJNHEJ', min_count = 10, y_plabel=c(-1.5, 1.5))
+                        domain_levels, 'log2_FC_MMEJ_NHEJ', min_count = 10, y_plabel=c(-1.5, 1.5))
 p1 = plot_comb_grid_beeswarm(GSK.dt, opt_df,
                         domain_levels, 'log2_FC_TIF', min_count = 10, y_plabel=c(-1.5, 1.5))
 
@@ -1771,11 +1780,6 @@ GSK.dt %>% mutate(state = ifelse(late_replicating == 1 &
 ```
 
 ```{r}
-# indel.data %>% filter(!between(zscore_TIF, -3.8906, 3.8906) & conc_char != "control" & viab_reproducibility & cor_TIF_filter & filter_zscore_TIF_comb_rep) %>% distinct(IPR, drug, replicate, target, tech, conc_char, zscore_TIF, zscore_TIF_comb_tech, zscore_TIF_comb_rep) %>% group_by(IPR, drug, conc_char, target, zscore_TIF_comb_rep) %>% count() %>% filter(n >= 6) %>% View()
-
-indel.data %>% filter(!between(zscore_TIF_comb_rep, -3.2905, 3.2905) & conc_char != "control" & viab_reproducibility & cor_TIF_filter & filter_zscore_TIF_comb_rep) %>% distinct(IPR, drug, replicate, target, tech, conc_char, zscore_TIF, zscore_TIF_comb_tech, zscore_TIF_comb_rep) %>% group_by(IPR, drug, conc_char, target) %>% count() %>% filter(n >= 6)
-
-
 indel.data %>% filter(!between(zscore_TIF_comb_rep, -3.2905, 3.2905) & conc_char != "control" & viab_reproducibility & cor_TIF_filter & filter_zscore_TIF_comb_rep) %>% 
   # distinct(IPR, drug, replicate, target, tech, conc_char, zscore_TIF, zscore_TIF_comb_tech, zscore_TIF_comb_rep) %>% 
   distinct(IPR, drug, conc_char, target, zscore_TIF_comb_rep) %>% 
@@ -1784,10 +1788,6 @@ indel.data %>% filter(!between(zscore_TIF_comb_rep, -3.2905, 3.2905) & conc_char
   facet_grid(. ~ conc_char) + 
   scale_color_manual(values = colors_targets) +
   theme_classic2()
-
-# indel.data %>% filter(zscore_TIF_comb_rep >= 3.2905 & conc_char != "control" & viab_reproducibility & cor_TIF_filter & filter_zscore_TIF_comb_rep) %>% distinct(IPR, drug, replicate, target, tech, conc_char, zscore_TIF, zscore_TIF_comb_tech, zscore_TIF_comb_rep) %>% group_by(IPR, drug, conc_char, target) %>% count() %>% filter(n >= 6) %>% View()
-
-indel.data %>% filter(!between(zscore_bal, -1.96, 1.96) & conc_char != "control" & viab_reproducibility & cor_bal_filter & filter_zscore_bal_comb_rep) %>% distinct(IPR, drug, replicate, target, tech, conc_char, zscore_bal, zscore_bal_comb_tech, zscore_bal_comb_rep) %>% group_by(IPR, drug, conc_char, target) %>% count() %>% filter(n >= 6)
 ```
 
 
