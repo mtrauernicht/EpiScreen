@@ -277,6 +277,7 @@ ordered_marks2 <- c("Negative Control", "MRN", "DNA-PK","Epigenetic Reader Domai
 # Data table and compute log2_ratio (This line needs to be adjusted)
 filtered_drug_conc = indel.data %>%
   distinct(drug, conc_char, IPR, zscore_TIF_comb_rep, zscore_bal_comb_rep, filter_zscore_TIF_comb_rep, filter_zscore_bal_comb_rep) %>%
+  filter(!is.na(zscore_bal_comb_rep), !is.na(zscore_TIF_comb_rep)) %>%
   mutate(zscore_TIF_comb_rep_temp = ifelse(!filter_zscore_TIF_comb_rep, 0, zscore_TIF_comb_rep),
          zscore_bal_comb_rep_temp = ifelse(!filter_zscore_bal_comb_rep, 0, zscore_bal_comb_rep),
          p_val_TIF = 2*pnorm(q = abs(zscore_TIF_comb_rep_temp), lower.tail = F),
@@ -286,33 +287,44 @@ filtered_drug_conc = indel.data %>%
          adj_pval_bal = p.adjust(p_val_bal, method = 'BH')) %>%
   filter(adj_pval_TIF < 0.01 | adj_pval_bal < 0.01 |drug == "DMSO") %>%
   mutate(drug_conc = paste(drug, conc_char,sep = " "),
-         effect_on_indelrate = ifelse(abs(zscore_TIF_comb_rep) >= 2.58 & adj_pval_TIF < 0.01, TRUE, FALSE),
-         effect_on_ratio = ifelse(abs(zscore_bal_comb_rep) >= 2.58 & adj_pval_bal < 0.01, TRUE, FALSE)) %>%
-  distinct(drug, conc_char, drug_conc, effect_on_indelrate, effect_on_ratio) %>%
-  mutate(counts = ave(drug_conc, drug, conc_char, FUN = function(x) length(x)),
-         keep = ifelse(counts > 1 & !effect_on_indelrate | counts > 1 & !effect_on_ratio, FALSE, TRUE)) %>%
+         # List if they affect the variable.
+         effect_on_indelrate = ifelse(adj_pval_TIF < 0.01, TRUE, FALSE),
+         effect_on_ratio = ifelse(adj_pval_bal < 0.01, TRUE, FALSE)) %>%
+  distinct(IPR, drug, conc_char, drug_conc, effect_on_indelrate, effect_on_ratio) %>%
+  mutate(# Count add conting of IPR per compound that have an effect. We want at least 2 (avoid outlyers)
+         counts = as.numeric(ave(drug_conc, drug, conc_char, FUN = function(x) length(x))),
+         # Keep here to at least 2 sites are significant. 
+         keep = ifelse(!effect_on_indelrate & !effect_on_ratio | 
+                         counts < 2, 
+                       FALSE, TRUE)) %>%
   filter(keep) %>% 
+  # There are duplicates, we want to remove them too. To do so let's replace the 
+  # FALSE with TRUE in one column if the other is TRUE. And then unique the set.
+  mutate(effect_on_indelrate = ifelse(effect_on_ratio, TRUE, effect_on_indelrate),
+         # same for the ratio
+         effect_on_ratio = ifelse(effect_on_indelrate, TRUE, effect_on_ratio)) %>%
   distinct(drug, conc_char, drug_conc, effect_on_indelrate, effect_on_ratio)
 
 
 ratios_tib <- indel.data %>%
   mutate(drug_conc = paste(drug, conc_char, sep = " ")) %>%
   semi_join(filtered_drug_conc) %>%
-  distinct(MMEJratio, freqCut, drug, conc_char, drug_conc, target, IPR) %>%
-  mutate(MMEJratio = ave(MMEJratio, drug, conc_char, IPR, FUN = mean)) %>%
+  distinct(MMEJratio_mean, freqCut_mean, drug, conc_char, drug_conc, target, IPR) %>%
+  mutate(MMEJratio = ave(MMEJratio_mean, drug, conc_char, IPR, FUN = mean)) %>%
   mutate(MMEJratio.log2 = log2(MMEJratio)) %>%
-  mutate(freqCut = (ave(freqCut, drug, conc_char, IPR, FUN = mean))) %>%
+  mutate(freqCut = (ave(freqCut_mean, drug, conc_char, IPR, FUN = mean))) %>%
   mutate(freqCut.log2 = log2(freqCut)) %>%
+  dplyr::select(-MMEJratio_mean, -freqCut_mean) %>%
   distinct()
 
 dmso_ratios_tib <- indel.data %>%
   filter(drug == "DMSO") %>%
-  distinct(MMEJratio, freqCut, IPR) %>%
-  mutate(DMSO.ratio = ave(MMEJratio, IPR, FUN = mean)) %>%
+  distinct(MMEJratio_mean, freqCut_mean, IPR) %>%
+  mutate(DMSO.ratio = ave(MMEJratio_mean, IPR, FUN = mean)) %>%
   mutate(DMSO.ratio.log2 = log2(DMSO.ratio)) %>%
-  mutate(DMSO.freqCut = ave(freqCut, IPR, FUN = mean)) %>%
+  mutate(DMSO.freqCut = ave(freqCut_mean, IPR, FUN = mean)) %>%
   mutate(DMSO.freqCut.log2 = log2(DMSO.freqCut)) %>%
-  dplyr::select(-MMEJratio, -freqCut) %>%
+  dplyr::select(-MMEJratio_mean, -freqCut_mean) %>%
   distinct()
 
 ratios_tib <- merge(ratios_tib, dmso_ratios_tib)
@@ -457,7 +469,8 @@ effect_compounds = ratios_tib_fc %>%
   left_join(distinct(filtered_drug_conc, drug_conc, effect_on_indelrate, effect_on_ratio))
 
 
-epistasis_tib %<>% left_join(effect_compounds)  %>% 
+epistasis_tib %<>% 
+  left_join(effect_compounds)  %>% 
   left_join(signif_hits) %>%
   mutate(
     # x_intercept_indelrate = ifelse(p.value.indelrate < 0.05,
@@ -466,7 +479,7 @@ epistasis_tib %<>% left_join(effect_compounds)  %>%
     #                            x_intercept_ratio, NA),
     indelrate_slope_plot = ifelse(x_intercept_indelrate < 1 & effect_on_indelrate & signif.freqCut, indelrate_slope, NA),
     ratio_slope_plot = ifelse(x_intercept_ratio < 1 & effect_on_ratio & signif.ratio, ratio_slope, NA)) %>%
-  distinct(drug_conc, feature, indelrate_slope_plot, ratio_slope_plot)
+  distinct(drug_conc, feature, indelrate_slope_plot, ratio_slope_plot) 
 ```
 
 ## Heatmap annoation

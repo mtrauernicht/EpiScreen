@@ -1148,8 +1148,8 @@ ggplot(., aes(y = mean_value, x = ID, fill = variable)) +
 ```
 
 
-## HDACi only heatmap
-```{r}
+## 3A HDACi only heatmap
+```{r 3A HDACi heapmap, fig.width = 12, fig.height = 12}
 HDAC_tib = read.table("rs20220708_HDAC_targets.txt", sep = "\t", fill = NA, header = T) %>%
   dplyr::select(-target_main, -target_second) %>%
   as_tibble()
@@ -1218,8 +1218,8 @@ plt3 = pheatmap(HDAC_matrix[clone5_map_ipr$labels,],
 ```
 
 
-## 2F Plot HDACi effects on different chromatin types
-```{r 2F HDACi in different clusters}
+## 3B Plot HDACi effects on different chromatin types
+```{r 3B HDACi in different clusters}
 chromatin_ipr <- chromatin %>%
   rownames_to_column("IPR")
 
@@ -1254,9 +1254,9 @@ chromatin_effect %>%
   xlab("Chromatin cluster")
 ```
 
-# Synergies
 
-## Load data
+## 3C HDAC CCD
+###Load data
 ```{r}
 file = list.files(in.dir, pattern = "CCD_table", full.names = T) %>% tail(n = 1)
 CCD_tib <- readRDS(file)
@@ -1267,6 +1267,8 @@ target <- readRDS(file)
 file = list.files(in.dir, pattern = "chrom_cluster_heatmap", full.names = T) %>% tail(n = 1)
 TRIP_chrom_clust <- readRDS(file)
 ```
+
+### Annotation
 
 ```{r heatmap annotation CCD}
 colors_drugs <- c("#FA8D62", "#65BFA4", "#8CA0C4", "#808184", "#F6D289", "#E5E5E5", "#ACACAC", "#737373")
@@ -1332,9 +1334,9 @@ clustering = data.frame(row.names=c('LMNB1', 'late_replicating', 'H3K9me2', 'H3K
 ```
 
 
-## Synergies Heatmaps
+### Synergies Heatmaps
 
-```{r Synergies chromatin - TIF all, fig.width= 10, fig.height= 20}
+```{r Synergies chromatin prep, fig.width= 10, fig.height= 20}
 all_compounds_epistasis_TIF = CCD_tib %>%
   dplyr::select(drug_conc, indelrate_slope_plot, feature) %>%
   group_by(drug_conc) %>%
@@ -1344,29 +1346,45 @@ all_compounds_epistasis_TIF = CCD_tib %>%
   column_to_rownames(var = "drug_conc")
 
 target_ctrl = rename(target, conc_char_ctrl = conc_char)
+```
 
+
+```{r 3B HDAC CCD, fig.width= 14, fig.height= 14}
+target_drugs = cluster_HDAC %>% pull(drug_conc)
+
+# Make matrix with drugs from selected target
+TIF_synergy_matrix = all_compounds_epistasis_TIF %>% 
+  rownames_to_column(var = "drug_conc") %>%
+  filter(drug_conc %in% target_drugs) %>%
+  column_to_rownames(var = "drug_conc")
+
+cluster_rows = ifelse(nrow(TIF_synergy_matrix) > 1, TRUE, FALSE)
 
 # change these numbers according to where you want to set the cutoff
-quant_breaks <- quantile(all_compounds_epistasis_TIF, c(.01,.99), na.rm = T)
+quant_breaks <- quantile(TIF_synergy_matrix, c(.01,.99), na.rm = T) 
 palette_length <- 100
 breaks <- c(seq(quant_breaks[1], 0, length.out=ceiling(palette_length/2) + 1), 
             seq(quant_breaks[2]/palette_length, quant_breaks[2], length.out=floor(palette_length/2)))
-colors = colorRampPalette(slope.colors %>% pull(color))(length(breaks))
+slope.colors.temp = slope.colors
+colors = colorRampPalette(slope.colors.temp %>% pull(color))(length(breaks))
 colors[which(quant_breaks == 0)-1] = "gray90"
 
-pheatmap(all_compounds_epistasis_TIF[, TRIP_chrom_clust$labels],
-         border_color = F,
-         cellwidth = 8,
-         cellheight = 8,
-         breaks = breaks,
-         cluster_cols = TRIP_chrom_clust,
-         clustering_method = "ward.D",
-         annotation_row = target_ctrl,
-         main = "Chromatin synergies - TIF all",
-         color = colors,
-         annotation_colors = annotation_colors_scr, 
-         annotation_legend = T)
+p = pheatmap(TIF_synergy_matrix[, TRIP_chrom_clust$labels],
+             border_color = F,
+             cellwidth = 8,
+             cellheight = 8,
+             cluster_rows = cluster_rows,
+             breaks = breaks,
+             cluster_cols = TRIP_chrom_clust,
+             annotation_row = target.cluster1,
+             clustering_method = "ward.D2",
+             main = paste("Chromatin synergies - TIF HDAC cluster"),
+             color = colors,
+             annotation_colors = annotation_colors_scr, 
+             annotation_legend = T)
+print(p)
 ```
+
 
 ```{r Synergies chromatin - TIF per target, fig.width= 10, fig.height= 10}
 targets = target %>% 
@@ -1411,7 +1429,7 @@ for (i in targets) {
                  breaks = breaks,
                  cluster_cols = TRIP_chrom_clust,
                  annotation_row = target_ctrl,
-                 clustering_method = "ward.D",
+                 clustering_method = "ward.D2",
                  main = paste("Chromatin synergies - TIF per target :" , i, sep = " "),
                  color = colors,
                  annotation_colors = annotation_colors_scr, 
@@ -1506,9 +1524,32 @@ for (i in targets) {
 }
 ```
 
+# Supplementary Figures
+## S3A
+```{r S3A Synergies chromatin - TIF all, fig.width= 10, fig.height= 20}
+# change these numbers according to where you want to set the cutoff
+quant_breaks <- quantile(all_compounds_epistasis_TIF, c(.01,.99), na.rm = T)
+palette_length <- 100
+breaks <- c(seq(quant_breaks[1], 0, length.out=ceiling(palette_length/2) + 1), 
+            seq(quant_breaks[2]/palette_length, quant_breaks[2], length.out=floor(palette_length/2)))
+colors = colorRampPalette(slope.colors %>% pull(color))(length(breaks))
+colors[which(quant_breaks == 0)-1] = "gray90"
+
+pheatmap(all_compounds_epistasis_TIF[, TRIP_chrom_clust$labels],
+         border_color = F,
+         cellwidth = 8,
+         cellheight = 8,
+         breaks = breaks,
+         cluster_cols = TRIP_chrom_clust,
+         clustering_method = "ward.D",
+         annotation_row = target_ctrl,
+         main = "Chromatin synergies - TIF all",
+         color = colors,
+         annotation_colors = annotation_colors_scr, 
+         annotation_legend = T)
+```
 
 # Vorinostat & GSK126 validations
-
 ```{r}
 vorinostat_validation = indel.validation.data %>% 
   filter(replicate == "mean" & plasmid == "LBR2", drug %in% c("DMSO", "Vorinostat"), sum_bc_reads > 1000)%>% 
