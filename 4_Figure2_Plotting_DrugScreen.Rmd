@@ -721,16 +721,14 @@ drug_conc = paste(drug, conc_char, sep = " "))
 top_hits = indel.data  %>% 
   filter(conc_char != "control" & indel_freq_filter & viab_reproducibility & filter_zscore_TIF_global_comb_rep & cor_TIF_filter) %>% 
   distinct(drug, conc_char, zscore_TIF_global_comb_rep , target) %>%
-  arrange(desc(zscore_TIF_global_comb_rep )) %>% eff.data.heatmap.top
+  arrange(desc(zscore_TIF_global_comb_rep )) %>% 
   slice_head(n = 8) %>% 
   distinct(drug, conc_char, target, zscore_TIF_global_comb_rep ) %>% 
   mutate(rank = seq(1:n()),
          drug = gsub(" [(].*[)]", "", drug),
          drug_conc = paste(drug, conc_char, sep = " "))
-eff.data.heatmap.top = top_hits %>%
-  left_join(eff.data.heatmap2) %>% 
-  filter(!is.na(IPR3))
 ```
+
 # Chormatin specific (Figure 3?)
 
 
@@ -843,8 +841,10 @@ plt1 = pheatmap(eff.data.matrix[ , clone5_map_ipr$labels],
                 annotation_legend = T,
                 cutree_row = 7)
 ```
-## 2C Plot postive regulator effects on different chromatin types (clusters 3, 4 and 5)
-```{r S2 chromatin effect per cluster, fig.width = 10, fig.height = 6}
+
+## S2B Plot regulatory effects on different chromatin types
+
+```{r S2B chromatin effect per cluster, fig.width = 10, fig.height = 6}
 chromatin_ipr <- chromatin %>%
   rownames_to_column("IPR")
 
@@ -873,8 +873,9 @@ ggplot(chromatin_effect,
   facet_wrap(~ clusters_drugs, nrow = 1)
 ```
 
-## S2C
-```{r S2D lowered TIF, fig.width = 8, fig.height = 5}
+## S2C TIF decreasing compounds
+
+```{r S2C lowered TIF, fig.width = 8, fig.height = 5}
 all_compounds_lowerTIF = indel.data %>% 
   filter(conc_char != "control" & indel_freq_filter & viab_reproducibility & cor_TIF_filter) %>% 
   mutate(drug = gsub(" [(].*[)]", "", drug),
@@ -913,7 +914,7 @@ indel.data %>% mutate(drug = gsub(" [(].*[)]", "", drug),
 
 
 
-```{r S2D PJ34 replicates, fig.width= 6, fig.height=4, echo = FALSE, eval=FALSE}
+```{r S2D Check replicates, fig.width= 6, fig.height=4, echo = FALSE, eval=FALSE}
 test_drug_short = "PJ34"
 
 drug_df <- indel.data %>%
