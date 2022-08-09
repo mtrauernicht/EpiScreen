@@ -77,29 +77,52 @@ library(magrittr)
 library(ggpubr)
 library(pls)
 # library(rstatix)
-
-## Select outdir
-out.dir = paste0("./figures/", Date, "/")
-dir.create(out.dir)
-in.dir = list.dirs(path = "/DATA/projects/DSBrepair/data/R") %>% .[grepl("episcreen", .)] %>% tail(n = 1)
-opts_chunk$set(dev=c('png', 'pdf'), fig.path = file.path(out.dir))
-pdf.options(useDingbats = FALSE)
-
 ```
 
-# Load libraries (Just need a data table with all the data and )
+```{r outdir}
+## Select outdir
+out.dir = list.dirs(path = "/DATA/projects/DSBrepair/data/R") %>% .[grepl("episcreen", .)] %>% tail(n = 1)
+in.dir = out.dir
+dir.create(out.dir, showWarnings = FALSE)
+
+# initials (for file export)
+initials = "rs"
+```
+
+
+## Custom functions
+```{r functions}
+serialNext = function(prefix, extension){
+  i=0
+  repeat {
+    f = paste0(prefix, "_", i , ".", extension)
+    if(!file.exists(f)){return(f)}
+    i=i+1
+  }
+}
+
+SetFileName <- function(filename, initials, extension) {
+  # Set filename with extension and initials to make filename with date integrated.
+  filename <- substitute(filename)
+  filename <- paste0(out.dir, "/", initials, substr(gsub("-","",Sys.time()),1,8), "_", filename)
+  filename <- serialNext(filename, extension)
+  filename
+}
+```
+
+# Load data
+## Load tables
 ```{r}
-#Chromatin data (it needs a barcode column)
+#Chromatin data (it needs a IPR column)
 # Import data from preprocessing script
 in.dir = list.dirs(path = "/DATA/projects/DSBrepair/data/R") %>% .[grepl("episcreen", .)] %>% tail(n = 1)
 file = list.files(in.dir, pattern = "episcreen_ratios", full.names = T) %>% tail(n = 1)
-indel.data <- readRDS(file) %>% filter(pathway_bal_filter == TRUE & viab_reproducibility == TRUE) %>%
+indel.data <- readRDS(file) %>% filter(viab_reproducibility) %>%
   mutate(drug = gsub(" [(].*[)]", "", drug)) %>%
   # We remove the HDAC1 and HDAC2 chromatin features as we do not have a sufficient dynamic range in
   # our clone to make strong conclusions. The max z-score we get are < 80% CI of the z-score in the
   # whole pool.
   dplyr::select(-HDAC1, -HDAC2)
-
 
 TRIP_chrom_tib <- readRDS('/DATA/projects/DSBrepair/data/R/cl20201026_ChIP_zscore_selection.RDS') %>% 
   # Same for the TRIP chromatin features
@@ -112,24 +135,24 @@ TRIP_chrom_clust = hclust(dist(t(TRIP_chrom)), method = "ward.D")
 
 figure_out = "/DATA/projects/DSBrepair/scratch/episcreen/"
 chromatin.features <- colnames(indel.data)[grepl("[.]zscore", colnames(indel.data))]
-chrom_data = indel.data %>% dplyr::select(barcode, all_of(chromatin.features)) %>% distinct()  %>%
+chrom_data = indel.data %>% dplyr::select(IPR, all_of(chromatin.features)) %>% distinct()  %>%
   rename_with(., ~gsub(".zscore", "", .x))
 
 chromatin.features.short = gsub(".zscore", "", chromatin.features)
 ```
 
-
+## Correlation with TRIP wide
 ```{r correlation between features TRIP wide, echo = FALSE, eval = FALSE}
 max_chrom_tib_C5 = chrom_data %>% 
-  as.tibble() %>% 
-  dplyr::select(-barcode) %>%
+  as_tibble() %>% 
+  dplyr::select(-IPR) %>%
   rename_with(., ~gsub(".zscore", "", .x)) %>% 
   summarise_each(., funs(max(., na.rm=TRUE))) %>% 
   pivot_longer(cols = everything(), names_to = "name", values_to = "max")
 
 maxmin_chrom_tib_C5 = chrom_data %>% 
-  as.tibble() %>% 
-  dplyr::select(-barcode) %>%
+  as_tibble() %>% 
+  dplyr::select(-IPR) %>%
   rename_with(., ~gsub(".zscore", "", .x)) %>% 
   summarise_each(., funs(min(., na.rm=TRUE))) %>% 
   pivot_longer(cols = everything(), names_to = "name", values_to = "min") %>%
@@ -188,13 +211,14 @@ corColor <- function(data, mapping, color = I("black"), sizeRange = c(1, 3), ...
   
   return(p)
 }
+
 boundaries <- c(-0.7, -.5,0.5,0.7)
 pdf("/DATA/projects/DSBrepair/git/EpiScreen/rs20220722_chrom_cor_clones.pdf", width=20, height=20)
-ggpairs(chrom_tib[, labels(TRIP_chrom_clust) %>% gsub(".zscore", "", .)],
+ggpairs(chrom_data[, labels(TRIP_chrom_clust)],
         upper = list(continuous = corColor),
         # lower = list(continuous = "density"),
         lower = list(continuous = function(data, mapping, ...) {
-          ggally_density(data = data, mapping = mapping) +
+          ggally_points(data = data, mapping = mapping) +
             geom_abline(slope = 1, lty = "twodash", col = "grey")
           # ggally_smooth(data = data, mapping = mapping, method = "lm", color = "red", lty = "dashed", size = 0.5)
         }),
@@ -205,7 +229,7 @@ ggpairs(chrom_tib[, labels(TRIP_chrom_clust) %>% gsub(".zscore", "", .)],
 dev.off()
 ```
 
-
+## Annotations
 ```{r}
 colors_drugs <- c("#FA8D62", "#65BFA4", "#8CA0C4", "#808184", "#F6D289", "#E5E5E5", "#ACACAC", "#737373")
 conc_control_colors = c("control" = colors_drugs[2], "100 nM" = colors_drugs[7], "1 µM" = colors_drugs[4], "10 µM" = "#000000")
@@ -244,40 +268,26 @@ ordered_marks2 <- c("Negative Control", "MRN", "DNA-PK","Epigenetic Reader Domai
                     "HIF", "JAK", "PIM",
                     "Aurora Kinase", "PARP")
 
-#Epistatic interaction colors
-slope.colors <- tibble(color = c("#8c510a", "#f5f5f5","#01665e"),label = c("negative","none","positive"), feature = "epistasis")
 
-annotation_colors_scr$target <- annotation_colors_scr$target[ordered_marks2]
-
-clustering = data.frame(row.names=c('LMNB1', 'late_replicating', 'H3K9me2', 'H3K9me3', 'H3K27me3', 'EZH2', 
-                                    'CTCF', 'SMC3',
-                                    'HDAC3', 
-                                    'H3K4me1', 'H3K4me2', 'H3K4me3', 'H3K27ac', 'H4K5acK8ac', 'H2AFZ', 
-                                    'DNAse', 'Dam', 
-                                    'm5C',
-                                    'H3K79me2', 'TTseq',  'H3K36me3', 'POL2AS2','POL2'),
-                        group=factor(c(rep('repressive', 6), 
-                                       rep('insulator', 2),
-                                       rep('HDAC', 1), 
-                                       rep('euchromatin', 6),
-                                       rep('accessibility', 2), 
-                                       'methylation',
-                                       rep('transcribing', 5)),
-                        levels=c('transcribing', 'accessibility',
-                                 'methylation', 'euchromatin',
-                                 'HDAC', 'insulator', 'repressive')))
 
 ```
 
-## Prepare data
-
+## Initial filtering and preparing the tables for mean log2 FC calculation
 ```{r}
 # Data table and compute log2_ratio (This line needs to be adjusted)
 filtered_drug_conc = indel.data %>%
-  filter(abs(zscore_TIF_comb_rep) > 2.58 | abs(zscore_bal_comb_rep) > 2.58 | drug == "DMSO") %>%
+  distinct(drug, conc_char, IPR, zscore_TIF_comb_rep, zscore_bal_comb_rep, filter_zscore_TIF_comb_rep, filter_zscore_bal_comb_rep) %>%
+  mutate(zscore_TIF_comb_rep_temp = ifelse(!filter_zscore_TIF_comb_rep, 0, zscore_TIF_comb_rep),
+         zscore_bal_comb_rep_temp = ifelse(!filter_zscore_bal_comb_rep, 0, zscore_bal_comb_rep),
+         p_val_TIF = 2*pnorm(q = abs(zscore_TIF_comb_rep_temp), lower.tail = F),
+         p_val_bal = 2*pnorm(q = abs(zscore_bal_comb_rep_temp), lower.tail = F),
+         # Adjust p value for false discovery rate
+         adj_pval_TIF = p.adjust(p_val_TIF, method = 'BH'),
+         adj_pval_bal = p.adjust(p_val_bal, method = 'BH')) %>%
+  filter(adj_pval_TIF < 0.01 | adj_pval_bal < 0.01 |drug == "DMSO") %>%
   mutate(drug_conc = paste(drug, conc_char,sep = " "),
-         effect_on_indelrate = ifelse(abs(zscore_TIF_comb_rep) > 2.58, TRUE, FALSE),
-         effect_on_ratio = ifelse(abs(zscore_bal_comb_rep) > 2.58, TRUE, FALSE)) %>%
+         effect_on_indelrate = ifelse(abs(zscore_TIF_comb_rep) >= 2.58 & adj_pval_TIF < 0.01, TRUE, FALSE),
+         effect_on_ratio = ifelse(abs(zscore_bal_comb_rep) >= 2.58 & adj_pval_bal < 0.01, TRUE, FALSE)) %>%
   distinct(drug, conc_char, drug_conc, effect_on_indelrate, effect_on_ratio) %>%
   mutate(counts = ave(drug_conc, drug, conc_char, FUN = function(x) length(x)),
          keep = ifelse(counts > 1 & !effect_on_indelrate | counts > 1 & !effect_on_ratio, FALSE, TRUE)) %>%
@@ -288,19 +298,19 @@ filtered_drug_conc = indel.data %>%
 ratios_tib <- indel.data %>%
   mutate(drug_conc = paste(drug, conc_char, sep = " ")) %>%
   semi_join(filtered_drug_conc) %>%
-  distinct(MMEJratio, freqCut, drug, conc_char, drug_conc, target, barcode) %>%
-  mutate(MMEJratio = ave(MMEJratio, drug, conc_char, barcode, FUN = mean)) %>%
+  distinct(MMEJratio, freqCut, drug, conc_char, drug_conc, target, IPR) %>%
+  mutate(MMEJratio = ave(MMEJratio, drug, conc_char, IPR, FUN = mean)) %>%
   mutate(MMEJratio.log2 = log2(MMEJratio)) %>%
-  mutate(freqCut = (ave(freqCut, drug, conc_char, barcode, FUN = mean))) %>%
+  mutate(freqCut = (ave(freqCut, drug, conc_char, IPR, FUN = mean))) %>%
   mutate(freqCut.log2 = log2(freqCut)) %>%
   distinct()
 
 dmso_ratios_tib <- indel.data %>%
   filter(drug == "DMSO") %>%
-  distinct(MMEJratio, freqCut, barcode) %>%
-  mutate(DMSO.ratio = ave(MMEJratio, barcode, FUN = mean)) %>%
+  distinct(MMEJratio, freqCut, IPR) %>%
+  mutate(DMSO.ratio = ave(MMEJratio, IPR, FUN = mean)) %>%
   mutate(DMSO.ratio.log2 = log2(DMSO.ratio)) %>%
-  mutate(DMSO.freqCut = ave(freqCut, barcode, FUN = mean)) %>%
+  mutate(DMSO.freqCut = ave(freqCut, IPR, FUN = mean)) %>%
   mutate(DMSO.freqCut.log2 = log2(DMSO.freqCut)) %>%
   dplyr::select(-MMEJratio, -freqCut) %>%
   distinct()
@@ -310,39 +320,38 @@ ratios_tib <- merge(ratios_tib, dmso_ratios_tib)
 
 The log2 distance ratio in our case is positive if it promotes NHEJ and negative if it promotes NHEJ
 
-
-# 2nd step check compute distances and plot them
+## Compute the mean log2 fold-change.
 ```{r}
 # Each replicate has a different value (compute differences by replicate)
-ratios_tib_dist <- ratios_tib %>% 
-  dplyr::group_by(barcode, drug, conc_char) %>% 
-  mutate(log2.dist.ratio = MMEJratio.log2 - DMSO.ratio.log2, 
-         log2.dist.freqCut = freqCut.log2 - DMSO.freqCut.log2) %>%
+ratios_tib_fc <- ratios_tib %>% 
+  dplyr::group_by(IPR, drug, conc_char) %>% 
+  mutate(log2.fc.ratio = MMEJratio.log2 - DMSO.ratio.log2, 
+         log2.fc.freqCut = freqCut.log2 - DMSO.freqCut.log2) %>%
   left_join(chrom_data)
 ```
 
-
-# Extract slopes for all genes
+# Calculating the Chromatin Context Dependency (CCD)
+## Extract slopes for all genes
 ```{r}
 # Perform analysis across all features for three test genes
-ratios_tib_dist %<>% mutate(drug_conc = paste(drug, conc_char, sep = " ")) %>% 
+ratios_tib_fc %<>% mutate(drug_conc = paste(drug, conc_char, sep = " ")) %>% 
   filter(!is.na(MMEJratio))
 
 slope.protein.features <- tibble(drug_conc = NA, feature = NA,  term = NA, 
                                  indelrate = NA, p.value.indelrate = NA, 
                                  ratio = NA, p.value.ratio = NA)
 
-for (i in unique(ratios_tib_dist$drug_conc)) {
+for (i in unique(ratios_tib_fc$drug_conc)) {
   for (j in chromatin.features.short) {
-    model_tib <- ratios_tib_dist %>% filter(drug_conc == i) 
+    model_tib <- ratios_tib_fc %>% filter(drug_conc == i) 
     
     # Indel rates
-    model.indelrate.log2 <- lm(formula = log2.dist.freqCut ~ unlist(model_tib[j]), 
+    model.indelrate.log2 <- lm(formula = log2.fc.freqCut ~ unlist(model_tib[j]), 
                                data = model_tib) %>% 
       tidy()
     
     # Pathway balance
-    model.ratio.log2 <- lm(formula = log2.dist.ratio ~ unlist(model_tib[j]), 
+    model.ratio.log2 <- lm(formula = log2.fc.ratio ~ unlist(model_tib[j]), 
                            data = model_tib) %>% 
       tidy()
     
@@ -368,15 +377,17 @@ slope.protein.features %<>%
   mutate(term = ifelse(term == "(Intercept)", "intercept", "slope"))
 ```
 
+
+### Calculating the Principle Component Regression (PCR)
 ```{r}
-CCD_tib = ratios_tib_dist %>% dplyr::select(barcode, drug_conc, log2.dist.freqCut, log2.dist.ratio, all_of(chromatin.features.short)) %>% ungroup()
+CCD_tib = ratios_tib_fc %>% dplyr::select(IPR, drug_conc, log2.fc.freqCut, log2.fc.ratio, all_of(chromatin.features.short)) %>% ungroup()
 
 #Create an empty dt with CCDs of DDR proteins
 drug_conc_CCDs_dt <- tibble(var = NA, drug_conc = NA, num_comp = NA, r.squared = NA, adj.r.squared = NA,p.value = NA)
 # chrom_formula = as.formula(paste("y ~ ", paste(chromatin.features, collapse= "+")))
 
 for (i in unique(CCD_tib$drug_conc)){
-  for (j in c("log2.dist.freqCut", "log2.dist.ratio")) {
+  for (j in c("log2.fc.freqCut", "log2.fc.ratio")) {
     drug_conc_dt <- filter(CCD_tib, drug_conc == i)
     # Run a model per drug_conc
     set.seed(1)
@@ -418,13 +429,13 @@ signif_hits = adj_p.value_KO_model %>% filter(p.adj < 0.01) %>%
   distinct(drug_conc, var) %>% 
   ungroup() %>% 
   mutate(val = TRUE,
-         var = gsub("log2.dist", "signif", var)) %>%
+         var = gsub("log2.fc", "signif", var)) %>%
   pivot_wider(names_from = var, 
               values_from = val, 
               values_fill = FALSE) 
 ```
 
-
+### Filtering the epistasis
 ```{r epistasis filtering}
 # Calculate postition where the linear model crosses y = 0, we do this by -intercept / slope
 epistasis_tib = slope.protein.features %>% 
@@ -434,12 +445,12 @@ epistasis_tib = slope.protein.features %>%
          x_intercept_indelrate = -indelrate_intercept / indelrate_slope,
          x_intercept_ratio = -ratio_intercept / ratio_slope)
 
-effect_compounds = ratios_tib_dist %>%
+effect_compounds = ratios_tib_fc %>%
   group_by(drug_conc)  %>% 
-  mutate(indelrate_pos = sum(log2.dist.freqCut > 0),
+  mutate(indelrate_pos = sum(log2.fc.freqCut > 0),
          indelrate_effect = ifelse(indelrate_pos >= 17, "indel_rate_increase", 
                                    ifelse(indelrate_pos <= 1, "indel_rate_decrease", "mixed")),
-         ratio_pos = sum(log2.dist.ratio > 0),
+         ratio_pos = sum(log2.fc.ratio > 0),
          ratio_effect = ifelse(ratio_pos >= 17, "NHEJ_increase", 
                                ifelse(ratio_pos <= 1, "MMEJ_increase", "mixed"))) %>%
   distinct(drug_conc, indelrate_effect, ratio_effect) %>% 
@@ -458,8 +469,10 @@ epistasis_tib %<>% left_join(effect_compounds)  %>%
   distinct(drug_conc, feature, indelrate_slope_plot, ratio_slope_plot)
 ```
 
+## Heatmap annoation
 
-```{r prepare heatmaps, fig.width= 10, fig.height= 20}
+### Clone 5 clustering
+```{r Clone 5 clustering}
 clone5.matrix = indel.data %>% 
   dplyr::select(IPR, ends_with(".zscore")) %>% 
   distinct() %>% 
@@ -469,17 +482,10 @@ clone5.matrix = indel.data %>%
 clone5_map_ipr = hclust(dist(clone5.matrix), method = "ward.D") %>% 
   # Rotate the middle node to math better the TIF in CTRL conditions
   dendextend::rotate(c(1:6, 10:7, 11:18))
+```
 
-chromatin <- readRDS(
-  "/DATA/usr/x.vergara/XV_ChIPIndels/XV20200902_DDR_RS_revision/XV20200902_DDR_RS_revision/data/xv20200915_DDR_data_CHIP.rds") %>% 
-  distinct(barcode, chromatin) %>%
-  left_join(distinct(indel.data, barcode, IPR)) 
-
-chromatin <- chromatin %>%
-  filter(IPR != "<NA>") %>% 
-  dplyr::select(-barcode) %>%
-  column_to_rownames(var="IPR")
-
+### Compound annotation
+```{r compound annotation}
 # Set annotation for heatmap
 viab_drug = indel.data %>% filter(drug != "PAO") %>% 
   mutate(drug = gsub(" [(].*[)]", "", drug),
@@ -495,6 +501,18 @@ target <- indel.data %>%
   left_join(viab_drug) %>%
   distinct(drug_conc, conc_char, target, viab) %>% 
   column_to_rownames(var="drug_conc")
+```
+### IPR annotation
+```{r IPR annotation}
+chromatin <- readRDS(
+  "/DATA/usr/x.vergara/XV_ChIPIndels/XV20200902_DDR_RS_revision/XV20200902_DDR_RS_revision/data/xv20200915_DDR_data_CHIP.rds") %>% 
+  distinct(barcode, chromatin) %>%
+  left_join(distinct(indel.data, IPR, barcode)) 
+
+chromatin <- chromatin %>%
+  filter(IPR != "<NA>") %>% 
+  dplyr::select(-barcode) %>%
+  column_to_rownames(var="IPR")
 
 TIF_IPR = indel.data %>% filter(drug == "DMSO") %>%
   distinct(replicate, tech, freqCut,MMEJratio, IPR, well, plate) %>%
@@ -507,400 +525,22 @@ chromatin_TIF = chromatin %>% rownames_to_column(var = "IPR") %>%
   column_to_rownames("IPR")
 ```
 
-```{r Synergies chromatin - Balance all, fig.width= 10, fig.height= 20}
-all_compounds_epistasis = epistasis_tib %>%
-  dplyr::select(drug_conc, ratio_slope_plot, feature) %>%
-  group_by(drug_conc) %>%
-  mutate(onlyNA = sum(is.na(ratio_slope_plot))) %>% 
-  filter(onlyNA != 25) %>%
-  reshape2::dcast(drug_conc ~ feature, value.var = "ratio_slope_plot", fill = 0) %>% 
-  column_to_rownames(var = "drug_conc")
+# Export
+```{r export}
+# The mutations list that can be loaded for the indel spectra plots.
+filename <- SetFileName("CCD_table", initials = initials, extension = "RDS")
+saveRDS(epistasis_tib, file = filename)
 
-# change these numbers according to where you want to set the cutoff
-quant_breaks <- quantile(all_compounds_epistasis, c(.01,.99), na.rm = T)
-palette_length <- 100
-breaks <- c(seq(quant_breaks[1], 0, length.out=ceiling(palette_length/2) + 1), 
-            seq(-quant_breaks[1]/palette_length, -quant_breaks[1], length.out=floor(palette_length/2)))
-colors = colorRampPalette(slope.colors %>% pull(color))(length(breaks))
-colors[which(quant_breaks == 0)-1] = "gray90"
+# The ratios list of the split technical replicates
+filename <- SetFileName("IPR_annotation_heatmap", initials = initials, extension = "RDS")
+saveRDS(chromatin_TIF, file = filename)
 
-target_ctrl = rename(target, conc_char_ctrl = conc_char)
+# The ratios list of the split technical replicates
+filename <- SetFileName("compound_annotation_heatmap", initials = initials, extension = "RDS")
+saveRDS(target, file = filename)
 
-pheatmap(all_compounds_epistasis[, TRIP_chrom_clust$labels],
-         border_color = F,
-         cellwidth = 8,
-         cellheight = 8,
-         breaks = breaks,
-         clustering_method = "ward.D",
-         cluster_cols = TRIP_chrom_clust,
-         annotation_row = target_ctrl,
-         annotation_col = clustering,
-         main = "Chromatin synergies - MMEJ ratio all",
-         color = colors,
-         annotation_colors = annotation_colors_scr, 
-         annotation_legend = T)
+# The ratios list of the split technical replicates
+filename <- SetFileName("chrom_cluster_heatmap", initials = initials, extension = "RDS")
+saveRDS(TRIP_chrom_clust, file = filename)
 ```
 
-```{r Synergies chromatin - Balance per target, fig.width= 10, fig.height= 10}
-targets = target %>% 
-  pull(target) %>% 
-  unique()
-
-for (i in targets) {
-  target_drugs = rownames(filter(target, target %in% i))
-  
-  # Make matrix with drugs from selected target
-  mmej_synergy_matrix = all_compounds_epistasis %>% 
-    rownames_to_column(var = "drug_conc") %>%
-    filter(drug_conc %in% target_drugs) %>%
-    column_to_rownames(var = "drug_conc")
-  
-  cluster_rows = ifelse(nrow(mmej_synergy_matrix) > 1, TRUE, FALSE)
-  
-  if(nrow(mmej_synergy_matrix) > 0) {
-    # change these numbers according to where you want to set the cutoff
-    quant_breaks <- quantile(mmej_synergy_matrix, c(.01,.99), na.rm = T) 
-    palette_length <- 100
-    breaks <- c(seq(quant_breaks[1], 0, length.out=ceiling(palette_length/2) + 1), 
-                seq(-quant_breaks[1]/palette_length, -quant_breaks[1], length.out=floor(palette_length/2)))
-    slope.colors.temp = slope.colors
-    if(all(mmej_synergy_matrix <= 0)) {
-      breaks <- c(seq(quant_breaks[1], 0, length.out=ceiling(palette_length)))
-      slope.colors.temp = filter(slope.colors, label != "positive")
-    }
-    if(all(mmej_synergy_matrix >= 0)) {
-      breaks <- c(seq(0, quant_breaks[2], length.out=ceiling(palette_length)))
-      slope.colors.temp = filter(slope.colors, label != "negative")
-    }
-    colors = colorRampPalette(slope.colors.temp %>% pull(color))(length(breaks))
-    colors[which(quant_breaks == 0)-1] = "gray90"
-    
-    # heatmap
-    p = pheatmap(mmej_synergy_matrix[, TRIP_chrom_clust$labels],
-                 border_color = F,
-                 cellwidth = 8,
-                 cellheight = 8,
-                 cluster_rows = cluster_rows,
-                 cluster_cols = TRIP_chrom_clust,
-                 breaks = breaks,
-                 annotation_row = target_ctrl,
-                 clustering_method = "ward.D",
-                 main = paste("Chromatin synergies - MMEJ ratio per target :" , i, sep = " "),
-                 color = colors,
-                 annotation_colors = annotation_colors_scr, 
-                 annotation_legend = T)
-    print(p)
-  }
-}
-```
-
-```{r Z-score - Balance all, fig.width= 10, fig.height= 20}
-ritios_tib_epi_effects = indel.data %>%
-  mutate(drug_conc_ctrl = paste(drug, conc_char, sep = " ")) %>%
-  filter(drug_conc_ctrl %in% rownames(all_compounds_epistasis)) %>%
-  distinct(IPR, zscore_bal_comb_rep, drug_conc_ctrl, drug, conc_char) 
-
-mmejzscore_matrix = ritios_tib_epi_effects %>%
-  distinct(drug_conc_ctrl, IPR, zscore_bal_comb_rep) %>% 
-  pivot_wider(names_from = IPR, values_from = zscore_bal_comb_rep) %>%
-  column_to_rownames(var = "drug_conc_ctrl")
-
-# clone5_map_ipr_TIF_Bal = hclust(dist(column_to_rownames(TIF_IPR, var = "IPR"))) %>% rotate(., c(1, 3, 2))
-
-quant_breaks <- quantile(mmejzscore_matrix, c(.01,.99), na.rm = T) # change these numbers according to where you want to set the cutoff
-palette_length <- 1000
-breaks <- breaks <- c(seq(quant_breaks[1], -1, 
-                          length.out=ceiling(palette_length/2) + 1), 
-                      seq(-quant_breaks[1]/palette_length, 
-                          -quant_breaks[1], 
-                          length.out=floor(palette_length/2)))
-colors = colorRampPalette(slope.colors %>% pull(color))(length(breaks))
-colors[-which(breaks < -2.58 | breaks > 2.58 )] = "gray90"
-
-pheatmap(mmejzscore_matrix[, clone5_map_ipr$labels],
-         border_color = F,
-         cellwidth = 8,
-         cellheight = 8,
-         breaks = breaks,
-         cluster_cols = clone5_map_ipr,
-         annotation_row = target_ctrl,
-         
-         clustering_method = "ward.D",
-         main = "Z-score [< 0.01 p.val] - MMEJ ratio all",
-         color = colors,
-         annotation_colors = annotation_colors_scr, 
-         annotation_legend = T,
-         annotation_col = chromatin_TIF)
-```
-
-```{r Z-score - Balance per target, fig.width= 10, fig.height= 10}
-targets = target %>% 
-  pull(target) %>% 
-  unique()
-
-for (i in targets) {
-  target_drugs = rownames(filter(target, target %in% i))
-  
-  # Make matrix with drugs from selected target
-  mmejzscore_matrix = ritios_tib_epi_effects %>%
-    distinct(drug_conc_ctrl, IPR, zscore_bal_comb_rep) %>% 
-    filter(drug_conc_ctrl %in% target_drugs) %>%
-    pivot_wider(names_from = IPR, values_from = zscore_bal_comb_rep) %>%
-    column_to_rownames(var = "drug_conc_ctrl")
-  
-  cluster_rows = ifelse(nrow(mmejzscore_matrix) > 1, TRUE, FALSE)
-  if(nrow(mmejzscore_matrix) > 0) {
-    # change these numbers according to where you want to set the cutoff
-    quant_breaks <- quantile(mmejzscore_matrix, c(.01,.99), na.rm = T) 
-    palette_length <- 100
-    breaks <- c(seq(quant_breaks[1], 0, length.out=ceiling(palette_length/2) + 1), 
-                seq(-quant_breaks[1]/palette_length, -quant_breaks[1], length.out=floor(palette_length/2)))
-    colors = colorRampPalette(slope.colors %>% pull(color))(length(breaks))
-    colors[which(quant_breaks == 0)-1] = "gray90"
-    
-    # heatmap
-    p = pheatmap(mmejzscore_matrix[, clone5_map_ipr$labels],
-                 border_color = F,
-                 cellwidth = 8,
-                 cellheight = 8,
-                 cluster_cols = clone5_map_ipr,
-                 cluster_rows = cluster_rows,
-                 
-                 clustering_method = "ward.D",
-                 breaks = breaks,
-                 annotation_row = target_ctrl,
-                 main = paste("Z-score [< 0.01 p.val] - MMEJ ratio per target :" , i, sep = " "),
-                 color = colors,
-                 annotation_colors = annotation_colors_scr, 
-                 annotation_legend = T,
-                 annotation_col = chromatin_TIF)
-    print(p)
-  }
-}
-```
-
-```{r Synergies chromatin - TIF all, fig.width= 10, fig.height= 20}
-all_compounds_epistasis_TIF = epistasis_tib %>%
-  dplyr::select(drug_conc, indelrate_slope_plot, feature) %>%
-  group_by(drug_conc) %>%
-  mutate(onlyNA = sum(is.na(indelrate_slope_plot))) %>% 
-  filter(onlyNA != 25) %>%
-  reshape2::dcast(drug_conc ~ feature, value.var = "indelrate_slope_plot", fill = 0) %>% 
-  column_to_rownames(var = "drug_conc")
-
-
-
-# change these numbers according to where you want to set the cutoff
-quant_breaks <- quantile(all_compounds_epistasis_TIF, c(.01,.99), na.rm = T)
-palette_length <- 100
-breaks <- c(seq(quant_breaks[1], 0, length.out=ceiling(palette_length/2) + 1), 
-            seq(quant_breaks[2]/palette_length, quant_breaks[2], length.out=floor(palette_length/2)))
-colors = colorRampPalette(slope.colors %>% pull(color))(length(breaks))
-colors[which(quant_breaks == 0)-1] = "gray90"
-
-pheatmap(all_compounds_epistasis_TIF[, TRIP_chrom_clust$labels],
-         border_color = F,
-         cellwidth = 8,
-         cellheight = 8,
-         breaks = breaks,
-         cluster_cols = TRIP_chrom_clust,
-         clustering_method = "ward.D",
-         annotation_row = target_ctrl,
-         main = "Chromatin synergies - TIF all",
-         color = colors,
-         annotation_colors = annotation_colors_scr, 
-         annotation_legend = T)
-```
-
-```{r Synergies chromatin - TIF per target, fig.width= 10, fig.height= 10}
-targets = target %>% 
-  pull(target) %>% 
-  unique()
-
-for (i in targets) {
-  target_drugs = rownames(filter(target, target %in% i))
-  
-  # Make matrix with drugs from selected target
-  TIF_synergy_matrix = all_compounds_epistasis_TIF %>% 
-    rownames_to_column(var = "drug_conc") %>%
-    filter(drug_conc %in% target_drugs) %>%
-    column_to_rownames(var = "drug_conc")
-  
-  cluster_rows = ifelse(nrow(TIF_synergy_matrix) > 1, TRUE, FALSE)
-  
-  if(nrow(TIF_synergy_matrix) > 0) {
-    # change these numbers according to where you want to set the cutoff
-    quant_breaks <- quantile(TIF_synergy_matrix, c(.01,.99), na.rm = T) 
-    palette_length <- 100
-    breaks <- c(seq(quant_breaks[1], 0, length.out=ceiling(palette_length/2) + 1), 
-                seq(quant_breaks[2]/palette_length, quant_breaks[2], length.out=floor(palette_length/2)))
-    slope.colors.temp = slope.colors
-    if(all(TIF_synergy_matrix <= 0)) {
-      breaks <- c(seq(quant_breaks[1], 0, length.out=ceiling(palette_length)))
-      slope.colors.temp = filter(slope.colors, label != "positive")
-    }
-    if(all(TIF_synergy_matrix >= 0)) {
-      breaks <- c(seq(0, quant_breaks[2], length.out=ceiling(palette_length)))
-      slope.colors.temp = filter(slope.colors, label != "negative")
-    }
-    colors = colorRampPalette(slope.colors.temp %>% pull(color))(length(breaks))
-    colors[which(quant_breaks == 0)-1] = "gray90"
-    
-    # heatmap
-    p = pheatmap(TIF_synergy_matrix[, TRIP_chrom_clust$labels],
-                 border_color = F,
-                 cellwidth = 8,
-                 cellheight = 8,
-                 cluster_rows = cluster_rows,
-                 breaks = breaks,
-                 cluster_cols = TRIP_chrom_clust,
-                 annotation_row = target_ctrl,
-                 clustering_method = "ward.D",
-                 main = paste("Chromatin synergies - TIF per target :" , i, sep = " "),
-                 color = colors,
-                 annotation_colors = annotation_colors_scr, 
-                 annotation_legend = T)
-    print(p)
-  }
-}
-```
-
-```{r Z-score - TIF all, fig.width= 10, fig.height= 20}
-ritios_tib_epi_effects = indel.data %>%
-  mutate(drug_conc_ctrl = paste(drug, conc_char, sep = " ")) %>%
-  filter(drug_conc_ctrl %in% rownames(all_compounds_epistasis)) %>%
-  distinct(IPR, zscore_TIF_comb_rep, drug_conc_ctrl, drug, conc_char) 
-
-mmejzscore_matrix = ritios_tib_epi_effects %>%
-  distinct(drug_conc_ctrl, IPR, zscore_TIF_comb_rep) %>% 
-  pivot_wider(names_from = IPR, values_from = zscore_TIF_comb_rep) %>%
-  column_to_rownames(var = "drug_conc_ctrl")
-
-
-quant_breaks <- quantile(mmejzscore_matrix, c(.01,.99), na.rm = T) # change these numbers according to where you want to set the cutoff
-palette_length <- 1000
-breaks <- breaks <- c(seq(quant_breaks[1], -1, 
-                          length.out=ceiling(palette_length/2) + 1), 
-                      seq(1, 
-                          quant_breaks[2], 
-                          length.out=floor(palette_length/2)))
-colors = colorRampPalette(slope.colors %>% pull(color))(length(breaks))
-colors[-which(breaks < -2.58 | breaks > 2.58 )] = "gray90"
-
-pheatmap(mmejzscore_matrix[, clone5_map_ipr$labels],
-         border_color = F,
-         cellwidth = 8,
-         cellheight = 8,
-         breaks = breaks,
-         cluster_cols = clone5_map_ipr,
-         annotation_row = target_ctrl,
-         main = "Z-score [< 0.01 p.val] - TIF all",
-         color = colors,
-         annotation_colors = annotation_colors_scr, 
-         annotation_legend = T,
-         annotation_col = chromatin_TIF)
-```
-
-```{r Z-score - TIF per target, fig.width= 10, fig.height= 10}
-targets = target %>% 
-  pull(target) %>% 
-  unique()
-
-HDAC_tib = read.table("rs20220708_HDAC_targets.txt", sep = "\t", fill = NA, header = T) %>%
-  dplyr::select(-target_main, -target_second) %>%
-  as_tibble()
-
-for (i in targets) {
-  target_drugs = rownames(filter(target, target %in% i))
-  
-  # Make matrix with drugs from selected target
-  mmejzscore_matrix = ritios_tib_epi_effects %>%
-    distinct(drug_conc_ctrl, IPR, zscore_TIF_comb_rep) %>% 
-    filter(drug_conc_ctrl %in% target_drugs) %>%
-    pivot_wider(names_from = IPR, values_from = zscore_TIF_comb_rep) %>%
-    column_to_rownames(var = "drug_conc_ctrl")
-  
-  cluster_rows = ifelse(nrow(mmejzscore_matrix) > 1, TRUE, FALSE)
-  if(nrow(mmejzscore_matrix) > 0) {
-    # change these numbers according to where you want to set the cutoff
-    quant_breaks <- quantile(mmejzscore_matrix, c(.01,.99), na.rm = T) 
-    palette_length <- 100
-    breaks <- c(seq(quant_breaks[1], 0, length.out=ceiling(palette_length/2) + 1), 
-                seq(quant_breaks[2]/palette_length, quant_breaks[2], length.out=floor(palette_length/2)))
-    colors = colorRampPalette(slope.colors %>% pull(color))(length(breaks))
-    colors[which(quant_breaks == 0)-1] = "gray90"
-    
-    # heatmap
-    p = pheatmap(mmejzscore_matrix[, clone5_map_ipr$labels],
-                 border_color = F,
-                 cellwidth = 8,
-                 cellheight = 8,
-                 cluster_cols = clone5_map_ipr,
-                 cluster_rows = cluster_rows,
-                 breaks = breaks,
-                 annotation_row = target_ctrl,
-                 main = paste("Z-score [< 0.01 p.val] - TIF per target :" , i, sep = " "),
-                 color = colors,
-                 annotation_colors = annotation_colors_scr, annotation_legend = T,
-                 annotation_col = chromatin_TIF)
-    print(p)
-  }
-}
-```
-
-
-```{r, fig.width= 10, fig.height= 8}
-# ratio_targets = slope.features.tib %>% left_join(rownames_to_column(target, var = "drug")) %>% 
-#   distinct(drug, conc, ratio_slope_plot, target, feature, conc) %>% 
-#   filter(ratio_slope_plot != 0) %>% 
-#   group_by(target, conc) %>% 
-#   mutate(sign = ifelse(ratio_slope_plot < 0, "increase NHEJ", "increase MMEJ"),
-#         total = length(target)) %>%
-#   group_by(conc, sign, target) %>%
-#   mutate(n = length(sign)) %>%
-#   ungroup() %>%
-#   distinct(target, total, sign, conc, n)
-# 
-# ggplot(ratio_targets,
-#        aes(y = reorder(target, -total), x = n, fill = sign)) +
-#   geom_bar(stat = "identity") +
-#   facet_wrap(~conc)+
-#   scale_fill_manual(values = c("#e07a5f", "#3d405b", "#C2C2C2"))
-
-
-ratio_features = epistasis_tib %>% left_join(rownames_to_column(target, var = "drug_conc")) %>% 
-  distinct(conc_char, ratio_slope_plot, target, feature, drug_conc) %>% 
-  filter(!is.na(ratio_slope_plot)) %>% 
-  mutate(sign = ifelse(ratio_slope_plot < 0, "increase NHEJ", "increase MMEJ")) %>%
-  group_by(conc_char, feature, sign) %>% 
-  mutate(total = length(target)) %>%
-  group_by(conc_char, sign, feature, target) %>%
-  mutate(n = length(target),
-         fraction = n/total) %>%
-  distinct(conc_char, feature, total, sign, n, target, fraction)
-
-ggplot(ratio_features,
-       aes(y = reorder(feature, -total), x = n, fill = target)) +
-  geom_bar(stat = "identity") +
-  facet_grid(conc_char ~ sign)+
-  scale_fill_manual(values = annotation_colors_scr$target)
-```
-
-```{r, fig.width= 10, fig.height= 8}
-ratio_features = epistasis_tib %>% left_join(rownames_to_column(target, var = "drug_conc")) %>% 
-  distinct(conc_char, indelrate_slope_plot, target, feature, drug_conc) %>% 
-  filter(!is.na(indelrate_slope_plot)) %>% 
-  mutate(sign = ifelse(indelrate_slope_plot < 0, "decrease TIF", "increase TIF")) %>%
-  group_by(conc_char, feature, sign) %>% 
-  mutate(total = length(target)) %>%
-  group_by(conc_char, sign, feature, target) %>%
-  mutate(n = length(target),
-         fraction = n/total) %>%
-  distinct(conc_char, feature, total, sign, n, target, fraction)
-
-ggplot(ratio_features,
-       aes(y = reorder(feature, -total), x = n, fill = target)) +
-  geom_bar(stat = "identity") +
-  facet_grid(conc_char ~ sign)+
-  scale_fill_manual(values = annotation_colors_scr$target)
-```
