@@ -299,7 +299,6 @@ file = list.files(in.dir, pattern = "episcreen_ratios", full.names = T) %>% tail
 indel.data <- readRDS(file)
 
 # Import data from preprocessing script
-in.dir = list.dirs(path = "/DATA/projects/DSBrepair/data/R") %>% .[grepl("episcreen", .)] %>% tail(n = 1)
 file.muts = list.files(in.dir, pattern = "episcreen_mutations", full.names = T) %>% tail(n = 1)
 
 IPR_set = c("IPR5", "IPR7")

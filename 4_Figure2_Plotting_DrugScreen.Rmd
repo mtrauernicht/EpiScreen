@@ -262,6 +262,11 @@ indel.data <- readRDS(file)
 meta.viab.file = list.files(in.dir, full.names = T)  %>% .[grepl("Viab_Meta", .)] %>% tail(n = 1)
 indel.statistics.dt = readRDS(meta.viab.file) %>%
   dplyr::select(ID, drug, target, replicate, viability, conc_char, tech)
+
+
+# Import data from preprocessing script
+file.muts = list.files(in.dir, pattern = "episcreen_mutations", full.names = T) %>% tail(n = 1)
+mutation.data <- readRDS(file.muts)
 ```
 
 ---
@@ -681,7 +686,7 @@ maxrank = nrow(rank_dt)
 rank_dt %>% 
   # left_join(near_all_TIF) %>%
   mutate(# n = ifelse(is.na(n), 1, 2),
-    col = ifelse(!between(rank, 10, maxrank-20) & 
+    col = ifelse(!between(rank, 8, maxrank-17) & 
                    filter_zscore_TIF_global_comb_rep & 
                    !(viab_mean < .60 & zscore_TIF_global_comb_rep < -2.54) & 
                    mean_eff_pval_adj_comb < 0.01,
@@ -740,9 +745,53 @@ top_hits = indel.data  %>%
          drug_conc = paste(drug, conc_char, sep = " "))
 ```
 
+## 2E Indel spectra
+```{r 2E Indel Plots top hits, eval = FALSE}
+label_ratio <- filter(indel.data, drug %in% c("DMSO", "PCI-24781 (Abexinostat)") & conc_char %in% c("control", "100 nM")) %>% 
+  group_by(IPR, drug) %>%
+  summarise(MMEJratio_mean = mean(MMEJratio),
+            MMEJratio_sd = sd(MMEJratio),
+            freqCut_mean = mean(freqCut),
+            freqCut_sd = sd(freqCut)) %>%
+  mutate(label_efficiency = paste0("Total indel frequency = ", round(freqCut_mean*100, 1),"% ±", round(freqCut_sd*100, 1),"%"), 
+         label_ratio = paste0("MMEJ ratio = ", round(MMEJratio_mean, 2)," ±", round(MMEJratio_sd, 2)))
 
-```{r 2E Indel Plots top hits}
+bc_mut_tib_mean <- mutation.data %>% 
+  distinct(IPR, drug, freq_mean,freq_sd, color, mutation, type, conc_char) %>%
+  filter(drug %in% c("DMSO", "PCI-24781 (Abexinostat)"), type %in% c("core", "grouped_indel") & conc_char %in% c("control", "100 nM")) %>% 
+  left_join(label_ratio)
 
+colors_pathways = c("wt" = "#808184", "other" = "black", "NHEJ" = "#e1251b", "MMEJ" = "#26419a", "SSTR" = "#007A4C")
+
+p2 = ggplot(bc_mut_tib_mean, 
+            aes(mutation, freq_mean)) + 
+  geom_bar(stat = "identity", aes(fill = color)) + 
+  # geom_quasirandom(data = bc_mut_tib, aes(mutation, freq_split, fill = color),  color = "black", shape = 21, ) + 
+  scale_fill_manual("legend", values = colors_pathways) + 
+  scale_color_manual("legend", values = colors_pathways) + 
+  # scale_y_continuous(name="frequency", labels = percent) +
+  scale_x_discrete(name="indel size", breaks = c("<-14", -7, 0, 1, ">2")) + 
+  facet_grid(drug ~ IPR) +
+  geom_text(aes(x = 7, y = .7, label = label_efficiency)) +
+  geom_text(aes(x = 7, y = .6, label = label_ratio)) + 
+  geom_errorbar(aes(ymin=freq_mean-freq_sd, ymax=freq_mean+freq_sd), width=.2,
+                position=position_dodge(.9)) +
+  theme_classic_lines()
+
+p2 = ggplot(bc_mut_tib_mean, 
+            aes(mutation, freq_mean)) + 
+  geom_quasirandom(stat = "identity", aes(fill = color)) + 
+  # geom_quasirandom(data = bc_mut_tib, aes(mutation, freq_split, fill = color),  color = "black", shape = 21, ) + 
+  scale_fill_manual("legend", values = colors_pathways) + 
+  scale_color_manual("legend", values = colors_pathways) + 
+  # scale_y_continuous(name="frequency", labels = percent) +
+  scale_x_discrete(name="indel size", breaks = c("<-14", -7, 0, 1, ">2")) + 
+  facet_grid(drug ~ IPR) +
+  geom_text(aes(x = 7, y = .7, label = label_efficiency)) +
+  geom_text(aes(x = 7, y = .6, label = label_ratio)) + 
+  geom_errorbar(aes(ymin=freq_mean-freq_sd, ymax=freq_mean+freq_sd), width=.2,
+                position=position_dodge(.9)) +
+  theme_classic_lines()
 ```
 
 
@@ -930,7 +979,7 @@ plot_grid(p1, p2, ncol = 1, labels = c("B", "C"))
 
 ## S2DEF TIF decreasing compounds
 
-```{r S2DEF lowered TIF, fig.width = 6, fig.height = 4}
+```{r S2DEF lowered TIF, fig.width = 9, fig.height = 6}
 all_compounds_lowerTIF = indel.data %>% 
   filter(conc_char != "control" & indel_freq_filter & viab_reproducibility & cor_TIF_filter) %>% 
   mutate(drug = gsub(" [(].*[)]", "", drug),
