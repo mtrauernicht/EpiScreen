@@ -1644,6 +1644,22 @@ vorino.dt %>% mutate(state = ifelse(late_replicating == 1 &
   geom_density()
 ```
 
+
+```{r}
+p1 = plot_comb_grid_beeswarm(vorino.dt, opt_df,
+                        domain_levels, 'log2_FC_TIF', min_count = 10, y_plabel=c(-1.5, 1.5))
+p2 = plot_comb_grid_beeswarm(GSK.dt, opt_df,
+                        domain_levels, 'log2_FC_TIF', min_count = 10, y_plabel=c(-1.5, 1.5))
+plot_grid(p1, p2, labels = c("TIF HDACi", "TIF EZH2i"))
+
+
+p1 = plot_comb_grid_beeswarm(vorino.dt, opt_df,
+                        domain_levels, 'log2_FC_MMEJ_NHEJ', min_count = 10, y_plabel=c(-2, 2))
+p2 = plot_comb_grid_beeswarm(GSK.dt, opt_df,
+                        domain_levels, 'log2_FC_MMEJ_NHEJ', min_count = 10, y_plabel=c(-2, 2))
+plot_grid(p1, p2, labels = c("Balance HDACi", "Balance EZH2i"))
+```
+
 ```{r GSK upset, fig.height=5, fig.width=7}
 domain_levels = c('late_replicating', 'LAD', 'H3K9me2', 'H3K27me3')
 
@@ -1651,7 +1667,7 @@ domains = paste0(domain_levels, '_domain')
 
 GSK.dt = GSK_ratios %>%
   filter(!is.na(diff_TIF)) %>%
-  dplyr::select(barcode, diff_TIF, log2_FC_MMEJ_NHEJ, ratio_MMEJ_NHEJ, log2_FC_TIF, domains) %>%
+  dplyr::select(barcode, diff_TIF, log2_FC_MMEJ_NHEJ, ratio_MMEJ_NHEJ, log2_FC_TIF, efficiency_GSK126, efficiency_DMSO_GSK, domains) %>%
   distinct(barcode, .keep_all = TRUE) %>%
   data.table()
 
@@ -1682,6 +1698,15 @@ p1 = plot_comb_grid_beeswarm(GSK.dt, opt_df,
                         domain_levels, 'log2_FC_TIF', min_count = 10, y_plabel=c(-1.5, 1.5))
 
 plot_grid(p1, p2, p3, p4, labels = c("ΔTIF", "M/N", "LogBal", "LogTIF"))
+
+
+p1 = plot_comb_grid_beeswarm(GSK.dt, opt_df,
+                        domain_levels, 'efficiency_DMSO_GSK', min_count = 10, y_plabel=c(0, 1))
+p2 = plot_comb_grid_beeswarm(GSK.dt, opt_df,
+                        domain_levels, 'efficiency_GSK126', min_count = 10, y_plabel=c(0, 1))
+
+plot_grid(p1, p2, labels = c("TIF CTRL", "TIF Ezh2i"))
+
 
 k27me3 = GSK.dt %>% filter(late_replicating == 0, 
                              LAD == 0,
