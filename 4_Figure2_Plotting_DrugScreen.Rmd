@@ -307,7 +307,7 @@ eff.data <- indel.data.freq %>%
 global.effects = eff.data %>%
   distinct(drug, conc_char, target, sign_global) %>%
   group_by(target, sign_global, conc_char) %>% 
-  count()
+  dplyr::count()
 
 mixed_effect = eff.data %>% 
   filter(sign_global == "No_Change" & sign_local != "No_Change") %>%
@@ -323,7 +323,7 @@ local.effects = eff.data %>%
   filter(n()<3) %>% ## Remove the mixed samples effect (this was checked) Apicidin, Mocetinostat & CYT387
   rbind(mixed_effect) %>%
   group_by(target, sign_local, conc_char) %>% 
-  count() %>% 
+  dplyr::count() %>%
   pivot_wider(names_from = sign_local, values_from = n, values_fill = 0) %>%
   mutate(No_Change = No_Change - TIF_Increase - TIF_Decrease - TIF_Mixed) %>%
   dplyr::rename(Local_TIF_Increase = TIF_Increase, Local_TIF_Decrease = TIF_Decrease, Mixed_TIF_effect = TIF_Mixed) %>% 
@@ -385,7 +385,7 @@ all_TIF = indel.data %>%
   group_by(drug, conc_char, target) %>% 
   mutate(drug = gsub(" [(].*[)]", "", drug),
          drug_conc = paste(drug, conc_char, sep = " ")) %>%
-  count() %>% 
+  dplyr::count() %>% 
   filter(n == 36) # 2 x 18
 
 kable(all_TIF)
@@ -403,7 +403,7 @@ near_all_TIF = indel.data %>%
            indel_freq_filter == T,
          mean_eff_pval_adj_comb < 0.01) %>% 
   group_by(drug, conc_char, target) %>% 
-  count() %>% 
+  dplyr::count() %>% 
   filter(n >= 32) # 2 x 16
 
 
@@ -497,7 +497,7 @@ annotation_colors_scr = list(
              HIF="#E3DCD5", JAK="#C8D7E2", PIM="#9AB8C4", `Aurora Kinase`="#F4CAE4",
              PARP="#CB546F", `Epigenetic Reader Domain`= "#476D61", `DNA-PK`="#E07A43"),
   conc_char = conc_colors,
-  clusters_drugs = sequential_hcl(7, "Plasma"),
+  clusters_drugs = sequential_hcl(4, "Greens"),
   # viab_rep1 = c('#ffeee9', '#ffdcd4', '#ffcbbe', '#ffb8a8', '#fda693', '#f9947e', '#f4826a', '#ef6f56', '#e95b43', '#e24530'),
   # viab_rep2 = c('#ffeee9', '#ffdcd4', '#ffcbbe', '#ffb8a8', '#fda693', '#f9947e', '#f4826a', '#ef6f56', '#e95b43', '#e24530'),
   viab = viab_colors,
@@ -543,7 +543,7 @@ eff.data.heatmap <- eff.data %>%
 top_50_hits = eff.data.heatmap %>% 
   arrange(desc(abs(freqCut_diff_mean))) %>% 
   distinct(drug, conc_char, min_score) %>%
-  slice(1:50) 
+  dplyr::slice(1:50) 
 
 
 #eff.data.heatmap2$freqCut_norm_mean[eff.data.heatmap2$mean_eff_zscore_comb > 0.05] <- NA

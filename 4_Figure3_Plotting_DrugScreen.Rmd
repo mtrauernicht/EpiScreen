@@ -851,7 +851,7 @@ indel.validation.data <- readRDS(file) # %>% filter(pathway_bal_filter == TRUE &
 # List chromatin name columns from this table
 chromatin_cols = colnames(indel.validation.data)[42:75]
 # Import data from DSB TRIP paper
-RSTP2_IndelRatios_Chromatin_2kb <- readRDS("~/DSBrepair/data/R/rs20210311/RSTP2_IndelRatios_Chromatin_2kb.RDS") %>% 
+RSTP2_IndelRatios_Chromatin_2kb <- readRDS("/DATA/usr/r.schep/DSBrepair/data/R/rs20210311/RSTP2_IndelRatios_Chromatin_2kb.RDS") %>% 
   filter(replicate == "mean" & drug %in% c("DMSO_GSK", "GSK126") & plasmid == "LBR2") %>%
   dplyr::select(barcode, drug, MMEJ, NHEJ, efficiency, all_of(chromatin_cols)) %>%
   distinct() %>%
@@ -1123,30 +1123,18 @@ all.samples %>%
   scale_color_manual(values = c("black", "white")) +
   theme_classic_lines_45()
 
-other_drugs <- unique(all.samples.plot$drug_conc[all.samples.plot$drug_conc != "DMSO 10 µM" & all.samples.plot$target != "Aurora Kinase"])
-all.samples.plot %>% filter(!target %in% c("Aurora Kinase"), ID == "LBR2") %>%
-mutate(drug_conc = factor(drug_conc, levels = c("DMSO 10 µM", other_drugs))) %>%
-ggplot(., aes(y = mean_value, x = drug_conc, fill = variable)) +
-  geom_bar(stat="identity") + 
-   geom_errorbar(aes(ymin = vadj-SD, ymax = vadj+SD, color = variable), width = 0.2, size = 1.5)+
-  labs(title = "cell cycle arrest upon treatment with Aurora Kinase inhibitors", 
-       x = "GFP/LBR2 transfection", y = "G1, S, and G2 fractions") + 
-  scale_fill_manual(values = c("grey80","grey60","grey40")) +
-  scale_color_manual(values = c("grey80","grey60","grey40")) +
-  theme_pubr(border = T, x.text.angle = 45)
+# other_drugs <- unique(all.samples.plot$drug_conc[all.samples.plot$drug_conc != "DMSO 10 µM" & all.samples.plot$target != "Aurora Kinase"])
+# all.samples.plot %>% filter(!target %in% c("Aurora Kinase"), ID == "LBR2") %>%
+# mutate(drug_conc = factor(drug_conc, levels = c("DMSO 10 µM", other_drugs))) %>%
+# ggplot(., aes(y = mean_value, x = drug_conc, fill = variable)) +
+#   geom_bar(stat="identity") + 
+#    geom_errorbar(aes(ymin = vadj-SD, ymax = vadj+SD, color = variable), width = 0.2, size = 1.5)+
+#   labs(title = "cell cycle arrest upon treatment with Aurora Kinase inhibitors", 
+#        x = "GFP/LBR2 transfection", y = "G1, S, and G2 fractions") + 
+#   scale_fill_manual(values = c("grey80","grey60","grey40")) +
+#   scale_color_manual(values = c("grey80","grey60","grey40")) +
+#   theme_pubr(border = T, x.text.angle = 45)
 ```
-
-```{r, fig.width = 4, fig.height = 4, eval = FALSE}
-# Barplot of each drug next to each other
-all.samples.plot %>% filter(target %in% c("Vehicle")) %>%
-ggplot(., aes(y = mean_value, x = ID, fill = variable)) +
-  geom_bar(stat="identity") + 
-   geom_errorbar(aes(ymin = vadj-SD, ymax = vadj+SD, color = variable), width = 0.2)+
-  labs(title = "Cll cycle distribution in control setting", 
-       x = "GFP/LBR2 transfection", y = "G1, S, and G2 fractions") + 
-  scale_fill_manual(values = c("#DED89C","#BF7538","#749075"))
-```
-
 
 ## 3A HDACi only heatmap
 ```{r 3A HDACi heapmap, fig.width = 12, fig.height = 12}
