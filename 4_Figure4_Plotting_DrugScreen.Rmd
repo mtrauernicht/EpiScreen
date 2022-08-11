@@ -241,6 +241,7 @@ colors_targets <-  c(HDAC="#60988D", HAT="#C6D0A8", Sirtuin="#8FCAAC",
                      HMT="#FDCDAC", DNMT="#D69C81", `Histone Demethylase`="#FFF2AE",
                      HIF="#E3DCD5", JAK="#C8D7E2", PIM="#9AB8C4", `Aurora Kinase`="#F4CAE4",
                      PARP="#CB546F", `Epigenetic Reader Domain`= "#476D61", `DNA-PK`="#E07A43")
+colors_pathways = c("wt" = "#808184", "other" = "black", "NHEJ" = "#e1251b", "MMEJ" = "#26419a", "SSTR" = "#007A4C")
 
 conc_colors = c("100 nM" = colors_drugs[7], "1 µM" = colors_drugs[4], "10 µM" = "#000000")
 
@@ -1492,12 +1493,12 @@ all.samples <- all.samples %>%
   mutate(drug_conc_exp = paste(drug, conc, exp, sep = "_")) %>%
   mutate(mean_value = ave(value, drug_conc, variable, exp, FUN = mean)) %>%
   mutate(SD = ave(value, drug_conc, variable, exp, FUN = sd)) %>%
-  #filter(exp == "effective_drugs") %>%
+  filter(exp == "effective_drugs") %>%
   distinct(drug, conc, drug_conc_exp, variable, mean_value, SD, value, exp, drug_conc) %>%
   mutate(pval = "")
 
 for (i in unique(all.samples$drug_conc_exp)) {
-  if (length(all.samples$value[all.samples$drug_conc_exp == i & all.samples$variable == "G2"]) > 1) { 
+  if (length(all.samples$value[all.samples$drug_conc_exp == i & all.samples$variable == "G2" & !is.na(all.samples$value)]) > 1) { 
     if (all.samples$exp[all.samples$drug_conc_exp == i] == "five_drugs") {
 
       all.samples$pval[all.samples$drug_conc_exp == i] <- t.test(all.samples$value[all.samples$drug_conc == "DMSO 10um" & all.samples$exp == "five_drugs" & all.samples$variable == "G2"], 
@@ -1509,7 +1510,9 @@ for (i in unique(all.samples$drug_conc_exp)) {
   }
 }
 
-
+all.samples <- all.samples %>%
+  dplyr::select(-value) %>%
+  distinct()
 
 vadj.G2 = all.samples %>% filter(variable %in% c("G2", "S", "G1")) %>% group_by(drug_conc_exp) %>% summarise(vadj = sum(mean_value)) %>% mutate(variable = "G2")
 vadj.S = all.samples %>% filter(variable %in% c("S", "G1")) %>% group_by(drug_conc_exp) %>% summarise(vadj = sum(mean_value)) %>% mutate(variable = "S")
@@ -1541,17 +1544,23 @@ g2_order <- all.samples.plot %>%
 
 all.samples.plot <- merge(all.samples.plot, g2_order, all = T)
 
+drugs_order <- all.samples.plot %>%
+  distinct(drug_conc, g2_value) %>%
+  filter(str_detect(drug_conc, "DMSO", negate = T)) %>%
+  arrange(desc(g2_value))
 
+all.samples.plot <- all.samples.plot %>% 
+  filter(drug != "PAO") %>%
+  mutate(drug_conc = factor(drug_conc, levels = c("DMSO 10um", drugs_order$drug_conc)))
 
-all.samples.plot %>% 
-  ggplot(., aes(y = mean_value, x = reorder(drug_conc, -g2_value))) +
+ggplot(all.samples.plot, aes(y = mean_value, x = drug_conc)) +
   geom_linerange(aes(ymin = vadj, ymax = vadj+SD, color = target), size = 1) +
-  geom_bar(stat="identity", aes(alpha = variable, fill = target)) +
+  geom_bar(stat="identity", aes(alpha = variable, fill = target), color = ifelse(all.samples.plot$pval < 0.05, "grey40", NA), size = .5, width = .75) +
   labs(title = "cell cycle arrest upon treatment with Aurora Kinase inhibitors") +
   scale_color_manual(values = annotation_colors_scr$target) +
   scale_fill_manual(values = annotation_colors_scr$target) +
   scale_alpha_discrete(range = c(0.3,1)) +
-  theme_pubr(border = T, x.text.angle = 45)
+  theme_pubr(border = T, x.text.angle = 90)
 
 all.samples %>%
   ggplot(., aes(y = mean_value, x = conc, color = target)) +
