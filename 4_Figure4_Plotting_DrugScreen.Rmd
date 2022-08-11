@@ -64,7 +64,7 @@ library(data.table)
 library(GGally)
 library(MASS)
 # library(DESeq2)
-# library(gghighlight)
+library(gghighlight)
 library(ggrepel)
 # library(platetools)
 library(ggpubr)
@@ -761,15 +761,15 @@ target_effects %>% filter(sign_global != "No_Change") %>% distinct(target, conc_
 ```{r 2C Top TIF boosting, , fig.width = 12, fig.height = 10}
 rank_dt = indel.data %>% 
   filter(drug != "DMSO" & pathway_bal_filter & viab_reproducibility & cor_bal_filter, filter_zscore_bal_global_comb_rep) %>%
-  distinct(drug, conc_char, zscore_bal_global_comb_rep , target, cor_bal, cor_bal_filter) %>% 
-  arrange(desc(zscore_bal_global_comb_rep )) %>%
+  distinct(drug, conc_char, MMEJratio_global_mean , target, cor_bal, cor_bal_filter) %>% 
+  arrange(MMEJratio_global_mean) %>%
   mutate(rank = seq(1:n()),
          drug = gsub(" [(].*[)]", "", drug),
          drug_conc = paste(drug, conc_char, sep = " "))
 
 p1 = rank_dt %>% 
   # filter(rank < 100 ) %>%
-  ggplot(., aes(rank, zscore_bal_global_comb_rep )) +
+  ggplot(., aes(rank, MMEJratio_global_mean )) +
   geom_point()  +
   scale_color_manual(values = colors_targets) +
   geom_label_repel(aes(label = ifelse(drug == "DNA-PKi", drug_conc,'')),
@@ -784,7 +784,7 @@ p1 = rank_dt %>%
 
 p2 = rank_dt %>%
   filter(rank <= 100 & drug != "DNA-PKi") %>%
-  ggplot(., aes(rank, zscore_bal_global_comb_rep , color = target)) +
+  ggplot(., aes(rank, MMEJratio_global_mean , color = target)) +
   geom_point()  +
   scale_color_manual(values = colors_targets) +
   gghighlight(rank <= 8, label_key = drug_conc) +
@@ -796,14 +796,12 @@ p2 = rank_dt %>%
 maxrank = rank_dt %>% nrow()
 
 p3 = rank_dt %>%
-  filter(rank > nrow(.)-100) %>%
-  ggplot(., aes(rank, zscore_bal_global_comb_rep , color = target)) +
+  filter(rank <= 150) %>%
+  ggplot(., aes(rank, MMEJratio_global_mean , color = target, size = 1)) +
   geom_point()  +
   scale_color_manual(values = colors_targets) +
-  gghighlight(rank > maxrank-10, label_key = drug_conc) +
-  geom_hline(linetype = "dashed", yintercept = -2.58) +
-  scale_x_reverse(limits = c(maxrank, maxrank-100)) +
-  # scale_x_reverse() +
+  gghighlight(rank <= 34, use_direct_label = F) +
+  geom_hline(linetype = "dashed", yintercept = 0.3711068) +
   ylab("Global combined MMEJ ratio z-score")
 
 
@@ -817,6 +815,80 @@ top_hits = indel.data  %>%
          drug = gsub(" [(].*[)]", "", drug),
          drug_conc = paste(drug, conc_char, sep = " "))
 ```
+
+
+## Indel plot decitabine
+
+```{r}
+# Import data from preprocessing script
+in.dir = list.dirs(path = "/DATA/projects/DSBrepair/data/R") %>% .[grepl("episcreen", .)] %>% tail(n = 1)
+file = list.files(in.dir, pattern = "episcreen_ratios", full.names = T) %>% tail(n = 1)
+indel.data <- readRDS(file)
+
+# Import data from preprocessing script
+in.dir = list.dirs(path = "/DATA/projects/DSBrepair/data/R") %>% .[grepl("episcreen", .)] %>% tail(n = 1)
+file.muts = list.files(in.dir, pattern = "episcreen_mutations", full.names = T) %>% tail(n = 1)
+
+mutation.data <- readRDS(file.muts)
+
+
+label_ratio <- indel.data %>%
+  mutate(drug_conc = paste(drug, conc_char, sep = "_")) %>%
+  filter(drug_conc %in% c("DMSO_control", "Decitabine_1 µM")) %>% 
+  group_by(drug_conc, IPR) %>%
+  summarise(MMEJratio_mean = mean(MMEJratio),
+            MMEJratio_sd = sd(MMEJratio),
+            freqCut_mean = mean(freqCut),
+            freqCut_sd = sd(freqCut)) %>%
+  ungroup() %>%
+  mutate(MMEJratio_mean_global = ave(MMEJratio_mean, drug_conc, FUN = mean)) %>%
+  mutate(MMEJratio_sd_global = ave(MMEJratio_mean, drug_conc, FUN = sd)) %>%
+  mutate(freqCut_mean_global = ave(freqCut_mean, drug_conc, FUN = mean)) %>%
+  mutate(freqCut_sd_global = ave(freqCut_mean, drug_conc, FUN = sd)) %>%
+  mutate(label_efficiency = paste0("Total indel frequency = ", round(freqCut_mean_global*100, 1),"% ±", round(freqCut_sd_global*100, 1),"%"), 
+         label_ratio = paste0("MMEJ ratio = ", round(MMEJratio_mean_global, 2)," ±", round(MMEJratio_sd_global, 2)))
+
+chrom <- chromatin %>%
+  rownames_to_column("IPR")
+
+bc_mut_tib_mean <- mutation.data %>% 
+  mutate(drug_conc = paste(drug, conc_char, sep = "_")) %>%
+  distinct(IPR, drug_conc, freq_mean,freq_sd, color, mutation, type) %>%
+  filter(drug_conc %in% c("DMSO_control", "Decitabine_1 µM"), type %in% c("core", "grouped_indel")) %>% 
+  left_join(label_ratio, by = c("drug_conc", "IPR")) %>%
+  left_join(chrom, by = "IPR")
+
+ggplot(bc_mut_tib_mean, 
+            aes(mutation, freq_mean)) + 
+  geom_bar(stat = "identity", aes(fill = color)) + 
+  # geom_quasirandom(data = bc_mut_tib, aes(mutation, freq_split, fill = color),  color = "black", shape = 21, ) + 
+  scale_fill_manual("legend", values = colors_pathways) + 
+  scale_color_manual("legend", values = colors_pathways) + 
+  scale_y_continuous(name="frequency", labels = percent) +
+  scale_x_discrete(name="indel size", breaks = c("<-14", -7, 0, 1, ">2")) + 
+  facet_wrap( ~ drug_conc, ncol = 1) +
+  geom_text(aes(x = 7, y = .7, label = label_efficiency)) +
+  geom_text(aes(x = 7, y = .6, label = label_ratio)) + 
+  geom_errorbar(aes(ymin=freq_mean-freq_sd, ymax=freq_mean+freq_sd), width=.2,
+                position=position_dodge(.9)) +
+  theme_pubr(border = T)
+
+ggplot(bc_mut_tib_mean, 
+            aes(mutation, freq_mean, color = color, fill = drug_conc)) + 
+  geom_boxplot(position = position_dodge(0.75), aes(alpha = 0.7)) +
+  geom_quasirandom(dodge.width = 0.75, shape = 21) + 
+  scale_fill_manual("legend", values = c("#D69C81", "white")) + 
+  scale_color_manual("legend", values = colors_pathways) + 
+  scale_y_continuous(name="frequency", labels = percent) +
+  scale_x_discrete(name="indel size", breaks = c("<-14", -7, 0, 1, ">2")) + 
+  #facet_wrap( ~ chromatin, ncol = 1) +
+  geom_text(aes(x = 7, y = .7, label = label_efficiency)) +
+  geom_text(aes(x = 7, y = .6, label = label_ratio)) + 
+  theme_pubr(border = T)
+```
+
+
+
 
 
 ```{r}
@@ -1416,6 +1488,86 @@ plot_grid(p1, p2, nrow = 2)
 all.samples = read_csv2("/DATA/usr/m.trauernicht/projects/EpiScreen/FACS/Data/mt20220802_facs_all_drugs.csv")
 
 all.samples <- all.samples %>%
+  mutate(drug_conc = paste(drug, conc, sep = " ")) %>%
+  mutate(drug_conc_exp = paste(drug, conc, exp, sep = "_")) %>%
+  mutate(mean_value = ave(value, drug_conc, variable, exp, FUN = mean)) %>%
+  mutate(SD = ave(value, drug_conc, variable, exp, FUN = sd)) %>%
+  #filter(exp == "effective_drugs") %>%
+  distinct(drug, conc, drug_conc_exp, variable, mean_value, SD, value, exp, drug_conc) %>%
+  mutate(pval = "")
+
+for (i in unique(all.samples$drug_conc_exp)) {
+  if (length(all.samples$value[all.samples$drug_conc_exp == i & all.samples$variable == "G2"]) > 1) { 
+    if (all.samples$exp[all.samples$drug_conc_exp == i] == "five_drugs") {
+
+      all.samples$pval[all.samples$drug_conc_exp == i] <- t.test(all.samples$value[all.samples$drug_conc == "DMSO 10um" & all.samples$exp == "five_drugs" & all.samples$variable == "G2"], 
+                                                                 all.samples$value[all.samples$drug_conc_exp == i & all.samples$variable == "G2"])$p.value
+      } else {
+        all.samples$pval[all.samples$drug_conc_exp == i] <- t.test(all.samples$value[all.samples$drug_conc == "DMSO 10um" & all.samples$exp == "effective_drugs" & all.samples$variable == "G2"], 
+                                                               all.samples$value[all.samples$drug_conc_exp == i & all.samples$variable == "G2"])$p.value
+  }
+  }
+}
+
+
+
+vadj.G2 = all.samples %>% filter(variable %in% c("G2", "S", "G1")) %>% group_by(drug_conc_exp) %>% summarise(vadj = sum(mean_value)) %>% mutate(variable = "G2")
+vadj.S = all.samples %>% filter(variable %in% c("S", "G1")) %>% group_by(drug_conc_exp) %>% summarise(vadj = sum(mean_value)) %>% mutate(variable = "S")
+vadj.G1 = all.samples %>% filter(variable %in% c("G1")) %>% group_by(drug_conc_exp) %>% summarise(vadj = sum(mean_value)) %>% mutate(variable = "G1")
+
+vadj.tib = rbind(vadj.G1, vadj.S, vadj.G2) %>% na.omit()
+targets <- target_set_drugs %>% 
+  distinct(drug, target)
+
+all.samples.plot = all.samples  %>%
+  as_tibble() %>%
+  filter(variable != "Apoptotic cells") %>%
+  left_join(vadj.tib) %>%
+  left_join(targets, by = "drug") %>%
+  mutate(variable = factor(variable, levels = c("G2", "S", "G1")),
+         target = ifelse(drug == "CX-6258", "PIM",
+                         ifelse(drug == "DMSO", "Vehicle",
+                                ifelse(drug == "DZNeP", "HMT",
+                                       ifelse(drug == "Suramin", "Sirtuin",target))))) %>%
+  na.omit()
+
+
+#aurk.inhibitors <- c("Alisertib 100 nM", "Aurora A Inhibitor I 1 µM", "Barasertib 1 µM", "CYC116 1 µM", "SNS-314 Mesylate 10 µM")
+
+g2_order <- all.samples.plot %>%
+  filter(variable == "G2") %>%
+  dplyr::select(drug_conc_exp, "g2_value" = mean_value) %>%
+  distinct()
+
+all.samples.plot <- merge(all.samples.plot, g2_order, all = T)
+
+
+
+all.samples.plot %>% 
+  ggplot(., aes(y = mean_value, x = reorder(drug_conc, -g2_value))) +
+  geom_linerange(aes(ymin = vadj, ymax = vadj+SD, color = target), size = 1) +
+  geom_bar(stat="identity", aes(alpha = variable, fill = target)) +
+  labs(title = "cell cycle arrest upon treatment with Aurora Kinase inhibitors") +
+  scale_color_manual(values = annotation_colors_scr$target) +
+  scale_fill_manual(values = annotation_colors_scr$target) +
+  scale_alpha_discrete(range = c(0.3,1)) +
+  theme_pubr(border = T, x.text.angle = 45)
+
+all.samples %>%
+  ggplot(., aes(y = mean_value, x = conc, color = target)) +
+  geom_line()+
+  geom_pointrange(aes(ymin=mean_value, ymax=mean_value+SD)
+                  #, position = position_dodge(width = 0.1)
+                  ) +
+  geom_hline(yintercept = 0.08419397, lty = "dashed") + 
+  ylim(0,0.7) +
+  gghighlight(pval < 0.05, label_key = drug_conc) +
+  scale_color_manual(values = colors_targets) 
+
+
+all.samples = read_csv2("/DATA/usr/m.trauernicht/projects/EpiScreen/FACS/Data/mt20220802_facs_all_drugs.csv")
+
+all.samples <- all.samples %>%
   mutate(drug_conc = paste(drug, conc, sep = "_")) %>%
   mutate(drug_conc_exp = paste(drug, conc, exp, sep = "_")) %>%
   mutate(mean_value = ave(value, drug_conc, variable, exp, FUN = mean)) %>%
@@ -1424,11 +1576,7 @@ all.samples <- all.samples %>%
   dplyr::select(-variable) %>%
   na.omit() %>%
   mutate(pval = "")
-# 
-# all.samples = all.samples %>%
-#   group_by(drug, conc, variable, exp) %>%
-#   summarise(mean_value = mean(value),
-#             sd_value = sd(value))
+
 
 
 pval_list <- list()
@@ -1449,48 +1597,6 @@ all.samples <- all.samples %>%
   mutate(pval_adj = p.adjust(pval, method = "fdr")) %>%
   left_join(target_set_drugs2) %>%
   distinct()
-
-# vadj.G2 = all.samples %>% filter(variable %in% c("G2", "S", "G1")) %>% group_by(drug_conc) %>% summarise(vadj = sum(mean_value)) %>% mutate(variable = "G2")
-# vadj.S = all.samples %>% filter(variable %in% c("S", "G1")) %>% group_by(drug_conc) %>% summarise(vadj = sum(mean_value)) %>% mutate(variable = "S")
-# vadj.G1 = all.samples %>% filter(variable %in% c("G1")) %>% group_by(drug_conc) %>% summarise(vadj = sum(mean_value)) %>% mutate(variable = "G1")
-# 
-# vadj.tib = rbind(vadj.G1, vadj.S, vadj.G2)
-# 
-# all.samples.plot = all.samples  %>% 
-#   as_tibble() %>% 
-#   filter(variable != "Apoptotic cells") %>% 
-#   left_join(vadj.tib) %>%
-#   left_join(target_set_drugs) %>%
-#   mutate(variable = factor(variable, levels = c("G2", "S", "G1")),
-#          target = ifelse(drug == "CX-6258", "PIM",
-#                          ifelse(drug == "DMSO", "Vehicle",
-#                                 ifelse(drug == "DZNeP", "HMT",
-#                                        ifelse(drug == "Suramin", "Sirtuin",target)))),
-#          ID = gsub("GFP", "-sgRNA", ID))
-# 
-# 
-# aurk.inhibitors <- c("Alisertib 100 nM", "Aurora A Inhibitor I 1 µM", "Barasertib 1 µM", "CYC116 1 µM", "SNS-314 Mesylate 10 µM")
-# 
-# all.samples.plot %>% filter(drug_conc %in% c("DMSO 10 µM", aurk.inhibitors), ID == "LBR2") %>%
-#   mutate(drug_conc = factor(drug_conc, levels = c("DMSO 10 µM", aurk.inhibitors))) %>%
-#   ggplot(., aes(y = mean_value, x = drug_conc, fill = variable)) +
-#   geom_bar(stat="identity") + 
-#   geom_errorbar(aes(ymin = vadj-SD, ymax = vadj+SD, color = variable), width = 0.2, size = 1.5)+
-#   labs(title = "cell cycle arrest upon treatment with Aurora Kinase inhibitors") +
-#   scale_fill_manual(values = c("grey80","grey60","grey40")) +
-#   scale_color_manual(values = c("grey80","grey60","grey40")) +
-#   theme_pubr(border = T, x.text.angle = 45)
-
-all.samples %>%
-  ggplot(., aes(y = mean_value, x = conc, color = target)) +
-  geom_line()+
-  geom_pointrange(aes(ymin=mean_value, ymax=mean_value+SD)
-                  #, position = position_dodge(width = 0.1)
-                  ) +
-  geom_hline(yintercept = 0.08419397, lty = "dashed") + 
-  ylim(0,0.7) +
-  gghighlight(pval < 0.05, label_key = drug_conc) +
-  scale_color_manual(values = colors_targets) 
 
 all.samples %>%
   ggplot(., aes(y = mean_value, x = conc, color = target)) +
