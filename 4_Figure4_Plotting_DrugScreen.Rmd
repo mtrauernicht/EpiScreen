@@ -892,197 +892,6 @@ ggplot(bc_mut_tib_mean,
 ```
 
 
-
-
-
-```{r}
-# Data table and compute log2_ratio (This line needs to be adjusted)
-filtered_drug_conc = indel.data %>%
-  filter(abs(zscore_TIF_comb_rep) > 2.58 | abs(zscore_TIF_comb_rep) > 2.58 | drug == "DMSO") %>%
-  mutate(drug_conc = paste(drug, conc_char,sep = " "),
-         effect_on_indelrate = ifelse(abs(zscore_TIF_comb_rep) > 2.58, TRUE, FALSE),
-         effect_on_ratio = ifelse(abs(zscore_bal_comb_rep) > 2.58, TRUE, FALSE)) %>%
-  distinct(drug, conc_char, drug_conc, effect_on_indelrate, effect_on_ratio) %>%
-  mutate(counts = ave(drug_conc, drug, conc_char, FUN = function(x) length(x)),
-         keep = ifelse(counts > 1 & !effect_on_indelrate | counts > 1 & !effect_on_ratio, FALSE, TRUE)) %>%
-  filter(keep) %>% 
-  distinct(drug, conc_char, drug_conc, effect_on_indelrate, effect_on_ratio)
-
-
-ratios_tib <- indel.data %>%
-  mutate(drug_conc = paste(drug, conc_char, sep = " ")) %>%
-  semi_join(filtered_drug_conc) %>%
-  distinct(MMEJratio, freqCut, drug, conc_char, drug_conc, target, barcode) %>%
-  mutate(MMEJratio = ave(MMEJratio, drug, conc_char, barcode, FUN = mean)) %>%
-  mutate(MMEJratio.log2 = log2(MMEJratio)) %>%
-  mutate(freqCut = (ave(freqCut, drug, conc_char, barcode, FUN = mean))) %>%
-  mutate(freqCut.log2 = log2(freqCut)) %>%
-  distinct()
-
-dmso_ratios_tib <- indel.data %>%
-  filter(drug == "DMSO") %>%
-  distinct(MMEJratio, freqCut, barcode) %>%
-  mutate(DMSO.ratio = ave(MMEJratio, barcode, FUN = mean)) %>%
-  mutate(DMSO.ratio.log2 = log2(DMSO.ratio)) %>%
-  mutate(DMSO.freqCut = ave(freqCut, barcode, FUN = mean)) %>%
-  mutate(DMSO.freqCut.log2 = log2(DMSO.freqCut)) %>%
-  dplyr::select(-MMEJratio, -freqCut) %>%
-  distinct()
-
-ratios_tib <- merge(ratios_tib, dmso_ratios_tib)
-```
-
-The log2 distance ratio in our case is positive if it promotes NHEJ and negative if it promotes NHEJ
-
-
-# 2nd step check compute distances and plot them
-```{r}
-# Each replicate has a different value (compute differences by replicate)
-ratios_tib_dist <- ratios_tib %>% 
-  dplyr::group_by(barcode, drug, conc_char) %>% 
-  mutate(log2.dist.ratio = MMEJratio.log2 - DMSO.ratio.log2, 
-         log2.dist.freqCut = freqCut.log2 - DMSO.freqCut.log2) %>%
-  left_join(chrom_data)
-```
-
-
-# Extract slopes for all genes
-```{r}
-# Perform analysis across all features for three test genes
-ratios_tib_dist %<>% mutate(drug_conc = paste(drug, conc_char, sep = " ")) %>% 
-  filter(!is.na(MMEJratio))
-
-slope.protein.features <- tibble(drug_conc = NA, feature = NA,  term = NA, 
-                                 indelrate = NA, p.value.indelrate = NA, 
-                                 ratio = NA, p.value.ratio = NA)
-
-for (i in unique(ratios_tib_dist$drug_conc)) {
-  for (j in chromatin.features.short) {
-    model_tib <- ratios_tib_dist %>% filter(drug_conc == i) 
-    
-    # Indel rates
-    model.indelrate.log2 <- lm(formula = log2.dist.freqCut ~ unlist(model_tib[j]), 
-                               data = model_tib) %>% 
-      tidy()
-    
-    # Pathway balance
-    model.ratio.log2 <- lm(formula = log2.dist.ratio ~ unlist(model_tib[j]), 
-                           data = model_tib) %>% 
-      tidy()
-    
-    slope.protein.features <- slope.protein.features %>% 
-      add_row(drug_conc = i, 
-              feature = j, 
-              term = model.indelrate.log2 %>%
-                pull(term),
-              indelrate = model.indelrate.log2 %>% 
-                pull(estimate), 
-              p.value.indelrate = model.indelrate.log2 %>% 
-                pull(p.value),
-              ratio = model.ratio.log2 %>% 
-                pull(estimate), 
-              p.value.ratio = model.ratio.log2 %>% 
-                pull(p.value))
-  }
-}
-
-# Remove the 1st NA column
-slope.protein.features %<>% 
-  filter(!is.na(feature)) %>%
-  mutate(term = ifelse(term == "(Intercept)", "intercept", "slope"))
-```
-
-```{r}
-CCD_tib = ratios_tib_dist %>% dplyr::select(barcode, drug_conc, log2.dist.freqCut, log2.dist.ratio, all_of(chromatin.features.short)) %>% ungroup()
-
-#Create an empty dt with CCDs of DDR proteins
-drug_conc_CCDs_dt <- tibble(var = NA, drug_conc = NA, num_comp = NA, r.squared = NA, adj.r.squared = NA,p.value = NA)
-# chrom_formula = as.formula(paste("y ~ ", paste(chromatin.features, collapse= "+")))
-
-for (i in unique(CCD_tib$drug_conc)){
-  for (j in c("log2.dist.freqCut", "log2.dist.ratio")) {
-    drug_conc_dt <- filter(CCD_tib, drug_conc == i)
-    # Run a model per drug_conc
-    set.seed(1)
-    chrom_formula = reformulate(chromatin.features.short, response = j)
-    PCR_model_DDR_test <- pcr(chrom_formula,
-                              data=drug_conc_dt , 
-                              validation="CV")
-    
-    pcr_pred <- predict(PCR_model_DDR_test, 
-                        drug_conc_dt, ncomp = 3)
-    
-    combined.dt <- tibble(measured = drug_conc_dt %>% pull(j), 
-                          predicted = as.numeric(pcr_pred))
-    
-    pred_vs_estim <- lm(formula = measured ~ predicted, 
-                        data = combined.dt) %>% 
-      glance()
-    
-    drug_conc_CCDs_dt <- drug_conc_CCDs_dt %>% 
-      add_row(var = j,
-              drug_conc = i, 
-              r.squared = pred_vs_estim %>% 
-                pull(r.squared), 
-              adj.r.squared = pred_vs_estim %>% 
-                pull(adj.r.squared), 
-              p.value = pred_vs_estim %>% 
-                pull(p.value))
-  }
-}
-
-#Correct model to adjust for multiple testing correction
-adj_p.value_KO_model <- drug_conc_CCDs_dt %>% 
-  dplyr::select(var, num_comp, p.value, drug_conc) %>% 
-  group_by(var) %>%
-  mutate(p.adj = p.adjust(p.value, method = "BH")) %>% 
-  dplyr::select(var, drug_conc,p.value,p.adj)
-
-signif_hits = adj_p.value_KO_model %>% filter(p.adj < 0.01) %>% 
-  distinct(drug_conc, var) %>% 
-  ungroup() %>% 
-  mutate(val = TRUE,
-         var = gsub("log2.dist", "signif", var)) %>%
-  pivot_wider(names_from = var, 
-              values_from = val, 
-              values_fill = FALSE) 
-```
-
-
-```{r epistasis filtering}
-# Calculate postition where the linear model crosses y = 0, we do this by -intercept / slope
-epistasis_tib = slope.protein.features %>% 
-  distinct(drug_conc, term, feature, indelrate, ratio) %>% 
-  pivot_wider(., names_from = term, values_from = c(indelrate, ratio)) %>%
-  mutate(feature = gsub(".zscore", "", feature),
-         x_intercept_indelrate = -indelrate_intercept / indelrate_slope,
-         x_intercept_ratio = -ratio_intercept / ratio_slope)
-
-effect_compounds = ratios_tib_dist %>%
-  group_by(drug_conc)  %>% 
-  mutate(indelrate_pos = sum(log2.dist.freqCut > 0),
-         indelrate_effect = ifelse(indelrate_pos >= 17, "indel_rate_increase", 
-                                   ifelse(indelrate_pos <= 1, "indel_rate_decrease", "mixed")),
-         ratio_pos = sum(log2.dist.ratio > 0),
-         ratio_effect = ifelse(ratio_pos >= 17, "NHEJ_increase", 
-                               ifelse(ratio_pos <= 1, "MMEJ_increase", "mixed"))) %>%
-  distinct(drug_conc, indelrate_effect, ratio_effect) %>% 
-  left_join(distinct(filtered_drug_conc, drug_conc, effect_on_indelrate, effect_on_ratio))
-
-
-epistasis_tib %<>% left_join(effect_compounds)  %>% 
-  left_join(signif_hits) %>%
-  mutate(
-    # x_intercept_indelrate = ifelse(p.value.indelrate < 0.05,
-    #                                x_intercept_indelrate, NA),
-    # x_intercept_ratio = ifelse(p.value.ratio < 0.05,
-    #                            x_intercept_ratio, NA),
-    indelrate_slope_plot = ifelse(x_intercept_indelrate < 1 & effect_on_indelrate & signif.freqCut, indelrate_slope, NA),
-    ratio_slope_plot = ifelse(x_intercept_ratio < 1 & effect_on_ratio & signif.ratio, ratio_slope, NA)) %>%
-  distinct(drug_conc, feature, indelrate_slope_plot, ratio_slope_plot)
-```
-
-
 ```{r prepare heatmaps, fig.width= 10, fig.height= 20}
 clone5.matrix = indel.data %>% 
   dplyr::select(IPR, ends_with(".zscore")) %>% 
@@ -1891,6 +1700,381 @@ ggplot(eff_mmej_corr_heatmap_plot,
   facet_wrap(~target, nrow = 3) +
   ggtitle("efficiency vs. mmej-ratio per target group") +
   scale_color_manual(values = c("#C2C2C2", "#3d405b", "#e07a5f")) 
+```
+
+## Vorinostat and GSK changes to pathway balance
+
+```{r eval = FALSE}
+## Vorinostat
+chrom.mods.cols <- seq(grep("CTCF", names(vorinostat_ratios)), grep("H3K27me3_domain", names(vorinostat_ratios))-1)
+
+vorinostat.hist.corr <- CorrelationDFMean(vorinostat_ratios, "log2_FC_MMEJ_NHEJ", targets = chrom.mods.cols) %>%
+  arrange(corr) %>% pull(rowname) %>% factor(.,levels = .)
+
+lims = 1
+
+CorrelationPlotMean(vorinostat_ratios, "log2_FC_MMEJ_NHEJ", targets = vorinostat.hist.corr, title = "with log2 FC balance after Vorinostat treatment")
+
+## GSK126
+chrom.mods.cols <- seq(grep("CTCF", names(GSK_ratios)), grep("H3K27me3_domain", names(GSK_ratios))-1)
+
+GSK.hist.corr <- CorrelationDFMean(GSK_ratios, "log2_FC_MMEJ_NHEJ", targets = chrom.mods.cols) %>%
+  arrange(corr) %>% pull(rowname) %>% factor(.,levels = .)
+
+lims = 1
+
+CorrelationPlotMean(GSK_ratios, "log2_FC_MMEJ_NHEJ", targets = GSK.hist.corr, title = "with log2 FC balance after GSK126 treatment")
+```
+
+ Vorinostat & GSK126 validations
+
+```{r}
+vorinostat_validation = indel.validation.data %>% 
+
+  filter(replicate == "mean" & plasmid == "LBR2", drug %in% c("DMSO", "Vorinostat"), sum_bc_reads > 1000)%>% 
+  dplyr::select(barcode, drug, MMEJ_NHEJ, efficiency, all_of(chromatin_cols)) %>%
+  distinct() 
+
+barcde_all_reps_vorino = vorinostat_validation %>% 
+  distinct(barcode, drug) %>% 
+  group_by(barcode) %>%
+  summarise(bccount = n()) %>% 
+  filter(bccount == 2) %>%
+  pull(barcode)
+
+vorinostat_ratios = vorinostat_validation  %>% 
+  filter(barcode %in% barcde_all_reps_vorino) %>%
+  pivot_wider(names_from = drug, values_from = c(efficiency, MMEJ_NHEJ)) %>%
+  mutate(diff_TIF = efficiency_Vorinostat - efficiency_DMSO,
+         ratio_TIF = efficiency_Vorinostat/efficiency_DMSO,
+         log2_FC_TIF = log2(ratio_TIF),
+         diff_MMEJ_NHEJ = MMEJ_NHEJ_Vorinostat - MMEJ_NHEJ_DMSO,
+         ratio_MMEJ_NHEJ = MMEJ_NHEJ_Vorinostat/MMEJ_NHEJ_DMSO,
+         log2_FC_MMEJ_NHEJ = log2(ratio_MMEJ_NHEJ)) 
+
+barcde_all_reps_gsk = RSTP2_IndelRatios_Chromatin_2kb %>% 
+  distinct(barcode, drug) %>% 
+  group_by(barcode) %>%
+  summarise(bccount = n()) %>% 
+  filter(bccount == 2) %>%
+  pull(barcode)
+
+GSK_ratios = RSTP2_IndelRatios_Chromatin_2kb %>% 
+  filter(barcode %in% barcde_all_reps_gsk) %>%
+  # distinct(barcode, drug, MMEJ_NHEJ , efficiency) %>% 
+  pivot_wider(names_from = drug, values_from = c(efficiency, MMEJ_NHEJ)) %>%
+  mutate(diff_TIF = efficiency_GSK126 - efficiency_DMSO_GSK,
+         ratio_TIF = efficiency_GSK126/efficiency_DMSO_GSK,
+         log2_FC_TIF = log2(ratio_TIF),
+         diff_MMEJ_NHEJ = MMEJ_NHEJ_GSK126 - MMEJ_NHEJ_DMSO_GSK,
+         ratio_MMEJ_NHEJ = MMEJ_NHEJ_GSK126/MMEJ_NHEJ_DMSO_GSK,
+         log2_FC_MMEJ_NHEJ = log2(ratio_MMEJ_NHEJ))
+
+vorinostat_ctrl <- vorinostat_ratios %>%
+  distinct(efficiency_DMSO, barcode)
+
+GSK_ratios <- GSK_ratios %>%
+  distinct(efficiency_DMSO_GSK, barcode)
+
+ctrl_compare <- merge(vorinostat_ctrl, GSK_ratios, by = "barcode")
+
+ggplot(ctrl_compare,
+       aes(x = efficiency_DMSO, y = efficiency_DMSO_GSK)) +
+  geom_point() +
+  geom_smooth(method = "lm")
+
+```
+
+## S3B GSK TIF FC correlation with chromatin features
+```{r S3B GSK TIF FC Correlations}
+## GSK126
+chrom.mods.cols <- seq(grep("CTCF", names(GSK_ratios)), grep("H3K27me3_domain", names(GSK_ratios))-1)
+
+GSK.hist.corr <- CorrelationDFMean(GSK_ratios, "log2_FC_TIF", targets = chrom.mods.cols) %>%
+  arrange(corr) %>% pull(rowname) %>% factor(.,levels = .)
+
+lims = 1
+
+CorrelationPlotMean(GSK_ratios, "log2_FC_TIF", targets = GSK.hist.corr, title = "with log2 FC TIF after GSK126 treatment")
+```
+
+## S3C Vorinostat TIF FC correlation with chromatin features
+```{r S3C Vorino TIF FC Correlations}
+## Vorinostat
+chrom.mods.cols <- seq(grep("CTCF", names(vorinostat_ratios)), grep("H3K27me3_domain", names(vorinostat_ratios))-1)
+
+vorinostat.hist.corr <- CorrelationDFMean(vorinostat_ratios, "log2_FC_TIF", targets = chrom.mods.cols) %>%
+  arrange(corr) %>% pull(rowname) %>% factor(.,levels = .)
+
+lims = 1
+
+CorrelationPlotMean(vorinostat_ratios, "log2_FC_TIF", targets = vorinostat.hist.corr, title = "with log2 FC TIF after Vorinostat treatment")
+```
+
+
+## S3D Vorinostat per cluster
+```{r S3D Vorino density, fig.height=5, fig.width=7}
+domain_levels = c('late_replicating', 'LAD', 'H3K9me2', 'H3K27me3')
+
+domains = paste0(domain_levels, '_domain')
+
+vorino.dt = vorinostat_ratios %>%
+  filter(!is.na(ratio_MMEJ_NHEJ)) %>%
+  dplyr::select(barcode, ratio_MMEJ_NHEJ, log2_FC_MMEJ_NHEJ, domains) %>%
+  distinct(barcode, .keep_all = TRUE) %>%
+  data.table()
+
+dim(vorino.dt)
+
+
+vorino.dt[vorino.dt=='iDomain'] <- 0
+vorino.dt[vorino.dt=='Domain'] <- 1
+vorino.dt[vorino.dt=='DHS'] <- 1
+
+vorino.dt[is.na(LAD_domain), LAD_domain:=0]
+# vorino.dt[is.na(DHS_domain), DHS_domain:=0]
+
+vorino.dt[, (domains) := lapply(.SD, as.numeric), .SDcols = domains]
+
+colnames(vorino.dt) = gsub('_domain', '', colnames(vorino.dt))
+
+opt_df = get_combinations(domain_levels)
+
+# Ratio of SSTR vs MME
+# p1 = plot_comb_grid_beeswarm(vorino.dt, opt_df,
+#                         domain_levels, 'diff_TIF', min_count = 10, y_plabel=c(-.2, .2))
+# p2 = plot_comb_grid_beeswarm(vorino.dt, opt_df,
+#                         domain_levels, 'ratio_MMEJ_NHEJ', min_count = 10, y_plabel=c(-2.5, 2.5))
+# p3 = plot_comb_grid_beeswarm(vorino.dt, opt_df,
+#                         domain_levels, 'log2_FC_MMEJ_NHEJ', min_count = 10, y_plabel=c(-2.5, 2.5))
+# p4 = plot_comb_grid_beeswarm(vorino.dt, opt_df,
+#                         domain_levels, 'log2_FC_TIF', min_count = 10, y_plabel=c(-.5, .5))
+# 
+# plot_grid(p1, p2, p3, p4, labels = c("ΔTIF", "M/N", "LogBal", "LogTIF"))
+
+k27me3 = vorino.dt %>% filter(late_replicating == 0, 
+                             LAD == 0,
+                             H3K9me2 == 0,
+                             H3K27me3 == 1) %>% 
+  pull(log2_FC_MMEJ_NHEJ)
+
+any.k27me3 = vorino.dt %>% filter(H3K27me3 == 1) %>% 
+  pull(log2_FC_MMEJ_NHEJ)
+
+not.k27me3 = vorino.dt %>% filter(H3K27me3 != 1) %>% 
+  pull(log2_FC_MMEJ_NHEJ)
+
+hetcomb = vorino.dt %>% filter(late_replicating == 1, 
+                              LAD == 1,
+                              H3K9me2 == 1,
+                              H3K27me3 == 0) %>% 
+  pull(log2_FC_MMEJ_NHEJ)
+
+idomain = vorino.dt %>% filter(late_replicating == 0, 
+                              LAD == 0,
+                              H3K9me2 == 0,
+                              H3K27me3 == 0) %>% 
+  pull(log2_FC_MMEJ_NHEJ)
+
+# DHS = vorino.dt %>% filter(late_replicating == 0,
+#                           LAD == 0,
+#                           H3K9me2 == 0,
+#                           H3K27me3 == 0,
+#                           DHS == 1) %>%
+#   pull(diff_TIF)
+
+wilcox.test(idomain, k27me3, alternative = "two.sided")
+
+wilcox.test(idomain, any.k27me3, alternative = "two.sided")
+wilcox.test(not.k27me3, any.k27me3, alternative = "two.sided")
+
+wilcox.test(idomain, hetcomb, alternative = "two.sided")
+
+vorino.dt %>% mutate(state = ifelse(late_replicating == 1 & 
+                                      LAD == 1 &
+                                      H3K9me2 == 1 &
+                                      H3K27me3 == 0, "Triple Heterochromatin", ifelse(
+                                        late_replicating == 0 & 
+                                          LAD == 0 & 
+                                          H3K9me2 == 0 & 
+                                          H3K27me3 == 0, "Euchromatin", ifelse(late_replicating == 0 &  
+                                                                                 LAD == 0 & 
+                                                                                 H3K9me2 == 0 & 
+                                                                                 H3K27me3 == 1, "H3K27me3", "other-heterochromatin")))) %>%
+  mutate(state = factor(state, levels = c("Euchromatin", "other-heterochromatin", "H3K27me3", "Triple Heterochromatin"))) %>%
+  ggplot(., aes(log2_FC_MMEJ_NHEJ, fill = state)) +
+  geom_density(alpha = 0.6, color = "white", size = .25) +
+  scale_fill_manual(values = group_colors)
+
+vorino.dt %>% mutate(state = ifelse(late_replicating == 1 & 
+                                      LAD == 1 &
+                                      H3K9me2 == 1 &
+                                      H3K27me3 == 0, "Triple Heterochromatin", ifelse(
+                                        late_replicating == 0 & 
+                                          LAD == 0 & 
+                                          H3K9me2 == 0 & 
+                                          H3K27me3 == 0, "Euchromatin", ifelse(late_replicating == 0 &  
+                                                                                 LAD == 0 & 
+                                                                                 H3K9me2 == 0 & 
+                                                                                 H3K27me3 == 1, "H3K27me3", "other-heterochromatin")))) %>%
+  mutate(state = factor(state, levels = c("Euchromatin", "other-heterochromatin", "H3K27me3", "Triple Heterochromatin"))) %>%
+  ggplot(., aes(log2_FC_MMEJ_NHEJ, color = state)) +
+  stat_ecdf() +
+  scale_color_manual(values = group_colors)
+
+
+vorinostat_df <- vorino.dt %>% mutate(state = ifelse(late_replicating == 1 & 
+                                                       LAD == 1 &
+                                                       H3K9me2 == 1 &
+                                                       H3K27me3 == 0, "Triple Heterochromatin", ifelse(
+                                                         late_replicating == 0 & 
+                                                           LAD == 0 & 
+                                                           H3K9me2 == 0 & 
+                                                           H3K27me3 == 0, "Euchromatin", ifelse(late_replicating == 0 &  
+                                                                                                  LAD == 0 & 
+                                                                                                  H3K9me2 == 0 & 
+                                                                                                  H3K27me3 == 1, "H3K27me3", "other-heterochromatin")))) %>%
+  distinct(barcode, "vorinostat_mmej_FC" = log2_FC_MMEJ_NHEJ)
+
+
+gsk_df <- GSK.dt %>% mutate(state = ifelse(late_replicating == 1 & 
+                                             LAD == 1 &
+                                             H3K9me2 == 1 &
+                                             H3K27me3 == 0, "Triple Heterochromatin", ifelse(
+                                               late_replicating == 0 & 
+                                                 LAD == 0 & 
+                                                 H3K9me2 == 0 & 
+                                                 H3K27me3 == 0, "Euchromatin", ifelse(late_replicating == 0 &  
+                                                                                        LAD == 0 & 
+                                                                                        H3K9me2 == 0 & 
+                                                                                        H3K27me3 == 1, "H3K27me3", "other-heterochromatin")))) %>%
+  distinct(barcode, "gsk_mmej_FC" = log2_FC_MMEJ_NHEJ, state)
+
+vorino_gsk_compare <- merge(vorinostat_df, gsk_df, by = "barcode")
+
+ggplot(vorino_gsk_compare,
+       aes(x = gsk_mmej_FC, y = vorinostat_mmej_FC)) +
+  geom_point() +
+  geom_smooth(method = "lm") +
+  facet_wrap(~state) 
+```
+
+
+```{r}
+p1 = plot_comb_grid_beeswarm(vorino.dt, opt_df,
+                        domain_levels, 'log2_FC_MMEJ_NHEJ', min_count = 10, y_plabel=c(-2, 2))
+p2 = plot_comb_grid_beeswarm(GSK.dt, opt_df,
+                        domain_levels, 'log2_FC_MMEJ_NHEJ', min_count = 10, y_plabel=c(-2, 2))
+plot_grid(p1, p2, labels = c("Balance HDACi", "Balance EZH2i"))
+```
+
+## S3E Vorinostat per cluster
+```{r S3E GSK density, fig.height=6, fig.width=6}
+domain_levels = c('late_replicating', 'LAD', 'H3K9me2', 'H3K27me3')
+
+domains = paste0(domain_levels, '_domain')
+
+GSK.dt = GSK_ratios %>%
+  filter(!is.na(diff_TIF)) %>%
+  dplyr::select(barcode, log2_FC_MMEJ_NHEJ, ratio_MMEJ_NHEJ, log2_FC_TIF, efficiency_GSK126, efficiency_DMSO_GSK, domains) %>%
+  distinct(barcode, .keep_all = TRUE) %>%
+  data.table()
+
+dim(GSK.dt)
+
+GSK.dt[GSK.dt=='iDomain'] <- 0
+GSK.dt[GSK.dt=='Domain'] <- 1
+GSK.dt[GSK.dt=='DHS'] <- 1
+
+GSK.dt[is.na(LAD_domain), LAD_domain:=0]
+# GSK.dt[is.na(DHS_domain), DHS_domain:=0]
+
+GSK.dt[, (domains) := lapply(.SD, as.numeric), .SDcols = domains]
+
+colnames(GSK.dt) = gsub('_domain', '', colnames(GSK.dt))
+
+opt_df = get_combinations(domain_levels)
+
+# Ratio of SSTR vs MME
+# p1 = plot_comb_grid_beeswarm(GSK.dt, opt_df,
+#                         domain_levels, 'diff_TIF', min_count = 10, y_plabel=c(-.25, .25))
+# p1 = plot_comb_grid_beeswarm(GSK.dt, opt_df,
+#                         domain_levels, 'ratio_MMEJ_NHEJ', min_count = 10, y_plabel=c(-2, 2))
+# p1 = plot_comb_grid_beeswarm(GSK.dt, opt_df,
+#                         domain_levels, 'log2_FC_MMEJ_NHEJ', min_count = 10, y_plabel=c(-1.5, 1.5))
+# p1 = plot_comb_grid_beeswarm(GSK.dt, opt_df,
+#                         domain_levels, 'log2_FC_TIF', min_count = 10, y_plabel=c(-1.5, 1.5))
+# 
+# plot_grid(p1, p2, p3, p4, labels = c("ΔTIF", "M/N", "LogBal", "LogTIF"))
+
+
+# p1 = plot_comb_grid_beeswarm(GSK.dt, opt_df,
+#                         domain_levels, 'efficiency_DMSO_GSK', min_count = 10, y_plabel=c(0, 1))
+# p2 = plot_comb_grid_beeswarm(GSK.dt, opt_df,
+#                         domain_levels, 'efficiency_GSK126', min_count = 10, y_plabel=c(0, 1))
+# 
+# plot_grid(p1, p2, labels = c("TIF CTRL", "TIF Ezh2i"))
+
+
+k27me3 = GSK.dt %>% filter(late_replicating == 0, 
+                             LAD == 0,
+                             H3K9me2 == 0,
+                             H3K27me3 == 1) %>% 
+  pull(diff_TIF)
+
+any.k27me3 = GSK.dt %>% filter(H3K27me3 == 1) %>% 
+  pull(diff_TIF)
+
+not.k27me3 = GSK.dt %>% filter(H3K27me3 != 1) %>% 
+  pull(diff_TIF)
+
+hetcomb = GSK.dt %>% filter(late_replicating == 1, 
+                              LAD == 1,
+                              H3K9me2 == 1,
+                              H3K27me3 == 0) %>% 
+  pull(diff_TIF)
+
+idomain = GSK.dt %>% filter(late_replicating == 0, 
+                              LAD == 0,
+                              H3K9me2 == 0,
+                              H3K27me3 == 0) %>% 
+  pull(diff_TIF)
+
+# DHS = GSK.dt %>% filter(late_replicating == 0,
+#                           LAD == 0,
+#                           H3K9me2 == 0,
+#                           H3K27me3 == 0,
+#                           DHS == 1) %>%
+#   pull(diff_TIF)
+
+wilcox.test(idomain, k27me3, alternative = "two.sided")
+wilcox.test(idomain, any.k27me3, alternative = "two.sided")
+wilcox.test(not.k27me3, any.k27me3, alternative = "two.sided")
+wilcox.test(idomain, hetcomb, alternative = "two.sided")
+
+GSK.dt %>% mutate(state = ifelse(late_replicating == 1 & 
+                                     LAD == 1 &
+                                     H3K9me2 == 1 &
+                                     H3K27me3 == 0, "Triple Heterochromatin", ifelse(
+                                       late_replicating == 0 & 
+                                         LAD == 0 & 
+                                         H3K9me2 == 0 & 
+                                         H3K27me3 == 0, "Euchromatin", ifelse(late_replicating == 0 &  
+                                                                            LAD == 0 & 
+                                                                            H3K9me2 == 0 & 
+                                                                            H3K27me3 == 1, "H3K27me3", "other-heterochromatin")))) %>%
+  ggplot(., aes(diff_TIF, fill = state)) +
+  geom_density(alpha = 0.6, color = "white", size = .25) +
+  scale_fill_manual(values = group_colors) +
+  theme_classic()
+```
+## S3FG Upset plots pool
+```{r S3FG Upset plots pool TIF FC, fig.width= 12, fig.height= 6}
+p1 = plot_comb_grid_beeswarm(vorino.dt, opt_df,
+                        domain_levels, 'log2_FC_MMEJ_NHEJ', min_count = 10, y_plabel=c(-2, 2))
+p2 = plot_comb_grid_beeswarm(GSK.dt, opt_df,
+                        domain_levels, 'log2_FC_MMEJ_NHEJ', min_count = 10, y_plabel=c(-2, 2))
+plot_grid(p1, p2, labels = c("Balance HDACi", "Balance EZH2i"))
 ```
 
 

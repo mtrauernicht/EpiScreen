@@ -586,6 +586,61 @@ ggplot(final,
 
 
 
+# KDM6A/B KNOCKDOWN
+```{r}
+indel.validation.data %>% 
+  filter(siRNA != "-" & replicate != "mean", plasmid == "LBR2") %>% 
+  distinct(replicate, siRNA, barcode, efficiency, MMEJ_NHEJ) %>% 
+  pivot_longer(cols = c("efficiency", "MMEJ_NHEJ")) %>% 
+  ggplot(., aes(name, value, color = siRNA)) + 
+  geom_quasirandom(position = "dodge", dodge.width = 1) +
+  facet_grid(. ~ replicate)
+
+bc_IPR = indel.data %>% distinct(barcode, IPR)
+
+control.KDM.KD = indel.validation.data %>% 
+  filter(siRNA == "siNT" & replicate != "mean", plasmid == "LBR2") %>%
+  distinct(replicate, barcode, efficiency, MMEJ_NHEJ) %>%
+  mutate(barcode = gsub("[.]B", "", barcode)) %>%
+  left_join(bc_IPR) %>%
+  filter(!is.na(IPR)) %>% # remove the 19th IPR just to match the rest
+  dplyr::rename(CTRL_TIF = efficiency, CTRL_bal = MMEJ_NHEJ)
+ 
+KDM6_KD = indel.validation.data %>% 
+  filter(siRNA != "-" & replicate != "mean", plasmid == "LBR2"
+         ) %>%
+  distinct(replicate, barcode, siRNA, efficiency, MMEJ_NHEJ) %>%
+  mutate(barcode = gsub("[.]B", "", barcode)) %>%
+  left_join(control.KDM.KD) %>%
+  filter(!is.na(IPR)) %>% 
+    mutate(diff_TIF = efficiency - CTRL_TIF,
+         ratio_TIF = efficiency/CTRL_TIF,
+         log2_FC_TIF = log2(ratio_TIF),
+         diff_MMEJ_NHEJ = MMEJ_NHEJ - CTRL_bal,
+         ratio_MMEJ_NHEJ = MMEJ_NHEJ/CTRL_bal,
+         log2_FC_MMEJ_NHEJ = log2(ratio_MMEJ_NHEJ)) %>%
+  filter(diff_TIF != 0)
+
+
+P1 = ggplot(KDM6_KD, aes(IPR, log2_FC_MMEJ_NHEJ, fill = replicate)) + 
+  geom_bar(stat = "identity", position = "dodge") +
+  facet_grid(. ~ siRNA) +
+  theme_classic() + 
+  ggtitle("Log2 FC MMEJ balance") +
+  theme(legend.position = "none")
+
+P2 =ggplot(KDM6_KD, aes(IPR, log2_FC_TIF, fill = replicate)) + 
+  geom_bar(stat = "identity", position = "dodge") +
+  facet_grid(. ~ siRNA) +
+  theme_classic() + 
+  ggtitle("Log2 FC TIF balance") +
+  theme(legend.position = "none")
+
+plot_grid(P1, P2)
+ggsave("/DATA/projects/DSBrepair/git/EpiScreen/figures/rs20220811_KDM6AB_KD_replicates.pdf")
+```
+
+
 
 ## SA: Correlation of cutting efficiency between replicates of significant hits
 We know that the cutting efficiency does not correlate well if all data is taken. However, because of the high noise level and the low effect size of the efficiency changes, it makes more sense to only investigate whether significant hits are robust throughout all replicates. 
