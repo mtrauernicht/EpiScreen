@@ -61,7 +61,7 @@ initials = "rs"
 # Viability (% of DMSO) for efficiency
 viab_limit_eff = 0.25
 # Viability threshold for repair pathway balance
-viab_limit_bal = 0.50
+viab_limit_bal = 0.40
 
 # Read count limit of +1 & -7 combined
 read_count_limit = 40
