@@ -1389,7 +1389,7 @@ ggplot(TIF_synergy_cluster,
               step_increase = 0.1)
 ```
 
-<<<<<<< HEAD
+
 ## Filtering out chromatin-interacting compounds
 ```{r}
 # Make matrix with drugs from selected target
@@ -1454,12 +1454,12 @@ pheatmap(only_H3K327me3[, TRIP_chrom_clust$labels],
          color = colors,
          annotation_colors = annotation_colors_scr, 
          annotation_legend = T)
->>>>>>> 1acb8ebe3c7962e83a4d0e46e056309665c6c79b
+
 
 
 ```
 
-<<<<<<< HEAD
+
 
 =======
 ## 3E m5C CCD
@@ -1535,7 +1535,7 @@ ggplot(K27me3_CTCF,
   stat_cor(method = "pearson") +
   xlab("Slope H3K27me3") +
   ylab("Slope CTCF")
->>>>>>> 1acb8ebe3c7962e83a4d0e46e056309665c6c79b
+
 
 
 K27me3_CTCF = indel.data %>% distinct(IPR, CTCF, SMC3, H3K27me3)
@@ -1630,13 +1630,10 @@ pheatmap(all_compounds_epistasis_TIF[, TRIP_chrom_clust$labels],
 ```
 
 # Vorinostat & GSK126 validations
-<<<<<<< HEAD
+
 ```{r}
-vorinostat_validation = indel.data.validation %>% 
-=======
-```{r GSK Vorino processing}
 vorinostat_validation = indel.validation.data %>% 
->>>>>>> 1acb8ebe3c7962e83a4d0e46e056309665c6c79b
+
   filter(replicate == "mean" & plasmid == "LBR2", drug %in% c("DMSO", "Vorinostat"), sum_bc_reads > 1000)%>% 
   dplyr::select(barcode, drug, MMEJ_NHEJ, efficiency, all_of(chromatin_cols)) %>%
   distinct() 
@@ -1828,7 +1825,6 @@ vorino.dt %>% mutate(state = ifelse(late_replicating == 1 &
                                                                             LAD == 0 & 
                                                                             H3K9me2 == 0 & 
                                                                             H3K27me3 == 1, "H3K27me3", "other-heterochromatin")))) %>%
-<<<<<<< HEAD
   mutate(state = factor(state, levels = c("Euchromatin", "other-heterochromatin", "H3K27me3", "Triple Heterochromatin"))) %>%
   ggplot(., aes(log2_FC_MMEJ_NHEJ, fill = state)) +
   geom_density(alpha = 0.6, color = "white", size = .25) +
@@ -1901,12 +1897,12 @@ p1 = plot_comb_grid_beeswarm(vorino.dt, opt_df,
 p2 = plot_comb_grid_beeswarm(GSK.dt, opt_df,
                         domain_levels, 'log2_FC_MMEJ_NHEJ', min_count = 10, y_plabel=c(-2, 2))
 plot_grid(p1, p2, labels = c("Balance HDACi", "Balance EZH2i"))
-=======
+
   ggplot(., aes(diff_TIF, fill = state)) +
   geom_density(alpha = 0.6, color = "white", size = .25) +
   scale_fill_manual(values = group_colors) +
   theme_classic()
->>>>>>> 1acb8ebe3c7962e83a4d0e46e056309665c6c79b
+
 ```
 
 ## S3E Vorinostat per cluster
