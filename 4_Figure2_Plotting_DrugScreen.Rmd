@@ -237,6 +237,8 @@ colors_targets <-  c(HDAC="#60988D", HAT="#C6D0A8", Sirtuin="#8FCAAC",
 conc_colors = c("100 nM" = colors_drugs[7], "1 µM" = colors_drugs[4], "10 µM" = "#000000")
 
 
+colors_pathways = c(wt = "#808184", other = "black", NHEJ = "#e1251b", MMEJ = "#26419a", SSTR = "#007A4C")
+
 
 ggplot_custom <- function(...) ggplot2::ggplot(...) + 
   scale_color_manual(values = colors_diverse) + 
@@ -975,11 +977,56 @@ p2 = rank_dt %>%
 plot_grid(p1, p2, ncol = 1, labels = c("B", "C"))
 ```
 
+## S2D PCI-24781 example
+
+```{r}
+chrom <- chromatin %>%
+  rownames_to_column("IPR")
+
+label_ratio <- indel.data %>%
+  mutate(drug_conc = paste(drug, conc_char, sep = " ")) %>%
+  filter(drug_conc %in% c("DMSO control", "PCI-24781 100 nM")) %>% 
+  group_by(drug_conc, IPR) %>%
+  dplyr::summarise(MMEJratio_mean = mean(MMEJratio),
+                   MMEJratio_sd = sd(MMEJratio),
+                   freqCut_mean = mean(freqCut),
+                   freqCut_sd = sd(freqCut)) %>%
+  left_join(chrom, by = "IPR") %>%
+  ungroup() %>%
+  mutate(MMEJratio_mean_chrom = ave(MMEJratio_mean, drug_conc, chromatin, FUN = mean)) %>%
+  mutate(MMEJratio_sd_chrom = ave(MMEJratio_mean, drug_conc, chromatin, FUN = sd)) %>%
+  mutate(freqCut_mean_chrom = ave(freqCut_mean, drug_conc, chromatin, FUN = mean)) %>%
+  mutate(freqCut_sd_chrom = ave(freqCut_mean, drug_conc, chromatin, FUN = sd))  %>%
+  mutate(label_efficiency = paste0(drug_conc, " TIF = ", round(freqCut_mean_chrom*100, 1),"% ±", round(freqCut_sd_chrom*100, 1),"%"), 
+         label_ratio = paste0(drug_conc, "MMEJ ratio = ", round(MMEJratio_mean_chrom, 2)," ±", round(MMEJratio_sd_chrom, 2)))
 
 
-## S2DEF TIF decreasing compounds
+bc_mut_tib_mean <- mutation.data %>% 
+  mutate(drug = gsub(" [(].*[)]", "", drug),
+         drug_conc = paste(drug, conc_char, sep = " ")) %>%
+  distinct(IPR, drug_conc, freq_mean,freq_sd, color, mutation, type, replicate) %>%
+  filter(drug_conc %in% c("DMSO control", "PCI-24781 100 nM"), type %in% c("core", "grouped_indel")) %>% 
+  left_join(label_ratio, by = c("drug_conc", "IPR"))
 
-```{r S2DEF lowered TIF, fig.width = 9, fig.height = 6}
+ggplot(bc_mut_tib_mean, 
+            aes(mutation, freq_mean, color = color, fill = drug_conc)) + 
+  geom_boxplot(position = position_dodge(0.75), aes(alpha = 0.7)) +
+  geom_quasirandom(dodge.width = 0.75, shape = 21) + 
+  scale_fill_manual("legend", values = c("#D69C81", "white")) + 
+  scale_color_manual("legend", values = colors_pathways[1:4]) + 
+  #scale_y_continuous(name="frequency", labels = percent) +
+  scale_x_discrete(name="indel size", breaks = c("<-14", -7, 0, 1, ">2")) + 
+  facet_wrap( ~ chromatin, ncol = 2) +
+  geom_text(aes(x = 7, y = .7, label = label_efficiency)) +
+  geom_text(aes(x = 7, y = .6, label = label_ratio)) + 
+  theme_pubr(border = T)
+```
+
+---
+
+## S2EFG TIF decreasing compounds
+
+```{r S2EFG lowered TIF, fig.width = 9, fig.height = 6}
 all_compounds_lowerTIF = indel.data %>% 
   filter(conc_char != "control" & indel_freq_filter & viab_reproducibility & cor_TIF_filter) %>% 
   mutate(drug = gsub(" [(].*[)]", "", drug),
@@ -1047,9 +1094,9 @@ plot_grid(p1, right_panel, labels = c("D", NULL), rel_widths = c(2, 1), nrow = 1
 
 ---
 
-## S2G Plot regulatory effects on different chromatin types
+## S2H Plot regulatory effects on different chromatin types
 
-```{r S2G chromatin effect per cluster, fig.width = 10, fig.height = 6}
+```{r S2H chromatin effect per cluster, fig.width = 10, fig.height = 6}
 chromatin_ipr <- chromatin %>%
   rownames_to_column("IPR")
 
