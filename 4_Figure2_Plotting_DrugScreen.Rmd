@@ -732,70 +732,6 @@ drug_conc = paste(drug, conc_char, sep = " "))
 
 ```
 
----
-
-## 2E Heatmap top hits boosting.
-```{r 2D top hits heatmap, fig.width= 8, fig.height=8}
-top_hits = indel.data  %>% 
-  filter(conc_char != "control" & indel_freq_filter & viab_reproducibility & filter_zscore_TIF_global_comb_rep & cor_TIF_filter) %>% 
-  distinct(drug, conc_char, zscore_TIF_global_comb_rep , target) %>%
-  arrange(desc(zscore_TIF_global_comb_rep )) %>% 
-  slice_head(n = 8) %>% 
-  distinct(drug, conc_char, target, zscore_TIF_global_comb_rep ) %>% 
-  mutate(rank = seq(1:n()),
-         drug = gsub(" [(].*[)]", "", drug),
-         drug_conc = paste(drug, conc_char, sep = " "))
-```
-
-## 2E Indel spectra
-```{r 2E Indel Plots top hits, eval = FALSE}
-label_ratio <- filter(indel.data, drug %in% c("DMSO", "PCI-24781 (Abexinostat)") & conc_char %in% c("control", "100 nM")) %>% 
-  group_by(IPR, drug) %>%
-  summarise(MMEJratio_mean = mean(MMEJratio),
-            MMEJratio_sd = sd(MMEJratio),
-            freqCut_mean = mean(freqCut),
-            freqCut_sd = sd(freqCut)) %>%
-  mutate(label_efficiency = paste0("Total indel frequency = ", round(freqCut_mean*100, 1),"% ±", round(freqCut_sd*100, 1),"%"), 
-         label_ratio = paste0("MMEJ ratio = ", round(MMEJratio_mean, 2)," ±", round(MMEJratio_sd, 2)))
-
-bc_mut_tib_mean <- mutation.data %>% 
-  distinct(IPR, drug, freq_mean,freq_sd, color, mutation, type, conc_char) %>%
-  filter(drug %in% c("DMSO", "PCI-24781 (Abexinostat)"), type %in% c("core", "grouped_indel") & conc_char %in% c("control", "100 nM")) %>% 
-  left_join(label_ratio)
-
-colors_pathways = c("wt" = "#808184", "other" = "black", "NHEJ" = "#e1251b", "MMEJ" = "#26419a", "SSTR" = "#007A4C")
-
-p2 = ggplot(bc_mut_tib_mean, 
-            aes(mutation, freq_mean)) + 
-  geom_bar(stat = "identity", aes(fill = color)) + 
-  # geom_quasirandom(data = bc_mut_tib, aes(mutation, freq_split, fill = color),  color = "black", shape = 21, ) + 
-  scale_fill_manual("legend", values = colors_pathways) + 
-  scale_color_manual("legend", values = colors_pathways) + 
-  # scale_y_continuous(name="frequency", labels = percent) +
-  scale_x_discrete(name="indel size", breaks = c("<-14", -7, 0, 1, ">2")) + 
-  facet_grid(drug ~ IPR) +
-  geom_text(aes(x = 7, y = .7, label = label_efficiency)) +
-  geom_text(aes(x = 7, y = .6, label = label_ratio)) + 
-  geom_errorbar(aes(ymin=freq_mean-freq_sd, ymax=freq_mean+freq_sd), width=.2,
-                position=position_dodge(.9)) +
-  theme_classic_lines()
-
-p2 = ggplot(bc_mut_tib_mean, 
-            aes(mutation, freq_mean)) + 
-  geom_quasirandom(stat = "identity", aes(fill = color)) + 
-  # geom_quasirandom(data = bc_mut_tib, aes(mutation, freq_split, fill = color),  color = "black", shape = 21, ) + 
-  scale_fill_manual("legend", values = colors_pathways) + 
-  scale_color_manual("legend", values = colors_pathways) + 
-  # scale_y_continuous(name="frequency", labels = percent) +
-  scale_x_discrete(name="indel size", breaks = c("<-14", -7, 0, 1, ">2")) + 
-  facet_grid(drug ~ IPR) +
-  geom_text(aes(x = 7, y = .7, label = label_efficiency)) +
-  geom_text(aes(x = 7, y = .6, label = label_ratio)) + 
-  geom_errorbar(aes(ymin=freq_mean-freq_sd, ymax=freq_mean+freq_sd), width=.2,
-                position=position_dodge(.9)) +
-  theme_classic_lines()
-```
-
 
 ---
 
@@ -908,7 +844,7 @@ plt1 = pheatmap(eff.data.matrix[ , clone5_map_ipr$labels],
 ---
 
 ## S2B-C Zoom on rank
-```{r, fig.width = 4, fig.height = 8}
+```{r S2BC Zoom on rank, fig.width = 8, fig.height = 4}
 # Boosting effect
 p1 = rank_dt %>% 
   filter(rank <= 75) %>%
@@ -974,20 +910,21 @@ p2 = rank_dt %>%
   theme_classic2() +
   theme(legend.position = "none")
 
-plot_grid(p1, p2, ncol = 1, labels = c("B", "C"))
+plot_grid(p1, p2, nrow = 1, labels = c("B", "C"))
 ```
 
 ## S2D PCI-24781 example
 
-```{r}
+```{r S2D PCI-24781 example, fig.width = 6, fig.height = 6}
 chrom <- chromatin %>%
   rownames_to_column("IPR")
 
 label_ratio <- indel.data %>%
-  mutate(drug_conc = paste(drug, conc_char, sep = " ")) %>%
+  mutate(drug = gsub(" [(].*[)]", "", drug),
+         drug_conc = paste(drug, conc_char, sep = " ")) %>%
   filter(drug_conc %in% c("DMSO control", "PCI-24781 100 nM")) %>% 
   group_by(drug_conc, IPR) %>%
-  dplyr::summarise(MMEJratio_mean = mean(MMEJratio),
+  summarise(MMEJratio_mean = mean(MMEJratio),
                    MMEJratio_sd = sd(MMEJratio),
                    freqCut_mean = mean(freqCut),
                    freqCut_sd = sd(freqCut)) %>%
@@ -1004,7 +941,7 @@ label_ratio <- indel.data %>%
 bc_mut_tib_mean <- mutation.data %>% 
   mutate(drug = gsub(" [(].*[)]", "", drug),
          drug_conc = paste(drug, conc_char, sep = " ")) %>%
-  distinct(IPR, drug_conc, freq_mean,freq_sd, color, mutation, type, replicate) %>%
+  distinct(IPR, drug_conc, freq_mean,freq_sd, color, mutation, type) %>%
   filter(drug_conc %in% c("DMSO control", "PCI-24781 100 nM"), type %in% c("core", "grouped_indel")) %>% 
   left_join(label_ratio, by = c("drug_conc", "IPR"))
 
@@ -1012,7 +949,7 @@ ggplot(bc_mut_tib_mean,
             aes(mutation, freq_mean, color = color, fill = drug_conc)) + 
   geom_boxplot(position = position_dodge(0.75), aes(alpha = 0.7)) +
   geom_quasirandom(dodge.width = 0.75, shape = 21) + 
-  scale_fill_manual("legend", values = c("#D69C81", "white")) + 
+  scale_fill_manual("legend", values = c(colors_drugs[2], "white")) + 
   scale_color_manual("legend", values = colors_pathways[1:4]) + 
   #scale_y_continuous(name="frequency", labels = percent) +
   scale_x_discrete(name="indel size", breaks = c("<-14", -7, 0, 1, ">2")) + 
