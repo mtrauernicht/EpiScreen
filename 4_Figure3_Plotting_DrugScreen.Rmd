@@ -849,7 +849,7 @@ file = list.files(in.dir, pattern = "validation_ratios", full.names = T) %>% tai
 indel.validation.data <- readRDS(file) # %>% filter(pathway_bal_filter == TRUE & viab_reproducibility == TRUE)
 
 # List chromatin name columns from this table
-chromatin_cols = colnames(indel.validation.data)[42:75]
+chromatin_cols = colnames(indel.data.validation)[42:75]
 # Import data from DSB TRIP paper
 RSTP2_IndelRatios_Chromatin_2kb <- readRDS("/DATA/usr/r.schep/DSBrepair/data/R/rs20210311/RSTP2_IndelRatios_Chromatin_2kb.RDS") %>% 
   filter(replicate == "mean" & drug %in% c("DMSO_GSK", "GSK126") & plasmid == "LBR2") %>%
@@ -1516,8 +1516,7 @@ pheatmap(all_compounds_epistasis_TIF[, TRIP_chrom_clust$labels],
 # Vorinostat & GSK126 validations
 
 ```{r}
-vorinostat_validation = indel.validation.data %>% 
-
+vorinostat_validation = indel.data.validation %>% 
   filter(replicate == "mean" & plasmid == "LBR2", drug %in% c("DMSO", "Vorinostat"), sum_bc_reads > 1000)%>% 
   dplyr::select(barcode, drug, MMEJ_NHEJ, efficiency, all_of(chromatin_cols)) %>%
   distinct() 
