@@ -280,7 +280,8 @@ chromatin.features.short = gsub(".zscore", "", chromatin.features)
 ```
 
 
-## 2D HDACi heatmap
+## 4A + S4A: MMEJ ratio change heatmap
+Aim: Give an overview of the most important MMEJ ratio fold-changes. 
 ```{r prepare data for heatmaps}
 # Order IPRs by their starting freqCut value
 dmso_freq <- indel.data %>%
@@ -464,7 +465,7 @@ annotation_colors_scr_set$target <- annotation_colors_scr$target[ordered_marks2]
 
 # Add cluster annotation
 clusters_drugs <- hclust(dist(balance.data.heatmap2), method = "ward.D")
-clusters_drugs <- cutree(tree = clusters_drugs, k = 8)
+clusters_drugs <- cutree(tree = clusters_drugs, k = 4)
 clusters_drugs <- data.frame(clusters_drugs)
 
 balance.data.heatmap2.clusters <- cbind(balance.data.heatmap2, clusters_drugs) %>% 
@@ -510,11 +511,13 @@ plt1 = pheatmap(balance.data.matrix[ , clone5_map_ipr$labels],
                 color = diverge_hcl(palette_length, "Blue-Red"),
                 annotation_colors = annotation_colors_scr_set, 
                 annotation_legend = T,
-                cutree_row = 8)
+                cutree_row = 4)
 ```
+*Conclusion Figure 4A: HDAC-rich cluster seems to show H3K27me3-specific MMEJ ratio decrease. No strong MMEJ ratio increases.*
 
 
-## Cluster differences per chromatin group
+## 5A + S5A: Cluster differences per chromatin group
+Aim: Is there any chromatin-specificity in the defined MMEJ ratio FC clusters?
 ```{r}
 chromatin_ipr <- chromatin %>%
   rownames_to_column("IPR")
@@ -545,7 +548,7 @@ ggplot(chromatin_effect,
   theme(legend.position = "none") +
   facet_wrap(~ clusters_drugs, nrow = 1)
 ```
-
+*Conclusion Figure 5A: Cluster 3 is most H3K27me3-specific and doesn't change the MMEJ ratio at all in euchromatin.*
 
 
 
@@ -598,8 +601,6 @@ kable(near_all_balance)
 near_all_balance %>% ungroup() %>% distinct(drug, target)
 ```
 
-## A: MMEJ-z-score per drug
-Are the compounds (per concentration) that significantly alter the MMEJ score?
 ```{r warning = FALSE}
 # Plot raw MMEJ ratio
 dmso_bal <- indel.data %>%
@@ -611,63 +612,6 @@ dmso_bal <- indel.data %>%
   mutate(dmso_mean = mean(dmso_bal),
          dsmo_sd = sd(dmso_bal)) %>%
   distinct(dmso_mean, dsmo_sd)
-
-
-
-volcano.df = indel.data %>%
-  filter(sample == "Epigenetic Compound" & pathway_bal_filter == TRUE & viab_reproducibility == TRUE) %>%
-  distinct(MMEJratio, drug, conc_char, zscore_bal_global_comb_rep) %>%
-  mutate(GlobalMMEJratio = ave(MMEJratio, drug, conc_char, FUN = mean)) %>%
-  distinct() %>%
-  mutate(MMEJ_pval_global_comb = 2*pnorm(q = abs(zscore_bal_global_comb_rep), lower.tail = F)) %>%
-  left_join(near_all_balance) %>%
-  mutate(MMEJ_pval_adj_global_comb = log10(p.adjust(MMEJ_pval_global_comb, method = 'fdr')),
-         col_bal = ifelse(MMEJ_pval_adj_global_comb < 0.01 & 
-                            GlobalMMEJratio > (dmso_bal$dmso_mean + dmso_bal$dsmo_sd), "MMEJ increase", 
-                          ifelse(MMEJ_pval_adj_global_comb < 0.01 & 
-                                   GlobalMMEJratio < (dmso_bal$dmso_mean - dmso_bal$dsmo_sd), "NHEJ increase","blue"))) %>%
-  distinct(MMEJ_pval_adj_global_comb, GlobalMMEJratio, drug, conc_char, target, n, col_bal)
-
-
-ggplot(volcano.df, 
-       aes(y = MMEJ_pval_adj_global_comb, 
-           x = GlobalMMEJratio, 
-           color = col_bal)) +
-  geom_point() +
-  geom_hline(linetype = "dashed", yintercept = log10(0.01)) +
-  geom_vline(linetype = "solid", xintercept = (dmso_bal$dmso_mean)) +
-  geom_vline(linetype = "dashed", xintercept = (dmso_bal$dmso_mean + dmso_bal$dsmo_sd)) +
-  geom_vline(linetype = "dashed", xintercept = (dmso_bal$dmso_mean - dmso_bal$dsmo_sd)) +
-  scale_color_manual(values = c("#C2C2C2", "#3d405b", "#e07a5f")) +
-  facet_wrap(~conc_char) +
-  annotate("rect",
-           xmin=(dmso_bal$dmso_mean - dmso_bal$dsmo_sd),
-           xmax=(dmso_bal$dmso_mean + dmso_bal$dsmo_sd),
-           ymin=-Inf,ymax=Inf, alpha=0.1, fill="black") +
-  annotate("rect",
-           xmin=-Inf,
-           xmax=Inf,
-           ymin=-Inf,
-           ymax= -log10(0.01), 
-           alpha=0.1, 
-           fill="black") +
-  coord_flip() +
-  ylim(0, -300) + 
-  geom_label_repel(data = volcano.df, 
-                   aes(y = MMEJ_pval_adj_global_comb, 
-                       x = GlobalMMEJratio, 
-                       label = ifelse(n == 36, drug,'')),
-                   box.padding   = 1, 
-                   point.padding = 0.5,
-                   force = 210,
-                   segment.color = 'black', 
-                   inherit.aes = F) +
-  geom_label_repel(aes(label = ifelse(between(n, 32, 35), drug,'')),
-                   box.padding   = 1, 
-                   force = 110,
-                   point.padding = 0.5,
-                   segment.color = 'gray50') 
-
 
 
 indel.data %>%
@@ -685,15 +629,10 @@ indel.data %>%
   distinct(drug, conc_char)
 ```
 
-
-*Figure 3A: Compound-induced change in MMEJ ratio of all tested compounds. Mean MMEJ z-score per drug & concentration.* 
-
-**Conclusion: Yes, there are a lot of interesting hits at all tested concentrations.**
-
 ---
 
-## B: MMEJ ratio change per target group
-Are there any target groups that are prone to changes in MMEJ ratio?
+## 4B: MMEJ ratio change per target group
+Aim: Are there any target groups that are prone to changes in MMEJ ratio?
 ```{r warning = FALSE}
 # C: Bar plot
 indel.data.bal <- indel.data %>%
@@ -757,11 +696,14 @@ ggplot(target_effects,
 target_effects %>% filter(sign_global != "No_Change") %>% distinct(target, conc_char, n) %>% group_by(conc_char) %>% summarise(count = sum(n))
 ```
 
-*Figure 2B: Number of compounds with significant changes in MMEJ ratio per target group.*
+*Conclusion Figure 4B: Again, HDACs have a significant fraction of local changes. Also AURK and ERD inhibitors stick out.*
 
-**Conclusion: Some target groups have more changes. But there are no groups significantly sticking out.**
 
 ---
+
+
+## 4C: Highlighting the strongest MMEJ ratio reducers. 
+Aim: Show which drugs and which target groups are responsible for the biggest global MMEJ ratio decrease.
 ```{r 2C Top TIF boosting, , fig.width = 12, fig.height = 10}
 rank_dt = indel.data %>% 
   filter(drug != "DMSO" & pathway_bal_filter & viab_reproducibility & cor_bal_filter, filter_zscore_bal_global_comb_rep) %>%
@@ -771,45 +713,16 @@ rank_dt = indel.data %>%
          drug = gsub(" [(].*[)]", "", drug),
          drug_conc = paste(drug, conc_char, sep = " "))
 
-p1 = rank_dt %>% 
-  # filter(rank < 100 ) %>%
-  ggplot(., aes(rank, MMEJratio_global_mean )) +
-  geom_point()  +
-  scale_color_manual(values = colors_targets) +
-  geom_label_repel(aes(label = ifelse(drug == "DNA-PKi", drug_conc,'')),
-                   box.padding   = 1, 
-                   point.padding = 0.5,
-                   segment.color = 'gray50') +
-  geom_hline(linetype = "dashed", yintercept = 2.58) +
-  geom_hline(linetype = "dashed", yintercept = -2.58) +
-  # scale_x_reverse(limits = c(100, 0)) +
-  scale_x_reverse() +
-  ylab("Global combined MMEJ ratio z-score")
-
-p2 = rank_dt %>%
-  filter(rank <= 100 & drug != "DNA-PKi") %>%
-  ggplot(., aes(rank, MMEJratio_global_mean , color = target)) +
-  geom_point()  +
-  scale_color_manual(values = colors_targets) +
-  gghighlight(rank <= 8, label_key = drug_conc) +
-  geom_hline(linetype = "dashed", yintercept = 2.58) +
-  scale_x_reverse(limits = c(100, 0)) +
-  # scale_x_reverse() +
-  ylab("Global combined MMEJ ratio z-score")
-
-maxrank = rank_dt %>% nrow()
-
-p3 = rank_dt %>%
+rank_dt %>%
   filter(rank <= 150) %>%
   ggplot(., aes(rank, MMEJratio_global_mean , color = target, size = 1)) +
   geom_point()  +
   scale_color_manual(values = colors_targets) +
   gghighlight(rank <= 34, use_direct_label = F) +
   geom_hline(linetype = "dashed", yintercept = 0.3711068) +
-  ylab("Global combined MMEJ ratio z-score")
+  ylab("Global MMEJ ratio")
 
 
-plot_grid(p1, p2, p3, labels = c('A', 'B', 'C'), label_size = 12, ncol = 3)
 
 top_hits = indel.data  %>% 
   filter(conc_char != "control" & pathway_bal_filter == T & viab_reproducibility == TRUE) %>% 
@@ -819,10 +732,79 @@ top_hits = indel.data  %>%
          drug = gsub(" [(].*[)]", "", drug),
          drug_conc = paste(drug, conc_char, sep = " "))
 ```
+*Conclusion Figure 4C: Many AURKi are the most stron MMEJ ratio reducers. Also Decitabine and a HDAC inhibitor are amongst the strongest.*
+
+## 5C: Indel plot Vorinostat
+Aim: Zoom in on Vorinostat to showcase the chromatin-specific MMEJ ratio reduction. 
+```{r}
+# Import data from preprocessing script
+indel.data <- readRDS("data/episcreen_ratios_mt20220811.RDS")
+mutation.data <- readRDS("data/episcreen_mutations_mt20220811.RDS")
+
+chrom <- chromatin %>%
+  rownames_to_column("IPR") 
+
+label_ratio <- indel.data %>%
+  mutate(drug_conc = paste(drug, conc_char, sep = " ")) %>%
+  filter(drug_conc %in% c("DMSO control", "Vorinostat (SAHA, MK0683) 1 µM")) %>% 
+  na.omit() %>%
+  group_by(drug_conc, IPR) %>%
+  dplyr::summarise(MMEJratio_mean = mean(MMEJratio),
+                   MMEJratio_sd = sd(MMEJratio),
+                   freqCut_mean = mean(freqCut),
+                   freqCut_sd = sd(freqCut)) %>%
+  ungroup() %>%
+  left_join(chrom, by = "IPR")
+
+FC_df <- indel.data %>% 
+  filter(drug == "Vorinostat (SAHA, MK0683)" & conc_char == "1 µM") %>% 
+  distinct(drug, MMEJ_log2_FC, freqCut_diff_mean, IPR) %>% 
+  mutate(MMEJ_log2_FC = ave(MMEJ_log2_FC, IPR, FUN = function(x) mean(x, na.rm = T))) %>% 
+  mutate(freqCut_diff_mean = ave(freqCut_diff_mean, IPR, FUN = function(x) mean(x, na.rm = T))) %>% 
+  distinct() %>%   
+  left_join(chrom, by = "IPR") %>% 
+  mutate(chrom_mmej_FC = ave(MMEJ_log2_FC, chromatin, FUN = mean)) %>% 
+  mutate(chrom_tif_FC = ave(freqCut_diff_mean, chromatin, FUN = mean)) %>% 
+  mutate(chrom_mmej_FC_sd = ave(MMEJ_log2_FC, chromatin, FUN = sd)) %>% 
+  mutate(chrom_tif_FC_sd = ave(freqCut_diff_mean, chromatin, FUN = sd)) 
 
 
-## Indel plot decitabine
+label_ratio <- label_ratio %>%
+  mutate(MMEJratio_mean_chrom = ave(MMEJratio_mean, drug_conc, chromatin, FUN = mean)) %>%
+  mutate(MMEJratio_sd_chrom = ave(MMEJratio_mean, drug_conc, chromatin, FUN = sd)) %>%
+  mutate(freqCut_mean_chrom = ave(freqCut_mean, drug_conc, chromatin, FUN = mean)) %>%
+  mutate(freqCut_sd_chrom = ave(freqCut_mean, drug_conc, chromatin, FUN = sd))  %>%
+  mutate(label_efficiency = paste0(drug_conc, " TIF = ", round(freqCut_mean_chrom*100, 1),"% ±", round(freqCut_sd_chrom*100, 1),"%"), 
+         label_ratio = paste0(drug_conc, "MMEJ ratio = ", round(MMEJratio_mean_chrom, 2)," ±", round(MMEJratio_sd_chrom, 2))) 
 
+label_ratio$drug_conc[label_ratio$drug_conc == "Vorinostat (SAHA, MK0683) 1 µM"] <- "Vorinostat 1 µM"
+
+bc_mut_tib_mean <- mutation.data %>% 
+  mutate(drug = gsub(" [(].*[)]", "", drug),
+         drug_conc = paste(drug, conc_char, sep = " ")) %>%
+  distinct(IPR, drug_conc, freq_mean,freq_sd, color, mutation, type) %>%
+  filter(drug_conc %in% c("DMSO control", "Vorinostat 1 µM"), type %in% c("core", "grouped_indel")) %>% 
+  na.omit() %>%
+  left_join(label_ratio, by = c("drug_conc", "IPR"))
+
+ggplot(bc_mut_tib_mean, 
+            aes(mutation, freq_mean, color = color, fill = drug_conc)) + 
+  geom_boxplot(position = position_dodge(0.75), aes(alpha = 0.7)) +
+  geom_quasirandom(dodge.width = 0.75, shape = 21) + 
+  scale_fill_manual("legend", values = c("white", "#60988D")) + 
+  scale_color_manual("legend", values = colors_pathways) + 
+  #scale_y_continuous(name="frequency", labels = percent) +
+  scale_x_discrete(name="indel size", breaks = c("<-14", -7, 0, 1, ">2")) + 
+  facet_wrap( ~ chromatin, ncol = 2) +
+  geom_text(aes(x = 7, y = .7, label = label_efficiency)) +
+  geom_text(aes(x = 7, y = .6, label = label_ratio)) + 
+  theme_pubr(border = T)
+```
+*Conclusion Figure 5C: Vorinostat reduces MMEJ more in H3K27me3 regions*
+
+
+## 4D: Indel plot decitabine
+Aim: Zoom in on Decitabine to showcase the strong MMEJ reduction. 
 ```{r}
 # Import data from preprocessing script
 in.dir = list.dirs(path = "/DATA/projects/DSBrepair/data/R") %>% .[grepl("episcreen", .)] %>% tail(n = 1)
@@ -835,47 +817,34 @@ file.muts = list.files(in.dir, pattern = "episcreen_mutations", full.names = T) 
 
 mutation.data <- readRDS(file.muts)
 
-
-label_ratio <- indel.data %>%
-  mutate(drug_conc = paste(drug, conc_char, sep = "_")) %>%
-  filter(drug_conc %in% c("DMSO_control", "Vorinostat (SAHA, MK0683)_1 µM")) %>% 
-  group_by(drug_conc, IPR) %>%
-  summarise(MMEJratio_mean = mean(MMEJratio),
-            MMEJratio_sd = sd(MMEJratio),
-            freqCut_mean = mean(freqCut),
-            freqCut_sd = sd(freqCut)) %>%
-  ungroup() %>%
-  mutate(MMEJratio_mean_global = ave(MMEJratio_mean, drug_conc, FUN = mean)) %>%
-  mutate(MMEJratio_sd_global = ave(MMEJratio_mean, drug_conc, FUN = sd)) %>%
-  mutate(freqCut_mean_global = ave(freqCut_mean, drug_conc, FUN = mean)) %>%
-  mutate(freqCut_sd_global = ave(freqCut_mean, drug_conc, FUN = sd)) %>%
-  mutate(label_efficiency = paste0("Total indel frequency = ", round(freqCut_mean_global*100, 1),"% ±", round(freqCut_sd_global*100, 1),"%"), 
-         label_ratio = paste0("MMEJ ratio = ", round(MMEJratio_mean_global, 2)," ±", round(MMEJratio_sd_global, 2)))
-
 chrom <- chromatin %>%
   rownames_to_column("IPR")
 
-bc_mut_tib_mean <- mutation.data %>% 
-  mutate(drug_conc = paste(drug, conc_char, sep = "_")) %>%
-  distinct(IPR, drug_conc, freq_mean,freq_sd, color, mutation, type) %>%
-  filter(drug_conc %in% c("DMSO_control", "Vorinostat (SAHA, MK0683)_1 µM"), type %in% c("core", "grouped_indel")) %>% 
-  left_join(label_ratio, by = c("drug_conc", "IPR")) %>%
-  left_join(chrom, by = "IPR")
+label_ratio <- indel.data %>%
+  mutate(drug_conc = paste(drug, conc_char, sep = " ")) %>%
+  filter(drug_conc %in% c("DMSO control", "Decitabine 1 µM")) %>% 
+  na.omit() %>%
+  group_by(drug_conc, IPR) %>%
+  dplyr::summarise(MMEJratio_mean = mean(MMEJratio),
+                   MMEJratio_sd = sd(MMEJratio),
+                   freqCut_mean = mean(freqCut),
+                   freqCut_sd = sd(freqCut)) %>%
+  ungroup() %>%
+  left_join(chrom, by = "IPR") %>%
+  mutate(MMEJratio_mean_chrom = ave(MMEJratio_mean, drug_conc, chromatin, FUN = mean)) %>%
+  mutate(MMEJratio_sd_chrom = ave(MMEJratio_mean, drug_conc, chromatin, FUN = sd)) %>%
+  mutate(freqCut_mean_chrom = ave(freqCut_mean, drug_conc, chromatin, FUN = mean)) %>%
+  mutate(freqCut_sd_chrom = ave(freqCut_mean, drug_conc, chromatin, FUN = sd))  %>%
+  mutate(label_efficiency = paste0(drug_conc, " TIF = ", round(freqCut_mean_chrom*100, 1),"% ±", round(freqCut_sd_chrom*100, 1),"%"), 
+         label_ratio = paste0(drug_conc, "MMEJ ratio = ", round(MMEJratio_mean_chrom, 2)," ±", round(MMEJratio_sd_chrom, 2))) 
 
-ggplot(bc_mut_tib_mean, 
-            aes(mutation, freq_mean)) + 
-  geom_bar(stat = "identity", aes(fill = color)) + 
-  # geom_quasirandom(data = bc_mut_tib, aes(mutation, freq_split, fill = color),  color = "black", shape = 21, ) + 
-  scale_fill_manual("legend", values = colors_pathways) + 
-  scale_color_manual("legend", values = colors_pathways) + 
-  #scale_y_continuous(name="frequency", labels = percent) +
-  scale_x_discrete(name="indel size", breaks = c("<-14", -7, 0, 1, ">2")) + 
-  facet_wrap( ~ drug_conc, ncol = 1) +
-  geom_text(aes(x = 7, y = .7, label = label_efficiency)) +
-  geom_text(aes(x = 7, y = .6, label = label_ratio)) + 
-  geom_errorbar(aes(ymin=freq_mean-freq_sd, ymax=freq_mean+freq_sd), width=.2,
-                position=position_dodge(.9)) +
-  theme_pubr(border = T)
+bc_mut_tib_mean <- mutation.data %>% 
+  mutate(drug = gsub(" [(].*[)]", "", drug),
+         drug_conc = paste(drug, conc_char, sep = " ")) %>%
+  distinct(IPR, drug_conc, freq_mean,freq_sd, color, mutation, type) %>%
+  filter(drug_conc %in% c("DMSO control", "Decitabine 1 µM"), type %in% c("core", "grouped_indel")) %>% 
+  na.omit() %>%
+  left_join(label_ratio, by = c("drug_conc", "IPR"))
 
 ggplot(bc_mut_tib_mean, 
             aes(mutation, freq_mean, color = color, fill = drug_conc)) + 
@@ -885,11 +854,15 @@ ggplot(bc_mut_tib_mean,
   scale_color_manual("legend", values = colors_pathways) + 
   #scale_y_continuous(name="frequency", labels = percent) +
   scale_x_discrete(name="indel size", breaks = c("<-14", -7, 0, 1, ">2")) + 
-  facet_wrap( ~ chromatin, ncol = 2) +
+  #facet_wrap( ~ chromatin, ncol = 2) +
   geom_text(aes(x = 7, y = .7, label = label_efficiency)) +
   geom_text(aes(x = 7, y = .6, label = label_ratio)) + 
   theme_pubr(border = T)
 ```
+*Conclusion Figure 4D: Decitabine reduces MMEJ drastically*
+
+
+
 
 
 ```{r prepare heatmaps, fig.width= 10, fig.height= 20}
