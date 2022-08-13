@@ -76,6 +76,7 @@ library(colorspace)
 library(magrittr)
 library(ggpubr)
 library(pls)
+library(MASS)
 # library(rstatix)
 ```
 
@@ -276,21 +277,21 @@ ordered_marks2 <- c("Negative Control", "MRN", "DNA-PK","Epigenetic Reader Domai
 ### Per technical replicate
 ```{r DMSO null distribution}
 #data frame to save data
-mean_sd_fits <- tibble(term = NA, estimate = NA, std.error = NA, barcode = NA, rep = NA)
+mean_sd_fits <- tibble(term = NA, estimate = NA, std.error = NA, IPR = NA, rep = NA)
 
-# First prepare a table with TIF in DMSO, well, barcode, replicate, tech and plate. Then group by tech and replicate.
+# First prepare a table with TIF in DMSO, well, IPR, replicate, tech and plate. Then group by tech and replicate.
 dmso.TIF.score <- indel.data %>%
   filter(drug == "DMSO") %>%
-  dplyr::select('DMSO' = freqCut, well, barcode, replicate, tech, plate) %>%
+  dplyr::select('DMSO' = freqCut, IPR, replicate, tech) %>%
   mutate(rep = paste(replicate, tech, sep = " ")) %>%
-  distinct(barcode, replicate, tech, well, plate, DMSO, rep)
+  distinct(IPR, replicate, tech, DMSO, rep)
 
 #Function to fit normal distribution through data
 for (i in unique(dmso.TIF.score$rep)) {
-  for (x in unique(dmso.TIF.score$barcode)) {
-    single_wt_ratio <- filter(dmso.TIF.score, rep == i & barcode == x) %>% pull(DMSO)
+  for (x in unique(dmso.TIF.score$IPR)) {
+    single_wt_ratio <- filter(dmso.TIF.score, rep == i & IPR == x) %>% pull(DMSO)
     mean_sd_fits_row <- fitdistr(single_wt_ratio, "normal") %>% tidy()
-    mean_sd_fits <- mean_sd_fits %>% add_row(mean_sd_fits_row %>% mutate(barcode = x, rep = i))
+    mean_sd_fits <- mean_sd_fits %>% add_row(mean_sd_fits_row %>% mutate(IPR = x, rep = i))
   }
 }
 
@@ -300,21 +301,21 @@ dmso.TIF.score <- mean_sd_fits %>% filter(!is.na(term)) %>%
   separate(rep, into = c("replicate", "tech"), sep = " ") %>%
   mutate(tech = as.integer(tech)) %>%
   pivot_wider(names_from = term, values_from = estimate) %>% 
-  dplyr::select(barcode, replicate, tech, mean_DMSO = mean, sd_DMSO = sd)
+  dplyr::select(IPR, replicate, tech, mean_DMSO = mean, sd_DMSO = sd)
 ```
 
 
 ```{r combine DMSO TIF in table}
 TIF_zscore_calc = indel.data %>% 
   filter(!is.na(freqCut)) %>%
-  mutate(drug = ifelse(drug == "DMSO", paste(drug, plate, well, sep = " "), drug), ### FIX THIS PART MAKE IT THAT DMSO IS KEPT SEPARATE SOMEHOW...
-         drug = gsub("DMSO [135]")) %>%
-
-  distinct(barcode, replicate, tech, drug, freqCut, conc_char) %>% 
+  mutate(drug = ifelse(drug == "DMSO" & plate %in% c(1,2,7,8,13,14), paste(drug, drug_plate, well, "1", sep = " "), 
+                       ifelse(drug == "DMSO" & plate %in% c(3,4,9,10,15,16), paste(drug, drug_plate, well, "2", sep = " "),
+                              ifelse(drug == "DMSO" & plate %in% c(5,6,11,12,17,18), paste(drug, drug_plate, well, "3", sep = " "),drug)))) %>%
+  distinct(IPR, replicate, tech, drug, freqCut, conc_char) %>% 
   left_join(dmso.TIF.score)
 ```
 
-### Calculate the TIF z-scores per barcode
+### Calculate the TIF z-scores per IPR
 ```{r calculate efficiency z-scores}
 # Calculate IPR z-scores per technical replicate
 TIF.zscore = TIF_zscore_calc %>%
@@ -322,8 +323,8 @@ TIF.zscore = TIF_zscore_calc %>%
   mutate(zscore_TIF = (freqCut - mean_DMSO) / sd_DMSO)
 
 # Combine the z-scores of both screens
-mean.TIF.zscore.comb = TIF.zscore %>% distinct(drug, conc_char, barcode, replicate, drug_plate, well, zscore_TIF) %>%
-  mutate(ID = paste(drug, conc_char, barcode,drug_plate, well, sep = " ")) %>%
+mean.TIF.zscore.comb = TIF.zscore %>% distinct(drug, conc_char, IPR, replicate, zscore_TIF) %>%
+  mutate(ID = paste(drug, conc_char, IPR, sep = " ")) %>%
   filter(!is.na(zscore_TIF)) %>%
   mutate(zscore_TIF_comb_tech = ave(zscore_TIF, ID, replicate, 
                                     FUN = function(x) sum(x)/sqrt(length(x))),
@@ -340,7 +341,7 @@ mean.TIF.zscore.comb = TIF.zscore %>% distinct(drug, conc_char, barcode, replica
 TIF.zscore %<>% left_join(mean.TIF.zscore.comb)
 
 TIF.zscore %<>%
-  dplyr::select(barcode, replicate, drug_plate, tech, well, drug, conc_char, 
+  dplyr::select(IPR, replicate, tech, drug, conc_char, 
                 zscore_TIF, 
                 zscore_TIF_comb_tech, filter_zscore_TIF_comb_tech,
                 zscore_TIF_comb_rep, filter_zscore_TIF_comb_rep)
@@ -352,22 +353,21 @@ TIF.zscore %<>%
 ### Per technical replicate
 ```{r DMSO null distribution balance}
 #data frame to save data
-mean_sd_fits <- tibble(term = NA, estimate = NA, std.error = NA, barcode = NA, rep = NA)
+mean_sd_fits <- tibble(term = NA, estimate = NA, std.error = NA, IPR = NA, rep = NA)
 
-# First prepare a table with MMEJ ratio in DMSO, well, barcode, replicate, tech and plate. Then group by tech and replicate.
+# First prepare a table with MMEJ ratio in DMSO, well, IPR, replicate, tech and plate. Then group by tech and replicate.
 dmso.bal.score <- indel.data %>%
   filter(drug == "DMSO") %>%
-  dplyr::select('DMSO' = MMEJratio, well, barcode, replicate, tech, drug_plate) %>%
-  mutate(DMSO = ave(DMSO, barcode, well, replicate, tech, drug_plate, FUN = function(x) mean(x, na.rm=T)),
-         rep = paste(replicate, tech, sep = " ")) %>%
-  distinct(barcode, replicate, tech, well, drug_plate, DMSO, rep)
+  dplyr::select('DMSO' = MMEJratio, IPR, replicate, tech) %>%
+  mutate(rep = paste(replicate, tech, sep = " ")) %>%
+  distinct(IPR, replicate, tech, DMSO, rep)
 
 #Function to fit normal distribution through data
 for (i in unique(dmso.bal.score$rep)) {
-  for (x in unique(dmso.bal.score$barcode)) {
-    single_wt_ratio <- filter(dmso.bal.score, rep == i & barcode == x) %>% pull(DMSO)
+  for (x in unique(dmso.bal.score$IPR)) {
+    single_wt_ratio <- filter(dmso.bal.score, rep == i & IPR == x) %>% pull(DMSO)
     mean_sd_fits_row <- fitdistr(single_wt_ratio, "normal") %>% tidy()
-    mean_sd_fits <- mean_sd_fits %>% add_row(mean_sd_fits_row %>% mutate(barcode = x, rep = i))
+    mean_sd_fits <- mean_sd_fits %>% add_row(mean_sd_fits_row %>% mutate(IPR = x, rep = i))
   }
 }
 
@@ -377,19 +377,20 @@ dmso.bal.score <- mean_sd_fits %>% filter(!is.na(term)) %>%
   separate(rep, into = c("replicate", "tech"), sep = " ") %>%
   mutate(tech = as.integer(tech)) %>%
   pivot_wider(names_from = term, values_from = estimate) %>% 
-  dplyr::select(barcode, replicate, tech, mean_DMSO = mean, sd_DMSO = sd)
+  dplyr::select(IPR, replicate, tech, mean_DMSO = mean, sd_DMSO = sd)
 ```
 
 
 ```{r add DMSO balance means & SDs}
 bal_zscore_calc = indel.data %>%
+   mutate(drug = ifelse(drug == "DMSO", paste(drug, plate, well, sep = " "), drug)) %>%
   filter(!is.na(MMEJratio)) %>%
-  distinct(barcode, replicate, tech, drug, drug_plate, well, MMEJratio, conc_char) %>% 
+  distinct(IPR, replicate, tech, drug, MMEJratio, conc_char) %>% 
   left_join(dmso.bal.score)
 ```
 
 
-### Calculate the balance z-scores per barcode
+### Calculate the balance z-scores per IPR
 ```{r calculate balance z-scores}
 # Calculate IPR z-scores per technical replicate
 bal.zscore = bal_zscore_calc %>%
@@ -399,8 +400,8 @@ bal.zscore = bal_zscore_calc %>%
          zscore_bal = (MMEJratio - mean_DMSO) / sd_DMSO)
 
 # Combine the z-scores of both screens
-mean.bal.zscore.comb = bal.zscore %>% distinct(drug, conc_char, barcode, replicate, zscore_bal) %>%
-  mutate(ID = paste(drug, conc_char, barcode, sep = " ")) %>%
+mean.bal.zscore.comb = bal.zscore %>% distinct(drug, conc_char, IPR, replicate, zscore_bal) %>%
+  mutate(ID = paste(drug, conc_char, IPR, sep = " ")) %>%
   filter(!is.na(zscore_bal)) %>%
   mutate(zscore_bal_comb_tech = ave(zscore_bal, ID, replicate,
                                     FUN = function(x) sum(x)/sqrt(length(x))),
@@ -415,7 +416,7 @@ mean.bal.zscore.comb = bal.zscore %>% distinct(drug, conc_char, barcode, replica
   dplyr::select(-sum_sign, -sum_sign_comb)
 
 bal.zscore %<>% left_join(mean.bal.zscore.comb) %>% 
-  dplyr::select(barcode, replicate, tech, drug, conc_char, MMEJ_FC, MMEJ_log2_FC,
+  dplyr::select(IPR, replicate, tech, drug, conc_char, MMEJ_FC, MMEJ_log2_FC,
                 zscore_bal, 
                 zscore_bal_comb_tech, filter_zscore_bal_comb_tech,
                 zscore_bal_comb_rep, filter_zscore_bal_comb_rep)
@@ -424,11 +425,15 @@ bal.zscore %<>% left_join(mean.bal.zscore.comb) %>%
 
 ```{r combine all the z-scores with the table}
 # Merge with main table
-cols_to_replace_1 = TIF.zscore %>% dplyr::select(-barcode, -replicate, -drug_plate, -tech, -well, -drug, -conc_char) %>% colnames()
-cols_to_replace_2 = bal.zscore %>% dplyr::select(-barcode, -replicate, -drug_plate, -tech, -well, -drug, -conc_char) %>% colnames()
+cols_to_replace_1 = TIF.zscore %>% dplyr::select(-IPR, -replicate, -tech, -drug, -conc_char) %>% colnames()
+cols_to_replace_2 = bal.zscore %>% dplyr::select(-IPR, -replicate, -tech, -drug, -conc_char) %>% colnames()
 cols_remove = c(cols_to_replace_1, cols_to_replace_2)
 indel.data2 <- indel.data %>% 
-  dplyr::select(-all_of(cols_remove)) %>%
+  # distinct(MMEJratio, freqCut, drug, conc_char, target, IPR, drug_plate, well, tech, replicate) %>%
+  mutate(drug = ifelse(drug == "DMSO" & plate %in% c(1,2,7,8,13,14), paste(drug, drug_plate, well, "1", sep = " "), 
+                       ifelse(drug == "DMSO" & plate %in% c(3,4,9,10,15,16), paste(drug, drug_plate, well, "2", sep = " "),
+                              ifelse(drug == "DMSO" & plate %in% c(5,6,11,12,17,18), paste(drug, drug_plate, well, "3", sep = " "),drug)))) %>%
+  # dplyr::select(-all_of(cols_remove)) %>%
   left_join(TIF.zscore) %>%
   left_join(bal.zscore)
 ```
@@ -437,8 +442,8 @@ indel.data2 <- indel.data %>%
 ## Initial filtering and preparing the tables for mean log2 FC calculation
 ```{r}
 # Data table and compute log2_ratio (This line needs to be adjusted)
-filtered_drug_conc = indel.data %>%
-  distinct(drug, conc_char, IPR, drug_plate, well, zscore_TIF_comb_rep, zscore_bal_comb_rep, filter_zscore_TIF_comb_rep, filter_zscore_bal_comb_rep) %>%
+filtered_drug_conc = indel.data2 %>%
+  distinct(drug, conc_char, IPR, zscore_TIF_comb_rep, zscore_bal_comb_rep, filter_zscore_TIF_comb_rep, filter_zscore_bal_comb_rep) %>%
   filter(!is.na(zscore_bal_comb_rep), !is.na(zscore_TIF_comb_rep)) %>%
   mutate(p_val_TIF = 2*pnorm(q = abs(zscore_TIF_comb_rep), lower.tail = F),
          p_val_bal = 2*pnorm(q = abs(zscore_bal_comb_rep), lower.tail = F),
@@ -446,7 +451,7 @@ filtered_drug_conc = indel.data %>%
          adj_pval_TIF = p.adjust(p_val_TIF, method = 'BH'),
          adj_pval_bal = p.adjust(p_val_bal, method = 'BH')) %>%
   filter(adj_pval_TIF < 0.01 | adj_pval_bal < 0.01) %>%
-  mutate(drug_conc = paste(drug, conc_char, drug_plate, well, sep = " "),
+  mutate(drug_conc = paste(drug, conc_char, sep = " "),
          # List if they affect the variable.
          effect_on_indelrate = ifelse(adj_pval_TIF < 0.01, TRUE, FALSE),
          effect_on_ratio = ifelse(adj_pval_bal < 0.01, TRUE, FALSE)) %>%
@@ -466,8 +471,8 @@ filtered_drug_conc = indel.data %>%
   distinct(drug, conc_char, drug_conc, effect_on_indelrate, effect_on_ratio)
 
 
-ratios_tib <- indel.data %>%
-  mutate(drug_conc = paste(drug, conc_char, drug_plate, well, sep = " ")) %>%
+ratios_tib <- indel.data2 %>%
+  mutate(drug_conc = paste(drug, conc_char, sep = " ")) %>%
   semi_join(filtered_drug_conc) %>%
   distinct(MMEJratio, freqCut, drug, conc_char, drug_conc, target, IPR) %>%
   mutate(MMEJratio = ave(MMEJratio, drug_conc, IPR, FUN = mean)) %>%
@@ -699,7 +704,7 @@ chromatin_TIF = chromatin %>% rownames_to_column(var = "IPR") %>%
 ```
 
 # Export
-```{r export}
+```{r export, eval = FALSE}
 # The mutations list that can be loaded for the indel spectra plots.
 filename <- SetFileName("CCD_table", initials = initials, extension = "RDS")
 saveRDS(epistasis_tib, file = filename)
