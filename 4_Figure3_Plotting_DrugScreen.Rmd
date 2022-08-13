@@ -1315,7 +1315,7 @@ plot_grid(p1, p2, labels = c("E", "F"), rel_widths = c(1, 5))
 
 # Samples to highlight in the heatmap S3C
 all_compounds_epistasis_TIF %>% 
-  filter(!between(H3K27me3, -0.02, .02)) %>%
+  filter(!between(H3K27me3, -0.01, .01)) %>%
   rownames()
 ```
 
@@ -1420,7 +1420,7 @@ plot_grid(p1, p2, labels = c("E", "F"), rel_widths = c(1, 5))
 
 # Samples to highlight in the heatmap S3C
 all_compounds_epistasis_TIF %>% 
-  filter(!between(m5C, -0.02, .02)) %>%
+  filter(!between(m5C, -0.01, .01)) %>%
   rownames()
 ```
 
