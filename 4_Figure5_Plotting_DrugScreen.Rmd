@@ -920,6 +920,113 @@ for (i in targets) {
 }
 ```
 
+### HDAC CCD heatmap
+```{r 3B HDAC CCD, fig.width= 14, fig.height= 14}
+target_drugs = cluster_HDAC %>% pull(drug_conc)
+
+# Make matrix with drugs from selected target
+TIF_synergy_matrix = all_compounds_epistasis_TIF %>% 
+  rownames_to_column(var = "drug_conc") %>%
+  filter(drug_conc %in% target_drugs) %>%
+  column_to_rownames(var = "drug_conc")
+
+cluster_rows = ifelse(nrow(TIF_synergy_matrix) > 1, TRUE, FALSE)
+
+# change these numbers according to where you want to set the cutoff
+quant_breaks <- quantile(TIF_synergy_matrix, c(.01,.99), na.rm = T) 
+palette_length <- 100
+breaks <- c(seq(quant_breaks[1], 0, length.out=ceiling(palette_length/2) + 1), 
+            seq(quant_breaks[2]/palette_length, quant_breaks[2], length.out=floor(palette_length/2)))
+slope.colors.temp = slope.colors
+colors = colorRampPalette(slope.colors.temp %>% pull(color))(length(breaks))
+colors[which(quant_breaks == 0)-1] = "gray90"
+
+p = pheatmap(TIF_synergy_matrix[, TRIP_chrom_clust$labels],
+             border_color = F,
+             cellwidth = 8,
+             cellheight = 8,
+             cluster_rows = cluster_rows,
+             breaks = breaks,
+             cluster_cols = TRIP_chrom_clust,
+             annotation_row = target.cluster1,
+             clustering_method = "ward.D2",
+             main = paste("Chromatin synergies - TIF HDAC cluster"),
+             color = colors,
+             annotation_colors = annotation_colors_scr, 
+             annotation_legend = T,
+                cutree_rows = 3)
+print(p)
+
+TIF_synergy_cluster <- TIF_synergy_matrix %>%
+  rownames_to_column("drug_conc") %>%
+  left_join(cluster_HDAC) %>%
+  mutate(cluster_HDAC = as.character(cluster_HDAC))
+
+ggplot(TIF_synergy_cluster,
+       aes(x = cluster_HDAC, y = H3K27me3)) +
+  geom_boxplot(outlier.shape = NA) +
+  geom_quasirandom() +
+  geom_signif(comparisons = combn(sort(unique(TIF_synergy_cluster$cluster_HDAC)), 2, simplify = F), 
+              map_signif_level=sigFunc, 
+              step_increase = 0.1)
+```
+
+
+
+```{r}
+for(i in unique(CCD_tib$feature)) {
+  rank_dt = CCD_tib %>% 
+    left_join(rownames_to_column(target, var = "drug_conc"), by = "drug_conc") %>%
+    filter(feature == i, !is.na(ratio_slope_plot)) %>%
+    distinct() %>%
+    arrange(desc(ratio_slope_plot))
+  
+  if(nrow(rank_dt) > 1) {
+    rank_dt %<>%
+      mutate(rank = seq(1:n()))
+    
+    maxrank = nrow(rank_dt)
+    
+    p1 = rank_dt %>% 
+      ggplot(., aes(x = rank, fill = target)) +
+      geom_bar() + 
+      scale_x_reverse() +
+      coord_flip() +
+      xlab("Rank") +
+      theme_classic2() +
+      scale_fill_manual(values = colors_targets) +
+      # geom_label(aes(label = ifelse(width == 2, drug_conc,''))) +
+      theme(legend.position = "none",
+            axis.title.x=element_blank(),
+            axis.text.x=element_blank(),
+            axis.ticks.x=element_blank())
+    
+    p2 = rank_dt %>% 
+      filter(!between(rank, 6, maxrank-5)) %>%
+      mutate(rank = seq(1:n())) %>% 
+      ggplot(., aes(x = rank, y = ratio_slope_plot, fill = target)) +
+      geom_bar(stat = "identity") + 
+      scale_x_reverse() +
+      coord_flip() +
+      ylab("MMEJ synergy score") +
+      theme_classic2() +
+      scale_fill_manual(values = colors_targets) +
+      # geom_label(aes(label = ifelse(width == 2, drug_conc,''))) +
+      geom_text(aes(label=drug_conc)) +
+      theme(legend.position = "none",
+            axis.title.y=element_blank(),
+            axis.text.y=element_blank(),
+            axis.ticks.y=element_blank()) +
+      ggtitle(paste0("Top MMEJ ratio synergies with: ", i))
+    
+    
+    p = plot_grid(p1, p2, labels = c("E", "F"), rel_widths = c(1, 5))
+    print(p)
+  }
+}
+```
+
+
 ```{r Z-score - Balance all, fig.width= 10, fig.height= 20}
 ritios_tib_epi_effects = indel.data %>%
   mutate(drug_conc_ctrl = paste(drug, conc_char, sep = " ")) %>%

@@ -1445,7 +1445,9 @@ vorino.dt %>% mutate(state = ifelse(late_replicating == 1 &
 ```
 *Conclusion Figure 5D: MMEJ ratio FC is the strongest in H3K27me3 domains*
 
-# S5B: Vorinostat MMEJ FC per chromatin group
+# Supplementary Figure 5
+
+## S5B: Vorinostat MMEJ FC per chromatin group
 Aim: Present a detailed view of the Vorinostat pool data
 ```{r}
 plot_comb_grid_beeswarm(vorino.dt, opt_df,
