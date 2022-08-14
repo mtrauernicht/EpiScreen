@@ -33,11 +33,11 @@ Clone 5 with ~18 sgRNA target site IPRs was cut and treated with 160 epigenetic 
 <!-- little HTML script to do indentation of the table of contents -->
 <script>
 $(document).ready(function() {
-  $items = $('div#TOC li');
-  $items.each(function(idx) {
-    num_ul = $(this).parentsUntil('#TOC').length;
-    $(this).css({'text-indent': num_ul * 10, 'padding-left': 0});
-  });
+$items = $('div#TOC li');
+$items.each(function(idx) {
+num_ul = $(this).parentsUntil('#TOC').length;
+$(this).css({'text-indent': num_ul * 10, 'padding-left': 0});
+});
 });
 </script>
 
@@ -78,6 +78,7 @@ library(rstatix)
 library(colorspace)
 library(Hmisc)
 library(MASS)
+library(corrr)
 
 
 ## Select outdir
@@ -102,28 +103,34 @@ CorrelationDFMean <- function(data, feature_name, targets, p.value=0.001){
 }
 
 
-CorrelationPlotMean <- function(data, feature_name, targets, title = "with treatment", p.value=0.001, alfa = c(0.5, 1)){
+CorrelationPlotMean <- function(data, feature_name, targets, title = "with treatment", p.value=0.01, alfa = c(0.5, 1)){
   cor.df = data.frame()
   for (i in feature_name){
-    corr.list <- data %>% dplyr::select(i, as.character(targets)) %>% as.matrix() %>% rcorr(type = "spearman")
+    corr.list <- data %>% 
+      dplyr::select(all_of(i), as.character(targets)) %>% 
+      as.matrix() %>% 
+      rcorr(type = "spearman")
     
     df <- data.frame(rowname = names(corr.list$r[1, -1]),
                      corr = corr.list$r[1, -1],
                      pvalue = corr.list$P[1, -1],
                      feature = i)
-    cor.df <- rbind(cor.df, df)
+    cor.df <- rbind(cor.df, df) %>%
+      transform(rowname = factor(rowname, levels = levels(targets)),
+                corr = corr,
+                pvalue = pvalue) %>% 
+      mutate(p.adj = p.adjust(pvalue)) %>%
+      add_significance("p.adj")
   }
-  p <- cor.df %>%
-    transform(rowname = factor(rowname, levels = levels(targets)),
-              corr = corr,
-              pvalue = pvalue) %>%
-    ggplot(aes(x = rowname, y = corr, fill = pvalue < p.value)) +
+  p <-  ggplot(cor.df, aes(x = rowname, y = corr, fill = p.adj.signif)) +
     geom_bar(stat = "identity", position = "dodge") +
     ylab(paste("Spearman correlation ",title)) +
     xlab("Chromatin Feature") +
-    # ggtitle(paste("Repair pathways correlation with chromatin features in", condition_name, "exps")) +
-    theme_bw(base_size = 16) +
+    # ggtitle(paste("Repair pathways correlation with chromatin features in", condition_name, "exps"))  +
+    theme_classic2(base_size = 16) +
     scale_y_continuous(breaks=seq(-1,1, .1)) +
+    scale_fill_manual(values = c("****" = "black", "***" = "gray20", "**" = "gray40", 
+                                 "*" = "gray50", "ns" = "gray80")) +
     coord_flip()
   return(list(dataframe=cor.df, plot = p))
 }
@@ -373,7 +380,7 @@ quantiles_95 <- function(x) {
 }
 
 plot_comb_grid_bothplot <- function(bix.dt, opt_df, domains, y_name, min_count=0,
-                                   max_count=Inf, group_by=NULL, color=NULL){
+                                    max_count=Inf, group_by=NULL, color=NULL){
   
   opt_melt = reshape2::melt(opt_df)
   colnames(opt_melt) = c('group', 'domain', 'is_in')
@@ -421,7 +428,7 @@ plot_comb_grid_bothplot <- function(bix.dt, opt_df, domains, y_name, min_count=0
   
   indel_selection = bix.dt[group%in%group_levels, ]
   indel_selection[,group:=factor(group, levels=group_levels)]
-
+  
   group_count_sel$group = factor(group_count_sel$group, levels=group_levels)
   
   count_plot = ggplot(group_count_sel, aes(x=group,y=1, label=Freq)) +
@@ -671,67 +678,67 @@ plot_comb_grid_beeswarm <- function(dt, opt_df, domains, y_name, min_count=0,
 
 p.adjust <- function(p, method = p.adjust.methods, n = length(p))
 {
-    ## Methods 'Hommel', 'BH', 'BY' and speed improvements
-    ## contributed by Gordon Smyth
-    method <- match.arg(method)
-    if(method == "fdr") method <- "BH"	# back compatibility
-    nm <- names(p)
-    p <- as.numeric(p)
-    p0 <- setNames(p, nm)
-    if(all(nna <- !is.na(p))) nna <- TRUE
-    p <- p[nna]
-    lp <- length(p)
-    # stopifnot(n >= lp)
-    if (n <= 1) return(p0)
-    if (n == 2 && method == "hommel") method <- "hochberg"
-
-    p0[nna] <-
-	switch(method,
-	       bonferroni = pmin(1, n * p),
-	       holm = {
-		   i <- seq_len(lp)
-		   o <- order(p)
-		   ro <- order(o)
-		   pmin(1, cummax( (n - i + 1L) * p[o] ))[ro]
-	       },
-	       hommel = { ## needs n-1 >= 2 in for() below
-		   if(n > lp) p <- c(p, rep.int(1, n-lp))
-		   i <- seq_len(n)
-		   o <- order(p)
-		   p <- p[o]
-		   ro <- order(o)
-		   q <- pa <- rep.int( min(n*p/i), n)
-		   for (j in (n-1):2) {
-		       ij <- seq_len(n-j+1)
-		       i2 <- (n-j+2):n
-		       q1 <- min(j*p[i2]/(2:j))
-		       q[ij] <- pmin(j*p[ij], q1)
-		       q[i2] <- q[n-j+1]
-		       pa <- pmax(pa,q)
-		   }
-		   pmax(pa,p)[if(lp < n) ro[1:lp] else ro]
-	       },
-	       hochberg = {
-		   i <- lp:1L
-		   o <- order(p, decreasing = TRUE)
-		   ro <- order(o)
-		   pmin(1, cummin( (n - i + 1L) * p[o] ))[ro]
-	       },
-	       BH = {
-		   i <- lp:1L
-		   o <- order(p, decreasing = TRUE)
-		   ro <- order(o)
-		   pmin(1, cummin( n / i * p[o] ))[ro]
-	       },
-	       BY = {
-		   i <- lp:1L
-		   o <- order(p, decreasing = TRUE)
-		   ro <- order(o)
-		   q <- sum(1L/(1L:n))
-		   pmin(1, cummin(q * n / i * p[o]))[ro]
-	       },
-	       none = p)
-    p0
+  ## Methods 'Hommel', 'BH', 'BY' and speed improvements
+  ## contributed by Gordon Smyth
+  method <- match.arg(method)
+  if(method == "fdr") method <- "BH"	# back compatibility
+  nm <- names(p)
+  p <- as.numeric(p)
+  p0 <- setNames(p, nm)
+  if(all(nna <- !is.na(p))) nna <- TRUE
+  p <- p[nna]
+  lp <- length(p)
+  # stopifnot(n >= lp)
+  if (n <= 1) return(p0)
+  if (n == 2 && method == "hommel") method <- "hochberg"
+  
+  p0[nna] <-
+    switch(method,
+           bonferroni = pmin(1, n * p),
+           holm = {
+             i <- seq_len(lp)
+             o <- order(p)
+             ro <- order(o)
+             pmin(1, cummax( (n - i + 1L) * p[o] ))[ro]
+           },
+           hommel = { ## needs n-1 >= 2 in for() below
+             if(n > lp) p <- c(p, rep.int(1, n-lp))
+             i <- seq_len(n)
+             o <- order(p)
+             p <- p[o]
+             ro <- order(o)
+             q <- pa <- rep.int( min(n*p/i), n)
+             for (j in (n-1):2) {
+               ij <- seq_len(n-j+1)
+               i2 <- (n-j+2):n
+               q1 <- min(j*p[i2]/(2:j))
+               q[ij] <- pmin(j*p[ij], q1)
+               q[i2] <- q[n-j+1]
+               pa <- pmax(pa,q)
+             }
+             pmax(pa,p)[if(lp < n) ro[1:lp] else ro]
+           },
+           hochberg = {
+             i <- lp:1L
+             o <- order(p, decreasing = TRUE)
+             ro <- order(o)
+             pmin(1, cummin( (n - i + 1L) * p[o] ))[ro]
+           },
+           BH = {
+             i <- lp:1L
+             o <- order(p, decreasing = TRUE)
+             ro <- order(o)
+             pmin(1, cummin( n / i * p[o] ))[ro]
+           },
+           BY = {
+             i <- lp:1L
+             o <- order(p, decreasing = TRUE)
+             ro <- order(o)
+             q <- sum(1L/(1L:n))
+             pmin(1, cummin(q * n / i * p[o]))[ro]
+           },
+           none = p)
+  p0
 }
 
 SetFileName <- function(filename, initials) {
@@ -745,27 +752,27 @@ SetFileName <- function(filename, initials) {
 # From Fede:
 # ggpairs custom functions
 corColor <- function(data, mapping, color = I("black"), sizeRange = c(1, 3), ...) {
-
+  
   x   <- eval_data_col(data, mapping$x)
   y   <- eval_data_col(data, mapping$y)
   r   <- cor(x, y)
   rt  <- format(r, digits = 3)
   tt  <- as.character(rt)
   cex <- max(sizeRange)
-
+  
   # helper function to calculate a useable size
   percent_of_range <- function(percent, range) {
     percent * diff(range) + min(range, na.rm = TRUE)
   }
-
+  
   # plot correlation coefficient
   p <- ggally_text(label = tt, mapping = aes(), xP = 0.5, yP = 0.5,
                    size = I(percent_of_range(cex * abs(r), sizeRange)), color = color, ...) +
     theme(panel.grid.minor=element_blank(),
           panel.grid.major=element_blank())
-
+  
   corColors <- RColorBrewer::brewer.pal(n = 7, name = "RdYlBu")[2:6]
-
+  
   if (r <= boundaries[1]) {
     corCol <- corColors[1]
   } else if (r <= boundaries[2]) {
@@ -777,37 +784,37 @@ corColor <- function(data, mapping, color = I("black"), sizeRange = c(1, 3), ...
   } else {
     corCol <- corColors[5]
   }
-
+  
   p <- p +
     theme(panel.background = element_rect(fill = corCol))
-
+  
   return(p)
 }
 
 theme_classic_lines <- function() {
   theme_pubr(border = T, legend = "top") +
-            theme(panel.grid.major = element_line(colour = "#adb5bd", size = 0.25),
-                  strip.background = element_rect(fill = "white", color = "white")
-            )
+    theme(panel.grid.major = element_line(colour = "#adb5bd", size = 0.25),
+          strip.background = element_rect(fill = "white", color = "white")
+    )
 }
 theme_classic_lines_45 <- function() {
   theme_pubr(border = T, legend = "top", x.text.angle = 45) +
-            theme(panel.grid.major = element_line(colour = "#adb5bd", size = 0.25),
-                  strip.background = element_rect(fill = "white", color = "white")
-            )
+    theme(panel.grid.major = element_line(colour = "#adb5bd", size = 0.25),
+          strip.background = element_rect(fill = "white", color = "white")
+    )
 }
 
 theme_classic_lines_90 <- function() {
   theme_pubr(border = T, legend = "top", x.text.angle = 90) +
-            theme(panel.grid.major = element_line(colour = "#adb5bd", size = 0.25),
-                  strip.background = element_rect(fill = "white", color = "white")
-            )
+    theme(panel.grid.major = element_line(colour = "#adb5bd", size = 0.25),
+          strip.background = element_rect(fill = "white", color = "white")
+    )
 }
 
 theme_classic_lines_90_noborder <- function() {
   theme_pubr(border = F, legend = "top", x.text.angle = 90) +
-            theme(strip.background = element_rect(fill = "white", color = "white")
-            )
+    theme(strip.background = element_rect(fill = "white", color = "white")
+    )
 }
 
 theme_set(theme_classic_lines())
@@ -836,9 +843,13 @@ ggplot_custom <- function(...) ggplot2::ggplot(...) +
 
 ```
 
+---
 
-### Data import
+# Data import
 
+## Screen and validation data
+
+#### Import
 ```{r data import, echo = FALSE, warning = FALSE}
 # # Import data from preprocessing script
 in.dir = list.dirs(path = "/DATA/projects/DSBrepair/data/R") %>% .[grepl("episcreen", .)] %>% tail(n = 1)
@@ -862,6 +873,7 @@ RSTP2_IndelRatios_Chromatin_2kb <- readRDS("/DATA/usr/r.schep/DSBrepair/data/R/r
 
 ---
 
+#### Heatmap annotation
 ```{r heatmap annotation}
 # Order IPRs by their starting freqCut value
 dmso_freq <- indel.data %>%
@@ -987,7 +999,7 @@ dmso.eff.score <- indel.data %>%
   pull(DMSO) %>%
   fitdistr(., "normal") %>% tidy()
 ```
-
+#### processing screen data for heatmaps
 ```{r filter heatmap}
 # Generate heatmap: select top drugs (highest change at any IPR) per concentration
 eff.data <- indel.data %>%
@@ -1000,16 +1012,16 @@ eff.data.heatmap <-  eff.data %>%
   group_by(drug, conc_char) %>%
   # ave to add IPR grouping level to calculate mean of the replicates
   mutate(freqCut_diff_mean = ave((freqCut_diff_mean*100), IPR, FUN = function(x) mean(x, na.rm = TRUE)),
-  ## Select drugs that have a large effect size in at least one location 
+         ## Select drugs that have a large effect size in at least one location 
          ## (some drugs might have a small global effect size, but large local)
          zscore_TIF_comb_rep_temp = ifelse(!filter_zscore_TIF_comb_rep, 0, zscore_TIF_comb_rep)) %>%
   ungroup() %>%
   mutate(p_value = 2*pnorm(q = abs(zscore_TIF_comb_rep_temp), lower.tail = F),
          # Adjust p value for false discovery rate
          adj_pvalue = p.adjust(p_value, method = 'BH')) %>%
-         # Pick the smallest per compound & concentration
+  # Pick the smallest per compound & concentration
   group_by(drug, conc_char) %>%
-         mutate(min_score = min(adj_pvalue)) %>%
+  mutate(min_score = min(adj_pvalue)) %>%
   # filter for adjusted p.val < 0.01 so we keep compounds with at least one signif effect.
   filter(min_score < 0.01) %>%
   distinct(drug, target, conc_char, freqCut_diff_mean, IPR, min_score) %>%
@@ -1025,9 +1037,108 @@ eff.data.heatmap2 <- eff.data.heatmap2[,c("drug", "target", "conc_char", iprs)]
 eff.data.heatmap2$drug <- gsub(" [(].*[)]", "", eff.data.heatmap2$drug) #shorten name of drug
 ```
 
+#### HDAC only heatmap
+```{r HDAC heatmap processing}
+eff.data.heatmap.cluster1 = eff.data.heatmap2 %>% 
+  filter(target == "HDAC" & drug != "Nullscript") %>%
+  mutate(drug_conc = paste(drug, conc_char, sep = " "))
+
+# Add cluster annotation
+cluster_HDAC <- hclust(dist(eff.data.heatmap.cluster1), method = "ward.D")
+cluster_HDAC <- cutree(tree = cluster_HDAC, k = 3)
+cluster_HDAC <- data.frame(cluster_HDAC)
+
+eff.data.heatmap.cluster1 <- cbind(eff.data.heatmap.cluster1, cluster_HDAC) %>% 
+  as_tibble()
+
+breaks <- quantile(unlist(eff.data.heatmap.cluster1 %>% 
+                            dplyr::select(contains('IPR'))), c(.01,.99), na.rm = T) # change these numbers according to where you want to set the cutoff
+palette_length <- 100
+
+myBreaks <- c(seq(-breaks[2], 0, length.out=ceiling(palette_length/2) + 1), 
+              seq(breaks[2]/palette_length, breaks[2], length.out=floor(palette_length/2)))
 
 
-## Load CCD Data
+cluster_HDAC <- eff.data.heatmap.cluster1 %>%
+  distinct(drug_conc, cluster_HDAC)
+
+target.cluster1 <- target_set_drugs %>%
+  rownames_to_column("drug_conc") %>%
+  left_join(HDAC_tib) %>%
+  left_join(cluster_HDAC) %>%
+  filter(!is.na(cluster_HDAC)) %>%
+  replace(is.na(.), 0)
+
+rownames(target.cluster1) <- target.cluster1$drug_conc
+target.cluster1 <- target.cluster1 %>%
+  dplyr::select(cluster_HDAC, conc_char, pan_HDAC, HDAC1,HDAC2, HDAC3,
+                HDAC4, HDAC6, HDAC8, HDAC10, viab)
+
+target.cluster1
+```
+
+### Process Vorinostat & GSK126 validations
+```{r}
+vorinostat_validation = indel.validation.data %>% 
+  filter(replicate == "mean" & plasmid == "LBR2", drug %in% c("DMSO", "Vorinostat"), sum_bc_reads > 1000)%>% 
+  dplyr::select(barcode, drug, MMEJ_NHEJ, efficiency, all_of(chromatin_cols)) %>%
+  distinct() 
+
+barcde_all_reps_vorino = vorinostat_validation %>% 
+  distinct(barcode, drug) %>% 
+  group_by(barcode) %>%
+  summarise(bccount = n()) %>% 
+  filter(bccount == 2) %>%
+  pull(barcode)
+
+vorinostat_ratios = vorinostat_validation  %>% 
+  filter(barcode %in% barcde_all_reps_vorino) %>%
+  pivot_wider(names_from = drug, values_from = c(efficiency, MMEJ_NHEJ)) %>%
+  mutate(diff_TIF = efficiency_Vorinostat - efficiency_DMSO,
+         ratio_TIF = efficiency_Vorinostat/efficiency_DMSO,
+         log2_FC_TIF = log2(ratio_TIF),
+         diff_MMEJ_NHEJ = MMEJ_NHEJ_Vorinostat - MMEJ_NHEJ_DMSO,
+         ratio_MMEJ_NHEJ = MMEJ_NHEJ_Vorinostat/MMEJ_NHEJ_DMSO,
+         log2_FC_MMEJ_NHEJ = log2(ratio_MMEJ_NHEJ)) 
+
+barcde_all_reps_gsk = RSTP2_IndelRatios_Chromatin_2kb %>% 
+  distinct(barcode, drug) %>% 
+  group_by(barcode) %>%
+  summarise(bccount = n()) %>% 
+  filter(bccount == 2) %>%
+  pull(barcode)
+
+GSK_ratios = RSTP2_IndelRatios_Chromatin_2kb %>% 
+  filter(barcode %in% barcde_all_reps_gsk) %>%
+  # distinct(barcode, drug, MMEJ_NHEJ , efficiency) %>% 
+  pivot_wider(names_from = drug, values_from = c(efficiency, MMEJ_NHEJ)) %>%
+  mutate(diff_TIF = efficiency_GSK126 - efficiency_DMSO_GSK,
+         ratio_TIF = efficiency_GSK126/efficiency_DMSO_GSK,
+         log2_FC_TIF = log2(ratio_TIF),
+         diff_MMEJ_NHEJ = MMEJ_NHEJ_GSK126 - MMEJ_NHEJ_DMSO_GSK,
+         ratio_MMEJ_NHEJ = MMEJ_NHEJ_GSK126/MMEJ_NHEJ_DMSO_GSK,
+         log2_FC_MMEJ_NHEJ = log2(ratio_MMEJ_NHEJ))
+
+vorinostat_ctrl <- vorinostat_ratios %>%
+  distinct(efficiency_DMSO, barcode)
+
+
+## Compare controls, just to check
+GSK_ratios2 <- GSK_ratios %>%
+  distinct(efficiency_DMSO_GSK, barcode)
+
+ctrl_compare <- merge(vorinostat_ctrl, GSK_ratios2, by = "barcode")
+
+# Spearman correlation
+cor(ctrl_compare$efficiency_DMSO, ctrl_compare$efficiency_DMSO_GSK, method = "spearman")
+
+# ggplot(ctrl_compare,
+#        aes(x = efficiency_DMSO, y = efficiency_DMSO_GSK)) +
+#   geom_point() +
+#   geom_smooth(method = "lm")
+```
+
+## CCD Data
 ###Load data
 ```{r}
 file = list.files(in.dir, pattern = "CCD_table", full.names = T) %>% tail(n = 1)
@@ -1100,49 +1211,12 @@ clustering = data.frame(row.names=c('LMNB1', 'late_replicating', 'H3K9me2', 'H3K
                                        rep('accessibility', 2), 
                                        'methylation',
                                        rep('transcribing', 5)),
-                        levels=c('transcribing', 'accessibility',
-                                 'methylation', 'euchromatin',
-                                 'HDAC', 'insulator', 'repressive')))
+                                     levels=c('transcribing', 'accessibility',
+                                              'methylation', 'euchromatin',
+                                              'HDAC', 'insulator', 'repressive')))
 ```
 
-```{r HDAC heatmap processing}
-eff.data.heatmap.cluster1 = eff.data.heatmap2 %>% 
-  filter(target == "HDAC" & drug != "Nullscript") %>%
-  mutate(drug_conc = paste(drug, conc_char, sep = " "))
 
-# Add cluster annotation
-cluster_HDAC <- hclust(dist(eff.data.heatmap.cluster1), method = "ward.D")
-cluster_HDAC <- cutree(tree = cluster_HDAC, k = 3)
-cluster_HDAC <- data.frame(cluster_HDAC)
-
-eff.data.heatmap.cluster1 <- cbind(eff.data.heatmap.cluster1, cluster_HDAC) %>% 
-  as_tibble()
-
-breaks <- quantile(unlist(eff.data.heatmap.cluster1 %>% 
-                            dplyr::select(contains('IPR'))), c(.01,.99), na.rm = T) # change these numbers according to where you want to set the cutoff
-palette_length <- 100
-
-myBreaks <- c(seq(-breaks[2], 0, length.out=ceiling(palette_length/2) + 1), 
-              seq(breaks[2]/palette_length, breaks[2], length.out=floor(palette_length/2)))
-
-
-cluster_HDAC <- eff.data.heatmap.cluster1 %>%
-  distinct(drug_conc, cluster_HDAC)
-
-target.cluster1 <- target_set_drugs %>%
-  rownames_to_column("drug_conc") %>%
-  left_join(HDAC_tib) %>%
-  left_join(cluster_HDAC) %>%
-  filter(!is.na(cluster_HDAC)) %>%
-  replace(is.na(.), 0)
-
-rownames(target.cluster1) <- target.cluster1$drug_conc
-target.cluster1 <- target.cluster1 %>%
-  dplyr::select(cluster_HDAC, conc_char, pan_HDAC, HDAC1,HDAC2, HDAC3,
-                HDAC4, HDAC6, HDAC8, HDAC10, viab)
-
-target.cluster1
-```
 
 
 ### Synergies Heatmaps
@@ -1160,6 +1234,8 @@ target_ctrl = rename(target, conc_char_ctrl = conc_char)
 ```
 
 ---
+
+# Main figures
 
 ## 3ABC CCD Examples
 ```{r 3A CCD examples, fig.width= 12, fig.height= 4}
@@ -1194,18 +1270,18 @@ p1 = ggplot(mock.slopes, aes(z_score,value,color = variable)) + theme_bw() +
 #   geom_smooth(method = "lm", color = "#01665e",se = FALSE) +
 #   stat_cor(method = "pearson") +
 #   xlab("m5C z-score") +
-#   ylab("∆ log2(TIF)") + 
+#   ylab("delta log2(TIF)") + 
 #   coord_cartesian()
 # 
 # CCD_tib %>% filter(drug_conc == "Decitabine 1 µM" & feature == "m5C")
 
 p2 = ggplot(CCD_example_tib,
-       aes(x = H3K27me3.zscore, y = EPZ6438_log2_FC_TIF)) +
+            aes(x = H3K27me3.zscore, y = EPZ6438_log2_FC_TIF)) +
   geom_point() +
   geom_smooth(method = "lm", color = "#01665e",se = FALSE) +
   stat_cor(method = "pearson") +
   xlab("H3K27me3 z-score") +
-  ylab("∆ log2(TIF)") + 
+  ylab("delta log2(TIF)") + 
   coord_cartesian()
 
 CCD_tib %>% filter(drug_conc == "EPZ-6438 10 µM" & feature == "H3K27me3")
@@ -1217,15 +1293,15 @@ p3 = ggplot(CCD_example_tib,
   geom_smooth(method = "lm", color = "black",se = FALSE) +
   stat_cor(method = "pearson") +
   xlab("H3K36me3 z-score") +
-  ylab("∆ log2(TIF)") + 
+  ylab("delta log2(TIF)") + 
   coord_cartesian()
 
 plot_grid(p1, p2, p3, nrow = 1, labels = c("A", "B", "C"))
 ```
 
 
-## 3B HDAC CCD Heatmap
-```{r 3B HDAC CCD, fig.width= 14, fig.height= 14}
+## 3D HDAC CCD Heatmap
+```{r 3D HDAC CCD, fig.width= 14, fig.height= 14}
 target_drugs = cluster_HDAC %>% pull(drug_conc)
 
 # Make matrix with drugs from selected target
@@ -1259,8 +1335,7 @@ p = pheatmap(TIF_synergy_matrix[, TRIP_chrom_clust$labels],
              color = colors,
              annotation_colors = annotation_colors_scr, 
              annotation_legend = T,
-                cutree_rows = 3)
-print(p)
+             cutree_rows = 3)
 
 TIF_synergy_cluster <- TIF_synergy_matrix %>%
   rownames_to_column("drug_conc") %>%
@@ -1268,8 +1343,8 @@ TIF_synergy_cluster <- TIF_synergy_matrix %>%
   mutate(cluster_HDAC = as.character(cluster_HDAC))
 ```
 
-## 3D K27me3 top CCDs
-```{r 3C H3K27me3 synergies, fig.width= 6, fig.height= 6}
+## 3E K27me3 top CCDs
+```{r 3E H3K27me3 synergies, fig.width= 6, fig.height= 6}
 rank_dt = CCD_tib %>% 
   left_join(rownames_to_column(target, var = "drug_conc")) %>%
   filter(feature == "H3K27me3", !is.na(indelrate_slope_plot)) %>%
@@ -1285,13 +1360,18 @@ p1 = rank_dt %>%
   scale_x_reverse() +
   coord_flip() +
   xlab("Rank") +
-  theme_classic2() +
+theme_classic2(base_size = 16) +
   scale_fill_manual(values = colors_targets) +
   # geom_label(aes(label = ifelse(width == 2, drug_conc,''))) +
   theme(legend.position = "none",
         axis.title.x=element_blank(),
         axis.text.x=element_blank(),
-        axis.ticks.x=element_blank())
+        axis.ticks.x=element_blank())+
+  # add horizontal line for 0.01 slope cutoff which is highlighted in the heatmap
+  geom_vline(xintercept = rank_dt[rank_dt$indelrate_slope_plot  < -0.01, ]$rank[1] - 0.5)  +
+  geom_vline(xintercept = max(rank_dt[rank_dt$indelrate_slope_plot  > 0.01, ]$rank) + 0.5)
+
+
 
 p2 = rank_dt %>% 
   filter(!between(rank, 11, maxrank-10)) %>%
@@ -1301,7 +1381,7 @@ p2 = rank_dt %>%
   scale_x_reverse() +
   coord_flip() +
   ylab("Synergy score") +
-  theme_classic2() +
+theme_classic2(base_size = 16) +
   scale_fill_manual(values = colors_targets) +
   # geom_label(aes(label = ifelse(width == 2, drug_conc,''))) +
   geom_text(aes(label=drug_conc)) +
@@ -1318,6 +1398,7 @@ all_compounds_epistasis_TIF %>%
   filter(!between(H3K27me3, -0.01, .01)) %>%
   rownames()
 ```
+
 
 ```{r top CCDs for all chromatin features, fig.width= 6, fig.height= 6, eval = FALSE}
 for(i in unique(CCD_tib$feature)) {
@@ -1339,13 +1420,17 @@ for(i in unique(CCD_tib$feature)) {
       scale_x_reverse() +
       coord_flip() +
       xlab("Rank") +
-      theme_classic2() +
+      theme_classic2(base_size = 16) +
       scale_fill_manual(values = colors_targets) +
       # geom_label(aes(label = ifelse(width == 2, drug_conc,''))) +
       theme(legend.position = "none",
             axis.title.x=element_blank(),
             axis.text.x=element_blank(),
-            axis.ticks.x=element_blank())
+            axis.ticks.x=element_blank())+
+      # add horizontal line for 0.01 slope cutoff which is highlighted in the heatmap
+      geom_vline(xintercept = rank_dt[rank_dt$indelrate_slope_plot  < -0.01, ]$rank[1] - 0.5)  +
+      geom_vline(xintercept = max(rank_dt[rank_dt$indelrate_slope_plot  > 0.01, ]$rank) + 0.5)
+    
     
     p2 = rank_dt %>% 
       filter(!between(rank, 6, maxrank-5)) %>%
@@ -1355,7 +1440,7 @@ for(i in unique(CCD_tib$feature)) {
       scale_x_reverse() +
       coord_flip() +
       ylab("Synergy score") +
-      theme_classic2() +
+      theme_classic2(base_size = 16) +
       scale_fill_manual(values = colors_targets) +
       # geom_label(aes(label = ifelse(width == 2, drug_conc,''))) +
       geom_text(aes(label=drug_conc)) +
@@ -1373,8 +1458,44 @@ for(i in unique(CCD_tib$feature)) {
 ```
 
 
-## 3D m5C top CCDs
-```{r 3C m5C synergies, fig.width= 6, fig.height= 6}
+## 3HI K27me3 and CTCF correlation
+```{r 3HI K37me3 vs CTCF CCD correlation, fig.width= 10, fig.height= 5}
+K27me3_CTCF = all_compounds_epistasis_TIF %>% rownames_to_column(var = "drug_conc") %>%
+  distinct(drug_conc, CTCF, SMC3, H3K27me3) %>% 
+  mutate(CTCF = replace(CTCF, CTCF == 0, NA), 
+         SMC3 = replace(SMC3, SMC3 == 0, NA), 
+         H3K27me3 = replace(H3K27me3, H3K27me3 == 0, NA))
+
+p1 = ggplot(K27me3_CTCF,
+            aes(x = H3K27me3, y = CTCF)) +
+  geom_point() +
+  geom_abline(lty = "twodash") +
+  geom_smooth(method = "lm") +
+  stat_cor(method = "pearson") +
+  theme_classic2(base_size = 16) +
+  xlab("Slope H3K27me3") +
+  ylab("Slope CTCF") 
+
+
+
+K27me3_CTCF = indel.data %>% distinct(IPR, CTCF, SMC3, H3K27me3)
+
+p2 = ggplot(K27me3_CTCF,
+            aes(x = H3K27me3, y = CTCF)) +
+  geom_point() +
+  geom_abline(lty = "twodash") +
+  geom_smooth(method = "lm") +
+  stat_cor(method = "pearson") +
+  theme_classic2(base_size = 16) +
+  xlab("H3K27me3 z-score") +
+  ylab("CTCF z-score")
+
+plot_grid(p1, p2, nrow = 1, labels = c("F", "G"))
+```
+
+
+## 3J m5C top CCDs
+```{r 3J m5C synergies, fig.width= 6, fig.height= 6}
 rank_dt = CCD_tib %>% 
   left_join(rownames_to_column(target, var = "drug_conc")) %>%
   filter(feature == "m5C", !is.na(indelrate_slope_plot)) %>%
@@ -1390,13 +1511,16 @@ p1 = rank_dt %>%
   scale_x_reverse() +
   coord_flip() +
   xlab("Rank") +
-  theme_classic2() +
+theme_classic2(base_size = 16) +
   scale_fill_manual(values = colors_targets) +
   # geom_label(aes(label = ifelse(width == 2, drug_conc,''))) +
   theme(legend.position = "none",
         axis.title.x=element_blank(),
         axis.text.x=element_blank(),
-        axis.ticks.x=element_blank())
+        axis.ticks.x=element_blank())+
+  # add horizontal line for 0.01 slope cutoff which is highlighted in the heatmap
+  geom_vline(xintercept = rank_dt[rank_dt$indelrate_slope_plot  < -0.01, ]$rank[1] - 0.5)  +
+  geom_vline(xintercept = max(rank_dt[rank_dt$indelrate_slope_plot  > 0.01, ]$rank) + 0.5)
 
 p2 = rank_dt %>% 
   filter(!between(rank, 6, maxrank-5)) %>%
@@ -1406,7 +1530,7 @@ p2 = rank_dt %>%
   scale_x_reverse() +
   coord_flip() +
   ylab("Synergy score") +
-  theme_classic2() +
+  theme_classic2(base_size = 16) +
   scale_fill_manual(values = colors_targets) +
   # geom_label(aes(label = ifelse(width == 2, drug_conc,''))) +
   geom_text(aes(label=drug_conc)) +
@@ -1424,37 +1548,8 @@ all_compounds_epistasis_TIF %>%
   rownames()
 ```
 
-## 3F K27me3 and CTCF correlation
-```{r 3F K37me3 vs CTCF CCD correlation, fig.width= 10, fig.height= 5}
-K27me3_CTCF = all_compounds_epistasis_TIF %>% rownames_to_column(var = "drug_conc") %>%
-  distinct(drug_conc, CTCF, SMC3, H3K27me3) %>% 
-  mutate(CTCF = replace(CTCF, CTCF == 0, NA), 
-         SMC3 = replace(SMC3, SMC3 == 0, NA), 
-         H3K27me3 = replace(H3K27me3, H3K27me3 == 0, NA))
-
-p1 = ggplot(K27me3_CTCF,
-       aes(x = H3K27me3, y = CTCF)) +
-  geom_point() +
-  geom_abline(lty = "twodash") +
-  geom_smooth(method = "lm") +
-  stat_cor(method = "pearson") +
-  xlab("Slope H3K27me3") +
-  ylab("Slope CTCF")
 
 
-K27me3_CTCF = indel.data %>% distinct(IPR, CTCF, SMC3, H3K27me3)
-
-p2 = ggplot(K27me3_CTCF,
-       aes(x = H3K27me3, y = CTCF)) +
-  geom_point() +
-  geom_abline(lty = "twodash") +
-  geom_smooth(method = "lm") +
-  stat_cor(method = "pearson") +
-  xlab("H3K27me3 z-score") +
-  ylab("CTCF z-score")
-
-plot_grid(p1, p2, nrow = 1, labels = c("F", "G"))
-```
 
 
 ```{r Synergies chromatin - TIF per target, fig.width= 10, fig.height= 10, eval = FALSE}
@@ -1535,7 +1630,7 @@ plt3 = pheatmap(HDAC_matrix[ ,clone5_map_ipr$labels],
                 annotation_colors = annotation_colors_scr,
                 annotation_legend = T,
                 cutree_rows = 3
-                )
+)
 ```
 
 
@@ -1601,66 +1696,8 @@ pheatmap(all_compounds_epistasis_TIF[, TRIP_chrom_clust$labels],
          annotation_legend = T)
 ```
 
-## S3B Validation of HDACi in the pool
-### Process Vorinostat & GSK126 validations
-```{r}
-vorinostat_validation = indel.validation.data %>% 
-  filter(replicate == "mean" & plasmid == "LBR2", drug %in% c("DMSO", "Vorinostat"), sum_bc_reads > 1000)%>% 
-  dplyr::select(barcode, drug, MMEJ_NHEJ, efficiency, all_of(chromatin_cols)) %>%
-  distinct() 
-
-barcde_all_reps_vorino = vorinostat_validation %>% 
-  distinct(barcode, drug) %>% 
-  group_by(barcode) %>%
-  summarise(bccount = n()) %>% 
-  filter(bccount == 2) %>%
-  pull(barcode)
-
-vorinostat_ratios = vorinostat_validation  %>% 
-  filter(barcode %in% barcde_all_reps_vorino) %>%
-  pivot_wider(names_from = drug, values_from = c(efficiency, MMEJ_NHEJ)) %>%
-  mutate(diff_TIF = efficiency_Vorinostat - efficiency_DMSO,
-         ratio_TIF = efficiency_Vorinostat/efficiency_DMSO,
-         log2_FC_TIF = log2(ratio_TIF),
-         diff_MMEJ_NHEJ = MMEJ_NHEJ_Vorinostat - MMEJ_NHEJ_DMSO,
-         ratio_MMEJ_NHEJ = MMEJ_NHEJ_Vorinostat/MMEJ_NHEJ_DMSO,
-         log2_FC_MMEJ_NHEJ = log2(ratio_MMEJ_NHEJ)) 
-
-barcde_all_reps_gsk = RSTP2_IndelRatios_Chromatin_2kb %>% 
-  distinct(barcode, drug) %>% 
-  group_by(barcode) %>%
-  summarise(bccount = n()) %>% 
-  filter(bccount == 2) %>%
-  pull(barcode)
-
-GSK_ratios = RSTP2_IndelRatios_Chromatin_2kb %>% 
-  filter(barcode %in% barcde_all_reps_gsk) %>%
-  # distinct(barcode, drug, MMEJ_NHEJ , efficiency) %>% 
-  pivot_wider(names_from = drug, values_from = c(efficiency, MMEJ_NHEJ)) %>%
-  mutate(diff_TIF = efficiency_GSK126 - efficiency_DMSO_GSK,
-         ratio_TIF = efficiency_GSK126/efficiency_DMSO_GSK,
-         log2_FC_TIF = log2(ratio_TIF),
-         diff_MMEJ_NHEJ = MMEJ_NHEJ_GSK126 - MMEJ_NHEJ_DMSO_GSK,
-         ratio_MMEJ_NHEJ = MMEJ_NHEJ_GSK126/MMEJ_NHEJ_DMSO_GSK,
-         log2_FC_MMEJ_NHEJ = log2(ratio_MMEJ_NHEJ))
-
-vorinostat_ctrl <- vorinostat_ratios %>%
-  distinct(efficiency_DMSO, barcode)
-
-GSK_ratios2 <- GSK_ratios %>%
-  distinct(efficiency_DMSO_GSK, barcode)
-
-ctrl_compare <- merge(vorinostat_ctrl, GSK_ratios2, by = "barcode")
-
-ggplot(ctrl_compare,
-       aes(x = efficiency_DMSO, y = efficiency_DMSO_GSK)) +
-  geom_point() +
-  geom_smooth(method = "lm")
-
-```
-
-## S3B GSK TIF FC correlation with chromatin features
-```{r S3B GSK TIF FC Correlations}
+## S3F GSK TIF FC correlation with chromatin features
+```{r S3F GSK TIF FC Correlations, fig.width= 8, fig.height= 8}
 ## GSK126
 chrom.mods.cols <- seq(grep("CTCF", names(GSK_ratios)), grep("H3K27me3_domain", names(GSK_ratios))-1)
 
@@ -1673,7 +1710,7 @@ CorrelationPlotMean(GSK_ratios, "log2_FC_TIF", targets = GSK.hist.corr, title = 
 ```
 
 ## S3C Vorinostat TIF FC correlation with chromatin features
-```{r S3C Vorino TIF FC Correlations}
+```{r S3C Vorino TIF FC Correlations, fig.width= 8, fig.height= 8}
 ## Vorinostat
 chrom.mods.cols <- seq(grep("CTCF", names(vorinostat_ratios)), grep("H3K27me3_domain", names(vorinostat_ratios))-1)
 
@@ -1689,8 +1726,9 @@ CorrelationPlotMean(vorinostat_ratios, "log2_FC_TIF", targets = vorinostat.hist.
 ## S3D Vorinostat per cluster
 ```{r S3D Vorino density, fig.height=5, fig.width=7}
 domain_levels = c('late_replicating', 'LAD', 'H3K9me2', 'H3K27me3')
-
 domains = paste0(domain_levels, '_domain')
+opt_df = get_combinations(domain_levels)
+
 
 vorino.dt = vorinostat_ratios %>%
   filter(!is.na(diff_TIF)) %>%
@@ -1698,192 +1736,101 @@ vorino.dt = vorinostat_ratios %>%
   distinct(barcode, .keep_all = TRUE) %>%
   data.table()
 
-dim(vorino.dt)
-
-
 vorino.dt[vorino.dt=='iDomain'] <- 0
 vorino.dt[vorino.dt=='Domain'] <- 1
 vorino.dt[vorino.dt=='DHS'] <- 1
 
 vorino.dt[is.na(LAD_domain), LAD_domain:=0]
-# vorino.dt[is.na(DHS_domain), DHS_domain:=0]
 
 vorino.dt[, (domains) := lapply(.SD, as.numeric), .SDcols = domains]
-
 colnames(vorino.dt) = gsub('_domain', '', colnames(vorino.dt))
 
-opt_df = get_combinations(domain_levels)
 
-k27me3 = vorino.dt %>% filter(late_replicating == 0, 
-                             LAD == 0,
-                             H3K9me2 == 0,
-                             H3K27me3 == 1) %>% 
-  pull(diff_TIF)
 
-any.k27me3 = vorino.dt %>% filter(H3K27me3 == 1) %>% 
-  pull(diff_TIF)
+vorino.dt = vorino.dt %>% 
+  mutate(state = ifelse(late_replicating == 1 & 
+                          LAD == 1 &
+                          H3K9me2 == 1 &
+                          H3K27me3 == 0, "Triple Heterochromatin", ifelse(
+                            late_replicating == 0 & 
+                              LAD == 0 & 
+                              H3K9me2 == 0 & 
+                              H3K27me3 == 0, "Euchromatin", 
+                            ifelse(late_replicating == 0 &  
+                                     LAD == 0 & 
+                                     H3K9me2 == 0 & 
+                                     H3K27me3 == 1, "H3K27me3", "other-heterochromatin")))) %>%
+  mutate(state = factor(state, 
+                        levels = c("Euchromatin", "other-heterochromatin", 
+                                   "H3K27me3", "Triple Heterochromatin")))
 
-not.k27me3 = vorino.dt %>% filter(H3K27me3 != 1) %>% 
-  pull(diff_TIF)
 
-hetcomb = vorino.dt %>% filter(late_replicating == 1, 
-                              LAD == 1,
-                              H3K9me2 == 1,
-                              H3K27me3 == 0) %>% 
-  pull(diff_TIF)
-
-idomain = vorino.dt %>% filter(late_replicating == 0, 
-                              LAD == 0,
-                              H3K9me2 == 0,
-                              H3K27me3 == 0) %>% 
-  pull(diff_TIF)
-
-# DHS = vorino.dt %>% filter(late_replicating == 0,
-#                           LAD == 0,
-#                           H3K9me2 == 0,
-#                           H3K27me3 == 0,
-#                           DHS == 1) %>%
-#   pull(diff_TIF)
-
-wilcox.test(idomain, k27me3, alternative = "two.sided")
-
-wilcox.test(idomain, any.k27me3, alternative = "two.sided")
-wilcox.test(not.k27me3, any.k27me3, alternative = "two.sided")
-
-wilcox.test(idomain, hetcomb, alternative = "two.sided")
-
-vorino.dt %>% mutate(state = ifelse(late_replicating == 1 & 
-                                      LAD == 1 &
-                                      H3K9me2 == 1 &
-                                      H3K27me3 == 0, "Triple Heterochromatin", ifelse(
-                                        late_replicating == 0 & 
-                                          LAD == 0 & 
-                                          H3K9me2 == 0 & 
-                                          H3K27me3 == 0, "Euchromatin", ifelse(late_replicating == 0 &  
-                                                                                 LAD == 0 & 
-                                                                                 H3K9me2 == 0 & 
-                                                                                 H3K27me3 == 1, "H3K27me3", "other-heterochromatin")))) %>%
-  mutate(state = factor(state, levels = c("Euchromatin", "other-heterochromatin", "H3K27me3", "Triple Heterochromatin"))) %>%
-  ggplot(., aes(log2_FC_TIF, fill = state)) +
+ggplot(vorino.dt, aes(log2_FC_TIF, fill = state)) +
   geom_density(alpha = 0.6, color = "white", size = .25) +
-  scale_fill_manual(values = group_colors)
+  scale_fill_manual(values = group_colors) +
+  theme_classic2(base_size = 16)
 
-vorino.dt %>% mutate(state = ifelse(late_replicating == 1 & 
-                                      LAD == 1 &
-                                      H3K9me2 == 1 &
-                                      H3K27me3 == 0, "Triple Heterochromatin", ifelse(
-                                        late_replicating == 0 & 
-                                          LAD == 0 & 
-                                          H3K9me2 == 0 & 
-                                          H3K27me3 == 0, "Euchromatin", ifelse(late_replicating == 0 &  
-                                                                                 LAD == 0 & 
-                                                                                 H3K9me2 == 0 & 
-                                                                                 H3K27me3 == 1, "H3K27me3", "other-heterochromatin")))) %>%
-  mutate(state = factor(state, levels = c("Euchromatin", "other-heterochromatin", "H3K27me3", "Triple Heterochromatin"))) %>%
-  ggplot(., aes(log2_FC_TIF, color = state)) +
+vorino.dt %>% wilcox_test(., diff_TIF ~ state)%>%
+  adjust_pvalue(method = "BH") %>%
+  add_significance("p.adj")
+
+ggplot(vorino.dt, aes(log2_FC_TIF, color = state)) +
   stat_ecdf() +
-  scale_color_manual(values = group_colors)
+  scale_color_manual(values = group_colors) +
+  theme_classic2(base_size = 16)
 ```
 
 ## S3E Vorinostat per cluster
-```{r S3E GSK density, fig.height=6, fig.width=6}
-domain_levels = c('late_replicating', 'LAD', 'H3K9me2', 'H3K27me3')
-
-domains = paste0(domain_levels, '_domain')
-
+```{r S3E GSK density, fig.height=5, fig.width=7}
 GSK.dt = GSK_ratios %>%
   filter(!is.na(diff_TIF)) %>%
-  dplyr::select(barcode, diff_TIF, log2_FC_TIF, efficiency_GSK126, efficiency_DMSO_GSK, domains) %>%
+  dplyr::select(barcode, diff_TIF, log2_FC_TIF, 
+                efficiency_GSK126, efficiency_DMSO_GSK, domains) %>%
   distinct(barcode, .keep_all = TRUE) %>%
   data.table()
-
-dim(GSK.dt)
-
 
 GSK.dt[GSK.dt=='iDomain'] <- 0
 GSK.dt[GSK.dt=='Domain'] <- 1
 GSK.dt[GSK.dt=='DHS'] <- 1
-
 GSK.dt[is.na(LAD_domain), LAD_domain:=0]
-# GSK.dt[is.na(DHS_domain), DHS_domain:=0]
 
 GSK.dt[, (domains) := lapply(.SD, as.numeric), .SDcols = domains]
-
 colnames(GSK.dt) = gsub('_domain', '', colnames(GSK.dt))
 
-opt_df = get_combinations(domain_levels)
-
-
-# p1 = plot_comb_grid_beeswarm(GSK.dt, opt_df,
-#                         domain_levels, 'efficiency_DMSO_GSK', min_count = 10, y_plabel=c(0, 1))
-# p2 = plot_comb_grid_beeswarm(GSK.dt, opt_df,
-#                         domain_levels, 'efficiency_GSK126', min_count = 10, y_plabel=c(0, 1))
-# 
-# plot_grid(p1, p2, labels = c("TIF CTRL", "TIF Ezh2i"))
-
-
 GSK.dt = GSK.dt %>% mutate(state = ifelse(late_replicating == 1 & 
-                                     LAD == 1 &
-                                     H3K9me2 == 1 &
-                                     H3K27me3 == 0, "Triple Heterochromatin", ifelse(
-                                       late_replicating == 0 & 
-                                         LAD == 0 & 
-                                         H3K9me2 == 0 & 
-                                         H3K27me3 == 0, "Euchromatin", ifelse(late_replicating == 0 &  
-                                                                            LAD == 0 & 
-                                                                            H3K9me2 == 0 & 
-                                                                            H3K27me3 == 1, "H3K27me3", "other-heterochromatin"))))
+                                            LAD == 1 &
+                                            H3K9me2 == 1 &
+                                            H3K27me3 == 0, "Triple Heterochromatin", ifelse(
+                                              late_replicating == 0 & 
+                                                LAD == 0 & 
+                                                H3K9me2 == 0 & 
+                                                H3K27me3 == 0, "Euchromatin", ifelse(late_replicating == 0 &  
+                                                                                       LAD == 0 & 
+                                                                                       H3K9me2 == 0 & 
+                                                                                       H3K27me3 == 1, "H3K27me3", "other-heterochromatin"))))
 
-
-# DHS = GSK.dt %>% filter(late_replicating == 0,
-#                           LAD == 0,
-#                           H3K9me2 == 0,
-#                           H3K27me3 == 0,
-#                           DHS == 1) %>%
-#   pull(diff_TIF)
-
-wilcox.test(idomain, k27me3, alternative = "two.sided")
-wilcox.test(idomain, any.k27me3, alternative = "two.sided")
-wilcox.test(not.k27me3, any.k27me3, alternative = "two.sided")
-wilcox.test(idomain, hetcomb, alternative = "two.sided")
 
 ggplot(GSK.dt, aes(diff_TIF, fill = state)) +
   geom_density(alpha = 0.6, color = "white", size = .25) +
   scale_fill_manual(values = group_colors) +
   theme_classic()
 
-GSK.dt %>% t_test(., diff_TIF ~ state)%>%
-  adjust_pvalue(method = "bonferroni") %>%
+GSK.dt %>% wilcox_test(., diff_TIF ~ state)%>%
+  adjust_pvalue(method = "BH") %>%
   add_significance("p.adj")
 
+ggplot(GSK.dt, aes(log2_FC_TIF, color = state)) +
+  stat_ecdf() +
+  scale_color_manual(values = group_colors) +
+  theme_classic2(base_size = 16)
 ```
 
 
 ```{r S3_ Correlation of log2 FC TIF}
-vorinostat_df <- vorino.dt %>% mutate(state = ifelse(late_replicating == 1 & 
-                                                       LAD == 1 &
-                                                       H3K9me2 == 1 &
-                                                       H3K27me3 == 0, "Triple Heterochromatin", ifelse(
-                                                         late_replicating == 0 & 
-                                                           LAD == 0 & 
-                                                           H3K9me2 == 0 & 
-                                                           H3K27me3 == 0, "Euchromatin", ifelse(late_replicating == 0 &  
-                                                                                                  LAD == 0 & 
-                                                                                                  H3K9me2 == 0 & 
-                                                                                                  H3K27me3 == 1, "H3K27me3", "other-heterochromatin")))) %>%
+vorinostat_df <- vorino.dt %>%
   distinct(barcode, "vorinostat_TIF_FC" = log2_FC_TIF)
 
-gsk_df <- GSK.dt %>% mutate(state = ifelse(late_replicating == 1 & 
-                                             LAD == 1 &
-                                             H3K9me2 == 1 &
-                                             H3K27me3 == 0, "Triple Heterochromatin", ifelse(
-                                               late_replicating == 0 & 
-                                                 LAD == 0 & 
-                                                 H3K9me2 == 0 & 
-                                                 H3K27me3 == 0, "Euchromatin", ifelse(late_replicating == 0 &  
-                                                                                        LAD == 0 & 
-                                                                                        H3K9me2 == 0 & 
-                                                                                        H3K27me3 == 1, "H3K27me3", "other-heterochromatin")))) %>%
+gsk_df <- GSK.dt %>%
   distinct(barcode, "gsk_TIF_FC" = log2_FC_TIF, state)
 
 vorino_gsk_compare <- merge(vorinostat_df, gsk_df, by = "barcode")
@@ -1891,6 +1838,8 @@ vorino_gsk_compare <- merge(vorinostat_df, gsk_df, by = "barcode")
 ggplot(vorino_gsk_compare,
        aes(x = gsk_TIF_FC, y = vorinostat_TIF_FC)) +
   geom_point() +
+  theme_classic2(base_size = 16) +
+  stat_cor(method = "pearson") +
   geom_smooth(method = "lm") +
   facet_wrap(~state) 
 ```
@@ -1899,9 +1848,9 @@ ggplot(vorino_gsk_compare,
 ## S3FG Upset plots pool
 ```{r S3FG Upset plots pool TIF FC, fig.width= 12, fig.height= 6}
 p1 = plot_comb_grid_beeswarm(vorino.dt, opt_df,
-                        domain_levels, 'log2_FC_TIF', min_count = 10, y_plabel=c(-0.35, 0.25))
+                             domain_levels, 'log2_FC_TIF', min_count = 10, y_plabel=c(-0.35, 0.25))
 p2 = plot_comb_grid_beeswarm(GSK.dt, opt_df,
-                        domain_levels, 'log2_FC_TIF', min_count = 10, y_plabel=c(-0.35, 0.25))
+                             domain_levels, 'log2_FC_TIF', min_count = 10, y_plabel=c(-0.35, 0.25))
 plot_grid(p1, p2, labels = c("TIF FC HDACi", "TIF FC EZH2i"))
 ```
 
@@ -1915,7 +1864,7 @@ indel.data %>% filter(!between(zscore_TIF_comb_rep, -3.2905, 3.2905) & conc_char
   geom_quasirandom() + 
   facet_grid(. ~ conc_char) + 
   scale_color_manual(values = colors_targets) +
-  theme_classic2()
+  theme_classic2(base_size = 16)
 ```
 
 # Session Info
