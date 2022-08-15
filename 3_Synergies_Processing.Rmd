@@ -459,10 +459,14 @@ epistasis_tib = slope.protein.features %>%
 
 effect_compounds = ratios_tib_fc %>%
   group_by(drug_conc)  %>% 
+  #
   mutate(indelrate_pos = sum(log2.fc.freqCut > 0),
+         #
          indelrate_effect = ifelse(indelrate_pos >= 17, "indel_rate_increase", 
                                    ifelse(indelrate_pos <= 1, "indel_rate_decrease", "mixed")),
+         #
          ratio_pos = sum(log2.fc.ratio > 0),
+         #
          ratio_effect = ifelse(ratio_pos >= 17, "NHEJ_increase", 
                                ifelse(ratio_pos <= 1, "MMEJ_increase", "mixed"))) %>%
   distinct(drug_conc, indelrate_effect, ratio_effect) %>% 
@@ -470,6 +474,31 @@ effect_compounds = ratios_tib_fc %>%
 
 
 epistasis_tib %<>% 
+  left_join(effect_compounds)  %>% 
+  left_join(signif_hits) %>%
+  mutate(
+    # x_intercept_indelrate = ifelse(p.value.indelrate < 0.05,
+    #                                x_intercept_indelrate, NA),
+    # x_intercept_ratio = ifelse(p.value.ratio < 0.05,
+    #                            x_intercept_ratio, NA),
+    indelrate_slope_plot = ifelse(x_intercept_indelrate < 1 & effect_on_indelrate & signif.freqCut, indelrate_slope, NA),
+    ratio_slope_plot = ifelse(x_intercept_ratio < 1 & effect_on_ratio & signif.ratio, ratio_slope, NA)) %>%
+  distinct(drug_conc, feature, indelrate_slope_plot, ratio_slope_plot) 
+
+
+without_slop = epistasis_tib %>% 
+  left_join(effect_compounds)  %>% 
+  left_join(signif_hits) %>%
+  mutate(
+    # x_intercept_indelrate = ifelse(p.value.indelrate < 0.05,
+    #                                x_intercept_indelrate, NA),
+    # x_intercept_ratio = ifelse(p.value.ratio < 0.05,
+    #                            x_intercept_ratio, NA),
+    indelrate_slope_plot = ifelse(indelrate_slope > 0 & effect_on_indelrate & signif.freqCut, indelrate_slope, NA),
+    ratio_slope_plot = ifelse(effect_on_ratio & signif.ratio, ratio_slope, NA)) %>%
+  distinct(drug_conc, feature, indelrate_slope_plot, ratio_slope_plot) 
+
+with_slop = epistasis_tib %>% 
   left_join(effect_compounds)  %>% 
   left_join(signif_hits) %>%
   mutate(

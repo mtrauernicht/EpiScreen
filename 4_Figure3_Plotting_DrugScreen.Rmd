@@ -79,6 +79,7 @@ library(colorspace)
 library(Hmisc)
 library(MASS)
 library(corrr)
+library(ggstatsplot)
 
 
 ## Select outdir
@@ -156,7 +157,7 @@ cor_test <- function(y, X, left, right){
   })
   p_vec = unlist(lapply(cor_list, function(x){x$p.value}))
   cor_vec = unlist(lapply(cor_list, function(x){x$estimate}))
-  p_adj = p.adjust(p_vec, method = "BH")
+  p_adj = p.adjust(p_vec, method = "holm")
   color = ifelse(p_adj < 0.05, ifelse(cor_vec > 0, left, right),
                  'None')
   importance = abs(cor_vec)
@@ -216,310 +217,10 @@ get_combinations <- function(domain_vec){
   return(opt_df)
 }
 
-plot_comb_grid <- function(indel.dt, opt_df, domains, y_name, min_count=0,
-                           max_count=Inf, group_by=NULL, color=NULL, y_plabel=c(0.15, 0.25)){
-  
-  opt_melt = reshape2::melt(opt_df)
-  colnames(opt_melt) = c('group', 'domain', 'is_in')
-  
-  opt_melt$is_in = ifelse(opt_melt$is_in, 'in', 'out')
-  opt_melt$domain = factor(opt_melt$domain, levels=domains)
-  
-  
-  group_list = lapply(rownames(opt_df), function(opt_name){
-    opt = opt_df[opt_name, ]
-    in_vec = domains[opt]
-    out_vec = domains[!opt]
-    
-    in_sum = rowSums(indel.dt[,..in_vec])
-    out_sum = rowSums(indel.dt[,..out_vec])
-    if (length(in_vec)==0){
-      in_group = which(out_sum == 0)
-    } else if (length(out_vec) == 0){
-      in_group = which(in_sum==length(in_vec))
-    } else  {
-      in_group = which(in_sum == length(in_vec) & out_sum==0)
-    }
-    return(in_group)
-  })
-  
-  names(group_list) = rownames(opt_df)
-  for (opt_name in names(group_list)){
-    i_vec = group_list[[opt_name]]
-    indel.dt[i_vec, group := opt_name]
-  }
-  if (is.null(group_by)){
-    group_count_df = data.frame(indel.dt[,table(group)])
-  } else {
-    group_count_df = data.frame(indel.dt[,table(group)/length(unique(get(group_by)))])
-  }
-  group_count_df = group_count_df[order(match(group_count_df$group, rownames(opt_df))),]
-  # print(group_count_df)
-  group_count_sel = group_count_df[group_count_df$Freq>=min_count,]
-  group_count_sel = group_count_sel[group_count_sel$Freq<=max_count,]
-  group_levels =  group_count_sel$group
-  opt_sel = opt_melt[opt_melt$group %in% group_levels, ]
-  
-  opt_sel$group = factor(opt_sel$group, levels=group_levels)
-  # print(opt_sel)
-  
-  indel_selection = indel.dt[group%in%group_levels, ]
-  indel_selection[,group:=factor(group, levels=group_levels)]
-  
-  group_count_sel$group = factor(group_count_sel$group, levels=group_levels)
-  
-  count_plot = ggplot(group_count_sel, aes(x=group,y=1, label=Freq)) +
-    geom_label() +
-    theme_void()
-  
-  
-  
-  dots = ggplot(opt_sel, aes(x=group, y=domain, color=is_in)) +
-    geom_point(size=2) +
-    geom_line(data=opt_sel[opt_sel$is_in=='in',], aes(group=group)) +
-    theme_bw() +
-    scale_color_manual(values=c('in'='black', 'out'='grey70')) +
-    guides(color="none")  +
-    geom_vline(xintercept=seq(1.5, length(unique(indel.dt$group))-0.5, 1),
-               lwd=0.5, colour="grey90") +
-    theme(axis.title=element_blank(),
-          axis.text=element_blank(),
-          axis.ticks=element_blank(),
-          panel.grid.major = element_blank())
-  
-  symnum = list(cutpoints = c(0, 0.0001, 0.001, 0.01, 0.05, 1),
-                symbols = c("****", "***", "**", "*", ""))
-  
-  if (is.null(group_by)){
-    level_vec = indel_selection[, levels(group)]
-    wilcox_list = lapply(level_vec[level_vec!='iDomain'],
-                         function(g){
-                           x = indel_selection[group==g, y_name, with=F]
-                           y = indel_selection[group=='iDomain', y_name,
-                                               with=F]
-                           w = wilcox.test(unlist(x),unlist(y))
-                           return(data.table('group1'='iDomain', 'group2'=g,
-                                             'p'=w$p.value))
-                         })
-    wilcox_dt = do.call(rbind, wilcox_list)
-    wilcox_dt[,p_adj := p.adjust(p, method = "BH")]
-    wilcox_dt[,p_label := sprintf('%.3g', p_adj)]
-    wilcox_dt$y.position = seq(y_plabel[1], y_plabel[2],
-                               length.out=nrow(wilcox_dt))
-    
-    comparisons = lapply(level_vec[level_vec!='iDomain'],
-                         function(x){return(c('iDomain', x))})
-    beeswarm = ggplot(indel_selection, aes_string(x='group', y=y_name)) +
-      geom_quasirandom(width=0.3) +
-      stat_summary(fun=median, fun.min = median,
-                   fun.max = median,
-                   geom="crossbar", width = 0.5,
-                   color='red') +
-      stat_pvalue_manual(wilcox_dt, label = "p_label")
-  } else {
-    wilcox_dt = indel_selection[,test_wilcox(.SD, group_by, y_name),
-                                by='group']
-    wilcox_dt[,p_adj:=p.adjust(p_value, method = "BH")]
-    wilcox_dt[,p_signif:=symnum(p_adj, cutpoints=symnum$cutpoints,
-                                symbols=symnum$symbols)]
-    beeswarm = ggplot(indel_selection,
-                      aes_string(x='group', y=y_name, color=group_by)) +
-      geom_quasirandom(dodge.width=1) +
-      scale_color_manual(values=color) +
-      stat_summary(aes_string(group=group_by), fun.=median,
-                   fun.min = median, fun.max = median,
-                   geom="crossbar", width = 0.5,
-                   color='red',
-                   position= position_dodge(width =1)) +
-      geom_text(data=wilcox_dt, aes(x=group, y=0.8, label=p_signif),
-                inherit.aes=F)
-  }
-  
-  beeswarm = beeswarm +
-    theme_bw() +
-    geom_vline(xintercept=seq(1.5, length(unique(indel.dt$group))-0.5, 1),
-               lwd=0.5, colour="grey90") +
-    theme(axis.title=element_blank(),
-          axis.text.x=element_blank(),
-          panel.grid.major.x = element_blank(),
-          axis.ticks.x=element_blank())
-  
-  count = data.frame(domain=gsub('_domain', '', domains),
-                     count=colSums(indel.dt[,..domains], na.rm=T))
-  
-  count$domain = factor(count$domain, levels=domain_levels)
-  
-  
-  histogram = ggplot(count, aes(x=1, y=domain, label = count)) +
-    geom_label() +
-    theme_bw() +
-    theme(plot.background = element_blank(),
-          panel.grid.major = element_blank(),
-          panel.grid.minor = element_blank(),
-          panel.border = element_blank(),
-          axis.title=element_blank(),
-          axis.text.x=element_blank(),
-          axis.ticks=element_blank())
-  
-  empty = ggplot(data=data.frame(1,1),aes(x=1,y=1)) +
-    geom_point() +
-    theme_void()
-  
-  count_beeswarm = plot_grid(beeswarm, count_plot, ncol=1, rel_heights=c(20,1),
-                             align='v', axis='lr')
-  return(plot_grid(empty, beeswarm, empty, count_plot,
-                   histogram, dots, nrow=3,
-                   rel_widths=c(1,10), rel_heights=c(15,1,5), align='vh',
-                   axis='tlbr'))
-}
-
 quantiles_95 <- function(x) {
   r <- quantile(x, probs=c(0.05, 0.25, 0.5, 0.75, 0.95))
   names(r) <- c("ymin", "lower", "middle", "upper", "ymax")
   r
-}
-
-plot_comb_grid_bothplot <- function(bix.dt, opt_df, domains, y_name, min_count=0,
-                                    max_count=Inf, group_by=NULL, color=NULL){
-  
-  opt_melt = reshape2::melt(opt_df)
-  colnames(opt_melt) = c('group', 'domain', 'is_in')
-  
-  opt_melt$is_in = ifelse(opt_melt$is_in, 'in', 'out')
-  opt_melt$domain = factor(opt_melt$domain, levels=domains)
-  
-  
-  group_list = lapply(rownames(opt_df), function(opt_name){
-    opt = opt_df[opt_name, ]
-    in_vec = domains[opt]
-    out_vec = domains[!opt]
-    
-    in_sum = rowSums(bix.dt[,..in_vec])
-    out_sum = rowSums(bix.dt[,..out_vec])
-    if (length(in_vec)==0){
-      in_group = which(out_sum == 0)
-    } else if (length(out_vec) == 0){
-      in_group = which(in_sum==length(in_vec))
-    } else  {
-      in_group = which(in_sum == length(in_vec) & out_sum==0)
-    }
-    return(in_group)
-  })
-  
-  names(group_list) = rownames(opt_df)
-  for (opt_name in names(group_list)){
-    i_vec = group_list[[opt_name]]
-    bix.dt[i_vec, group := opt_name]
-  }
-  if (is.null(group_by)){
-    group_count_df = data.frame(bix.dt[,table(group)])
-  } else {
-    group_count_df = data.frame(bix.dt[,table(group)/length(unique(get(group_by)))])
-  }
-  group_count_df = group_count_df[order(match(group_count_df$group, rownames(opt_df))),]
-  # print(group_count_df)
-  group_count_sel = group_count_df[group_count_df$Freq>=min_count,]
-  group_count_sel = group_count_sel[group_count_sel$Freq<=max_count,]
-  group_levels =  group_count_sel$group
-  opt_sel = opt_melt[opt_melt$group %in% group_levels, ]
-  
-  opt_sel$group = factor(opt_sel$group, levels=group_levels)
-  # print(opt_sel)
-  
-  indel_selection = bix.dt[group%in%group_levels, ]
-  indel_selection[,group:=factor(group, levels=group_levels)]
-  
-  group_count_sel$group = factor(group_count_sel$group, levels=group_levels)
-  
-  count_plot = ggplot(group_count_sel, aes(x=group,y=1, label=Freq)) +
-    geom_label() +
-    theme_void()
-  
-  
-  
-  dots = ggplot(opt_sel, aes(x=group, y=domain, color=is_in)) +
-    geom_point(size=2) +
-    geom_line(data=opt_sel[opt_sel$is_in=='in',], aes(group=group)) +
-    theme_bw() +
-    scale_color_manual(values=c('in'='black', 'out'='grey70')) +
-    guides(color="none")  +
-    geom_vline(xintercept=seq(1.5, length(unique(bix.dt$group))-0.5, 1),
-               lwd=0.5, colour="grey90") +
-    theme(axis.title=element_blank(),
-          axis.text=element_blank(),
-          axis.ticks=element_blank(),
-          panel.grid.major = element_blank())
-  
-  symnum = list(cutpoints = c(0, 0.0001, 0.001, 0.01, 0.05, 1),
-                symbols = c("****", "***", "**", "*", " "))
-  
-  if (is.null(group_by)){
-    boxpl = ggplot(indel_selection, aes_string(x='group', y=y_name)) +
-      geom_quasirandom(width=0.3) +
-      stat_summary(fun=median, fun.min = median,
-                   fun.max = median,
-                   geom="crossbar", width = 0.5,
-                   color='red') +
-      stat_compare_means(aes(label = ..p.signif..),
-                         symnum.args = symnum,
-                         method = 'wilcox.test',
-                         ref.group='iDomain')
-  } else {
-    
-    boxpl = ggplot(indel_selection,
-                   aes_string(x='group', y=y_name, color=group_by)) +
-      guides(fill="none") +
-      # scale_fill_manual(values=color) +
-      scale_color_manual(values=color) +
-      # geom_violin(position=position_dodge(width=1)) +
-      geom_quasirandom(dodge.width = 1) +
-      # stat_summary(fun.data = quantiles_95,
-      #              geom="boxplot",
-      #              position=position_dodge(width=1),
-      #              width = 0.2) +
-      stat_summary(fun=median, fun.min = median,
-                   fun.max = median,
-                   geom="crossbar", width = 0.6,
-                   position=position_dodge(width=1))
-  }
-  boxpl = boxpl +
-    theme_bw() +
-    geom_vline(xintercept=seq(1.5, length(unique(bix.dt$group))-0.5, 1),
-               lwd=0.5, colour="grey90") +
-    theme(axis.title=element_blank(),
-          axis.text.x=element_blank(),
-          panel.grid.major.x = element_blank(),
-          axis.ticks.x=element_blank()) +
-    ylim(0, 1)
-  
-  
-  count = data.frame(domain=gsub('_domain', '', domains),
-                     count=colSums(bix.dt[,..domains], na.rm=T))
-  
-  count$domain = factor(count$domain, levels=domain_levels)
-  
-  
-  histogram = ggplot(count, aes(x=1, y=domain, label = count)) +
-    geom_label() +
-    theme_bw() +
-    theme(plot.background = element_blank(),
-          panel.grid.major = element_blank(),
-          panel.grid.minor = element_blank(),
-          panel.border = element_blank(),
-          axis.title=element_blank(),
-          axis.text.x=element_blank(),
-          axis.ticks=element_blank())
-  
-  empty = ggplot(data=data.frame(1,1),aes(x=1,y=1)) +
-    geom_point() +
-    theme_void()
-  
-  count_beeswarm = plot_grid(boxpl, count_plot, ncol=1, rel_heights=c(20,1),
-                             align='v', axis='lr')
-  return(plot_grid(empty, boxpl, empty, count_plot,
-                   histogram, dots, nrow=3,
-                   rel_widths=c(1,10), rel_heights=c(15,1,5), align='vh',
-                   axis='tlbr'))
 }
 
 plot_comb_grid_beeswarm <- function(dt, opt_df, domains, y_name, min_count=0,
@@ -620,7 +321,7 @@ plot_comb_grid_beeswarm <- function(dt, opt_df, domains, y_name, min_count=0,
   } else {
     wilcox_dt = indel_selection[,test_wilcox(.SD, group_by, y_name),
                                 by='group']
-    wilcox_dt[,p_adj:=p.adjust(p_value, method = "BH")]
+    wilcox_dt[,p_adj:=p.adjust(p_value, method = "holm")]
     wilcox_dt[,p_signif:=symnum(p_adj, cutpoints=symnum$cutpoints,
                                 symbols=symnum$symbols)]
     
@@ -678,10 +379,10 @@ plot_comb_grid_beeswarm <- function(dt, opt_df, domains, y_name, min_count=0,
 
 p.adjust <- function(p, method = p.adjust.methods, n = length(p))
 {
-  ## Methods 'Hommel', 'BH', 'BY' and speed improvements
+  ## Methods 'Hommel', 'holm', 'BY' and speed improvements
   ## contributed by Gordon Smyth
   method <- match.arg(method)
-  if(method == "fdr") method <- "BH"	# back compatibility
+  if(method == "fdr") method <- "holm"	# back compatibility
   nm <- names(p)
   p <- as.numeric(p)
   p0 <- setNames(p, nm)
@@ -1231,6 +932,13 @@ all_compounds_epistasis_TIF = CCD_tib %>%
   column_to_rownames(var = "drug_conc")
 
 target_ctrl = rename(target, conc_char_ctrl = conc_char)
+
+quant_breaks <- quantile(all_compounds_epistasis_TIF, c(.01,.99), na.rm = T)
+palette_length <- 100
+breaks <- c(seq(quant_breaks[1], 0, length.out=ceiling(palette_length/2) + 1), 
+            seq(quant_breaks[2]/palette_length, quant_breaks[2], length.out=floor(palette_length/2)))
+colors = colorRampPalette(slope.colors %>% pull(color))(length(breaks))
+colors[which(quant_breaks == 0)-1] = "gray90"
 ```
 
 ---
@@ -1261,8 +969,12 @@ p1 = ggplot(mock.slopes, aes(z_score,value,color = variable)) + theme_bw() +
   geom_smooth() +
   geom_vline(xintercept = 0, linetype = 2) + 
   geom_hline(yintercept = 0, linetype = 2) + 
-  ylab("log2(fold change TIF)") + xlab("Feature signal (z-score)") + 
-  theme(legend.position = "none") + coord_cartesian(ylim= c(-1.5,1.5)) + scale_color_manual(values = c("black","#01665e","#8c510a"))
+  ylab("log2(fold change TIF)") + 
+  xlab("Feature signal (z-score)") + 
+  theme(legend.position = "none") + 
+  coord_cartesian(ylim= c(-1.5,1.5)) + 
+  scale_color_manual(values = c("black","#01665e","#8c510a"))+
+  theme_classic2(base_size = 16)
 
 # p2 = ggplot(CCD_example_tib,
 #        aes(x = m5C.zscore, y = Decitabine_log2_FC_TIF)) +
@@ -1282,7 +994,8 @@ p2 = ggplot(CCD_example_tib,
   stat_cor(method = "pearson") +
   xlab("H3K27me3 z-score") +
   ylab("delta log2(TIF)") + 
-  coord_cartesian()
+  coord_cartesian()+
+  theme_classic2(base_size = 16)
 
 CCD_tib %>% filter(drug_conc == "EPZ-6438 10 µM" & feature == "H3K27me3")
 
@@ -1294,7 +1007,8 @@ p3 = ggplot(CCD_example_tib,
   stat_cor(method = "pearson") +
   xlab("H3K36me3 z-score") +
   ylab("delta log2(TIF)") + 
-  coord_cartesian()
+  coord_cartesian()+
+  theme_classic2(base_size = 16)
 
 plot_grid(p1, p2, p3, nrow = 1, labels = c("A", "B", "C"))
 ```
@@ -1312,15 +1026,15 @@ TIF_synergy_matrix = all_compounds_epistasis_TIF %>%
 
 cluster_rows = ifelse(nrow(TIF_synergy_matrix) > 1, TRUE, FALSE)
 
-# change these numbers according to where you want to set the cutoff
-quant_breaks <- quantile(TIF_synergy_matrix, c(.01,.99), na.rm = T) 
-max_quant = max(abs(quant_breaks))
-palette_length <- 100
-breaks <- c(seq(-max_quant, 0, length.out=ceiling(palette_length/2) + 1), 
-            seq(max_quant/palette_length, max_quant, length.out=floor(palette_length/2)))
-slope.colors.temp = slope.colors
-colors = colorRampPalette(slope.colors.temp %>% pull(color))(length(breaks))
-colors[which(quant_breaks == 0)-1] = "gray90"
+# # change these numbers according to where you want to set the cutoff
+# quant_breaks_ <- quantile(TIF_synergy_matrix, c(.01,.99), na.rm = T) 
+# max_quant = max(abs(quant_breaks))
+# palette_length <- 100
+# breaks <- c(seq(-max_quant, 0, length.out=ceiling(palette_length/2) + 1), 
+#             seq(max_quant/palette_length, max_quant, length.out=floor(palette_length/2)))
+# slope.colors.temp = slope.colors
+# colors = colorRampPalette(slope.colors.temp %>% pull(color))(length(breaks))
+# colors[which(quant_breaks == 0)-1] = "gray90"
 
 p = pheatmap(TIF_synergy_matrix[, TRIP_chrom_clust$labels],
              border_color = F,
@@ -1354,7 +1068,34 @@ rank_dt = CCD_tib %>%
 
 maxrank = nrow(rank_dt)
 
-p1 = rank_dt %>% 
+quant_breaks <- quantile(all_compounds_epistasis_TIF, c(.01,.99), na.rm = T)
+palette_length <- 100
+breaks <- c(seq(quant_breaks[1], 0, length.out=ceiling(palette_length/2) + 1), 
+            seq(quant_breaks[2]/palette_length, quant_breaks[2], length.out=floor(palette_length/2)))
+colors = colorRampPalette(slope.colors %>% pull(color))(length(breaks))
+colors[which(quant_breaks == 0)-1] = "gray90"
+
+max_slope = max(abs(rank_dt$indelrate_slope_plot))
+# 
+# p1 = rank_dt %>% 
+#   ggplot(., aes(x = rank, y = 1)) +
+#   geom_bar(stat = "identity", aes(fill = indelrate_slope_plot)) + 
+#   scale_x_reverse() +
+#   coord_flip() +
+#   xlab("Rank") +
+#   theme_classic2(base_size = 16) +
+#   scale_fill_distiller(palette = "BrBG", 
+#                        breaks = c(seq(-0.04, 0.04, 0.01)), direction = 1,
+#                        limits = c(-max_slope, max_slope)) +
+#   # geom_label(aes(label = ifelse(width == 2, drug_conc,''))) +
+#   theme(axis.title.x=element_blank(),
+#         axis.text.x=element_blank(),
+#         axis.ticks.x=element_blank())+
+#   # add horizontal line for 0.01 slope cutoff which is highlighted in the heatmap
+#   geom_vline(xintercept = rank_dt[rank_dt$indelrate_slope_plot  < -0.01, ]$rank[1] - 0.5)  +
+#   geom_vline(xintercept = max(rank_dt[rank_dt$indelrate_slope_plot  > 0.01, ]$rank) + 0.5)
+
+p2 = rank_dt %>% 
   ggplot(., aes(x = rank, fill = target)) +
   geom_bar() + 
   scale_x_reverse() +
@@ -1372,8 +1113,7 @@ theme_classic2(base_size = 16) +
   geom_vline(xintercept = max(rank_dt[rank_dt$indelrate_slope_plot  > 0.01, ]$rank) + 0.5)
 
 
-
-p2 = rank_dt %>% 
+p3 = rank_dt %>% 
   filter(!between(rank, 11, maxrank-10)) %>%
   mutate(rank = seq(1:n())) %>% 
   ggplot(., aes(x = rank, y = indelrate_slope_plot, fill = target)) +
@@ -1391,7 +1131,8 @@ theme_classic2(base_size = 16) +
         axis.ticks.y=element_blank())
 
 
-plot_grid(p1, p2, labels = c("E", "F"), rel_widths = c(1, 5))
+plot_grid(# p1, #comment out the slope per rank
+          p2, p3, labels = c("E", "F"), rel_widths = c(1, 7), nrow = 1)
 
 # Samples to highlight in the heatmap S3C
 all_compounds_epistasis_TIF %>% 
@@ -1457,6 +1198,14 @@ for(i in unique(CCD_tib$feature)) {
 }
 ```
 
+## S3FG Upset plots pool
+```{r S3FG Upset plots pool TIF FC, fig.width= 14, fig.height= 6}
+p1 = plot_comb_grid_beeswarm(vorino.dt, opt_df,
+                             domain_levels, 'log2_FC_TIF', min_count = 10, y_plabel=c(-0.35, 0.25))
+p2 = plot_comb_grid_beeswarm(GSK.dt, opt_df,
+                             domain_levels, 'log2_FC_TIF', min_count = 10, y_plabel=c(-0.35, 0.25))
+plot_grid(p1, p2, labels = c("TIF FC HDACi", "TIF FC EZH2i"))
+```
 
 ## 3HI K27me3 and CTCF correlation
 ```{r 3HI K37me3 vs CTCF CCD correlation, fig.width= 10, fig.height= 5}
@@ -1493,7 +1242,6 @@ p2 = ggplot(K27me3_CTCF,
 plot_grid(p1, p2, nrow = 1, labels = c("F", "G"))
 ```
 
-
 ## 3J m5C top CCDs
 ```{r 3J m5C synergies, fig.width= 6, fig.height= 6}
 rank_dt = CCD_tib %>% 
@@ -1505,7 +1253,28 @@ rank_dt = CCD_tib %>%
 
 maxrank = nrow(rank_dt)
 
-p1 = rank_dt %>% 
+max_slope = max(abs(rank_dt$indelrate_slope_plot))
+
+# p1 = rank_dt %>% 
+#   ggplot(., aes(x = rank, y = 1)) +
+#   geom_bar(stat = "identity", aes(fill = indelrate_slope_plot)) + 
+#   scale_x_reverse() +
+#   coord_flip() +
+#   xlab("Rank") +
+#   theme_classic2(base_size = 16) +
+#   scale_fill_distiller(palette = "BrBG", 
+#                        breaks = c(seq(-0.04, 0.04, 0.01)), direction = 1,
+#                        limits = c(-max_slope, max_slope)) +
+#   # geom_label(aes(label = ifelse(width == 2, drug_conc,''))) +
+#   theme(legend.position = "none",
+#         axis.title.x=element_blank(),
+#         axis.text.x=element_blank(),
+#         axis.ticks.x=element_blank())+
+#   # add horizontal line for 0.01 slope cutoff which is highlighted in the heatmap
+#   geom_vline(xintercept = rank_dt[rank_dt$indelrate_slope_plot  < -0.01, ]$rank[1] - 0.5)  +
+#   geom_vline(xintercept = max(rank_dt[rank_dt$indelrate_slope_plot  > 0.01, ]$rank) + 0.5)
+
+p2 = rank_dt %>% 
   ggplot(., aes(x = rank, fill = target)) +
   geom_bar() + 
   scale_x_reverse() +
@@ -1522,7 +1291,7 @@ theme_classic2(base_size = 16) +
   geom_vline(xintercept = rank_dt[rank_dt$indelrate_slope_plot  < -0.01, ]$rank[1] - 0.5)  +
   geom_vline(xintercept = max(rank_dt[rank_dt$indelrate_slope_plot  > 0.01, ]$rank) + 0.5)
 
-p2 = rank_dt %>% 
+p3 = rank_dt %>% 
   filter(!between(rank, 6, maxrank-5)) %>%
   mutate(rank = seq(1:n())) %>% 
   ggplot(., aes(x = rank, y = indelrate_slope_plot, fill = target)) +
@@ -1540,7 +1309,8 @@ p2 = rank_dt %>%
         axis.ticks.y=element_blank())
 
 
-plot_grid(p1, p2, labels = c("E", "F"), rel_widths = c(1, 5))
+plot_grid(# p1, # comment out the TIF slope 
+          p2, p3, labels = c("E", "F"), rel_widths = c(1, 6), nrow = 1)
 
 # Samples to highlight in the heatmap S3C
 all_compounds_epistasis_TIF %>% 
@@ -1670,10 +1440,45 @@ chromatin_effect %>%
   xlab("Chromatin cluster")
 ```
 
+## S3CD Example CCD
+```{r S3CD example of filtered out CCDs,  fig.width = 8, fig.height = 4}
+
+#Create mock examples
+mock.slopes <- tibble(z_score = seq(-3,3,0.25), 
+                      A = z_score*0.1 -0.6, 
+                      B = z_score*-0.1 +0.6) %>% 
+  reshape2::melt(id.vars = "z_score")
+
+#Plot mock examples
+p1 = ggplot(mock.slopes, aes(z_score,value,color = variable)) + theme_bw() + 
+  geom_smooth() +
+  geom_vline(xintercept = 0, linetype = 2) + 
+  geom_hline(yintercept = 0, linetype = 2) + 
+  ylab("log2(fold change TIF)") + 
+  xlab("Feature signal (z-score)") + 
+  theme(legend.position = "none") + 
+  coord_cartesian(ylim= c(-1.5,1.5)) + 
+  scale_color_manual(values = c("#01665e","#8c510a"))+
+  theme_classic2(base_size = 16)
+
+p2 = ggplot(CCD_example_tib,
+            aes(x = H3K36me3.zscore, y = EPZ6438_log2_FC_TIF)) +
+  geom_point() +
+  geom_smooth(method = "lm", color = "#8c510a",se = FALSE) +
+  stat_cor(method = "pearson") +
+  geom_vline(xintercept = 0, linetype = 2) + 
+  geom_hline(yintercept = 0, linetype = 2) + 
+  xlab("H3K27me3 z-score") +
+  ylab("delta log2(TIF)") + 
+  coord_cartesian() +
+  theme_classic2(base_size = 16)
+
+plot_grid(p1, p2, nrow = 1, labels = c("C", "D"))
+```
 
 
-## S3C All compound synergies with chromatin
-```{r S3C Synergies chromatin - TIF all, fig.width= 10, fig.height= 20}
+## S3E All compound synergies with chromatin
+```{r S3E Synergies chromatin - TIF all, fig.width= 10, fig.height= 20}
 # change these numbers according to where you want to set the cutoff
 quant_breaks <- quantile(all_compounds_epistasis_TIF, c(.01,.99), na.rm = T)
 palette_length <- 100
@@ -1709,8 +1514,8 @@ lims = 1
 CorrelationPlotMean(GSK_ratios, "log2_FC_TIF", targets = GSK.hist.corr, title = "with log2 FC TIF after GSK126 treatment")
 ```
 
-## S3C Vorinostat TIF FC correlation with chromatin features
-```{r S3C Vorino TIF FC Correlations, fig.width= 8, fig.height= 8}
+## S3G Vorinostat TIF FC correlation with chromatin features
+```{r S3G Vorino TIF FC Correlations, fig.width= 8, fig.height= 8}
 ## Vorinostat
 chrom.mods.cols <- seq(grep("CTCF", names(vorinostat_ratios)), grep("H3K27me3_domain", names(vorinostat_ratios))-1)
 
@@ -1723,8 +1528,8 @@ CorrelationPlotMean(vorinostat_ratios, "log2_FC_TIF", targets = vorinostat.hist.
 ```
 
 
-## S3D Vorinostat per cluster
-```{r S3D Vorino density, fig.height=5, fig.width=7}
+## S3extra Vorinostat per cluster
+```{r S3extra Vorino density, fig.height=5, fig.width=7}
 domain_levels = c('late_replicating', 'LAD', 'H3K9me2', 'H3K27me3')
 domains = paste0(domain_levels, '_domain')
 opt_df = get_combinations(domain_levels)
@@ -1771,17 +1576,31 @@ ggplot(vorino.dt, aes(log2_FC_TIF, fill = state)) +
   theme_classic2(base_size = 16)
 
 vorino.dt %>% wilcox_test(., diff_TIF ~ state)%>%
-  adjust_pvalue(method = "BH") %>%
+  adjust_pvalue(method = "holm") %>%
   add_significance("p.adj")
 
 ggplot(vorino.dt, aes(log2_FC_TIF, color = state)) +
   stat_ecdf() +
   scale_color_manual(values = group_colors) +
   theme_classic2(base_size = 16)
+
+ggplot(vorino.dt, aes(state, log2_FC_TIF, color = state)) +
+  geom_quasirandom() +
+  scale_color_manual(values = group_colors) +
+  theme_classic2(base_size = 16)
+
+ggbetweenstats(
+  data  = vorino.dt,
+  x     = state,
+  y     = log2_FC_TIF,
+  title = "Log2 FC TIF per chromatin state Vorinostat",
+  p.adjust.method = "holm",
+  type = "non-parametric"
+)
 ```
 
-## S3E Vorinostat per cluster
-```{r S3E GSK density, fig.height=5, fig.width=7}
+## S3extra Vorinostat per cluster
+```{r S3extra GSK density, fig.height=5, fig.width=7}
 GSK.dt = GSK_ratios %>%
   filter(!is.na(diff_TIF)) %>%
   dplyr::select(barcode, diff_TIF, log2_FC_TIF, 
@@ -1816,13 +1635,22 @@ ggplot(GSK.dt, aes(diff_TIF, fill = state)) +
   theme_classic()
 
 GSK.dt %>% wilcox_test(., diff_TIF ~ state)%>%
-  adjust_pvalue(method = "BH") %>%
+  adjust_pvalue(method = "holm") %>%
   add_significance("p.adj")
 
 ggplot(GSK.dt, aes(log2_FC_TIF, color = state)) +
   stat_ecdf() +
   scale_color_manual(values = group_colors) +
   theme_classic2(base_size = 16)
+
+ggbetweenstats(
+  data  = GSK.dt,
+  x     = state,
+  y     = log2_FC_TIF,
+  title = "Log2 FC TIF per chromatin state GSK126",
+  p.adjust.method = "holm",
+  type = "non-parametric",
+)
 ```
 
 
@@ -1843,18 +1671,6 @@ ggplot(vorino_gsk_compare,
   geom_smooth(method = "lm") +
   facet_wrap(~state) 
 ```
-
-
-## S3FG Upset plots pool
-```{r S3FG Upset plots pool TIF FC, fig.width= 12, fig.height= 6}
-p1 = plot_comb_grid_beeswarm(vorino.dt, opt_df,
-                             domain_levels, 'log2_FC_TIF', min_count = 10, y_plabel=c(-0.35, 0.25))
-p2 = plot_comb_grid_beeswarm(GSK.dt, opt_df,
-                             domain_levels, 'log2_FC_TIF', min_count = 10, y_plabel=c(-0.35, 0.25))
-plot_grid(p1, p2, labels = c("TIF FC HDACi", "TIF FC EZH2i"))
-```
-
-
 
 ```{r eval=FALSE}
 indel.data %>% filter(!between(zscore_TIF_comb_rep, -3.2905, 3.2905) & conc_char != "control" & viab_reproducibility & cor_TIF_filter & filter_zscore_TIF_comb_rep) %>% 
