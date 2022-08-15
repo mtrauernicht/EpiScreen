@@ -1230,7 +1230,8 @@ all_compounds_epistasis_TIF = CCD_tib %>%
   reshape2::dcast(drug_conc ~ feature, value.var = "indelrate_slope_plot", fill = 0) %>% 
   column_to_rownames(var = "drug_conc")
 
-target_ctrl = rename(target, conc_char_ctrl = conc_char)
+target_ctrl = target %>%
+  setnames('conc_char', 'conc_char_ctrl')
 ```
 
 ---
