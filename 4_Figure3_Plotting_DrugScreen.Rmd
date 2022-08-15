@@ -918,8 +918,6 @@ clustering = data.frame(row.names=c('LMNB1', 'late_replicating', 'H3K9me2', 'H3K
 ```
 
 
-
-
 ### Synergies Heatmaps
 
 ```{r Synergies chromatin prep, fig.width= 10, fig.height= 20}
@@ -931,7 +929,7 @@ all_compounds_epistasis_TIF = CCD_tib %>%
   reshape2::dcast(drug_conc ~ feature, value.var = "indelrate_slope_plot", fill = 0) %>% 
   column_to_rownames(var = "drug_conc")
 
-target_ctrl = rename(target, conc_char_ctrl = conc_char)
+target_ctrl = dplyr::rename(target, conc_char_ctrl = conc_char)
 
 quant_breaks <- quantile(all_compounds_epistasis_TIF, c(.01,.99), na.rm = T)
 palette_length <- 100
