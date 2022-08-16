@@ -79,7 +79,7 @@ library(colorspace)
 library(Hmisc)
 library(MASS)
 library(corrr)
-library(ggstatsplot)
+#library(ggstatsplot)
 
 
 ## Select outdir
@@ -1054,6 +1054,19 @@ TIF_synergy_cluster <- TIF_synergy_matrix %>%
   left_join(cluster_HDAC) %>%
   mutate(cluster_HDAC = as.character(cluster_HDAC))
 ```
+## HDAC2/3 CCD
+```{r}
+hdac2_3 <- TIF_synergy_cluster %>%
+  distinct(drug_conc, H3K27me3, H3K4me1, EZH2) %>%
+  left_join(target.cluster1 %>% rownames_to_column("drug_conc")) %>%
+  mutate(hdac3_pan = ifelse(HDAC3 == 1 | pan_HDAC == 1, 1, 0))
+
+ggplot(hdac2_3,
+       aes(x = HDAC3, y = EZH2)) +
+  geom_quasirandom()
+```
+
+
 
 ## 3E K27me3 top CCDs
 ```{r 3E H3K27me3 synergies, fig.width= 6, fig.height= 6}
