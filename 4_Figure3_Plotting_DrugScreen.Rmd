@@ -1011,8 +1011,6 @@ p3 = ggplot(CCD_example_tib,
 plot_grid(p1, p2, p3, nrow = 1, labels = c("A", "B", "C"))
 ```
 
-<<<<<<< HEAD
-
 ## 3D HDAC CCD Heatmap
 ```{r 3D HDAC CCD, fig.width= 14, fig.height= 14}
 target_drugs = cluster_HDAC %>% pull(drug_conc)
@@ -1071,11 +1069,6 @@ ggplot(hdac2_3,
 
 ## 3E K27me3 top CCDs
 ```{r 3E H3K27me3 synergies, fig.width= 6, fig.height= 6}
-=======
-## 3D K27me3 top CCDs
-```{r 3D H3K27me3 synergies, fig.width= 6, fig.height= 6}
->>>>>>> 443919d6068079044955a90ba3a524f9dfe41ec8
-rank_dt = CCD_tib %>% 
   left_join(rownames_to_column(target, var = "drug_conc")) %>%
   filter(feature == "H3K27me3", !is.na(indelrate_slope_plot)) %>%
   distinct() %>%
