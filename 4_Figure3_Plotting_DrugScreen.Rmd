@@ -1011,6 +1011,7 @@ p3 = ggplot(CCD_example_tib,
 plot_grid(p1, p2, p3, nrow = 1, labels = c("A", "B", "C"))
 ```
 
+<<<<<<< HEAD
 
 ## 3D HDAC CCD Heatmap
 ```{r 3D HDAC CCD, fig.width= 14, fig.height= 14}
@@ -1070,6 +1071,10 @@ ggplot(hdac2_3,
 
 ## 3E K27me3 top CCDs
 ```{r 3E H3K27me3 synergies, fig.width= 6, fig.height= 6}
+=======
+## 3D K27me3 top CCDs
+```{r 3D H3K27me3 synergies, fig.width= 6, fig.height= 6}
+>>>>>>> 443919d6068079044955a90ba3a524f9dfe41ec8
 rank_dt = CCD_tib %>% 
   left_join(rownames_to_column(target, var = "drug_conc")) %>%
   filter(feature == "H3K27me3", !is.na(indelrate_slope_plot)) %>%
@@ -1209,52 +1214,9 @@ for(i in unique(CCD_tib$feature)) {
 }
 ```
 
-## S3FG Upset plots pool
-```{r S3FG Upset plots pool TIF FC, fig.width= 14, fig.height= 6}
-p1 = plot_comb_grid_beeswarm(vorino.dt, opt_df,
-                             domain_levels, 'log2_FC_TIF', min_count = 10, y_plabel=c(-0.35, 0.25))
-p2 = plot_comb_grid_beeswarm(GSK.dt, opt_df,
-                             domain_levels, 'log2_FC_TIF', min_count = 10, y_plabel=c(-0.35, 0.25))
-plot_grid(p1, p2, labels = c("TIF FC HDACi", "TIF FC EZH2i"))
-```
 
-## 3HI K27me3 and CTCF correlation
-```{r 3HI K37me3 vs CTCF CCD correlation, fig.width= 10, fig.height= 5}
-K27me3_CTCF = all_compounds_epistasis_TIF %>% rownames_to_column(var = "drug_conc") %>%
-  distinct(drug_conc, CTCF, SMC3, H3K27me3) %>% 
-  mutate(CTCF = replace(CTCF, CTCF == 0, NA), 
-         SMC3 = replace(SMC3, SMC3 == 0, NA), 
-         H3K27me3 = replace(H3K27me3, H3K27me3 == 0, NA))
-
-p1 = ggplot(K27me3_CTCF,
-            aes(x = H3K27me3, y = CTCF)) +
-  geom_point() +
-  geom_abline(lty = "twodash") +
-  geom_smooth(method = "lm") +
-  stat_cor(method = "pearson") +
-  theme_classic2(base_size = 16) +
-  xlab("Slope H3K27me3") +
-  ylab("Slope CTCF") 
-
-
-
-K27me3_CTCF = indel.data %>% distinct(IPR, CTCF, SMC3, H3K27me3)
-
-p2 = ggplot(K27me3_CTCF,
-            aes(x = H3K27me3, y = CTCF)) +
-  geom_point() +
-  geom_abline(lty = "twodash") +
-  geom_smooth(method = "lm") +
-  stat_cor(method = "pearson") +
-  theme_classic2(base_size = 16) +
-  xlab("H3K27me3 z-score") +
-  ylab("CTCF z-score")
-
-plot_grid(p1, p2, nrow = 1, labels = c("F", "G"))
-```
-
-## 3J m5C top CCDs
-```{r 3J m5C synergies, fig.width= 6, fig.height= 6}
+## 3E m5C top CCDs
+```{r 3E m5C synergies, fig.width= 6, fig.height= 6}
 rank_dt = CCD_tib %>% 
   left_join(rownames_to_column(target, var = "drug_conc")) %>%
   filter(feature == "m5C", !is.na(indelrate_slope_plot)) %>%
@@ -1329,8 +1291,100 @@ all_compounds_epistasis_TIF %>%
   rownames()
 ```
 
+## 3F HDAC CCD Heatmap
+```{r 3F HDAC CCD, fig.width= 14, fig.height= 14}
+target_drugs = cluster_HDAC %>% pull(drug_conc)
+
+# Make matrix with drugs from selected target
+TIF_synergy_matrix = all_compounds_epistasis_TIF %>% 
+  rownames_to_column(var = "drug_conc") %>%
+  filter(drug_conc %in% target_drugs) %>%
+  column_to_rownames(var = "drug_conc")
+
+cluster_rows = ifelse(nrow(TIF_synergy_matrix) > 1, TRUE, FALSE)
+
+# # change these numbers according to where you want to set the cutoff
+# quant_breaks_ <- quantile(TIF_synergy_matrix, c(.01,.99), na.rm = T) 
+# max_quant = max(abs(quant_breaks))
+# palette_length <- 100
+# breaks <- c(seq(-max_quant, 0, length.out=ceiling(palette_length/2) + 1), 
+#             seq(max_quant/palette_length, max_quant, length.out=floor(palette_length/2)))
+# slope.colors.temp = slope.colors
+# colors = colorRampPalette(slope.colors.temp %>% pull(color))(length(breaks))
+# colors[which(quant_breaks == 0)-1] = "gray90"
+
+p = pheatmap(TIF_synergy_matrix[, TRIP_chrom_clust$labels],
+             border_color = F,
+             cellwidth = 8,
+             cellheight = 8,
+             cluster_rows = cluster_rows,
+             breaks = breaks,
+             cluster_cols = TRIP_chrom_clust,
+             annotation_row = target.cluster1,
+             clustering_method = "ward.D2",
+             main = paste("Chromatin synergies - TIF HDAC cluster"),
+             color = colors,
+             annotation_colors = annotation_colors_scr, 
+             annotation_legend = T,
+             cutree_rows = 3)
+
+TIF_synergy_cluster <- TIF_synergy_matrix %>%
+  rownames_to_column("drug_conc") %>%
+  left_join(cluster_HDAC) %>%
+  mutate(cluster_HDAC = as.character(cluster_HDAC))
+```
 
 
+
+
+
+## 3GH Upset plots pool
+```{r Upset prep}
+domain_levels = c('late_replicating', 'LAD', 'H3K9me2', 'H3K27me3')
+domains = paste0(domain_levels, '_domain')
+opt_df = get_combinations(domain_levels)
+
+# Prepare Vorinostat table 
+vorino.dt = vorinostat_ratios %>%
+  filter(!is.na(diff_TIF)) %>%
+  dplyr::select(barcode, diff_TIF, log2_FC_TIF, domains) %>%
+  distinct(barcode, .keep_all = TRUE) %>%
+  data.table()
+
+vorino.dt[vorino.dt=='iDomain'] <- 0
+vorino.dt[vorino.dt=='Domain'] <- 1
+vorino.dt[vorino.dt=='DHS'] <- 1
+
+vorino.dt[is.na(LAD_domain), LAD_domain:=0]
+
+vorino.dt[, (domains) := lapply(.SD, as.numeric), .SDcols = domains]
+colnames(vorino.dt) = gsub('_domain', '', colnames(vorino.dt))
+
+
+# Prepare GSK table 
+GSK.dt = GSK_ratios %>%
+  filter(!is.na(diff_TIF)) %>%
+  dplyr::select(barcode, diff_TIF, log2_FC_TIF, 
+                efficiency_GSK126, efficiency_DMSO_GSK, domains) %>%
+  distinct(barcode, .keep_all = TRUE) %>%
+  data.table()
+
+GSK.dt[GSK.dt=='iDomain'] <- 0
+GSK.dt[GSK.dt=='Domain'] <- 1
+GSK.dt[GSK.dt=='DHS'] <- 1
+GSK.dt[is.na(LAD_domain), LAD_domain:=0]
+
+GSK.dt[, (domains) := lapply(.SD, as.numeric), .SDcols = domains]
+colnames(GSK.dt) = gsub('_domain', '', colnames(GSK.dt))
+```
+
+```{r 3GH Upset plots pool TIF FC, fig.width= 14, fig.height= 6}
+p1 = plot_comb_grid_beeswarm(vorino.dt, opt_df,
+                             domain_levels, 'log2_FC_TIF', min_count = 10, y_plabel=c(-0.35, 0.25))
+p2 = plot_comb_grid_beeswarm(GSK.dt, opt_df,
+                             domain_levels, 'log2_FC_TIF', min_count = 10, y_plabel=c(-0.35, 0.25))
+plot_grid(p1, p2, labels = c("TIF FC HDACi", "TIF FC EZH2i"))
+```
 
 
 ```{r Synergies chromatin - TIF per target, fig.width= 10, fig.height= 10, eval = FALSE}
@@ -1387,72 +1441,8 @@ for (i in targets) {
 ```
 
 # Supplementary Figures
-## S3A HDACi only heatmap
-```{r 3A HDACi heapmap, fig.width = 12, fig.height = 12}
-HDAC_matrix = eff.data.heatmap.cluster1 %>%
-  arrange(target.cluster1) %>%
-  column_to_rownames('drug_conc') %>%
-  dplyr::select(contains('IPR'))
-
-# pdf(paste0(figure_out, "rs20220623_indelfrequency_heatmap_HDAC.pdf"), width=16, height=8)
-plt3 = pheatmap(HDAC_matrix[ ,clone5_map_ipr$labels],
-                border_color = F,
-                cellwidth = 8,
-                cellheight = 8,
-                breaks = myBreaks,
-                clustering_method = "ward.D",
-                cluster_cols = clone5_map_ipr,
-                cluster_rows = T,
-                na_col = "white",
-                main = 'efficiency change, all concentrations',
-                annotation_row = target.cluster1,
-                annotation_col = chromatin,
-                color = diverge_hcl(palette_length, "Blue-Red"),
-                annotation_colors = annotation_colors_scr,
-                annotation_legend = T,
-                cutree_rows = 3
-)
-```
-
-
-## S3B Plot HDACi effects on different chromatin types
-```{r S3B HDACi in different clusters}
-chromatin_ipr <- chromatin %>%
-  rownames_to_column("IPR")
-
-eff.data.heatmap3 <- eff.data.heatmap.cluster1 %>%
-  pivot_longer(contains("IPR"), names_to = "IPR", values_to = "freqCut_dif")
-
-chromatin_effect <- merge(eff.data.heatmap3, chromatin_ipr) %>%
-  #filter(target == "HDAC") %>%
-  mutate(freqCut_dif = ave(freqCut_dif, drug, chromatin, conc_char, FUN = function(x) mean(x, na.rm = TRUE))) %>%
-  distinct(freqCut_dif, drug, chromatin, conc_char, target, cluster_HDAC)
-
-sigFunc = function(x){
-  if(x < 0.001){"***"} 
-  else if(x < 0.01){"**"}
-  else if(x < 0.05){"*"}
-  else{NA}}
-
-chromatin_effect %>%
-  filter(target == "HDAC")  %>%
-  ggplot(.,
-         aes(x = chromatin, y = freqCut_dif, fill = chromatin)) +
-  geom_boxplot(outlier.shape = NA) +
-  geom_quasirandom() +
-  geom_signif(comparisons = combn(sort(unique(chromatin_effect$chromatin)), 2, simplify = F), 
-              map_signif_level=sigFunc, 
-              step_increase = 0.1) +
-  theme_classic_lines_45() +
-  scale_fill_manual(values = group_colors) +
-  theme(legend.position = "none") +
-  facet_grid(. ~ cluster_HDAC) +
-  ylab("Total indel frequency change") +
-  xlab("Chromatin cluster")
-```
-
-## S3CD Example CCD
-```{r S3CD example of filtered out CCDs,  fig.width = 8, fig.height = 4}
+## S3AB Example CCD
+```{r S3AB example of filtered out CCDs,  fig.width = 8, fig.height = 3}
 
 #Create mock examples
 mock.slopes <- tibble(z_score = seq(-3,3,0.25), 
@@ -1461,16 +1451,16 @@ mock.slopes <- tibble(z_score = seq(-3,3,0.25),
   reshape2::melt(id.vars = "z_score")
 
 #Plot mock examples
-p1 = ggplot(mock.slopes, aes(z_score,value,color = variable)) + theme_bw() + 
+p1 = ggplot(mock.slopes, aes(z_score, value, color = variable)) + 
   geom_smooth() +
   geom_vline(xintercept = 0, linetype = 2) + 
   geom_hline(yintercept = 0, linetype = 2) + 
   ylab("log2(fold change TIF)") + 
   xlab("Feature signal (z-score)") + 
-  theme(legend.position = "none") + 
   coord_cartesian(ylim= c(-1.5,1.5)) + 
   scale_color_manual(values = c("#01665e","#8c510a"))+
-  theme_classic2(base_size = 16)
+  theme_classic2(base_size = 16) + 
+  theme(legend.position = "none")
 
 p2 = ggplot(CCD_example_tib,
             aes(x = H3K36me3.zscore, y = EPZ6438_log2_FC_TIF)) +
@@ -1485,11 +1475,13 @@ p2 = ggplot(CCD_example_tib,
   theme_classic2(base_size = 16)
 
 plot_grid(p1, p2, nrow = 1, labels = c("C", "D"))
+
+CCD_tib %>% filter(feature == "H3K36me3" & drug_conc == "EPZ-6438 10 µM") %>% pull(indelrate_slope_plot)
 ```
 
 
-## S3E All compound synergies with chromatin
-```{r S3E Synergies chromatin - TIF all, fig.width= 10, fig.height= 20}
+## S3C All compound synergies with chromatin
+```{r S3C Synergies chromatin - TIF all, fig.width= 10, fig.height= 20}
 # change these numbers according to where you want to set the cutoff
 quant_breaks <- quantile(all_compounds_epistasis_TIF, c(.01,.99), na.rm = T)
 palette_length <- 100
@@ -1510,6 +1502,41 @@ pheatmap(all_compounds_epistasis_TIF[, TRIP_chrom_clust$labels],
          color = colors,
          annotation_colors = annotation_colors_scr, 
          annotation_legend = T)
+```
+
+## S3DE K27me3 and CTCF correlation
+```{r 3DE K37me3 vs CTCF CCD correlation, fig.width= 10, fig.height= 5}
+K27me3_CTCF = all_compounds_epistasis_TIF %>% rownames_to_column(var = "drug_conc") %>%
+  distinct(drug_conc, CTCF, SMC3, H3K27me3) %>% 
+  mutate(CTCF = replace(CTCF, CTCF == 0, NA), 
+         SMC3 = replace(SMC3, SMC3 == 0, NA), 
+         H3K27me3 = replace(H3K27me3, H3K27me3 == 0, NA))
+
+p1 = ggplot(K27me3_CTCF,
+            aes(x = H3K27me3, y = CTCF)) +
+  geom_point() +
+  geom_abline(lty = "twodash") +
+  geom_smooth(method = "lm") +
+  stat_cor(method = "pearson") +
+  theme_classic2(base_size = 16) +
+  xlab("Slope H3K27me3") +
+  ylab("Slope CTCF") 
+
+
+
+K27me3_CTCF = indel.data %>% distinct(IPR, CTCF, SMC3, H3K27me3)
+
+p2 = ggplot(K27me3_CTCF,
+            aes(x = H3K27me3, y = CTCF)) +
+  geom_point() +
+  geom_abline(lty = "twodash") +
+  geom_smooth(method = "lm") +
+  stat_cor(method = "pearson") +
+  theme_classic2(base_size = 16) +
+  xlab("H3K27me3 z-score") +
+  ylab("CTCF z-score")
+
+plot_grid(p1, p2, nrow = 1, labels = c("F", "G"))
 ```
 
 ## S3F GSK TIF FC correlation with chromatin features
@@ -1541,28 +1568,6 @@ CorrelationPlotMean(vorinostat_ratios, "log2_FC_TIF", targets = vorinostat.hist.
 
 ## S3extra Vorinostat per cluster
 ```{r S3extra Vorino density, fig.height=5, fig.width=7}
-domain_levels = c('late_replicating', 'LAD', 'H3K9me2', 'H3K27me3')
-domains = paste0(domain_levels, '_domain')
-opt_df = get_combinations(domain_levels)
-
-
-vorino.dt = vorinostat_ratios %>%
-  filter(!is.na(diff_TIF)) %>%
-  dplyr::select(barcode, diff_TIF, log2_FC_TIF, domains) %>%
-  distinct(barcode, .keep_all = TRUE) %>%
-  data.table()
-
-vorino.dt[vorino.dt=='iDomain'] <- 0
-vorino.dt[vorino.dt=='Domain'] <- 1
-vorino.dt[vorino.dt=='DHS'] <- 1
-
-vorino.dt[is.na(LAD_domain), LAD_domain:=0]
-
-vorino.dt[, (domains) := lapply(.SD, as.numeric), .SDcols = domains]
-colnames(vorino.dt) = gsub('_domain', '', colnames(vorino.dt))
-
-
-
 vorino.dt = vorino.dt %>% 
   mutate(state = ifelse(late_replicating == 1 & 
                           LAD == 1 &
@@ -1612,21 +1617,6 @@ ggbetweenstats(
 
 ## S3extra Vorinostat per cluster
 ```{r S3extra GSK density, fig.height=5, fig.width=7}
-GSK.dt = GSK_ratios %>%
-  filter(!is.na(diff_TIF)) %>%
-  dplyr::select(barcode, diff_TIF, log2_FC_TIF, 
-                efficiency_GSK126, efficiency_DMSO_GSK, domains) %>%
-  distinct(barcode, .keep_all = TRUE) %>%
-  data.table()
-
-GSK.dt[GSK.dt=='iDomain'] <- 0
-GSK.dt[GSK.dt=='Domain'] <- 1
-GSK.dt[GSK.dt=='DHS'] <- 1
-GSK.dt[is.na(LAD_domain), LAD_domain:=0]
-
-GSK.dt[, (domains) := lapply(.SD, as.numeric), .SDcols = domains]
-colnames(GSK.dt) = gsub('_domain', '', colnames(GSK.dt))
-
 GSK.dt = GSK.dt %>% mutate(state = ifelse(late_replicating == 1 & 
                                             LAD == 1 &
                                             H3K9me2 == 1 &
