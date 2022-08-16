@@ -732,6 +732,73 @@ drug_conc = paste(drug, conc_char, sep = " "))
 
 ```
 
+---
+
+## 2D HDACi only heatmap
+```{r 2D HDACi heapmap, fig.width = 12, fig.height = 12}
+HDAC_matrix = eff.data.heatmap.cluster1 %>%
+  arrange(target.cluster1) %>%
+  column_to_rownames('drug_conc') %>%
+  dplyr::select(contains('IPR'))
+
+# pdf(paste0(figure_out, "rs20220623_indelfrequency_heatmap_HDAC.pdf"), width=16, height=8)
+plt3 = pheatmap(HDAC_matrix[ ,clone5_map_ipr$labels],
+                border_color = F,
+                cellwidth = 8,
+                cellheight = 8,
+                breaks = myBreaks,
+                clustering_method = "ward.D",
+                cluster_cols = clone5_map_ipr,
+                cluster_rows = T,
+                na_col = "white",
+                main = 'efficiency change, all concentrations',
+                annotation_row = target.cluster1,
+                annotation_col = chromatin,
+                color = diverge_hcl(palette_length, "Blue-Red"),
+                annotation_colors = annotation_colors_scr,
+                annotation_legend = T,
+                cutree_rows = 3
+)
+```
+
+
+---
+
+## 2F Plot HDACi effects on different chromatin types
+```{r 2F HDACi in different clusters}
+chromatin_ipr <- chromatin %>%
+  rownames_to_column("IPR")
+
+eff.data.heatmap3 <- eff.data.heatmap.cluster1 %>%
+  pivot_longer(contains("IPR"), names_to = "IPR", values_to = "freqCut_dif")
+
+chromatin_effect <- merge(eff.data.heatmap3, chromatin_ipr) %>%
+  #filter(target == "HDAC") %>%
+  mutate(freqCut_dif = ave(freqCut_dif, drug, chromatin, conc_char, FUN = function(x) mean(x, na.rm = TRUE))) %>%
+  distinct(freqCut_dif, drug, chromatin, conc_char, target, cluster_HDAC)
+
+sigFunc = function(x){
+  if(x < 0.001){"***"} 
+  else if(x < 0.01){"**"}
+  else if(x < 0.05){"*"}
+  else{NA}}
+
+chromatin_effect %>%
+  filter(target == "HDAC")  %>%
+  ggplot(.,
+         aes(x = chromatin, y = freqCut_dif, fill = chromatin)) +
+  geom_boxplot(outlier.shape = NA) +
+  geom_quasirandom() +
+  geom_signif(comparisons = combn(sort(unique(chromatin_effect$chromatin)), 2, simplify = F), 
+              map_signif_level=sigFunc, 
+              step_increase = 0.1) +
+  theme_classic_lines_45() +
+  scale_fill_manual(values = group_colors) +
+  theme(legend.position = "none") +
+  facet_grid(. ~ cluster_HDAC) +
+  ylab("Total indel frequency change") +
+  xlab("Chromatin cluster")
+```
 
 ---
 
