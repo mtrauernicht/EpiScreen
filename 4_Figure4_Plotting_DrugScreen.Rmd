@@ -509,10 +509,9 @@ sigFunc = function(x){
 
 ```{r data import, echo = FALSE, warning = FALSE}
 # # Import data from preprocessing script
-# in.dir = list.dirs(path = "/DATA/projects/DSBrepair/data/R") %>% .[grepl("episcreen", .)] %>% tail(n = 1)
-# file = list.files(in.dir, pattern = "episcreen_ratios", full.names = T) %>% tail(n = 1)
-# indel.data <- readRDS(file) # %>% filter(pathway_bal_filter == TRUE & viab_reproducibility == TRUE)
-indel.data <- readRDS("data/episcreen_ratios_mt20220811.RDS") 
+in.dir = list.dirs(path = "/DATA/projects/DSBrepair/data/R") %>% .[grepl("episcreen", .)] %>% tail(n = 1)
+file = list.files(in.dir, pattern = "episcreen_ratios", full.names = T) %>% tail(n = 1)
+indel.data <- readRDS(file) # %>% filter(pathway_bal_filter == TRUE & viab_reproducibility == TRUE)
 
 # Import data from preprocessing validation script
 file.validation = list.files(in.dir, pattern = "validation_ratio", full.names = T) %>% tail(n = 1)
@@ -1352,7 +1351,128 @@ ggplot(bc_mut_tib_mean,
 
 ## 4E: Decitabine combined with NU7441
 
+```{r 4E HTS Decitabine + NU7441}
+# plot pathway balance in both replicates
+Dec_NU_tib = indel.data.validation %>% filter(grepl("DecNU_", replicate) & plasmid == "LBR2") %>% 
+  distinct(barcode, drug, replicate, MMEJ_NHEJ, efficiency, time) %>%
+  pivot_wider(names_from = c(replicate), values_from = c(MMEJ_NHEJ, efficiency))
+
+bc_IPR = indel.data %>% distinct(barcode, IPR, chromatin)
+
+ggplot(Dec_NU_tib,
+            aes(x = MMEJ_NHEJ_DecNU_rep1, y = MMEJ_NHEJ_DecNU_rep2)) +
+  geom_point() +
+  geom_abline(lty = "twodash") +
+  geom_smooth(method = "lm") +
+  stat_cor(method = "pearson") +
+  theme_classic2(base_size = 16) +
+  xlab("MMEJ ratio rep 1") +
+  ylab("MMEJ ratio rep 2")  +
+  facet_wrap(time ~ drug, scales = "free")
+
+ggplot(Dec_NU_tib,
+            aes(x = efficiency_DecNU_rep1, y = efficiency_DecNU_rep2)) +
+  geom_point() +
+  geom_abline(lty = "twodash") +
+  geom_smooth(method = "lm") +
+  stat_cor(method = "pearson") +
+  theme_classic2(base_size = 16) +
+  xlab("TIF rep 1") +
+  ylab("TIF rep 2")  +
+  facet_grid(time ~ drug)
+
+Dec_NU_tib = indel.data.validation %>% 
+  filter(grepl("DecNU_", replicate) & plasmid == "LBR2" & drug == "DMSODN" | 
+           grepl("mean", replicate) & plasmid == "LBR2" & drug %in% c("Decitabine-NU7441", "Decitabine", "NU7441")) %>% 
+  distinct(barcode, drug, MMEJ_NHEJ, efficiency, time, sum_reads, sum_bc_reads, MMEJ, NHEJ) %>% 
+  mutate(barcode = gsub(".B", "", barcode)) %>%
+  right_join(bc_IPR) %>%
+  mutate(sum_reads = ave(sum_bc_reads, drug, time, FUN = sum),
+         relative_reads = sum_bc_reads / sum_reads,
+         other = 1-MMEJ-NHEJ)
+
+Dec_NU_tib %>% 
+  ggplot(., aes(time, relative_reads, group = IPR, color = chromatin)) + 
+  geom_point() + 
+  geom_line() + 
+  facet_grid(drug ~ .)
+  
+Dec_NU_tib %>% filter(drug == "NU7441", time %in% c(120, 144)) %>% group_by(barcode, chromatin) %>% dplyr::count()
+
+
+Dec_NU_tib %>% 
+  ggplot(., aes(time, MMEJ_NHEJ, group = IPR, color = chromatin)) + 
+  geom_quasirandom() + 
+  facet_wrap(. ~ drug)
+
+Dec_NU_tib %>% 
+  ggplot(., aes(time, efficiency, group = IPR, color = chromatin)) + 
+  geom_quasirandom() + 
+  facet_grid(. ~ drug)
+
+
+
+Dec_NU_tib %>% 
+  ggplot(., aes(time, MMEJ, group = IPR, color = chromatin)) + 
+  geom_quasirandom() + 
+  facet_wrap(. ~ drug)
+
+
+Dec_NU_tib %>% 
+  ggplot(., aes(time, NHEJ, group = IPR, color = chromatin)) + 
+  geom_quasirandom() + 
+  facet_wrap(. ~ drug)
+
+
+Dec_NU_tib %>% 
+  ggplot(., aes(time, other, group = IPR, color = chromatin)) + 
+  geom_quasirandom() + 
+  facet_wrap(. ~ drug)
+
+
+```
+
 ```{r}
+rel_bc_count = data.table(Dec_NU_tib)
+
+
+rel_bc_count[, rel_broken:=relative_reads/relative_reads[time==72],
+             by=c('barcode', 'drug')]
+
+rel_bc_count[, rel_count:=relative_reads * length(unique(barcode)),
+             by=c('drug')]
+
+
+rel_bc_med = rel_bc_count[, list(rel_measured = median(rel_broken),
+                                 rel_count = median(rel_count)),
+                          by=c('barcode', 'drug', 'time')]
+# This does not work
+# fit_loess <- function(dt){
+#     time = 72:144
+#     fit = loess(rel_measured ~ time, data=dt)
+#     print(fit)
+#     p = predict(fit, time)
+#     return(list(time=time, loess=p))
+# }
+# 
+# 
+# loess_dt = rel_bc_med[ ,fit_loess(.SD),
+#                         by=c('barcode', 'drug')]
+# loess_dt[,group:=domain_dt[barcode, 'group']]
+# setkey(clone_dt, 'barcode')
+# loess_dt[,seqnames:=clone_dt[barcode, 'seqnames']]
+
+
+
+rel_bc_med %>% left_join(bc_IPR) %>%
+  ggplot(., aes(time, rel_measured, group = IPR, color = chromatin)) + 
+  geom_point() + 
+  geom_line() + 
+  facet_grid(drug ~ .)
+```
+
+
+```{r 4E TIDE}
 decitabine_nu7441_df <- read_csv("/DATA/usr/m.trauernicht/projects/EpiScreen/data/decitabine_synergy_indels.csv")
 
 decitabine_nu7441_df <- decitabine_nu7441_df %>%
