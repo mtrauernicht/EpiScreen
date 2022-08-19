@@ -79,7 +79,7 @@ library(colorspace)
 library(Hmisc)
 library(MASS)
 library(corrr)
-library(ggstatsplot)
+#library(ggstatsplot)
 
 
 ## Select outdir
@@ -1011,9 +1011,64 @@ p3 = ggplot(CCD_example_tib,
 plot_grid(p1, p2, p3, nrow = 1, labels = c("A", "B", "C"))
 ```
 
-## 3D K27me3 top CCDs
-```{r 3D H3K27me3 synergies, fig.width= 6, fig.height= 6}
-rank_dt = CCD_tib %>% 
+## 3D HDAC CCD Heatmap
+```{r 3D HDAC CCD, fig.width= 14, fig.height= 14}
+target_drugs = cluster_HDAC %>% pull(drug_conc)
+
+# Make matrix with drugs from selected target
+TIF_synergy_matrix = all_compounds_epistasis_TIF %>% 
+  rownames_to_column(var = "drug_conc") %>%
+  filter(drug_conc %in% target_drugs) %>%
+  column_to_rownames(var = "drug_conc")
+
+cluster_rows = ifelse(nrow(TIF_synergy_matrix) > 1, TRUE, FALSE)
+
+# # change these numbers according to where you want to set the cutoff
+# quant_breaks_ <- quantile(TIF_synergy_matrix, c(.01,.99), na.rm = T) 
+# max_quant = max(abs(quant_breaks))
+# palette_length <- 100
+# breaks <- c(seq(-max_quant, 0, length.out=ceiling(palette_length/2) + 1), 
+#             seq(max_quant/palette_length, max_quant, length.out=floor(palette_length/2)))
+# slope.colors.temp = slope.colors
+# colors = colorRampPalette(slope.colors.temp %>% pull(color))(length(breaks))
+# colors[which(quant_breaks == 0)-1] = "gray90"
+
+p = pheatmap(TIF_synergy_matrix[, TRIP_chrom_clust$labels],
+             border_color = F,
+             cellwidth = 8,
+             cellheight = 8,
+             cluster_rows = cluster_rows,
+             breaks = breaks,
+             cluster_cols = TRIP_chrom_clust,
+             annotation_row = target.cluster1,
+             clustering_method = "ward.D2",
+             main = paste("Chromatin synergies - TIF HDAC cluster"),
+             color = colors,
+             annotation_colors = annotation_colors_scr, 
+             annotation_legend = T,
+             cutree_rows = 3)
+
+TIF_synergy_cluster <- TIF_synergy_matrix %>%
+  rownames_to_column("drug_conc") %>%
+  left_join(cluster_HDAC) %>%
+  mutate(cluster_HDAC = as.character(cluster_HDAC))
+```
+## HDAC2/3 CCD
+```{r}
+hdac2_3 <- TIF_synergy_cluster %>%
+  distinct(drug_conc, H3K27me3, H3K4me1, EZH2) %>%
+  left_join(target.cluster1 %>% rownames_to_column("drug_conc")) %>%
+  mutate(hdac3_pan = ifelse(HDAC3 == 1 | pan_HDAC == 1, 1, 0))
+
+ggplot(hdac2_3,
+       aes(x = HDAC3, y = EZH2)) +
+  geom_quasirandom()
+```
+
+
+
+## 3E K27me3 top CCDs
+```{r 3E H3K27me3 synergies, fig.width= 6, fig.height= 6}
   left_join(rownames_to_column(target, var = "drug_conc")) %>%
   filter(feature == "H3K27me3", !is.na(indelrate_slope_plot)) %>%
   distinct() %>%
