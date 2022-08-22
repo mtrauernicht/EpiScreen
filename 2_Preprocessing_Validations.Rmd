@@ -119,27 +119,27 @@ MeanExperiments <- function(mutdt) {
   dt
 }
 
-# serialNext = function(prefix, extension){
-#     i=0
-#     repeat {
-#        f = paste0(prefix, "_", i , ".", extension)
-#        if(!file.exists(f)){return(f)}
-#        i=i+1
-#      }
-#   }
-# 
-# SetFileName <- function(filename, initials, extension) {
-#   # Set filename with extension and initials to make filename with date integrated.
-#   filename <- substitute(filename)
-#   filename <- paste0(out.dir, "/", initials, substr(gsub("-","",Sys.time()),1,8), "_", filename)
-#   filename <- serialNext(filename, extension)
-#   filename
-# }
-# 
-# CallTrueBarcodes <- function(df) {
-#   df %<>% filter(barcode %in% barcodes.clone5)
-#   df
-# }
+serialNext = function(prefix, extension){
+    i=0
+    repeat {
+       f = paste0(prefix, "_", i , ".", extension)
+       if(!file.exists(f)){return(f)}
+       i=i+1
+     }
+  }
+
+SetFileName <- function(filename, initials, extension) {
+  # Set filename with extension and initials to make filename with date integrated.
+  filename <- substitute(filename)
+  filename <- paste0(out.dir, "/", initials, substr(gsub("-","",Sys.time()),1,8), "_", filename)
+  filename <- serialNext(filename, extension)
+  filename
+}
+
+CallTrueBarcodes <- function(df) {
+  df %<>% filter(barcode %in% barcodes.clone5)
+  df
+}
 ```
 
 ## Data import
@@ -172,7 +172,7 @@ n.samples <- length(df.list)
 load("/DATA/projects/DSBrepair/data/R/rs20210311/Analyis_Mapping_RSTP2_2000.RData")
 
 # Read metadata file
-metadata <- read.table("/DATA/projects/DSBrepair/config/rs20210805_EpiScreen_validations_metadata.txt", 
+metadata <- read.table("/DATA/projects/DSBrepair/git/EpiScreen/config/rs20220816_EpiScreen_validations_metadata.txt", 
                        header = TRUE, 
                        stringsAsFactors = FALSE) %>% 
   dplyr::select(-file, -run, -index_length) %>%
@@ -226,6 +226,9 @@ mapped_barcodes <- c(analysis.mapped.integrations.df$barcode, barcodes.list, clo
 mutations.dt = do.call(rbind, c(mut.list, fill = T))
 mutations.dt = mutations.dt[exp != "clone32_anoek"]
 dim(mutations.dt)
+
+# Rename one exp, there is a typo (a "-") in the list, therefore it doesn't combine the data correctly.
+mutations.dt[, exp := gsub("LBR2_Decitabine-NU7441_", "LBR2_DecitabineNU7441_", exp, perl = TRUE)]
 
 # Remove Run number from exp name and sum the read counts for these experiments.
 mutations.dt[, exp := gsub("_run[123]$", "", exp, perl = TRUE)]

@@ -485,30 +485,30 @@ epistasis_tib %<>%
     ratio_slope_plot = ifelse(x_intercept_ratio < 1 & effect_on_ratio & signif.ratio, ratio_slope, NA)) %>%
   distinct(drug_conc, feature, indelrate_slope_plot, ratio_slope_plot) 
 
-
-without_slop = epistasis_tib %>% 
-  left_join(effect_compounds)  %>% 
-  left_join(signif_hits) %>%
-  mutate(
-    # x_intercept_indelrate = ifelse(p.value.indelrate < 0.05,
-    #                                x_intercept_indelrate, NA),
-    # x_intercept_ratio = ifelse(p.value.ratio < 0.05,
-    #                            x_intercept_ratio, NA),
-    indelrate_slope_plot = ifelse(indelrate_slope > 0 & effect_on_indelrate & signif.freqCut, indelrate_slope, NA),
-    ratio_slope_plot = ifelse(effect_on_ratio & signif.ratio, ratio_slope, NA)) %>%
-  distinct(drug_conc, feature, indelrate_slope_plot, ratio_slope_plot) 
-
-with_slop = epistasis_tib %>% 
-  left_join(effect_compounds)  %>% 
-  left_join(signif_hits) %>%
-  mutate(
-    # x_intercept_indelrate = ifelse(p.value.indelrate < 0.05,
-    #                                x_intercept_indelrate, NA),
-    # x_intercept_ratio = ifelse(p.value.ratio < 0.05,
-    #                            x_intercept_ratio, NA),
-    indelrate_slope_plot = ifelse(x_intercept_indelrate < 1 & effect_on_indelrate & signif.freqCut, indelrate_slope, NA),
-    ratio_slope_plot = ifelse(x_intercept_ratio < 1 & effect_on_ratio & signif.ratio, ratio_slope, NA)) %>%
-  distinct(drug_conc, feature, indelrate_slope_plot, ratio_slope_plot) 
+# 
+# without_slop = epistasis_tib %>% 
+#   left_join(effect_compounds)  %>% 
+#   left_join(signif_hits) %>%
+#   mutate(
+#     # x_intercept_indelrate = ifelse(p.value.indelrate < 0.05,
+#     #                                x_intercept_indelrate, NA),
+#     # x_intercept_ratio = ifelse(p.value.ratio < 0.05,
+#     #                            x_intercept_ratio, NA),
+#     indelrate_slope_plot = ifelse(indelrate_slope > 0 & effect_on_indelrate & signif.freqCut, indelrate_slope, NA),
+#     ratio_slope_plot = ifelse(effect_on_ratio & signif.ratio, ratio_slope, NA)) %>%
+#   distinct(drug_conc, feature, indelrate_slope_plot, ratio_slope_plot) 
+# 
+# with_slop = epistasis_tib %>% 
+#   left_join(effect_compounds)  %>% 
+#   left_join(signif_hits) %>%
+#   mutate(
+#     # x_intercept_indelrate = ifelse(p.value.indelrate < 0.05,
+#     #                                x_intercept_indelrate, NA),
+#     # x_intercept_ratio = ifelse(p.value.ratio < 0.05,
+#     #                            x_intercept_ratio, NA),
+#     indelrate_slope_plot = ifelse(x_intercept_indelrate < 1 & effect_on_indelrate & signif.freqCut, indelrate_slope, NA),
+#     ratio_slope_plot = ifelse(x_intercept_ratio < 1 & effect_on_ratio & signif.ratio, ratio_slope, NA)) %>%
+#   distinct(drug_conc, feature, indelrate_slope_plot, ratio_slope_plot) 
 ```
 
 ## Heatmap annoation
