@@ -993,6 +993,15 @@ bal.zscore = bal_zscore_calc %>%
          zscore_bal = (MMEJratio - mean_DMSO) / sd_DMSO,
          zscore_bal_global = (MMEJratio_global - mean_DMSO_global) / sd_DMSO_global)
 
+# Remove -Inf
+bal.zscore = bal.zscore %>%
+  group_by(drug, conc_char, barcode) %>%
+  mutate(min_MMEJ_FC = min(MMEJ_log2_FC[is.finite(MMEJ_log2_FC)])) %>%
+  mutate(MMEJ_log2_FC = ifelse(!is.finite(MMEJ_log2_FC), min_MMEJ_FC, MMEJ_log2_FC)) %>%
+  ungroup() %>%
+  dplyr::select(-min_MMEJ_FC)
+
+
 # Combine the z-scores of both screens
 mean.bal.zscore.comb = bal.zscore %>% distinct(drug, conc_char, barcode, replicate, zscore_bal) %>%
   filter(!is.na(zscore_bal)) %>%
