@@ -691,7 +691,7 @@ min.value = min(balance.data.heatmap$MMEJ_log2_FC_mean[is.finite(balance.data.he
 top_50_hits = balance.data.heatmap %>% 
   distinct(drug_conc, min_score) %>%
   arrange(desc(abs(min_score))) %>% 
-  dplyr::slice_tail(n = 60) %>%
+  #dplyr::slice_tail(n = 60) %>%
   distinct(drug_conc)
 
 
