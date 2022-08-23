@@ -139,7 +139,7 @@ file.list <- list.files("/DATA/projects/DSBrepair/data/rs20210628_EpiScreen/inde
 # import the data
 df.list <- mclapply(file.list, 
                     read.table, 
-                    mc.cores = 20, 
+                    mc.cores = 30, 
                     header = TRUE, 
                     stringsAsFactors = FALSE, 
                     col.names = c("barcode", "type", 
@@ -183,7 +183,7 @@ barcodes.clone5 <- c("AGGGCGTAAAATATTT", "TATGGCTGTCGGGTAG", "TGTCCCTTAGTACTTT",
 
 ```{r indel data table list}
 # Call true barcodes for clone 5 experiments
-df.list = mclapply(df.list, CallTrueBarcodes, mc.cores = 10)
+df.list = mclapply(df.list, CallTrueBarcodes, mc.cores = 20)
 
 # add name of the processed file to each mutation table and change mutations to char
 mut.list = mclapply(names(df.list), function(exp){
@@ -864,15 +864,18 @@ mean.TIF.zscore.comb = TIF.zscore %>% distinct(drug, conc_char, barcode, replica
   filter(!is.na(zscore_TIF)) %>%
   mutate(zscore_TIF_comb_tech = ave(zscore_TIF, drug, conc_char, barcode, replicate,
                                     FUN = function(x) sum(x)/sqrt(length(x))),
-         sum_sign = ave(zscore_TIF, drug, conc_char, barcode, replicate,
-                        FUN = function(x) length(table(sign(x)))),
-         filter_zscore_TIF_comb_tech = ifelse(sum_sign == 1, TRUE, FALSE),
+         # Filter the z-scores for at least 2 significant hits per screen. 
+         binary_zscore = ifelse(abs(zscore_TIF) >= 1.96, 1, 0),
+         sum_tech = ave(binary_zscore, drug, conc_char, barcode, replicate,
+                        FUN = sum),
+         filter_zscore_TIF_comb_tech = ifelse(sum_tech >= 2, TRUE, FALSE), 
          zscore_TIF_comb_rep = ave(zscore_TIF, drug, conc_char, barcode,
                                    FUN = function(x) sum(x)/sqrt(length(x))),
-         sum_sign_comb = ave(zscore_TIF, drug, conc_char, barcode,
-                             FUN = function(x) length(table(sign(x)))),
-         filter_zscore_TIF_comb_rep = ifelse(sum_sign_comb == 1, TRUE, FALSE)) %>%
-  dplyr::select(-sum_sign, -sum_sign_comb)
+         # Make filter for replicate, here both tech filters need to be true.
+         sum_rep = ave(as.integer(filter_zscore_TIF_comb_tech), drug, conc_char, barcode,
+                             FUN = sum),
+         filter_zscore_TIF_comb_rep = ifelse(sum_rep >= 4, TRUE, FALSE)) %>%
+  dplyr::select(-sum_tech, -sum_rep, -binary_zscore)
 
 TIF.zscore %<>% left_join(mean.TIF.zscore.comb)
 ```
@@ -885,18 +888,22 @@ TIF.zscore.global = TIF_zscore_calc %>%
   mutate(zscore_TIF_global = (freqCut_global - mean_DMSO_global) / sd_DMSO_global)
 
 # Combine the z-scores of both screens
-TIF.zscore.global.comb = TIF.zscore %>% distinct(drug, conc_char, barcode, replicate, zscore_TIF_global) %>%
+TIF.zscore.global.comb = TIF.zscore.global %>% distinct(drug, conc_char, replicate, zscore_TIF_global) %>%
   filter(!is.na(zscore_TIF_global)) %>%
-  mutate(zscore_TIF_global_comb_tech = ave(zscore_TIF_global, drug, conc_char, barcode, replicate,
-                                           FUN = function(x) sum(x)/sqrt(length(x))),
-         sum_sign = ave(zscore_TIF_global, drug, conc_char, barcode, replicate,
-                        FUN = function(x) length(table(sign(x)))),
-         filter_zscore_TIF_global_comb_tech = ifelse(sum_sign == 1, TRUE, FALSE),
-         zscore_TIF_global_comb_rep = ave(zscore_TIF_global, drug, conc_char, barcode,
-                                          FUN = function(x) sum(x)/sqrt(length(x))),
-         sum_sign_comb = ave(zscore_TIF_global, drug, conc_char, barcode,
-                             FUN = function(x) length(table(sign(x)))),
-         filter_zscore_TIF_global_comb_rep = ifelse(sum_sign_comb == 1, TRUE, FALSE))
+ mutate(zscore_TIF_global_comb_tech = ave(zscore_TIF_global, drug, conc_char, replicate,
+                                    FUN = function(x) sum(x)/sqrt(length(x))),
+         # Filter the z-scores for at least 2 significant hits per screen. 
+         binary_zscore = ifelse(abs(zscore_TIF_global) >= 1.96, 1, 0),
+         sum_tech = ave(binary_zscore, drug, conc_char, replicate,
+                        FUN = sum),
+         filter_zscore_TIF_global_comb_tech = ifelse(sum_tech >= 2, TRUE, FALSE), 
+         zscore_TIF_global_comb_rep = ave(zscore_TIF_global, drug, conc_char, 
+                                   FUN = function(x) sum(x)/sqrt(length(x))),
+         # Make filter for replicate, here both tech filters need to be true.
+         sum_rep = ave(as.integer(filter_zscore_TIF_global_comb_tech), drug, conc_char, 
+                       FUN = sum),
+         filter_zscore_TIF_global_comb_rep = ifelse(sum_rep >= 4, TRUE, FALSE)) %>%
+  dplyr::select(-sum_tech, -sum_rep, -binary_zscore)
 
 TIF.zscore.global %<>% left_join(TIF.zscore.global.comb)
 
@@ -1007,15 +1014,18 @@ mean.bal.zscore.comb = bal.zscore %>% distinct(drug, conc_char, barcode, replica
   filter(!is.na(zscore_bal)) %>%
   mutate(zscore_bal_comb_tech = ave(zscore_bal, drug, conc_char, barcode, replicate,
                                     FUN = function(x) sum(x)/sqrt(length(x))),
-         sum_sign = ave(zscore_bal, drug, conc_char, barcode, replicate,
-                        FUN = function(x) length(table(sign(x)))),
-         filter_zscore_bal_comb_tech = ifelse(sum_sign == 1, TRUE, FALSE),
+         # Filter the z-scores for at least 2 significant hits per screen. 
+         binary_zscore = ifelse(abs(zscore_bal) >= 1.96, 1, 0),
+         sum_tech = ave(binary_zscore, drug, conc_char, barcode, replicate,
+                        FUN = sum),
+         filter_zscore_bal_comb_tech = ifelse(sum_tech >= 2, TRUE, FALSE), 
          zscore_bal_comb_rep = ave(zscore_bal, drug, conc_char, barcode,
                                    FUN = function(x) sum(x)/sqrt(length(x))),
-         sum_sign_comb = ave(zscore_bal, drug, conc_char, barcode,
-                             FUN = function(x) length(table(sign(x)))),
-         filter_zscore_bal_comb_rep = ifelse(sum_sign_comb == 1, TRUE, FALSE)) %>%
-  dplyr::select(-sum_sign, -sum_sign_comb)
+         # Make filter for replicate, here both tech filters need to be true.
+         sum_rep = ave(as.integer(filter_zscore_bal_comb_tech), drug, conc_char, barcode,
+                             FUN = sum),
+         filter_zscore_bal_comb_rep = ifelse(sum_rep >= 4, TRUE, FALSE)) %>%
+  dplyr::select(-sum_tech, -sum_rep, -binary_zscore)
 
 bal.zscore %<>% left_join(mean.bal.zscore.comb)
 ```
@@ -1043,18 +1053,22 @@ bal.zscore.global = bal_zscore_calc %>%
   mutate(zscore_bal_global = (MMEJratio_global - mean_DMSO_global) / sd_DMSO_global)
 
 # Combine the z-scores of both screens
-bal.zscore.global.comb = bal.zscore %>% distinct(drug, conc_char, barcode, replicate, zscore_bal_global) %>%
+bal.zscore.global.comb = bal.zscore.global %>% distinct(drug, conc_char, replicate, zscore_bal_global) %>%
   filter(!is.na(zscore_bal_global)) %>%
-  mutate(zscore_bal_global_comb_tech = ave(zscore_bal_global, drug, conc_char, barcode, replicate,
-                                           FUN = function(x) sum(x)/sqrt(length(x))),
-         sum_sign = ave(zscore_bal_global, drug, conc_char, barcode, replicate,
-                        FUN = function(x) length(table(sign(x)))),
-         filter_zscore_bal_global_comb_tech = ifelse(sum_sign == 1, TRUE, FALSE),
-         zscore_bal_global_comb_rep = ave(zscore_bal_global, drug, conc_char, barcode,
-                                          FUN = function(x) sum(x)/sqrt(length(x))),
-         sum_sign_comb = ave(zscore_bal_global, drug, conc_char, barcode,
-                             FUN = function(x) length(table(sign(x)))),
-         filter_zscore_bal_global_comb_rep = ifelse(sum_sign_comb == 1, TRUE, FALSE))
+  mutate(zscore_bal_global_comb_tech = ave(zscore_bal_global, drug, conc_char, replicate,
+                                    FUN = function(x) sum(x)/sqrt(length(x))),
+         # Filter the z-scores for at least 2 significant hits per screen. 
+         binary_zscore = ifelse(abs(zscore_bal_global) >= 1.96, 1, 0),
+         sum_tech = ave(binary_zscore, drug, conc_char, replicate,
+                        FUN = sum),
+         filter_zscore_bal_global_comb_tech = ifelse(sum_tech >= 2, TRUE, FALSE), 
+         zscore_bal_global_comb_rep = ave(zscore_bal_global, drug, conc_char, 
+                                   FUN = function(x) sum(x)/sqrt(length(x))),
+         # Make filter for replicate, here both tech filters need to be true.
+         sum_rep = ave(as.integer(filter_zscore_bal_global_comb_tech), drug, conc_char, 
+                             FUN = sum),
+         filter_zscore_bal_global_comb_rep = ifelse(sum_rep >= 4, TRUE, FALSE)) %>%
+  dplyr::select(-sum_tech, -sum_rep, -binary_zscore)
 
 bal.zscore.global %<>% left_join(bal.zscore.global.comb)
 
