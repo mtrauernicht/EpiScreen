@@ -549,8 +549,8 @@ eff.data.heatmap <- eff.data %>%
 
 top_50_hits = eff.data.heatmap %>% 
   arrange(desc(abs(freqCut_diff_mean))) %>% 
-  distinct(drug, conc_char, min_score) %>%
-  dplyr::slice(1:60) 
+  distinct(drug, conc_char, min_score) #%>%
+  #dplyr::slice(1:100) 
 
 
 #eff.data.heatmap2$freqCut_norm_mean[eff.data.heatmap2$mean_eff_zscore_comb > 0.05] <- NA
@@ -581,7 +581,6 @@ annotation_colors_scr_set = annotation_colors_scr
 
 annotation_colors_scr_set$target <- annotation_colors_scr_set$target[ordered_marks2]
 
-
 ## New simplified annotation - we don't need concentration or cluster. 
 target_set_all <- target_set_drugs %>% 
   filter(rownames(.) %in% eff.data.heatmap2$drug_conc) %>%
@@ -593,25 +592,26 @@ target_set_all <- target_set_drugs %>%
 # pdf(paste0(figure_out, "rs20220623_indelfrequency_heatmap_allconc.pdf"), width=20, height=8)
 eff.data.matrix = eff.data.heatmap2 %>%
   column_to_rownames('drug_conc') %>%
-  dplyr::select(contains('IPR'))
+  dplyr::select(contains('IPR')) 
 
-plt1 = pheatmap(eff.data.matrix[ , clone5_map_ipr$labels],
-                cluster_cols = clone5_map_ipr,
+plt1 = pheatmap(eff.data.matrix[ , clone5_map_ipr$labels] %>% as.matrix() %>% t(),
+                cluster_rows = clone5_map_ipr,
                 border_color = F,
                 cellwidth = 8,
                 cellheight = 8,
                 breaks = myBreaks,
                 clustering_method = "ward.D",
-                cluster_rows = T,
+                cluster_cols = T,
                 na_col = "white",
                 main = 'efficiency change, all concentrations',
-                annotation_row = target_set_all,
-                annotation_col = chromatin,
+                annotation_col = target_all,
+                annotation_row = chromatin,
                 # color = colorRampPalette(c("#e07a5f", "#e5e5e5", "#3d405b"))(palette_length),
                 color = diverge_hcl(palette_length, "Blue-Red"),
                 annotation_colors = annotation_colors_scr_set,
                 annotation_legend = T,
                 cutree_row = 4)
+
 ```
 
 ---
@@ -619,12 +619,13 @@ plt1 = pheatmap(eff.data.matrix[ , clone5_map_ipr$labels],
 ## 2B Ranking 
 ```{r 2B Top TIF boosting, fig.width = 8, fig.height = 8}
 rank_dt = indel.data %>% 
-  filter(drug != "DMSO" & indel_freq_filter & viab_reproducibility  & !is.na(zscore_TIF_global_comb_rep)  & cor_TIF_filter) %>%
+  filter(!drug %in% c("DMSO", "Mirin", "DNA-PKi") & indel_freq_filter & viab_reproducibility  & !is.na(zscore_TIF_global_comb_rep)  & cor_TIF_filter) %>%
   distinct(drug, conc_char, zscore_TIF_global_comb_rep , target, viab_mean, viab_reproducibility, filter_zscore_TIF_global_comb_rep) %>% 
   mutate(viab_mean = ave(viab_mean, drug, conc_char, FUN = mean),
          mean_eff_pval_comb = 2*pnorm(q = abs(zscore_TIF_global_comb_rep), lower.tail = FALSE),
          mean_eff_pval_adj_comb = p.adjust(mean_eff_pval_comb, method = 'bonferroni')) %>%
   distinct() %>%
+  filter(!(viab_mean < .60 & zscore_TIF_global_comb_rep < -2.54)) %>% 
   arrange(desc(zscore_TIF_global_comb_rep )) %>%
   mutate(rank = seq(1:n()),
          drug = gsub(" [(].*[)]", "", drug),
@@ -636,7 +637,7 @@ maxrank = nrow(rank_dt)
 rank_dt %>% 
   # left_join(near_all_TIF) %>%
   mutate(# n = ifelse(is.na(n), 1, 2),
-    col = ifelse(!between(rank, 8, maxrank-17) & 
+    col = ifelse(!between(rank, 15, maxrank-8) & 
                    filter_zscore_TIF_global_comb_rep & 
                    !(viab_mean < .60 & zscore_TIF_global_comb_rep < -2.54) & 
                    mean_eff_pval_adj_comb < 0.01,
@@ -662,7 +663,8 @@ rank_dt %>%
   scale_x_reverse() +
   ylim(-75,75) +
   ylab("Global combined TIF z-score") +
-  theme_classic2()
+  theme_classic2()+ 
+  theme(legend.position = "none") 
 
 
 bottom_hits = rank_dt  %>%
