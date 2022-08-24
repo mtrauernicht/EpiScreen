@@ -1,21 +1,28 @@
 --- 
 title: "Indels Preprocessing"
-author: "Ruben Schep"
+author: 
+  - name: "Ruben Schep"
+    email: "r.schep@nki.nl"
+    affiliation: "Netherlands Cancer Institute"
 date: "`r format(Sys.time(), '%Y-%m-%d')`"
 output:
   html_document:
-    theme: journal #cerulean
-    highlight: monochrome
-    toc: true
-    toc_float: true
-    code_folding: show
-  editor_options:
-    chunk_output_type: console
+    theme: united
+    highlight: pygments
+    fig_caption: yes
+    code_folding: hide
+    df_print: kable
+    toc: yes
+    toc_depth: 4
+    toc_float:
+      collapsed: no
+  pdf_document:
+    toc: yes
+    toc_depth: '4'
 ---
 
-knitr document van Steensel lab
+*knitr document van Steensel lab*
 
-# Preprocessing of the indel data
 # Introduction
 
 In this script I want to prepocess the datafiles into several working dataframes.
@@ -59,7 +66,22 @@ Mutations files : *genuine_mapped.table
 | TTTCCCACATCAGGAG | wt | 0 |
 | CCATAGTAGTGATTAC | del | -4 |
 
-# Data importing and processing
+
+
+# Data importing and processing {.tabset}
+
+<!-- little HTML script to do indentation of the table of contents -->
+<script>
+$(document).ready(function() {
+$items = $('div#TOC li');
+$items.each(function(idx) {
+num_ul = $(this).parentsUntil('#TOC').length;
+$(this).css({'text-indent': num_ul * 10, 'padding-left': 0});
+});
+
+});
+</script>
+
 ## Path, Libraries, Parameters and Useful Functions
 
 ```{r setup validation, message=FALSE, warnings=FALSE}
@@ -86,7 +108,6 @@ initials = "rs"
 ``` 
 
 ## Custom functions
-Functions used
 
 ```{r functions validations}
 MeanExperiments <- function(mutdt) {
@@ -195,8 +216,10 @@ clone5barcodes <- paste0(barcodes.list, ".clone5")
 ```
 
 # Data processing into large data table
+
 Set everything in a datafram that contains the barcodes, indel ratios, and efficiencies.
-## extract data to list of data tables
+
+## Extract data to list of data tables
 ```{r indel data table list validation}
 # To be able to setup the functions in a general way. This means in cases where we have A
 # and B samples.
@@ -483,6 +506,8 @@ setnames(mean.mutations.dt, old = "group", new = "exp")
 all.mutations.dt <- rbind(sep.mutations.dt, mean.mutations.dt)
 ```
 
+---
+
 # Calculating frequencies and ratios 
 
 ## Calcuate frequencies
@@ -508,7 +533,10 @@ setcolorder(all.mutations.dt, c("exp", "barcode", "nexp", "no", "exp_ID",
                                 "sd_norm", "ratio_indels", "sd_ratio_indels", "freq", "sd_freq"))
 ```
 
+---
+
 # Combining large indels for plotting
+
 ## Combining large indels
 ```{r large indels validation}
 # Fix large deletions for every deletion above 25

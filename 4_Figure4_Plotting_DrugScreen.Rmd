@@ -45,7 +45,6 @@ overflow-x: hidden;
 }
 ```
 ### Libraries
-### Libraries
 
 ```{r load_packages, results = 'hide', warning = FALSE, message = FALSE}
 knitr::opts_chunk$set(echo = TRUE)
@@ -648,7 +647,7 @@ iprs <- dmso_bal$IPR
 iprs <- as.character(iprs)
 ```
 
-
+# Main Figure 5
 ## 5A MMEJ ratio change heatmap
 Aim: Give an overview of the most important MMEJ ratio fold-changes. 
 ```{r prepare data for heatmaps}

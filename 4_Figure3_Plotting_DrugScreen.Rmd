@@ -77,9 +77,10 @@ library(cowplot)
 library(rstatix)
 library(colorspace)
 library(Hmisc)
+library(pls)
 library(MASS)
 library(corrr)
-#library(ggstatsplot)
+library(ggstatsplot)
 
 
 ## Select outdir
@@ -800,7 +801,8 @@ vorinostat_ratios = vorinostat_validation  %>%
          log2_FC_TIF = log2(ratio_TIF),
          diff_MMEJ_NHEJ = MMEJ_NHEJ_Vorinostat - MMEJ_NHEJ_DMSO,
          ratio_MMEJ_NHEJ = MMEJ_NHEJ_Vorinostat/MMEJ_NHEJ_DMSO,
-         log2_FC_MMEJ_NHEJ = log2(ratio_MMEJ_NHEJ)) 
+         log2_FC_MMEJ_NHEJ = log2(ratio_MMEJ_NHEJ),
+         drug = "Vorinostat") 
 
 barcde_all_reps_gsk = RSTP2_IndelRatios_Chromatin_2kb %>% 
   distinct(barcode, drug) %>% 
@@ -818,7 +820,8 @@ GSK_ratios = RSTP2_IndelRatios_Chromatin_2kb %>%
          log2_FC_TIF = log2(ratio_TIF),
          diff_MMEJ_NHEJ = MMEJ_NHEJ_GSK126 - MMEJ_NHEJ_DMSO_GSK,
          ratio_MMEJ_NHEJ = MMEJ_NHEJ_GSK126/MMEJ_NHEJ_DMSO_GSK,
-         log2_FC_MMEJ_NHEJ = log2(ratio_MMEJ_NHEJ))
+         log2_FC_MMEJ_NHEJ = log2(ratio_MMEJ_NHEJ),
+         drug = "GSK-126")
 
 vorinostat_ctrl <- vorinostat_ratios %>%
   distinct(efficiency_DMSO, barcode)
@@ -837,7 +840,227 @@ cor(ctrl_compare$efficiency_DMSO, ctrl_compare$efficiency_DMSO_GSK, method = "sp
 #        aes(x = efficiency_DMSO, y = efficiency_DMSO_GSK)) +
 #   geom_point() +
 #   geom_smooth(method = "lm")
+
+pool_validation_ratios = bind_rows(vorinostat_ratios, GSK_ratios) %>% 
+  dplyr::select(-efficiency_Vorinostat, -efficiency_DMSO, -MMEJ_NHEJ_DMSO, 
+                -MMEJ_NHEJ_Vorinostat, -MMEJ_NHEJ_DMSO_GSK, -efficiency_DMSO_GSK, 
+                -MMEJ_NHEJ_DMSO_GSK, -MMEJ_NHEJ_GSK126, -efficiency_GSK126)
 ```
+
+### CCD processing of the pool data
+
+```{r all scatterplots pool, eval = FALSE}
+valid_ratios_long = pool_validation_ratios %>% 
+  dplyr::select(drug, all_of(chromatin.features.short), log2_FC_TIF, log2_FC_MMEJ_NHEJ) %>% 
+  distinct() %>%
+  pivot_longer(cols = chromatin.features.short, names_to = "feature", values_to = "zscore")
+
+
+pdf("/DATA/projects/DSBrepair/git/EpiScreen/figures/rs20220824_CCD_pool.pdf", height = 20, width = 20)
+
+ggplot(valid_ratios_long %>% filter(drug == "Vorinostat"), aes(zscore, log2_FC_TIF)) + 
+  geom_point_rast() +
+  geom_smooth(method = "lm", se = F) +
+  stat_cor(method = "pearson") +
+  ggtitle("TIF Vorinostat") +
+  stat_poly_eq(aes(label = paste(after_stat(eq.label),
+                                 after_stat(rr.label), sep = "*\", \"*")),
+               label.x = "left", label.y = "bottom") +
+  facet_wrap(. ~ feature) +
+  theme_bw(base_size = 16)
+
+ggplot(valid_ratios_long%>% filter(drug == "Vorinostat"), aes(zscore, log2_FC_MMEJ_NHEJ)) + 
+  geom_point_rast() +
+  geom_smooth(method = "lm", se = F) +
+  stat_cor(method = "pearson") +
+  ggtitle("Bal Vorinostat") +
+  stat_poly_eq(aes(label = paste(after_stat(eq.label),
+                                 after_stat(rr.label), sep = "*\", \"*")),
+               label.x = "left", label.y = "bottom") +
+  facet_wrap(. ~ feature) +
+  theme_bw(base_size = 16)
+
+ggplot(valid_ratios_long%>% filter(drug == "GSK-126"), aes(zscore, log2_FC_TIF)) + 
+  geom_point_rast() +
+  geom_smooth(method = "lm", se = F) +
+  stat_cor(method = "pearson") +
+  ggtitle("TIF GSK-126") +
+  stat_poly_eq(aes(label = paste(after_stat(eq.label),
+                                 after_stat(rr.label), sep = "*\", \"*")),
+               label.x = "left", label.y = "bottom") +
+  facet_wrap(. ~ feature) +
+  theme_bw(base_size = 16)
+
+ggplot(valid_ratios_long%>% filter(drug == "GSK-126"), aes(zscore, log2_FC_MMEJ_NHEJ)) + 
+  geom_point_rast() +
+  geom_smooth(method = "lm", se = F) +
+  stat_cor(method = "pearson") +
+  ggtitle("Bal GSK-126") +
+  stat_poly_eq(aes(label = paste(after_stat(eq.label),
+                                 after_stat(rr.label), sep = "*\", \"*")),
+               label.x = "left", label.y = "bottom") +
+  facet_wrap(. ~ feature) +
+  theme_bw(base_size = 16)
+
+dev.off()
+```
+
+
+# Calculating the Chromatin Context Dependency (CCD)
+## Extract slopes for all genes
+
+```{r}
+chromatin.features.short = chromatin_cols[1:24]
+
+slope.protein.features <- tibble(drug = NA, feature = NA,  term = NA, 
+                                 indelrate = NA, p.value.indelrate = NA, 
+                                 ratio = NA, p.value.ratio = NA)
+
+for (i in unique(pool_validation_ratios$drug)) {
+  for (j in chromatin.features.short) {
+    model_tib <- pool_validation_ratios %>% filter(drug == i) 
+    
+    # Indel rates
+    model.indelrate.log2 <- lm(formula = log2_FC_TIF ~ unlist(model_tib[j]), 
+                               data = model_tib) %>% 
+      tidy()
+    
+    # Pathway balance
+    model.ratio.log2 <- lm(formula = log2_FC_MMEJ_NHEJ ~ unlist(model_tib[j]), 
+                           data = model_tib) %>% 
+      tidy()
+    
+    slope.protein.features <- slope.protein.features %>% 
+      add_row(drug = i, 
+              feature = j, 
+              term = model.indelrate.log2 %>%
+                pull(term),
+              indelrate = model.indelrate.log2 %>% 
+                pull(estimate), 
+              p.value.indelrate = model.indelrate.log2 %>% 
+                pull(p.value),
+              ratio = model.ratio.log2 %>% 
+                pull(estimate), 
+              p.value.ratio = model.ratio.log2 %>% 
+                pull(p.value))
+  }
+}
+
+# Remove the 1st NA column
+slope.protein.features %<>% 
+  filter(!is.na(feature)) %>%
+  mutate(term = ifelse(term == "(Intercept)", "intercept", "slope"))
+```
+
+
+### Calculating the Principle Component Regression (PCR)
+```{r}
+CCD_tib = pool_validation_ratios %>% dplyr::select(barcode, drug, log2_FC_TIF, log2_FC_MMEJ_NHEJ, all_of(chromatin.features.short)) %>% ungroup()
+
+#Create an empty dt with CCDs of DDR proteins
+pool_CCDs_dt <- tibble(var = NA, drug = NA, num_comp = NA, r.squared = NA, adj.r.squared = NA,p.value = NA)
+# chrom_formula = as.formula(paste("y ~ ", paste(chromatin.features, collapse= "+")))
+
+for (i in unique(CCD_tib$drug)){
+  for (j in c("log2_FC_TIF", "log2_FC_MMEJ_NHEJ")) {
+    pool_dt <- filter(CCD_tib, drug == i)
+    # Run a model per drug
+    set.seed(1)
+    chrom_formula = reformulate(chromatin.features.short, response = j)
+    PCR_model_DDR_test <- pcr(chrom_formula,
+                              data=pool_dt , 
+                              validation="CV")
+    
+    pcr_pred <- predict(PCR_model_DDR_test, 
+                        pool_dt, ncomp = 3)
+    
+    combined.dt <- tibble(measured = pool_dt %>% pull(j), 
+                          predicted = as.numeric(pcr_pred))
+    
+    pred_vs_estim <- lm(formula = measured ~ predicted, 
+                        data = combined.dt) %>% 
+      glance()
+    
+    pool_CCDs_dt <- pool_CCDs_dt %>% 
+      add_row(var = j,
+              drug = i, 
+              r.squared = pred_vs_estim %>% 
+                pull(r.squared), 
+              adj.r.squared = pred_vs_estim %>% 
+                pull(adj.r.squared), 
+              p.value = pred_vs_estim %>% 
+                pull(p.value))
+  }
+}
+
+#Correct model to adjust for multiple testing correction
+adj_p.value_KO_model <- pool_CCDs_dt %>% 
+  dplyr::select(var, num_comp, p.value, drug) %>% 
+  group_by(var) %>%
+  mutate(p.adj = p.adjust(p.value, method = "BH")) %>% 
+  dplyr::select(var, drug,p.value,p.adj)
+
+signif_hits = adj_p.value_KO_model %>% filter(p.adj < 0.01) %>% 
+  distinct(drug, var) %>% 
+  ungroup() %>% 
+  mutate(val = TRUE,
+         var = gsub("log2.fc", "signif", var)) %>%
+  pivot_wider(names_from = var, 
+              values_from = val, 
+              values_fill = FALSE) 
+```
+
+### Filtering the epistasis
+```{r epistasis filtering}
+# Calculate postition where the linear model crosses y = 0, we do this by -intercept / slope
+epistasis_tib = slope.protein.features %>% 
+  mutate(indelrate = ifelse(p.value.indelrate < 0.05, indelrate, 0),
+         ratio = ifelse(p.value.ratio < 0.05, ratio, 0)) %>%
+  distinct(drug, term, feature, indelrate, ratio) %>% 
+  pivot_wider(., names_from = term, values_from = c(indelrate, ratio)) %>%
+  mutate(feature = gsub(".zscore", "", feature),
+         x_intercept_indelrate = -indelrate_intercept / indelrate_slope,
+         x_intercept_ratio = -ratio_intercept / ratio_slope)
+
+effect_compounds = pool_validation_ratios %>%
+  group_by(drug)  %>% 
+  #
+  mutate(indelrate_pos = sum(log2_FC_TIF > 0),
+         #
+         indelrate_effect = ifelse(indelrate_pos >= 17, "indel_rate_increase", 
+                                   ifelse(indelrate_pos <= 1, "indel_rate_decrease", "mixed")),
+         #
+         ratio_pos = sum(log2_FC_MMEJ_NHEJ > 0),
+         #
+         ratio_effect = ifelse(ratio_pos >= 17, "NHEJ_increase", 
+                               ifelse(ratio_pos <= 1, "MMEJ_increase", "mixed"))) %>%
+  distinct(drug, indelrate_effect, ratio_effect)
+
+
+epistasis_tib %<>% 
+  left_join(effect_compounds)  %>% 
+  left_join(signif_hits) %>%
+  mutate(
+    # x_intercept_indelrate = ifelse(p.value.indelrate < 0.05,
+    #                                x_intercept_indelrate, NA),
+    # x_intercept_ratio = ifelse(p.value.ratio < 0.05,
+    #                            x_intercept_ratio, NA),
+    indelrate_slope_plot = ifelse(x_intercept_indelrate < 1, indelrate_slope, NA),
+    ratio_slope_plot = ifelse(x_intercept_ratio < 1, ratio_slope, NA)) %>%
+  distinct(drug, feature, indelrate_slope_plot, ratio_slope_plot) 
+
+validation_epistasis_TIF = epistasis_tib %>%
+  dplyr::select(drug, indelrate_slope_plot, feature) %>%
+  reshape2::dcast(drug ~ feature, value.var = "indelrate_slope_plot", fill = 0) %>% 
+  column_to_rownames(var = "drug")
+
+validation_epistasis_bal = epistasis_tib %>%
+  dplyr::select(drug, ratio_slope_plot, feature) %>%
+  reshape2::dcast(drug ~ feature, value.var = "ratio_slope_plot", fill = 0) %>% 
+  column_to_rownames(var = "drug")
+```
+
+
 
 ## CCD Data
 ###Load data
@@ -929,7 +1152,7 @@ all_compounds_epistasis_TIF = CCD_tib %>%
   reshape2::dcast(drug_conc ~ feature, value.var = "indelrate_slope_plot", fill = 0) %>% 
   column_to_rownames(var = "drug_conc")
 
-target_ctrl = dplyr::rename(target, conc_char_ctrl = conc_char)
+target_ctrl = dplyr::select(target, -conc_char)
 
 quant_breaks <- quantile(all_compounds_epistasis_TIF, c(.01,.99), na.rm = T)
 palette_length <- 100
@@ -1069,6 +1292,7 @@ ggplot(hdac2_3,
 
 ## 3E K27me3 top CCDs
 ```{r 3E H3K27me3 synergies, fig.width= 6, fig.height= 6}
+rank_dt = CCD_tib %>% 
   left_join(rownames_to_column(target, var = "drug_conc")) %>%
   filter(feature == "H3K27me3", !is.na(indelrate_slope_plot)) %>%
   distinct() %>%
@@ -1327,7 +1551,49 @@ TIF_synergy_cluster <- TIF_synergy_matrix %>%
   mutate(cluster_HDAC = as.character(cluster_HDAC))
 ```
 
+## 3.. Pool CCD TIF
 
+```{r GH CCD in the pool}
+quant_breaks <- quantile(validation_epistasis_TIF, c(.01,.99), na.rm = T)
+palette_length <- 100
+breaks.validation <- c(seq(quant_breaks[1], 0, length.out=ceiling(palette_length/2) + 1), 
+            seq(quant_breaks[2]/palette_length, quant_breaks[2], length.out=floor(palette_length/2)))
+colors.validations = colorRampPalette(slope.colors %>% pull(color))(length(breaks.validation))
+colors.validations[which(quant_breaks == 0)-1] = "gray90"
+
+
+order_chrom = TRIP_chrom_clust$labels
+order_chrom = order_chrom[!grepl("H3K9me3", order_chrom)]
+
+
+pheatmap(validation_epistasis_TIF[ , order_chrom],
+             border_color = F,
+             cellwidth = 8,
+             cellheight = 8,
+             breaks = breaks.validation,
+             main = paste("Chromatin synergies - TIF"),
+             color = colors.validations,
+             annotation_legend = T)
+
+
+
+quant_breaks <- quantile(validation_epistasis_bal, c(.01,.99), na.rm = T)
+palette_length <- 100
+breaks.validation <- c(seq(quant_breaks[1], 0, length.out=ceiling(palette_length/2) + 1), 
+            seq(quant_breaks[2]/palette_length, quant_breaks[2], length.out=floor(palette_length/2)))
+colors.validations = colorRampPalette(slope.colors %>% pull(color))(length(breaks.validation))
+colors.validations[which(quant_breaks == 0)-1] = "gray90"
+
+
+pheatmap(validation_epistasis_bal[ , order_chrom],
+             border_color = F,
+             cellwidth = 8,
+             cellheight = 8,
+             breaks = breaks.validation,
+             main = paste("Chromatin synergies - Balance"),
+             color = colors.validations,
+             annotation_legend = T)
+```
 
 
 
