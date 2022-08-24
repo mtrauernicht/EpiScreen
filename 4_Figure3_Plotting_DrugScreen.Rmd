@@ -1635,13 +1635,14 @@ GSK.dt[is.na(LAD_domain), LAD_domain:=0]
 
 GSK.dt[, (domains) := lapply(.SD, as.numeric), .SDcols = domains]
 colnames(GSK.dt) = gsub('_domain', '', colnames(GSK.dt))
+  
 ```
 
 ```{r 3GH Upset plots pool TIF FC, fig.width= 14, fig.height= 6}
 p1 = plot_comb_grid_beeswarm(vorino.dt, opt_df,
-                             domain_levels, 'log2_FC_TIF', min_count = 10, y_plabel=c(-0.35, 0.25))
+                             domain_levels, 'diff_TIF', min_count = 10, y_plabel=c(-0.15, 0.15))
 p2 = plot_comb_grid_beeswarm(GSK.dt, opt_df,
-                             domain_levels, 'log2_FC_TIF', min_count = 10, y_plabel=c(-0.35, 0.25))
+                             domain_levels, 'diff_TIF', min_count = 10, y_plabel=c(-0.15, 0.15))
 plot_grid(p1, p2, labels = c("TIF FC HDACi", "TIF FC EZH2i"))
 ```
 
