@@ -513,7 +513,7 @@ sigFunc = function(x){
 # in.dir = list.dirs(path = "/DATA/projects/DSBrepair/data/R") %>% .[grepl("episcreen", .)] %>% tail(n = 1)
 # file = list.files(in.dir, pattern = "episcreen_ratios", full.names = T) %>% tail(n = 1)
 # indel.data <- readRDS(file) # %>% filter(pathway_bal_filter == TRUE & viab_reproducibility == TRUE)
-indel.data <- readRDS("data/episcreen_ratios_mt20220819.RDS") 
+#indel.data <- readRDS("data/episcreen_ratios_mt20220819.RDS") 
 in.dir = list.dirs(path = "/DATA/projects/DSBrepair/data/R") %>% .[grepl("episcreen", .)] %>% tail(n = 1)
 file = list.files(in.dir, pattern = "episcreen_ratios", full.names = T) %>% tail(n = 1)
 indel.data <- readRDS(file) # %>% filter(pathway_bal_filter == TRUE & viab_reproducibility == TRUE)
@@ -653,23 +653,13 @@ iprs <- as.character(iprs)
 Aim: Give an overview of the most important MMEJ ratio fold-changes. 
 ```{r prepare data for heatmaps}
 # Generate heatmap: select top drugs (highest change at any IPR) per concentration
-balance.data <- indel.data %>%
-  filter(!target %in% c("Aurora Kinase", "JAK", "PARP", "PIM", "HIF")) %>%
-  filter(sample == "Epigenetic Compound") %>% 
-  filter(pathway_bal_filter == TRUE & viab_reproducibility == TRUE) %>%
-  filter(abs(zscore_bal_global_comb_rep) >= 2.58) %>%  # we can choose to display all drugs that have significant global hits
-  distinct(conc_char, drug, target, IPR, zscore_bal_comb_rep, MMEJ_log2_FC, replicate, tech)
-
-dmso_bal <- indel.data %>%
-  filter(drug == "DMSO") %>%
-  dplyr::select('dmso_bal' = MMEJ_log2_FC , IPR) %>%
-  mutate(dmso_bal = ave(dmso_bal, IPR, FUN = function(x) mean(x, na.rm = TRUE))) %>%
-  distinct()
-
-balance.data.heatmap <- balance.data %>%
-  # left_join(dmso_bal) %>%
-  group_by(drug, conc_char) %>%
-  # ave to add IPR grouping level to calculate mean of the replicates
+balance.data.heatmap <- indel.data %>%
+  #filter(!target %in% c("Aurora Kinase", "JAK", "PARP", "PIM", "HIF")) %>%
+  mutate(drug_conc = paste(drug, conc_char, sep = "_")) %>%
+  filter(sample == "Epigenetic Compound") %>%
+  filter(pathway_bal_filter == TRUE) %>%
+  distinct(conc_char, drug, drug_conc, target, IPR, zscore_bal_comb_rep, MMEJ_log2_FC, replicate, tech, filter_zscore_bal_comb_rep) %>%
+  group_by(drug_conc) %>%
   mutate(MMEJ_log2_FC_mean = ave(MMEJ_log2_FC, IPR, FUN = function(x) mean(x, na.rm = TRUE)),
          ## Select drugs that have a large effect size in at least one location 
          ## (some drugs might have a small global effect size, but large local)
@@ -677,12 +667,22 @@ balance.data.heatmap <- balance.data %>%
          # Adjust p value for false discovery rate
          adj_pvalue = p.adjust(p_value, method = 'bonferroni'),
          # Pick the smallest per compound & concentration
-         min_score = min(adj_pvalue)) %>%
+         min_score = min(adj_pvalue, na.rm = T)) %>%
   # filter for adjusted p.val < 0.01 so we keep compounds with at least one signif effect.
   filter(min_score < 0.01) %>%
-  distinct(drug, target, conc_char, MMEJ_log2_FC_mean, IPR, min_score) %>%
+  distinct(drug, drug_conc, target, conc_char, MMEJ_log2_FC_mean, IPR, min_score, filter_zscore_bal_comb_rep) %>%
   ungroup() %>%
-  mutate(drug_conc = paste(drug, conc_char, sep = "_"))
+  group_by(drug_conc, IPR) %>%
+  mutate(filter_n = length(filter_zscore_bal_comb_rep == T)) %>%
+  filter(filter_n >= 1) %>%
+  ungroup() %>%
+  distinct(drug, target, conc_char, MMEJ_log2_FC_mean, IPR, min_score, drug_conc) 
+
+dmso_bal <- indel.data %>%
+  filter(drug == "DMSO") %>%
+  dplyr::select('dmso_bal' = MMEJ_log2_FC , IPR) %>%
+  mutate(dmso_bal = ave(dmso_bal, IPR, FUN = function(x) mean(x, na.rm = TRUE))) %>%
+  distinct()
 
 
 # replace -Inf with minimal value of the table.
@@ -691,7 +691,7 @@ min.value = min(balance.data.heatmap$MMEJ_log2_FC_mean[is.finite(balance.data.he
 top_50_hits = balance.data.heatmap %>% 
   distinct(drug_conc, min_score) %>%
   arrange(desc(abs(min_score))) %>% 
-  #dplyr::slice_tail(n = 60) %>%
+  #dplyr::slice_tail(n = 50) %>%
   distinct(drug_conc)
 
 
@@ -769,8 +769,7 @@ plt1 = pheatmap(balance.data.matrix[ , clone5_map_ipr$labels],
                 # color = colorRampPalette(c("#e07a5f", "#e5e5e5", "#3d405b"))(palette_length),
                 color = diverge_hcl(palette_length, "Blue-Red"),
                 annotation_colors = annotation_colors_scr_set, 
-                annotation_legend = T,
-                cutree_rows = 7)
+                annotation_legend = T)
 ```
 *Conclusion Figure 5A: HDAC-rich cluster seems to show H3K27me3-specific MMEJ ratio decrease. No strong MMEJ ratio increases.*
 
@@ -784,11 +783,11 @@ chromatin_ipr <- chromatin %>%
 balance.data.heatmap3 <- balance.data.heatmap2 %>%
   pivot_longer(cols = contains("IPR"), names_to = "IPR", values_to = "MMEJratio_FC")
 
-balance.data.heatmap3$target[!balance.data.heatmap3$target %in% c("HDAC", "Epigenetic Reader Domain")] <- "Rest"
+#balance.data.heatmap3$target[!balance.data.heatmap3$target %in% c("HDAC", "Epigenetic Reader Domain")] <- "Rest"
 
 chromatin_effect <- left_join(balance.data.heatmap3, chromatin_ipr) %>%
-  filter(target %in% c("HDAC", "Epigenetic Reader Domain", "Rest")) %>%
-  filter(drug != "Barasertib") %>%
+  filter(target %in% c("HDAC", "Epigenetic Reader Domain", "Aurora Kinase")) %>%
+  filter(!drug %in% c("Barasertib")) %>%
   mutate(MMEJratio_FC = ave(MMEJratio_FC, drug, chromatin, conc_char, FUN = function(x) mean(x, na.rm = TRUE)),
          drug_conc = paste(drug, conc_char, sep = " ")) %>%
   distinct(MMEJratio_FC, drug, chromatin, conc_char, target, drug_conc)
@@ -808,81 +807,81 @@ ggplot(chromatin_effect,
 
 
 
-```{r}
-#data frame to save data
-mean_sd_fits <- tibble(term = NA, estimate = NA, std.error = NA, barcode = NA, rep = NA)
+<!-- ```{r} -->
+<!-- #data frame to save data -->
+<!-- mean_sd_fits <- tibble(term = NA, estimate = NA, std.error = NA, barcode = NA, rep = NA) -->
 
 
-# First calculate means and sd of the DMSO efficiency per replicate and barcode
-dmso.eff.score <- indel.data %>%
-  filter(drug == "DMSO") %>%
-  dplyr::select('DMSO' = MMEJratio, well, barcode, replicate, tech, plate) %>%
-  mutate(DMSO = ave(DMSO, well, replicate, tech, plate, FUN = function(x) mean(x, na.rm=T))) %>%
-  distinct(replicate, tech, well, plate, DMSO) %>% 
-  pull(DMSO) %>%
-  fitdistr(., "normal") %>% tidy()
-```
+<!-- # First calculate means and sd of the DMSO efficiency per replicate and barcode -->
+<!-- dmso.eff.score <- indel.data %>% -->
+<!--   filter(drug == "DMSO") %>% -->
+<!--   dplyr::select('DMSO' = MMEJratio, well, barcode, replicate, tech, plate) %>% -->
+<!--   mutate(DMSO = ave(DMSO, well, replicate, tech, plate, FUN = function(x) mean(x, na.rm=T))) %>% -->
+<!--   distinct(replicate, tech, well, plate, DMSO) %>%  -->
+<!--   pull(DMSO) %>% -->
+<!--   fitdistr(., "normal") %>% tidy() -->
+<!-- ``` -->
 
-```{r Compounds that affect the balance at all the sites}
-## Which compounds change the balance at all the sites in both screens?
-all_balance = indel.data %>% 
-  distinct(drug, conc_char, replicate, zscore_bal_comb_rep, target, 
-           barcode, viab_reproducibility, pathway_bal_filter) %>% 
-  filter(!is.na(zscore_bal_comb_rep) & 
-           !between(zscore_bal_comb_rep, -1.96, 1.96) & 
-           viab_reproducibility == T & 
-           pathway_bal_filter == T) %>% 
-  group_by(drug, conc_char, target) %>% 
-  count() %>% 
-  filter(n == 36) # 2 x 18
+<!-- ```{r Compounds that affect the balance at all the sites} -->
+<!-- ## Which compounds change the balance at all the sites in both screens? -->
+<!-- all_balance = indel.data %>%  -->
+<!--   distinct(drug, conc_char, replicate, zscore_bal_comb_rep, target,  -->
+<!--            barcode, viab_reproducibility, pathway_bal_filter) %>%  -->
+<!--   filter(!is.na(zscore_bal_comb_rep) &  -->
+<!--            !between(zscore_bal_comb_rep, -1.96, 1.96) &  -->
+<!--            viab_reproducibility == T &  -->
+<!--            pathway_bal_filter == T) %>%  -->
+<!--   group_by(drug, conc_char, target) %>%  -->
+<!--   count() %>%  -->
+<!--   filter(n == 36) # 2 x 18 -->
 
-kable(all_balance)
-all_balance %>% ungroup() %>% distinct(drug, target)
+<!-- kable(all_balance) -->
+<!-- all_balance %>% ungroup() %>% distinct(drug, target) -->
 
-## Now with 16/18 (~ 90%) of the sites with an effect. Near global
-near_all_balance = indel.data %>% 
-  distinct(drug, conc_char, replicate, zscore_bal_comb_rep, target, 
-           barcode, viab_reproducibility, pathway_bal_filter) %>% 
-  filter(!is.na(zscore_bal_comb_rep) & 
-           !between(zscore_bal_comb_rep, -1.96, 1.96) & 
-           viab_reproducibility == T & 
-           pathway_bal_filter == T) %>% 
-  group_by(drug, conc_char, target) %>% 
-  count() %>% 
-  filter(n >= 32) # 2 x 16
-
-
-kable(near_all_balance)
-near_all_balance %>% ungroup() %>% distinct(drug, target)
-```
-
-```{r warning = FALSE}
-# Plot raw MMEJ ratio
-dmso_bal <- indel.data %>%
-  filter(drug == "DMSO") %>%
-  dplyr::select('dmso_bal' = MMEJratio, IPR, replicate, tech, well, plate) %>%
-  group_by(replicate, tech, well, plate) %>%
-  summarise(dmso_bal = mean(dmso_bal)) %>%
-  ungroup() %>%
-  mutate(dmso_mean = mean(dmso_bal),
-         dsmo_sd = sd(dmso_bal)) %>%
-  distinct(dmso_mean, dsmo_sd)
+<!-- ## Now with 16/18 (~ 90%) of the sites with an effect. Near global -->
+<!-- near_all_balance = indel.data %>%  -->
+<!--   distinct(drug, conc_char, replicate, zscore_bal_comb_rep, target,  -->
+<!--            barcode, viab_reproducibility, pathway_bal_filter) %>%  -->
+<!--   filter(!is.na(zscore_bal_comb_rep) &  -->
+<!--            !between(zscore_bal_comb_rep, -1.96, 1.96) &  -->
+<!--            viab_reproducibility == T &  -->
+<!--            pathway_bal_filter == T) %>%  -->
+<!--   group_by(drug, conc_char, target) %>%  -->
+<!--   count() %>%  -->
+<!--   filter(n >= 32) # 2 x 16 -->
 
 
-indel.data %>%
-  filter(sample == "Epigenetic Compound" & pathway_bal_filter == TRUE & viab_reproducibility == TRUE) %>%
-  distinct(MMEJratio, drug, conc_char, zscore_bal_global_comb_rep) %>%
-  mutate(GlobalMMEJratio = ave(MMEJratio, drug, conc_char, FUN = mean)) %>%
-  distinct() %>%
-  mutate(zscore_bal_global_comb_rep = 2*pnorm(q = abs(zscore_bal_global_comb_rep), lower.tail = F)) %>%
-  mutate(MMEJ_pval_adj_global_comb = log10(p.adjust(zscore_bal_global_comb_rep, method = 'fdr')),
-         col_bal = ifelse(MMEJ_pval_adj_global_comb < 0.01 & 
-                            GlobalMMEJratio > (dmso_bal$dmso_mean + dmso_bal$dsmo_sd), "green", 
-                          ifelse(MMEJ_pval_adj_global_comb < 0.01 & 
-                                   GlobalMMEJratio < (dmso_bal$dmso_mean - dmso_bal$dsmo_sd), "yellow","blue"))) %>%  
-  filter(col_bal != "blue") %>%
-  distinct(drug, conc_char)
-```
+<!-- kable(near_all_balance) -->
+<!-- near_all_balance %>% ungroup() %>% distinct(drug, target) -->
+<!-- ``` -->
+
+<!-- ```{r warning = FALSE} -->
+<!-- # Plot raw MMEJ ratio -->
+<!-- dmso_bal <- indel.data %>% -->
+<!--   filter(drug == "DMSO") %>% -->
+<!--   dplyr::select('dmso_bal' = MMEJratio, IPR, replicate, tech, well, plate) %>% -->
+<!--   group_by(replicate, tech, well, plate) %>% -->
+<!--   summarise(dmso_bal = mean(dmso_bal)) %>% -->
+<!--   ungroup() %>% -->
+<!--   mutate(dmso_mean = mean(dmso_bal), -->
+<!--          dsmo_sd = sd(dmso_bal)) %>% -->
+<!--   distinct(dmso_mean, dsmo_sd) -->
+
+
+<!-- indel.data %>% -->
+<!--   filter(sample == "Epigenetic Compound" & pathway_bal_filter == TRUE & viab_reproducibility == TRUE) %>% -->
+<!--   distinct(MMEJratio, drug, conc_char, zscore_bal_global_comb_rep) %>% -->
+<!--   mutate(GlobalMMEJratio = ave(MMEJratio, drug, conc_char, FUN = mean)) %>% -->
+<!--   distinct() %>% -->
+<!--   mutate(zscore_bal_global_comb_rep = 2*pnorm(q = abs(zscore_bal_global_comb_rep), lower.tail = F)) %>% -->
+<!--   mutate(MMEJ_pval_adj_global_comb = log10(p.adjust(zscore_bal_global_comb_rep, method = 'fdr')), -->
+<!--          col_bal = ifelse(MMEJ_pval_adj_global_comb < 0.01 &  -->
+<!--                             GlobalMMEJratio > (dmso_bal$dmso_mean + dmso_bal$dsmo_sd), "green",  -->
+<!--                           ifelse(MMEJ_pval_adj_global_comb < 0.01 &  -->
+<!--                                    GlobalMMEJratio < (dmso_bal$dmso_mean - dmso_bal$dsmo_sd), "yellow","blue"))) %>%   -->
+<!--   filter(col_bal != "blue") %>% -->
+<!--   distinct(drug, conc_char) -->
+<!-- ``` -->
 
 
 ---
@@ -892,9 +891,8 @@ indel.data %>%
 Aim: Show which drugs and which target groups are responsible for the biggest global MMEJ ratio decrease.
 ```{r 2C Top TIF boosting, , fig.width = 12, fig.height = 10}
 rank_dt = indel.data %>% 
-  filter(drug != "DMSO") %>%
-  filter(drug != "DMSO" & pathway_bal_filter & viab_reproducibility) %>%
-  filter(!target %in% c("Aurora Kinase", "JAK", "PARP", "PIM", "HIF")) %>%
+  filter(drug != "DMSO" & pathway_bal_filter) %>%
+  #filter(!target %in% c("Aurora Kinase", "JAK", "PARP", "PIM", "HIF")) %>%
   distinct(drug, conc_char, zscore_bal_global_comb_rep , target, cor_bal, viab_mean) %>% 
   arrange(zscore_bal_global_comb_rep) %>%
   mutate(viab_mean = ave(viab_mean, drug, conc_char, FUN = mean)) %>%
@@ -907,36 +905,40 @@ rank_dt = indel.data %>%
 colors_targets_black = c(colors_targets, black="gray30")
 maxrank = nrow(rank_dt)
 
+ggplot(rank_dt, aes(rank, zscore_bal_global_comb_rep)) +
+  geom_point(color = "black")  +
+  geom_hline(linetype = "dashed", yintercept = 2.58) +
+  geom_hline(linetype = "dashed", yintercept = -2.58) +
+  scale_x_reverse() +
+  ylim(-75,25) +
+  ylab("Global combined balance z-score") +
+  theme_classic2() + 
+  theme(legend.position = "none") 
+
 rank_dt %>% 
   # left_join(near_all_TIF) %>%
   mutate(# n = ifelse(is.na(n), 1, 2),
-    col = ifelse(!between(rank, 10, maxrank-5) & 
+    col = ifelse(!between(rank, 11, maxrank-5) & 
                    !(viab_mean < .40 & zscore_bal_global_comb_rep < -2.54),
                  target, "black")
   ) %>%
-  #filter(rank < 100 ) %>%
+  filter(rank < 85) %>%
   ggplot(., aes(rank, zscore_bal_global_comb_rep, 
-                # size = n, 
                 color = col)) +
   geom_point()  +
   scale_color_manual(values = colors_targets_black) +
-  geom_hline(linetype = "dashed", yintercept = 2.58) +
-  geom_hline(linetype = "dashed", yintercept = -2.58) +
+  #geom_hline(linetype = "dashed", yintercept = 2.58) +
+  #geom_hline(linetype = "dashed", yintercept = -2.58) +
   geom_label_repel(aes(label = ifelse(col != "black", drug_conc,'')),
                    box.padding   = 1,
                    point.padding = 0.5,
                    max.overlaps = Inf,
                    segment.color = 'gray50') +
-  # gghighlight(!between(rank, 10, maxrank-10) & filter_zscore_TIF_global_comb_rep, 
-  #             label_key = drug_conc, 
-  #             max_highlight = Inf) +
-  # scale_x_reverse(limits = c(100, 0)) +
   scale_x_reverse() +
-  ylim(-75,15) +
+  #ylim(-75,15) +
   ylab("Global combined balance z-score") +
   theme_classic2() + 
   theme(legend.position = "none") 
-
 
 
 
@@ -1725,7 +1727,7 @@ p = pheatmap(TIF_synergy_matrix[, TRIP_chrom_clust$labels],
              breaks = breaks,
              cluster_cols = TRIP_chrom_clust,
              annotation_row = target_set_drugs %>% dplyr::select(-drug),
-             clustering_method = "ward.D2",
+             clustering_method = "ward.D",
              main = paste("Chromatin synergies - All effective drugs cluster"),
              color = colors,
              annotation_colors = annotation_colors_scr_set, 
@@ -1743,10 +1745,10 @@ TIF_synergy_cluster <- TIF_synergy_matrix %>%
 ```{r 3E H3K27me3 synergies, fig.width= 6, fig.height= 6}
 rank_dt = CCD_tib %>% 
   left_join(rownames_to_column(target, var = "drug_conc")) %>%
-  filter(!target %in% c("Aurora Kinase", "JAK", "PARP", "PIM", "HIF")) %>%
+  #filter(!target %in% c("Aurora Kinase", "JAK", "PARP", "PIM", "HIF")) %>%
   filter(feature == "H3K27me3", !is.na(ratio_slope_plot)) %>%
-  distinct() %>%
-  arrange(desc(ratio_slope_plot)) %>%
+  distinct(drug_conc, ratio_slope_plot, target, viab) %>%
+  arrange(ratio_slope_plot) %>%
   mutate(rank = seq(1:n()))
 
 maxrank = nrow(rank_dt)
@@ -1771,7 +1773,7 @@ theme_classic2(base_size = 16) +
 
 
 p2 = rank_dt %>% 
-  filter(!between(rank, 11, maxrank-10)) %>%
+  filter(!between(rank, 25, maxrank-0)) %>%
   mutate(rank = seq(1:n())) %>% 
   ggplot(., aes(x = rank, y = ratio_slope_plot, fill = target)) +
   geom_bar(stat = "identity") + 
@@ -1801,10 +1803,11 @@ all_compounds_epistasis_TIF %>%
 for(i in unique(CCD_tib$feature)) {
   rank_dt = CCD_tib %>% 
     left_join(rownames_to_column(target, var = "drug_conc"), by = "drug_conc") %>%
-    filter(!target %in% c("Aurora Kinase", "JAK", "PARP", "PIM", "HIF")) %>%
+    #filter(!target %in% c("Aurora Kinase", "JAK", "PARP", "PIM", "HIF")) %>%
     filter(feature == i, !is.na(ratio_slope_plot)) %>%
-    distinct() %>%
-    arrange(desc(ratio_slope_plot))
+    distinct(drug_conc, ratio_slope_plot, target, viab, feature) %>%
+    arrange(desc(ratio_slope_plot)) %>%
+    mutate(rank = seq(1:n()))
   
   if(nrow(rank_dt) > 1) {
     rank_dt <- rank_dt %>%
@@ -1831,7 +1834,7 @@ for(i in unique(CCD_tib$feature)) {
     
     
     p2 = rank_dt %>% 
-      filter(between(rank, maxrank-20, maxrank)) %>%
+      filter(!between(rank, 15, maxrank-15)) %>%
       mutate(rank = seq(1:n())) %>% 
       ggplot(., aes(x = rank, y = ratio_slope_plot, fill = target)) +
       geom_bar(stat = "identity") + 
