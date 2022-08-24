@@ -842,21 +842,20 @@ cor(ctrl_compare$efficiency_DMSO, ctrl_compare$efficiency_DMSO_GSK, method = "sp
 #   geom_point() +
 #   geom_smooth(method = "lm")
 
-pool_validation_ratios = bind_rows(vorinostat_ratios, GSK_ratios) %>% 
+pool_validation_ratios = bind_rows(filter(vorinostat_ratios,efficiency_DMSO < .85),  filter(GSK_ratios, efficiency_DMSO_GSK < 0.85)) %>% 
   dplyr::select(-efficiency_Vorinostat, -efficiency_DMSO, -MMEJ_NHEJ_DMSO, 
                 -MMEJ_NHEJ_Vorinostat, -MMEJ_NHEJ_DMSO_GSK, -efficiency_DMSO_GSK, 
                 -MMEJ_NHEJ_DMSO_GSK, -MMEJ_NHEJ_GSK126, -efficiency_GSK126)
+
+valid_ratios_long = pool_validation_ratios %>% 
+  dplyr::select(barcode, drug, all_of(chromatin.features.short), log2_FC_TIF, log2_FC_MMEJ_NHEJ) %>% 
+  distinct() %>%
+  pivot_longer(cols = chromatin.features.short, names_to = "feature", values_to = "zscore")
 ```
 
 ### CCD processing of the pool data
 
 ```{r all scatterplots pool, eval = FALSE}
-valid_ratios_long = pool_validation_ratios %>% 
-  dplyr::select(drug, all_of(chromatin.features.short), log2_FC_TIF, log2_FC_MMEJ_NHEJ) %>% 
-  distinct() %>%
-  pivot_longer(cols = chromatin.features.short, names_to = "feature", values_to = "zscore")
-
-
 pdf("/DATA/projects/DSBrepair/git/EpiScreen/figures/rs20220824_CCD_pool.pdf", height = 20, width = 20)
 
 ggplot(valid_ratios_long %>% filter(drug == "Vorinostat"), aes(zscore, log2_FC_TIF)) + 
@@ -1233,8 +1232,8 @@ plot_grid(p1, p2, p3, nrow = 1, labels = c("A", "B", "C"))
 ```
 
 
-## S3C All compound synergies with chromatin
-```{r S3C Synergies chromatin - TIF all, fig.width= 10, fig.height= 20}
+## 3D All compound synergies with chromatin
+```{r 3D Synergies chromatin - TIF all, fig.width= 10, fig.height= 20}
 # change these numbers according to where you want to set the cutoff
 quant_breaks <- quantile(all_compounds_epistasis_TIF, c(.01,.99), na.rm = T)
 palette_length <- 100
@@ -1256,146 +1255,6 @@ pheatmap(all_compounds_epistasis_TIF[, TRIP_chrom_clust$labels],
          annotation_colors = annotation_colors_scr, 
          annotation_legend = T)
 ```
-
-## 3D HDAC CCD Heatmap
-```{r 3D HDAC CCD, fig.width= 14, fig.height= 14}
-target_drugs = cluster_HDAC %>% pull(drug_conc)
-
-# Make matrix with drugs from selected target
-TIF_synergy_matrix = all_compounds_epistasis_TIF %>% 
-  rownames_to_column(var = "drug_conc") %>%
-  filter(drug_conc %in% target_drugs) %>%
-  column_to_rownames(var = "drug_conc")
-
-cluster_rows = ifelse(nrow(TIF_synergy_matrix) > 1, TRUE, FALSE)
-
-# # change these numbers according to where you want to set the cutoff
-# quant_breaks_ <- quantile(TIF_synergy_matrix, c(.01,.99), na.rm = T) 
-# max_quant = max(abs(quant_breaks))
-# palette_length <- 100
-# breaks <- c(seq(-max_quant, 0, length.out=ceiling(palette_length/2) + 1), 
-#             seq(max_quant/palette_length, max_quant, length.out=floor(palette_length/2)))
-# slope.colors.temp = slope.colors
-# colors = colorRampPalette(slope.colors.temp %>% pull(color))(length(breaks))
-# colors[which(quant_breaks == 0)-1] = "gray90"
-
-p = pheatmap(TIF_synergy_matrix[, TRIP_chrom_clust$labels],
-             border_color = F,
-             cellwidth = 8,
-             cellheight = 8,
-             cluster_rows = cluster_rows,
-             breaks = breaks,
-             cluster_cols = TRIP_chrom_clust,
-             annotation_row = target.cluster1,
-             clustering_method = "ward.D2",
-             main = paste("Chromatin synergies - TIF HDAC cluster"),
-             color = colors,
-             annotation_colors = annotation_colors_scr, 
-             annotation_legend = T,
-             cutree_rows = 3)
-
-TIF_synergy_cluster <- TIF_synergy_matrix %>%
-  rownames_to_column("drug_conc") %>%
-  left_join(cluster_HDAC) %>%
-  mutate(cluster_HDAC = as.character(cluster_HDAC))
-```
-## HDAC2/3 CCD
-```{r}
-hdac2_3 <- TIF_synergy_cluster %>%
-  distinct(drug_conc, H3K27me3, H3K4me1, EZH2) %>%
-  left_join(target.cluster1 %>% rownames_to_column("drug_conc")) %>%
-  mutate(hdac3_pan = ifelse(HDAC3 == 1 | pan_HDAC == 1, 1, 0))
-
-ggplot(hdac2_3,
-       aes(x = HDAC3, y = EZH2)) +
-  geom_quasirandom()
-```
-
-
-
-## 3E K27me3 top CCDs
-```{r 3E H3K27me3 synergies, fig.width= 6, fig.height= 6}
-rank_dt = CCD_tib %>% 
-  left_join(rownames_to_column(target, var = "drug_conc")) %>%
-  filter(feature == "H3K27me3", !is.na(indelrate_slope_plot)) %>%
-  distinct() %>%
-  arrange(desc(indelrate_slope_plot)) %>%
-  mutate(rank = seq(1:n()))
-
-maxrank = nrow(rank_dt)
-
-quant_breaks <- quantile(all_compounds_epistasis_TIF, c(.01,.99), na.rm = T)
-palette_length <- 100
-breaks <- c(seq(quant_breaks[1], 0, length.out=ceiling(palette_length/2) + 1), 
-            seq(quant_breaks[2]/palette_length, quant_breaks[2], length.out=floor(palette_length/2)))
-colors = colorRampPalette(slope.colors %>% pull(color))(length(breaks))
-colors[which(quant_breaks == 0)-1] = "gray90"
-
-max_slope = max(abs(rank_dt$indelrate_slope_plot))
-# 
-# p1 = rank_dt %>% 
-#   ggplot(., aes(x = rank, y = 1)) +
-#   geom_bar(stat = "identity", aes(fill = indelrate_slope_plot)) + 
-#   scale_x_reverse() +
-#   coord_flip() +
-#   xlab("Rank") +
-#   theme_classic2(base_size = 16) +
-#   scale_fill_distiller(palette = "BrBG", 
-#                        breaks = c(seq(-0.04, 0.04, 0.01)), direction = 1,
-#                        limits = c(-max_slope, max_slope)) +
-#   # geom_label(aes(label = ifelse(width == 2, drug_conc,''))) +
-#   theme(axis.title.x=element_blank(),
-#         axis.text.x=element_blank(),
-#         axis.ticks.x=element_blank())+
-#   # add horizontal line for 0.01 slope cutoff which is highlighted in the heatmap
-#   geom_vline(xintercept = rank_dt[rank_dt$indelrate_slope_plot  < -0.01, ]$rank[1] - 0.5)  +
-#   geom_vline(xintercept = max(rank_dt[rank_dt$indelrate_slope_plot  > 0.01, ]$rank) + 0.5)
-
-p2 = rank_dt %>% 
-  ggplot(., aes(x = rank, fill = target)) +
-  geom_bar() + 
-  scale_x_reverse() +
-  coord_flip() +
-  xlab("Rank") +
-theme_classic2(base_size = 16) +
-  scale_fill_manual(values = colors_targets) +
-  # geom_label(aes(label = ifelse(width == 2, drug_conc,''))) +
-  theme(legend.position = "none",
-        axis.title.x=element_blank(),
-        axis.text.x=element_blank(),
-        axis.ticks.x=element_blank())+
-  # add horizontal line for 0.01 slope cutoff which is highlighted in the heatmap
-  geom_vline(xintercept = rank_dt[rank_dt$indelrate_slope_plot  < -0.01, ]$rank[1] - 0.5)  +
-  geom_vline(xintercept = max(rank_dt[rank_dt$indelrate_slope_plot  > 0.01, ]$rank) + 0.5)
-
-
-p3 = rank_dt %>% 
-  filter(!between(rank, 11, maxrank-10)) %>%
-  mutate(rank = seq(1:n())) %>% 
-  ggplot(., aes(x = rank, y = indelrate_slope_plot, fill = target)) +
-  geom_bar(stat = "identity") + 
-  scale_x_reverse() +
-  coord_flip() +
-  ylab("Synergy score") +
-theme_classic2(base_size = 16) +
-  scale_fill_manual(values = colors_targets) +
-  # geom_label(aes(label = ifelse(width == 2, drug_conc,''))) +
-  geom_text(aes(label=drug_conc)) +
-  theme(legend.position = "none",
-        axis.title.y=element_blank(),
-        axis.text.y=element_blank(),
-        axis.ticks.y=element_blank())
-
-
-plot_grid(# p1, #comment out the slope per rank
-          p2, p3, labels = c("E", "F"), rel_widths = c(1, 7), nrow = 1)
-
-# Samples to highlight in the heatmap S3C
-all_compounds_epistasis_TIF %>% 
-  filter(!between(H3K27me3, -0.01, .01)) %>%
-  rownames()
-```
-
 
 ```{r top CCDs for all chromatin features, fig.width= 6, fig.height= 6, eval = FALSE}
 for(i in unique(CCD_tib$feature)) {
@@ -1455,128 +1314,9 @@ for(i in unique(CCD_tib$feature)) {
 ```
 
 
-## 3E m5C top CCDs
-```{r 3E m5C synergies, fig.width= 6, fig.height= 6}
-rank_dt = CCD_tib %>% 
-  left_join(rownames_to_column(target, var = "drug_conc")) %>%
-  filter(feature == "m5C", !is.na(indelrate_slope_plot)) %>%
-  distinct() %>%
-  arrange(desc(indelrate_slope_plot)) %>%
-  mutate(rank = seq(1:n()))
+## 3E Pool CCD TIF
 
-maxrank = nrow(rank_dt)
-
-max_slope = max(abs(rank_dt$indelrate_slope_plot))
-
-# p1 = rank_dt %>% 
-#   ggplot(., aes(x = rank, y = 1)) +
-#   geom_bar(stat = "identity", aes(fill = indelrate_slope_plot)) + 
-#   scale_x_reverse() +
-#   coord_flip() +
-#   xlab("Rank") +
-#   theme_classic2(base_size = 16) +
-#   scale_fill_distiller(palette = "BrBG", 
-#                        breaks = c(seq(-0.04, 0.04, 0.01)), direction = 1,
-#                        limits = c(-max_slope, max_slope)) +
-#   # geom_label(aes(label = ifelse(width == 2, drug_conc,''))) +
-#   theme(legend.position = "none",
-#         axis.title.x=element_blank(),
-#         axis.text.x=element_blank(),
-#         axis.ticks.x=element_blank())+
-#   # add horizontal line for 0.01 slope cutoff which is highlighted in the heatmap
-#   geom_vline(xintercept = rank_dt[rank_dt$indelrate_slope_plot  < -0.01, ]$rank[1] - 0.5)  +
-#   geom_vline(xintercept = max(rank_dt[rank_dt$indelrate_slope_plot  > 0.01, ]$rank) + 0.5)
-
-p2 = rank_dt %>% 
-  ggplot(., aes(x = rank, fill = target)) +
-  geom_bar() + 
-  scale_x_reverse() +
-  coord_flip() +
-  xlab("Rank") +
-theme_classic2(base_size = 16) +
-  scale_fill_manual(values = colors_targets) +
-  # geom_label(aes(label = ifelse(width == 2, drug_conc,''))) +
-  theme(legend.position = "none",
-        axis.title.x=element_blank(),
-        axis.text.x=element_blank(),
-        axis.ticks.x=element_blank())+
-  # add horizontal line for 0.01 slope cutoff which is highlighted in the heatmap
-  geom_vline(xintercept = rank_dt[rank_dt$indelrate_slope_plot  < -0.01, ]$rank[1] - 0.5)  +
-  geom_vline(xintercept = max(rank_dt[rank_dt$indelrate_slope_plot  > 0.01, ]$rank) + 0.5)
-
-p3 = rank_dt %>% 
-  filter(!between(rank, 6, maxrank-5)) %>%
-  mutate(rank = seq(1:n())) %>% 
-  ggplot(., aes(x = rank, y = indelrate_slope_plot, fill = target)) +
-  geom_bar(stat = "identity") + 
-  scale_x_reverse() +
-  coord_flip() +
-  ylab("Synergy score") +
-  theme_classic2(base_size = 16) +
-  scale_fill_manual(values = colors_targets) +
-  # geom_label(aes(label = ifelse(width == 2, drug_conc,''))) +
-  geom_text(aes(label=drug_conc)) +
-  theme(legend.position = "none",
-        axis.title.y=element_blank(),
-        axis.text.y=element_blank(),
-        axis.ticks.y=element_blank())
-
-
-plot_grid(# p1, # comment out the TIF slope 
-          p2, p3, labels = c("E", "F"), rel_widths = c(1, 6), nrow = 1)
-
-# Samples to highlight in the heatmap S3C
-all_compounds_epistasis_TIF %>% 
-  filter(!between(m5C, -0.01, .01)) %>%
-  rownames()
-```
-
-## 3F HDAC CCD Heatmap
-```{r 3F HDAC CCD, fig.width= 14, fig.height= 14}
-target_drugs = cluster_HDAC %>% pull(drug_conc)
-
-# Make matrix with drugs from selected target
-TIF_synergy_matrix = all_compounds_epistasis_TIF %>% 
-  rownames_to_column(var = "drug_conc") %>%
-  filter(drug_conc %in% target_drugs) %>%
-  column_to_rownames(var = "drug_conc")
-
-cluster_rows = ifelse(nrow(TIF_synergy_matrix) > 1, TRUE, FALSE)
-
-# # change these numbers according to where you want to set the cutoff
-# quant_breaks_ <- quantile(TIF_synergy_matrix, c(.01,.99), na.rm = T) 
-# max_quant = max(abs(quant_breaks))
-# palette_length <- 100
-# breaks <- c(seq(-max_quant, 0, length.out=ceiling(palette_length/2) + 1), 
-#             seq(max_quant/palette_length, max_quant, length.out=floor(palette_length/2)))
-# slope.colors.temp = slope.colors
-# colors = colorRampPalette(slope.colors.temp %>% pull(color))(length(breaks))
-# colors[which(quant_breaks == 0)-1] = "gray90"
-
-p = pheatmap(TIF_synergy_matrix[, TRIP_chrom_clust$labels],
-             border_color = F,
-             cellwidth = 8,
-             cellheight = 8,
-             cluster_rows = cluster_rows,
-             breaks = breaks,
-             cluster_cols = TRIP_chrom_clust,
-             annotation_row = target.cluster1,
-             clustering_method = "ward.D2",
-             main = paste("Chromatin synergies - TIF HDAC cluster"),
-             color = colors,
-             annotation_colors = annotation_colors_scr, 
-             annotation_legend = T,
-             cutree_rows = 3)
-
-TIF_synergy_cluster <- TIF_synergy_matrix %>%
-  rownames_to_column("drug_conc") %>%
-  left_join(cluster_HDAC) %>%
-  mutate(cluster_HDAC = as.character(cluster_HDAC))
-```
-
-## 3.. Pool CCD TIF
-
-```{r GH CCD in the pool}
+```{r 3E CCD in the pool}
 quant_breaks <- quantile(validation_epistasis_TIF, c(.01,.99), na.rm = T)
 palette_length <- 100
 breaks.validation <- c(seq(quant_breaks[1], 0, length.out=ceiling(palette_length/2) + 1), 
@@ -1637,6 +1377,57 @@ plot_grid(p1, p2, nrow = 1, labels = c("C", "D"))
 
 CCD_tib %>% filter(feature == "H3K36me3" & drug_conc == "EPZ-6438 10 µM") %>% pull(indelrate_slope_plot)
 ```
+
+## Scatterplot Vorino & GSK
+```{r}
+vorino_screen_K27 = indel.data %>% 
+  filter((grepl("Vorinostat", drug) & conc_char == "1 µM") | 
+           (grepl("EPZ-64", drug) & conc_char == "10 µM")) %>% 
+  distinct(drug, barcode, replicate, tech, freqCut_norm_mean, 
+           H3K27me3,LMNB1, MMEJ_FC) %>%
+  group_by(barcode, drug) %>% 
+  summarise(log2_FC_TIF = log2(mean(freqCut_norm_mean)),
+            log2_FC_MMEJ_NHEJ = log2(mean(MMEJ_FC, na.rm = TRUE)),
+            H3K27me3 = mean(H3K27me3),
+            LMNB1 = mean(LMNB1),
+            source = "screen") %>%
+  pivot_longer(cols = c("LMNB1", "H3K27me3"), names_to = "feature", values_to = "zscore") %>%
+  mutate(drug = ifelse(grepl("Vorinostat", drug), "HDACi", "EZH2i"))
+
+vorino_pool_K27 = valid_ratios_long%>% 
+  filter(feature %in% c("H3K27me3" , "LMNB1")) %>%
+  mutate(source = "pool",
+         drug = ifelse(grepl("Vorinostat", drug), "HDACi", "EZH2i"))
+
+vorino_k27 = bind_rows(vorino_screen_K27, vorino_pool_K27)
+
+pdf("/DATA/projects/DSBrepair/git/EpiScreen/figures/rs20220824_validation_poo_max85TIFl.pdf", height = 10, width = 10)
+
+ggplot(vorino_k27, aes(zscore, log2_FC_TIF, color = source)) + 
+  geom_point() +
+  geom_smooth(method = "lm", se = F) +
+  stat_cor(method = "pearson") +
+  ggtitle("log2 FC TIF") +
+  stat_poly_eq(aes(label = paste(after_stat(eq.label),
+                                 after_stat(rr.label), sep = "*\", \"*")),
+               label.x = "left", label.y = "bottom") +
+  facet_grid(drug ~ feature) +
+  theme_bw(base_size = 16)
+
+ggplot(vorino_k27, aes(zscore, log2_FC_MMEJ_NHEJ, color = source)) + 
+  geom_point() +
+  geom_smooth(method = "lm", se = F) +
+  stat_cor(method = "pearson") +
+  ggtitle("log2 FC Balance") +
+  stat_poly_eq(aes(label = paste(after_stat(eq.label),
+                                 after_stat(rr.label), sep = "*\", \"*")),
+               label.x = "left", label.y = "bottom") +
+  facet_grid(drug ~ feature) +
+  theme_bw(base_size = 16)
+
+dev.off()
+```
+
 
 ## S3DE K27me3 and CTCF correlation
 ```{r 3DE K37me3 vs CTCF CCD correlation, fig.width= 10, fig.height= 5}
