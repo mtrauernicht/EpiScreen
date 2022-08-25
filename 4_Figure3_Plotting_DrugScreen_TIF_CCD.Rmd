@@ -842,7 +842,13 @@ cor(ctrl_compare$efficiency_DMSO, ctrl_compare$efficiency_DMSO_GSK, method = "sp
 #   geom_point() +
 #   geom_smooth(method = "lm")
 
-pool_validation_ratios = bind_rows(filter(vorinostat_ratios,efficiency_DMSO < .85),  filter(GSK_ratios, efficiency_DMSO_GSK < 0.85)) %>% 
+vorino_bc_85 = vorinostat_ratios %>% filter(efficiency_DMSO < 0.85) %>% pull(barcode)
+gsk_bc_85 = GSK_ratios %>% filter(efficiency_DMSO_GSK < 0.85)
+
+pool_validation_ratios = bind_rows(
+  vorinostat_ratios, # %>% filter(efficiency_DMSO < 0.85),  
+  GSK_ratios #%>% filter(efficiency_DMSO_GSK < 0.85)
+  ) %>% 
   dplyr::select(-efficiency_Vorinostat, -efficiency_DMSO, -MMEJ_NHEJ_DMSO, 
                 -MMEJ_NHEJ_Vorinostat, -MMEJ_NHEJ_DMSO_GSK, -efficiency_DMSO_GSK, 
                 -MMEJ_NHEJ_DMSO_GSK, -MMEJ_NHEJ_GSK126, -efficiency_GSK126)
@@ -1395,13 +1401,22 @@ vorino_screen_K27 = indel.data %>%
   mutate(drug = ifelse(grepl("Vorinostat", drug), "HDACi", "EZH2i"))
 
 vorino_pool_K27 = valid_ratios_long%>% 
-  filter(feature %in% c("H3K27me3" , "LMNB1")) %>%
+  filter(feature %in% c("H3K27me3" , "LMNB1"), 
+         # barcode %in% barcode_set_match_clone
+         barcode %in% c(vorino_bc_85, gsk_bc_85)
+         ) %>%
   mutate(source = "pool",
          drug = ifelse(grepl("Vorinostat", drug), "HDACi", "EZH2i"))
 
-vorino_k27 = bind_rows(vorino_screen_K27, vorino_pool_K27)
+vorino_pool_K27_cloneset = valid_ratios_long %>% 
+  filter(feature %in% c("H3K27me3" , "LMNB1"), barcode %in% paste0(unique(indel.data$barcode), ".B")) %>%
+  mutate(source = "pool_clone",
+         drug = ifelse(grepl("Vorinostat", drug), "HDACi", "EZH2i"))
 
-pdf("/DATA/projects/DSBrepair/git/EpiScreen/figures/rs20220824_validation_poo_max85TIFl.pdf", height = 10, width = 10)
+
+vorino_k27 = bind_rows(vorino_screen_K27, vorino_pool_K27, vorino_pool_K27_cloneset)
+
+pdf("/DATA/projects/DSBrepair/git/EpiScreen/figures/rs20220824_validation_pool_clone_pool_max85.pdf", height = 10, width = 10)
 
 ggplot(vorino_k27, aes(zscore, log2_FC_TIF, color = source)) + 
   geom_point() +
@@ -1426,6 +1441,103 @@ ggplot(vorino_k27, aes(zscore, log2_FC_MMEJ_NHEJ, color = source)) +
   theme_bw(base_size = 16)
 
 dev.off()
+```
+```{r}
+dmso_TIF = indel.data %>%
+  filter(drug == "DMSO") %>%
+  mutate(freqCut = ave(freqCut, IPR, replicate, well, tech, FUN = mean)) %>%
+  distinct(IPR, freqCut, replicate, well, tech) %>%
+  arrange(freqCut) %>%
+  mutate(source = "screen",
+         barcode = paste(IPR, replicate, well, tech, sep = "_")) %>% 
+  dplyr::rename(efficiency_DMSO = freqCut) %>% 
+  distinct(barcode, efficiency_DMSO, source)
+
+dmso_freq_vorino = vorinostat_ratios %>% distinct(barcode, efficiency_DMSO) %>% 
+  arrange(efficiency_DMSO) %>%
+  mutate(source = "pool_vorino", 
+         efficiency_DMSO = efficiency_DMSO)
+
+dmso_freq_vorino_set = vorinostat_ratios %>% distinct(barcode, efficiency_DMSO) %>% 
+  filter(barcode %in% barcode_set_match_clone) %>%
+  arrange(efficiency_DMSO) %>%
+  mutate(source = "pool_vorino_subset", 
+         efficiency_DMSO = efficiency_DMSO)
+
+dmso_freq_gsk_set = GSK_ratios %>% distinct(barcode, efficiency_DMSO_GSK) %>% 
+  filter(barcode %in% barcode_set_match_clone) %>%
+  arrange(efficiency_DMSO_GSK) %>%
+  mutate(source = "pool_gsk_subset", 
+         efficiency_DMSO = efficiency_DMSO_GSK)
+
+dmso_freq_gsk = GSK_ratios %>% distinct(barcode, efficiency_DMSO_GSK) %>% 
+  arrange(efficiency_DMSO_GSK) %>%
+  mutate(source = "pool_gsk", 
+         efficiency_DMSO = efficiency_DMSO_GSK) %>%
+  distinct(barcode, efficiency_DMSO, source)
+
+dmso_freq_gsk_cutoff = GSK_ratios %>% distinct(barcode, efficiency_DMSO_GSK) %>% 
+  arrange(efficiency_DMSO_GSK) %>% 
+  filter(efficiency_DMSO_GSK < 0.85) %>%
+  mutate(source = "pool_gsk_max85", 
+         efficiency_DMSO = efficiency_DMSO_GSK) %>%
+  distinct(barcode, efficiency_DMSO, source)
+
+ctrl_TIF = bind_rows(dmso_TIF, dmso_freq_vorino, dmso_freq_gsk, dmso_freq_gsk_cutoff, dmso_freq_vorino_set, dmso_freq_gsk_set)
+
+# bind_rows(filter(vorinostat_ratios,efficiency_DMSO < .85),  filter(GSK_ratios, efficiency_DMSO_GSK < 0.85))
+
+
+
+ggplot(ctrl_TIF, aes(x = efficiency_DMSO , fill=source))  + geom_histogram( position="identity", alpha=0.5 , bins = 100)
+
+ctrl_TIF %>%
+  mutate(bin = cut(efficiency_DMSO, breaks = 100))
+
+
+
+require(ggplot2)
+ggplot(ctrl_TIF, aes(x = efficiency_DMSO , fill=source))  + geom_histogram( position="identity", alpha=0.5 , bins = 100) + facet_wrap(. ~ source) + theme_bw(base_size =  16)
+
+ctrl_TIF = ctrl_TIF %>%
+  mutate(bin = cut(efficiency_DMSO, breaks = 100))
+
+
+#Simple density estimators
+p_density<- table(ctrl_TIF %>% filter(source == "pool") %>% pull(bin))/nrow(dmso_freq_vorino)
+q_density<- table(ctrl_TIF %>% filter(source == "screen") %>% pull(bin))/nrow(dmso_TIF)
+
+#Evaluate density of both distribution at each point of group 1 
+p <- p_density[ctrl_TIF %>% filter(source == "pool") %>% pull(bin)]
+q <- q_density[ctrl_TIF %>% filter(source == "pool") %>% pull(bin)]
+
+sample_set <- dplyr::slice_sample(ctrl_TIF %>% filter(source == "pool"), n = 300, replace = FALSE, weight_by =  q/p )
+
+barcode_set_match_clone = sample_set %>% pull(barcode)
+
+
+var_cut <- cut(var,breaks = 100)
+
+#Simple density estimators
+p_density2 <- table(var_cut[label == "group1"])/length(group1)
+q_density2 <- table(var_cut[label == "group2"])/length(group2)
+
+#Evaluate density of both distribution at each point of group 1 
+p2 <- p_density[var_cut[label == "group1"]]
+q2 <- q_density[var_cut[label=="group1"]]
+
+matching_idx <- sample(which(label == "group1"), sum(label=="group2"), FALSE, q/p )
+
+#plot it
+mydata$matching_vec <- rep(NA, nrow(mydata))
+mydata$matching_vec[matching_idx] <- "group1 (matching)"
+mydata$matching_vec[label == "group2"] <- "group2"
+mydata$matching_vec <- factor(mydata$matching_vec)
+
+ggplot(subset(mydata, !is.na(matching_vec))) +  aes(x = var , fill=matching_vec)  + geom_histogram( position="identity", alpha=0.5 , bins = 100 )
+
+
+
 ```
 
 
