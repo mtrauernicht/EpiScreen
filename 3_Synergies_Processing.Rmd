@@ -305,25 +305,24 @@ filtered_drug_conc = indel.data %>%
          effect_on_ratio = ifelse(effect_on_indelrate, TRUE, effect_on_ratio)) %>%
   distinct(drug, conc_char, drug_conc, effect_on_indelrate, effect_on_ratio)
 
-
 ratios_tib <- indel.data %>%
   mutate(drug_conc = paste(drug, conc_char, sep = " ")) %>%
   semi_join(filtered_drug_conc) %>%
   distinct(MMEJratio_mean, freqCut_mean, drug, conc_char, drug_conc, target, IPR) %>%
-  mutate(MMEJratio = ave(MMEJratio_mean, drug, conc_char, IPR, FUN = mean)) %>%
-  mutate(MMEJratio.log2 = log2(MMEJratio)) %>%
-  mutate(freqCut = (ave(freqCut_mean, drug, conc_char, IPR, FUN = mean))) %>%
-  mutate(freqCut.log2 = log2(freqCut)) %>%
+  mutate(MMEJratio.log2 = log2(MMEJratio_mean),
+         MMEJratio.log2 = ave(MMEJratio.log2, drug, conc_char, IPR, FUN = mean),
+         freqCut.log2 = log2(freqCut_mean),
+         freqCut.log2 = (ave(freqCut.log2, drug, conc_char, IPR, FUN = mean))) %>%
   dplyr::select(-MMEJratio_mean, -freqCut_mean) %>%
   distinct()
 
 dmso_ratios_tib <- indel.data %>%
   filter(drug == "DMSO") %>%
   distinct(MMEJratio_mean, freqCut_mean, IPR) %>%
-  mutate(DMSO.ratio = ave(MMEJratio_mean, IPR, FUN = mean)) %>%
-  mutate(DMSO.ratio.log2 = log2(DMSO.ratio)) %>%
-  mutate(DMSO.freqCut = ave(freqCut_mean, IPR, FUN = mean)) %>%
-  mutate(DMSO.freqCut.log2 = log2(DMSO.freqCut)) %>%
+  mutate(DMSO.ratio.log2 = log2(MMEJratio_mean),
+         DMSO.ratio.log2 = ave(DMSO.ratio.log2, IPR, FUN = mean),
+         DMSO.freqCut.log2 = log2(freqCut_mean),
+         DMSO.freqCut.log2 = (ave(DMSO.freqCut.log2, IPR, FUN = mean))) %>%
   dplyr::select(-MMEJratio_mean, -freqCut_mean) %>%
   distinct()
 
@@ -346,8 +345,7 @@ ratios_tib_fc <- ratios_tib %>%
 ## Extract slopes for all genes
 ```{r}
 # Perform analysis across all features for three test genes
-ratios_tib_fc %<>% mutate(drug_conc = paste(drug, conc_char, sep = " ")) %>% 
-  filter(!is.na(MMEJratio))
+ratios_tib_fc %<>% mutate(drug_conc = paste(drug, conc_char, sep = " "))
 
 slope.protein.features <- tibble(drug_conc = NA, feature = NA,  term = NA, 
                                  indelrate = NA, p.value.indelrate = NA, 

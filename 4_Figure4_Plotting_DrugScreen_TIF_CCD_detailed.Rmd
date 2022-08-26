@@ -94,290 +94,6 @@ pdf.options(useDingbats = FALSE)
 ### Functions
 
 ```{r functions, message=FALSE, warnings=FALSE}
-CorrelationDFMean <- function(data, feature_name, targets, p.value=0.001){
-  hist.corr.list <- data %>% dplyr::select(all_of(feature_name), targets) %>% as.matrix() %>% rcorr(type = "spearman")
-  
-  histone.corr.df <- data.frame(rowname = names(hist.corr.list$r[1, -1]),
-                                corr = hist.corr.list$r[1, -1],
-                                pvalue = hist.corr.list$P[1, -1])
-  
-  return(histone.corr.df=histone.corr.df)
-}
-
-
-CorrelationPlotMean <- function(data, feature_name, targets, title = "with treatment", p.value=0.01, alfa = c(0.5, 1)){
-  cor.df = data.frame()
-  for (i in feature_name){
-    corr.list <- data %>% 
-      dplyr::select(all_of(i), as.character(targets)) %>% 
-      as.matrix() %>% 
-      rcorr(type = "spearman")
-    
-    df <- data.frame(rowname = names(corr.list$r[1, -1]),
-                     corr = corr.list$r[1, -1],
-                     pvalue = corr.list$P[1, -1],
-                     feature = i)
-    cor.df <- rbind(cor.df, df) %>%
-      transform(rowname = factor(rowname, levels = levels(targets)),
-                corr = corr,
-                pvalue = pvalue) %>% 
-      mutate(p.adj = p.adjust(pvalue)) %>%
-      add_significance("p.adj")
-  }
-  p <-  ggplot(cor.df, aes(x = rowname, y = corr, fill = p.adj.signif)) +
-    geom_bar(stat = "identity", position = "dodge") +
-    ylab(paste("Spearman correlation ",title)) +
-    xlab("Chromatin Feature") +
-    # ggtitle(paste("Repair pathways correlation with chromatin features in", condition_name, "exps"))  +
-    theme_classic2(base_size = 16) +
-    scale_y_continuous(breaks=seq(-1,1, .1)) +
-    scale_fill_manual(values = c("****" = "black", "***" = "gray20", "**" = "gray40", 
-                                 "*" = "gray50", "ns" = "gray80")) +
-    coord_flip()
-  return(list(dataframe=cor.df, plot = p))
-}
-
-clustering = data.frame(row.names=c('LMNB1', 'late_replicating', 'H3K9me2',
-                                    'H3K27me3', 'EZH2', 'CTCF', 'SMC3',
-                                    'HDAC3', 'HDAC2', 'HDAC1', 'H3K4me1',
-                                    'H3K4me2', 'H3K4me3', 'H3K27ac',
-                                    'H4K5acK8ac', 'H2AFZ', 'DNAse', 'Dam', 
-                                    'm5C', 'H3K79me2', 'TTseq', 'H3K36me3', 
-                                    'POL2AS2', 'POL2'),
-                        group=factor(c(rep('repressive', 5), rep('insulator', 2),
-                                       rep('HDAC', 3), rep('euchromatin', 6),
-                                       rep('accessibility', 2), 'methylation',
-                                       rep('transcribing', 5)),
-                                     levels=c('transcribing', 'accessibility',
-                                              'methylation', 'euchromatin',
-                                              'HDAC', 'insulator', 'repressive')))
-
-cor_test <- function(y, X, left, right){
-  cor_list = lapply(X, function(x){
-    cor.test(x,y)
-  })
-  p_vec = unlist(lapply(cor_list, function(x){x$p.value}))
-  cor_vec = unlist(lapply(cor_list, function(x){x$estimate}))
-  p_adj = p.adjust(p_vec, method = "holm")
-  color = ifelse(p_adj < 0.05, ifelse(cor_vec > 0, left, right),
-                 'None')
-  importance = abs(cor_vec)
-  target=factor(colnames(X), levels=rownames(clustering))
-  feature_group = clustering[colnames(X), ]
-  return(list(correlation=cor_vec,importance = importance, p=p_vec,
-              p_adj=p_adj, target=target, color=color,
-              feature_group=feature_group))
-}
-
-get_combinations <- function(domain_vec){
-  n_domain = length(domain_vec)
-  get_ivec <-function (last_x, n_domain){
-    if (last_x < n_domain){
-      i_vec = c(0, c((last_x+1):n_domain))
-    } else{
-      i_vec = c(0)
-    }
-  }
-  
-  combine <- function(x_new, x_vec, n_domain){
-    new_vec = c(x_vec, x_new)
-    if (length(new_vec)==n_domain){
-      return(new_vec)
-    } else {
-      i_vec = get_ivec(max(new_vec), n_domain)
-      x_list = lapply(i_vec, combine, x_vec=new_vec,
-                      n_domain=n_domain)
-      return(do.call(rbind, x_list))
-    }
-  }
-  
-  comb_list = lapply(c(0:n_domain), combine, x_vec=c(), n_domain=n_domain)
-  
-  comb = do.call(rbind, comb_list)
-  comb_df = unique(t(apply(comb, 1, function(x){x[order(x)]})))
-  
-  name_list = apply(comb_df, 1, function(x){
-    name = paste(domain_vec[x], collapse='-')
-    if (name == ''){
-      name = 'iDomain'
-    }
-    return(name)
-  })
-  
-  opt_list = lapply(domain_vec, function(d){
-    apply(comb_df, 1, function(x){
-      opt = domain_vec[x]
-      return(d%in%opt)
-    })
-  })
-  
-  opt_df = do.call(cbind, opt_list)
-  colnames(opt_df) = domain_vec
-  rownames(opt_df) = name_list
-  
-  return(opt_df)
-}
-
-quantiles_95 <- function(x) {
-  r <- quantile(x, probs=c(0.05, 0.25, 0.5, 0.75, 0.95))
-  names(r) <- c("ymin", "lower", "middle", "upper", "ymax")
-  r
-}
-
-plot_comb_grid_beeswarm <- function(dt, opt_df, domains, y_name, min_count=0,
-                                    max_count=Inf, group_by=NULL, color=NULL, y_plabel=c(-1.5, 1.5)){
-  
-  opt_melt = reshape2::melt(opt_df)
-  colnames(opt_melt) = c('group', 'domain', 'is_in')
-  
-  opt_melt$is_in = ifelse(opt_melt$is_in, 'in', 'out')
-  opt_melt$domain = factor(opt_melt$domain, levels=domains)
-  
-  
-  group_list = lapply(rownames(opt_df), function(opt_name){
-    opt = opt_df[opt_name, ]
-    in_vec = domains[opt]
-    out_vec = domains[!opt]
-    
-    in_sum = rowSums(dt[,..in_vec])
-    out_sum = rowSums(dt[,..out_vec])
-    if (length(in_vec)==0){
-      in_group = which(out_sum == 0)
-    } else if (length(out_vec) == 0){
-      in_group = which(in_sum==length(in_vec))
-    } else  {
-      in_group = which(in_sum == length(in_vec) & out_sum==0)
-    }
-    return(in_group)
-  })
-  
-  names(group_list) = rownames(opt_df)
-  for (opt_name in names(group_list)){
-    i_vec = group_list[[opt_name]]
-    dt[i_vec, group := opt_name]
-  }
-  if (is.null(group_by)){
-    group_count_df = data.frame(dt[,table(group)])
-  } else {
-    group_count_df = data.frame(dt[,table(group)/length(unique(get(group_by)))])
-  }
-  group_count_df = group_count_df[order(match(group_count_df$group, rownames(opt_df))),]
-  # print(group_count_df)
-  group_count_sel = group_count_df[group_count_df$Freq>=min_count,]
-  group_count_sel = group_count_sel[group_count_sel$Freq<=max_count,]
-  group_levels =  group_count_sel$group
-  opt_sel = opt_melt[opt_melt$group %in% group_levels, ]
-  
-  opt_sel$group = factor(opt_sel$group, levels=group_levels)
-  # print(opt_sel)
-  
-  indel_selection = dt[group%in%group_levels, ]
-  indel_selection[,group:=factor(group, levels=group_levels)]
-  
-  # wilcox_list = lapply(group_levels[group_levels!='iDomain'],
-  #                      function(g){
-  #                          x = indel_selection[group==g, y_name, with=F]
-  #                          y = indel_selection[group=='iDomain', y_name,
-  #                                              with=F]
-  #                          wilcox.test(unlist(x),unlist(y))
-  #                      })
-  
-  group_count_sel$group = factor(group_count_sel$group, levels=group_levels)
-  
-  count_plot = ggplot(group_count_sel, aes(x=group,y=1, label=Freq)) +
-    geom_label() +
-    theme_void()
-  
-  
-  
-  dots = ggplot(opt_sel, aes(x=group, y=domain, color=is_in)) +
-    geom_point(size=2) +
-    geom_line(data=opt_sel[opt_sel$is_in=='in',], aes(group=group)) +
-    theme_bw() +
-    scale_color_manual(values=c('in'='black', 'out'='grey70')) +
-    guides(color="none")  +
-    geom_vline(xintercept=seq(1.5, length(unique(dt$group))-0.5, 1),
-               lwd=0.5, colour="grey90") +
-    theme(axis.title=element_blank(),
-          axis.text=element_blank(),
-          axis.ticks=element_blank(),
-          panel.grid.major = element_blank())
-  
-  symnum = list(cutpoints = c(0, 0.0001, 0.001, 0.01, 0.05, 1),
-                symbols = c("****", "***", "**", "*", " "))
-  
-  
-  if (is.null(group_by)){
-    beeswarm = ggplot(indel_selection, aes_string(x='group', y=y_name)) +
-      geom_quasirandom(width=0.3) +
-      stat_summary(fun=median, fun.min = median,
-                   fun.max = median,
-                   geom="crossbar", width = 0.5,
-                   color='red') +
-      stat_compare_means(aes(label = ..p.signif..),
-                         symnum.args = symnum,
-                         method = 'wilcox.test',
-                         ref.group='iDomain')
-    
-  } else {
-    wilcox_dt = indel_selection[,test_wilcox(.SD, group_by, y_name),
-                                by='group']
-    wilcox_dt[,p_adj:=p.adjust(p_value, method = "holm")]
-    wilcox_dt[,p_signif:=symnum(p_adj, cutpoints=symnum$cutpoints,
-                                symbols=symnum$symbols)]
-    
-    
-    beeswarm = ggplot(indel_selection,
-                      aes_string(x='group', y=y_name, color=group_by)) +
-      geom_quasirandom(dodge.width=1) +
-      scale_color_manual(values=color) +
-      stat_summary(aes_string(group=group_by), fun=median,
-                   fun.min = median, fun.max = median,
-                   geom="crossbar", width = 0.5,
-                   color='red',
-                   position= position_dodge(width =1)) +
-      geom_text(data=wilcox_dt, aes(x=group, y=0.8, label=p_signif),
-                inherit.aes=F)
-    print(wilcox_dt)
-  }
-  beeswarm = beeswarm +
-    theme_bw() +
-    geom_vline(xintercept=seq(1.5, length(unique(dt$group))-0.5, 1),
-               lwd=0.5, colour="grey90") +
-    theme(axis.title=element_blank(),
-          axis.text.x=element_blank(),
-          panel.grid.major.x = element_blank(),
-          axis.ticks.x=element_blank()) +
-    ylim(y_plabel)
-  
-  count = data.frame(domain=gsub('_domain', '', domains),
-                     count=colSums(dt[,..domains], na.rm=T))
-  
-  count$domain = factor(count$domain, levels=domain_levels)
-  
-  histogram = ggplot(count, aes(x=1, y=domain, label = count)) +
-    geom_label() +
-    theme_bw() +
-    theme(plot.background = element_blank(),
-          panel.grid.major = element_blank(),
-          panel.grid.minor = element_blank(),
-          panel.border = element_blank(),
-          axis.title=element_blank(),
-          axis.text.x=element_blank(),
-          axis.ticks=element_blank())
-  
-  empty = ggplot(data=data.frame(1,1),aes(x=1,y=1)) +
-    geom_point() +
-    theme_void()
-  
-  count_beeswarm = plot_grid(beeswarm, count_plot, ncol=1, rel_heights=c(20,1),
-                             align='v', axis='lr')
-  return(plot_grid(empty, beeswarm, empty, count_plot,
-                   histogram, dots, nrow=3,
-                   rel_widths=c(1,10), rel_heights=c(15,1,5), align='vh',
-                   axis='tlbr'))
-}
-
 p.adjust <- function(p, method = p.adjust.methods, n = length(p))
 {
   ## Methods 'Hommel', 'holm', 'BY' and speed improvements
@@ -443,79 +159,12 @@ p.adjust <- function(p, method = p.adjust.methods, n = length(p))
   p0
 }
 
-SetFileName <- function(filename, initials) {
-  # Set filename with extension and initials to make filename with date integrated.
-  filename <- substitute(filename)
-  initials <- substitute(initials)
-  filename <- paste0(initials, Date, filename)
-  filename
-}
-
 # From Fede:
 # ggpairs custom functions
-corColor <- function(data, mapping, color = I("black"), sizeRange = c(1, 3), ...) {
-  
-  x   <- eval_data_col(data, mapping$x)
-  y   <- eval_data_col(data, mapping$y)
-  r   <- cor(x, y)
-  rt  <- format(r, digits = 3)
-  tt  <- as.character(rt)
-  cex <- max(sizeRange)
-  
-  # helper function to calculate a useable size
-  percent_of_range <- function(percent, range) {
-    percent * diff(range) + min(range, na.rm = TRUE)
-  }
-  
-  # plot correlation coefficient
-  p <- ggally_text(label = tt, mapping = aes(), xP = 0.5, yP = 0.5,
-                   size = I(percent_of_range(cex * abs(r), sizeRange)), color = color, ...) +
-    theme(panel.grid.minor=element_blank(),
-          panel.grid.major=element_blank())
-  
-  corColors <- RColorBrewer::brewer.pal(n = 7, name = "RdYlBu")[2:6]
-  
-  if (r <= boundaries[1]) {
-    corCol <- corColors[1]
-  } else if (r <= boundaries[2]) {
-    corCol <- corColors[2]
-  } else if (r < boundaries[3]) {
-    corCol <- corColors[3]
-  } else if (r < boundaries[4]) {
-    corCol <- corColors[4]
-  } else {
-    corCol <- corColors[5]
-  }
-  
-  p <- p +
-    theme(panel.background = element_rect(fill = corCol))
-  
-  return(p)
-}
-
 theme_classic_lines <- function() {
   theme_pubr(border = T, legend = "top") +
     theme(panel.grid.major = element_line(colour = "#adb5bd", size = 0.25),
           strip.background = element_rect(fill = "white", color = "white")
-    )
-}
-theme_classic_lines_45 <- function() {
-  theme_pubr(border = T, legend = "top", x.text.angle = 45) +
-    theme(panel.grid.major = element_line(colour = "#adb5bd", size = 0.25),
-          strip.background = element_rect(fill = "white", color = "white")
-    )
-}
-
-theme_classic_lines_90 <- function() {
-  theme_pubr(border = T, legend = "top", x.text.angle = 90) +
-    theme(panel.grid.major = element_line(colour = "#adb5bd", size = 0.25),
-          strip.background = element_rect(fill = "white", color = "white")
-    )
-}
-
-theme_classic_lines_90_noborder <- function() {
-  theme_pubr(border = F, legend = "top", x.text.angle = 90) +
-    theme(strip.background = element_rect(fill = "white", color = "white")
     )
 }
 
@@ -742,325 +391,28 @@ eff.data.heatmap2$drug <- gsub(" [(].*[)]", "", eff.data.heatmap2$drug) #shorten
 
 #### HDAC only heatmap
 ```{r HDAC heatmap processing}
-eff.data.heatmap.cluster1 = eff.data.heatmap2 %>% 
-  filter(target == "HDAC" & drug != "Nullscript") %>%
-  mutate(drug_conc = paste(drug, conc_char, sep = " "))
+HDACs = indel.data %>% 
+  distinct(drug, conc_char, target) %>%
+    mutate(drug = gsub(" [(].*[)]", "", drug),
+         drug_conc = paste(drug, conc_char, sep = " ")) %>% 
+  filter(target == "HDAC" & drug != "Nullscript") %>% 
+  pull(drug_conc)
 
-# Add cluster annotation
-cluster_HDAC <- hclust(dist(eff.data.heatmap.cluster1), method = "ward.D")
-cluster_HDAC <- cutree(tree = cluster_HDAC, k = 3)
-cluster_HDAC <- data.frame(cluster_HDAC)
-
-eff.data.heatmap.cluster1 <- cbind(eff.data.heatmap.cluster1, cluster_HDAC) %>% 
-  as_tibble()
-
-breaks <- quantile(unlist(eff.data.heatmap.cluster1 %>% 
-                            dplyr::select(contains('IPR'))), c(.01,.99), na.rm = T) # change these numbers according to where you want to set the cutoff
-palette_length <- 100
-
-myBreaks <- c(seq(-breaks[2], 0, length.out=ceiling(palette_length/2) + 1), 
-              seq(breaks[2]/palette_length, breaks[2], length.out=floor(palette_length/2)))
-
-
-cluster_HDAC <- eff.data.heatmap.cluster1 %>%
-  distinct(drug_conc, cluster_HDAC)
-
-target.cluster1 <- target_set_drugs %>%
+target.HDAC <- target_set_drugs %>%
   rownames_to_column("drug_conc") %>%
   left_join(HDAC_tib) %>%
-  left_join(cluster_HDAC) %>%
-  filter(!is.na(cluster_HDAC)) %>%
+  filter(drug_conc %in% HDACs) %>%
   replace(is.na(.), 0)
 
-rownames(target.cluster1) <- target.cluster1$drug_conc
-target.cluster1 <- target.cluster1 %>%
-  dplyr::select(cluster_HDAC, conc_char, pan_HDAC, HDAC1,HDAC2, HDAC3,
+rownames(target.HDAC) <- target.HDAC$drug_conc
+target.HDAC <- target.HDAC %>%
+  dplyr::select(pan_HDAC, HDAC1,HDAC2, HDAC3,
                 HDAC4, HDAC6, HDAC8, HDAC10, viab)
 
-target.cluster1
-```
-
-### Process Vorinostat & GSK126 validations
-```{r}
-vorinostat_validation = indel.validation.data %>% 
-  filter(replicate == "mean" & plasmid == "LBR2", drug %in% c("DMSO", "Vorinostat"), sum_bc_reads > 1000)%>% 
-  dplyr::select(barcode, drug, MMEJ_NHEJ, efficiency, all_of(chromatin_cols)) %>%
-  distinct() 
-
-barcde_all_reps_vorino = vorinostat_validation %>% 
-  distinct(barcode, drug) %>% 
-  group_by(barcode) %>%
-  summarise(bccount = n()) %>% 
-  filter(bccount == 2) %>%
-  pull(barcode)
-
-vorinostat_ratios = vorinostat_validation  %>% 
-  filter(barcode %in% barcde_all_reps_vorino) %>%
-  pivot_wider(names_from = drug, values_from = c(efficiency, MMEJ_NHEJ)) %>%
-  mutate(diff_TIF = efficiency_Vorinostat - efficiency_DMSO,
-         ratio_TIF = efficiency_Vorinostat/efficiency_DMSO,
-         log2_FC_TIF = log2(ratio_TIF),
-         diff_MMEJ_NHEJ = MMEJ_NHEJ_Vorinostat - MMEJ_NHEJ_DMSO,
-         ratio_MMEJ_NHEJ = MMEJ_NHEJ_Vorinostat/MMEJ_NHEJ_DMSO,
-         log2_FC_MMEJ_NHEJ = log2(ratio_MMEJ_NHEJ),
-         drug = "Vorinostat") 
-
-barcde_all_reps_gsk = RSTP2_IndelRatios_Chromatin_2kb %>% 
-  distinct(barcode, drug) %>% 
-  group_by(barcode) %>%
-  summarise(bccount = n()) %>% 
-  filter(bccount == 2) %>%
-  pull(barcode)
-
-GSK_ratios = RSTP2_IndelRatios_Chromatin_2kb %>% 
-  filter(barcode %in% barcde_all_reps_gsk) %>%
-  # distinct(barcode, drug, MMEJ_NHEJ , efficiency) %>% 
-  pivot_wider(names_from = drug, values_from = c(efficiency, MMEJ_NHEJ)) %>%
-  mutate(diff_TIF = efficiency_GSK126 - efficiency_DMSO_GSK,
-         ratio_TIF = efficiency_GSK126/efficiency_DMSO_GSK,
-         log2_FC_TIF = log2(ratio_TIF),
-         diff_MMEJ_NHEJ = MMEJ_NHEJ_GSK126 - MMEJ_NHEJ_DMSO_GSK,
-         ratio_MMEJ_NHEJ = MMEJ_NHEJ_GSK126/MMEJ_NHEJ_DMSO_GSK,
-         log2_FC_MMEJ_NHEJ = log2(ratio_MMEJ_NHEJ),
-         drug = "GSK-126")
-
-vorinostat_ctrl <- vorinostat_ratios %>%
-  distinct(efficiency_DMSO, barcode)
-
-
-## Compare controls, just to check
-GSK_ratios2 <- GSK_ratios %>%
-  distinct(efficiency_DMSO_GSK, barcode)
-
-ctrl_compare <- merge(vorinostat_ctrl, GSK_ratios2, by = "barcode")
-
-# Spearman correlation
-cor(ctrl_compare$efficiency_DMSO, ctrl_compare$efficiency_DMSO_GSK, method = "spearman")
-
-# ggplot(ctrl_compare,
-#        aes(x = efficiency_DMSO, y = efficiency_DMSO_GSK)) +
-#   geom_point() +
-#   geom_smooth(method = "lm")
-
-pool_validation_ratios = bind_rows(vorinostat_ratios, GSK_ratios) %>% 
-  dplyr::select(-efficiency_Vorinostat, -efficiency_DMSO, -MMEJ_NHEJ_DMSO, 
-                -MMEJ_NHEJ_Vorinostat, -MMEJ_NHEJ_DMSO_GSK, -efficiency_DMSO_GSK, 
-                -MMEJ_NHEJ_DMSO_GSK, -MMEJ_NHEJ_GSK126, -efficiency_GSK126)
-```
-
-### CCD processing of the pool data
-
-```{r all scatterplots pool, eval = FALSE}
-valid_ratios_long = pool_validation_ratios %>% 
-  dplyr::select(drug, all_of(chromatin.features.short), log2_FC_TIF, log2_FC_MMEJ_NHEJ) %>% 
-  distinct() %>%
-  pivot_longer(cols = chromatin.features.short, names_to = "feature", values_to = "zscore")
-
-
-pdf("/DATA/projects/DSBrepair/git/EpiScreen/figures/rs20220824_CCD_pool.pdf", height = 20, width = 20)
-
-ggplot(valid_ratios_long %>% filter(drug == "Vorinostat"), aes(zscore, log2_FC_TIF)) + 
-  geom_point_rast() +
-  geom_smooth(method = "lm", se = F) +
-  stat_cor(method = "pearson") +
-  ggtitle("TIF Vorinostat") +
-  stat_poly_eq(aes(label = paste(after_stat(eq.label),
-                                 after_stat(rr.label), sep = "*\", \"*")),
-               label.x = "left", label.y = "bottom") +
-  facet_wrap(. ~ feature) +
-  theme_bw(base_size = 16)
-
-ggplot(valid_ratios_long%>% filter(drug == "Vorinostat"), aes(zscore, log2_FC_MMEJ_NHEJ)) + 
-  geom_point_rast() +
-  geom_smooth(method = "lm", se = F) +
-  stat_cor(method = "pearson") +
-  ggtitle("Bal Vorinostat") +
-  stat_poly_eq(aes(label = paste(after_stat(eq.label),
-                                 after_stat(rr.label), sep = "*\", \"*")),
-               label.x = "left", label.y = "bottom") +
-  facet_wrap(. ~ feature) +
-  theme_bw(base_size = 16)
-
-ggplot(valid_ratios_long%>% filter(drug == "GSK-126"), aes(zscore, log2_FC_TIF)) + 
-  geom_point_rast() +
-  geom_smooth(method = "lm", se = F) +
-  stat_cor(method = "pearson") +
-  ggtitle("TIF GSK-126") +
-  stat_poly_eq(aes(label = paste(after_stat(eq.label),
-                                 after_stat(rr.label), sep = "*\", \"*")),
-               label.x = "left", label.y = "bottom") +
-  facet_wrap(. ~ feature) +
-  theme_bw(base_size = 16)
-
-ggplot(valid_ratios_long%>% filter(drug == "GSK-126"), aes(zscore, log2_FC_MMEJ_NHEJ)) + 
-  geom_point_rast() +
-  geom_smooth(method = "lm", se = F) +
-  stat_cor(method = "pearson") +
-  ggtitle("Bal GSK-126") +
-  stat_poly_eq(aes(label = paste(after_stat(eq.label),
-                                 after_stat(rr.label), sep = "*\", \"*")),
-               label.x = "left", label.y = "bottom") +
-  facet_wrap(. ~ feature) +
-  theme_bw(base_size = 16)
-
-dev.off()
-```
-
-
-# Calculating the Chromatin Context Dependency (CCD)
-## Extract slopes for all features
-```{r}
-chromatin.features.short = chromatin_cols[1:24]
-
-slope.protein.features <- tibble(drug = NA, feature = NA,  term = NA, 
-                                 indelrate = NA, p.value.indelrate = NA, 
-                                 ratio = NA, p.value.ratio = NA)
-
-for (i in unique(pool_validation_ratios$drug)) {
-  for (j in chromatin.features.short) {
-    model_tib <- pool_validation_ratios %>% filter(drug == i) 
-    
-    # Indel rates
-    model.indelrate.log2 <- lm(formula = log2_FC_TIF ~ unlist(model_tib[j]), 
-                               data = model_tib) %>% 
-      tidy()
-    
-    # Pathway balance
-    model.ratio.log2 <- lm(formula = log2_FC_MMEJ_NHEJ ~ unlist(model_tib[j]), 
-                           data = model_tib) %>% 
-      tidy()
-    
-    slope.protein.features <- slope.protein.features %>% 
-      add_row(drug = i, 
-              feature = j, 
-              term = model.indelrate.log2 %>%
-                pull(term),
-              indelrate = model.indelrate.log2 %>% 
-                pull(estimate), 
-              p.value.indelrate = model.indelrate.log2 %>% 
-                pull(p.value),
-              ratio = model.ratio.log2 %>% 
-                pull(estimate), 
-              p.value.ratio = model.ratio.log2 %>% 
-                pull(p.value))
-  }
-}
-
-# Remove the 1st NA column
-slope.protein.features %<>% 
-  filter(!is.na(feature)) %>%
-  mutate(term = ifelse(term == "(Intercept)", "intercept", "slope"))
-```
-
-
-### Calculating the Principle Component Regression (PCR)
-```{r}
-CCD_tib = pool_validation_ratios %>% dplyr::select(barcode, drug, log2_FC_TIF, log2_FC_MMEJ_NHEJ, all_of(chromatin.features.short)) %>% ungroup()
-
-#Create an empty dt with CCDs of DDR proteins
-pool_CCDs_dt <- tibble(var = NA, drug = NA, num_comp = NA, r.squared = NA, adj.r.squared = NA,p.value = NA)
-# chrom_formula = as.formula(paste("y ~ ", paste(chromatin.features, collapse= "+")))
-
-for (i in unique(CCD_tib$drug)){
-  for (j in c("log2_FC_TIF", "log2_FC_MMEJ_NHEJ")) {
-    pool_dt <- filter(CCD_tib, drug == i)
-    # Run a model per drug
-    set.seed(1)
-    chrom_formula = reformulate(chromatin.features.short, response = j)
-    PCR_model_DDR_test <- pcr(chrom_formula,
-                              data=pool_dt , 
-                              validation="CV")
-    
-    pcr_pred <- predict(PCR_model_DDR_test, 
-                        pool_dt, ncomp = 3)
-    
-    combined.dt <- tibble(measured = pool_dt %>% pull(j), 
-                          predicted = as.numeric(pcr_pred))
-    
-    pred_vs_estim <- lm(formula = measured ~ predicted, 
-                        data = combined.dt) %>% 
-      glance()
-    
-    pool_CCDs_dt <- pool_CCDs_dt %>% 
-      add_row(var = j,
-              drug = i, 
-              r.squared = pred_vs_estim %>% 
-                pull(r.squared), 
-              adj.r.squared = pred_vs_estim %>% 
-                pull(adj.r.squared), 
-              p.value = pred_vs_estim %>% 
-                pull(p.value))
-  }
-}
-
-#Correct model to adjust for multiple testing correction
-adj_p.value_KO_model <- pool_CCDs_dt %>% 
-  dplyr::select(var, num_comp, p.value, drug) %>% 
-  group_by(var) %>%
-  mutate(p.adj = p.adjust(p.value, method = "BH")) %>% 
-  dplyr::select(var, drug,p.value,p.adj)
-
-signif_hits = adj_p.value_KO_model %>% filter(p.adj < 0.01) %>% 
-  distinct(drug, var) %>% 
-  ungroup() %>% 
-  mutate(val = TRUE,
-         var = gsub("log2.fc", "signif", var)) %>%
-  pivot_wider(names_from = var, 
-              values_from = val, 
-              values_fill = FALSE) 
-```
-
-### Filtering the epistasis
-```{r epistasis filtering}
-# Calculate postition where the linear model crosses y = 0, we do this by -intercept / slope
-epistasis_tib = slope.protein.features %>% 
-  mutate(indelrate = ifelse(p.value.indelrate < 0.05, indelrate, 0),
-         ratio = ifelse(p.value.ratio < 0.05, ratio, 0)) %>%
-  distinct(drug, term, feature, indelrate, ratio) %>% 
-  pivot_wider(., names_from = term, values_from = c(indelrate, ratio)) %>%
-  mutate(feature = gsub(".zscore", "", feature),
-         x_intercept_indelrate = -indelrate_intercept / indelrate_slope,
-         x_intercept_ratio = -ratio_intercept / ratio_slope)
-
-effect_compounds = pool_validation_ratios %>%
-  group_by(drug)  %>% 
-  #
-  mutate(indelrate_pos = sum(log2_FC_TIF > 0),
-         #
-         indelrate_effect = ifelse(indelrate_pos >= 17, "indel_rate_increase", 
-                                   ifelse(indelrate_pos <= 1, "indel_rate_decrease", "mixed")),
-         #
-         ratio_pos = sum(log2_FC_MMEJ_NHEJ > 0),
-         #
-         ratio_effect = ifelse(ratio_pos >= 17, "NHEJ_increase", 
-                               ifelse(ratio_pos <= 1, "MMEJ_increase", "mixed"))) %>%
-  distinct(drug, indelrate_effect, ratio_effect)
-
-
-epistasis_tib %<>% 
-  left_join(effect_compounds)  %>% 
-  left_join(signif_hits) %>%
-  mutate(
-    # x_intercept_indelrate = ifelse(p.value.indelrate < 0.05,
-    #                                x_intercept_indelrate, NA),
-    # x_intercept_ratio = ifelse(p.value.ratio < 0.05,
-    #                            x_intercept_ratio, NA),
-    indelrate_slope_plot = ifelse(x_intercept_indelrate < 1, indelrate_slope, NA),
-    ratio_slope_plot = ifelse(x_intercept_ratio < 1, ratio_slope, NA)) %>%
-  distinct(drug, feature, indelrate_slope_plot, ratio_slope_plot) 
-
-validation_epistasis_TIF = epistasis_tib %>%
-  dplyr::select(drug, indelrate_slope_plot, feature) %>%
-  reshape2::dcast(drug ~ feature, value.var = "indelrate_slope_plot", fill = 0) %>% 
-  column_to_rownames(var = "drug")
-
-validation_epistasis_bal = epistasis_tib %>%
-  dplyr::select(drug, ratio_slope_plot, feature) %>%
-  reshape2::dcast(drug ~ feature, value.var = "ratio_slope_plot", fill = 0) %>% 
-  column_to_rownames(var = "drug")
 ```
 
 # CCD Data Screen
+
 ###Load data
 ```{r}
 file = list.files(in.dir, pattern = "CCD_table", full.names = T) %>% tail(n = 1)
@@ -1164,13 +516,11 @@ colors[which(quant_breaks == 0)-1] = "gray90"
 
 # Main figures
 ## 4A HDAC CCD Heatmap
-```{r 4A HDAC CCD, fig.width= 14, fig.height= 14}
-target_drugs = cluster_HDAC %>% pull(drug_conc)
-
+```{r 4A HDAC CCD, fig.width= 10, fig.height= 10}
 # Make matrix with drugs from selected target
 TIF_synergy_matrix = all_compounds_epistasis_TIF %>% 
   rownames_to_column(var = "drug_conc") %>%
-  filter(drug_conc %in% target_drugs) %>%
+  filter(drug_conc %in% HDACs) %>%
   column_to_rownames(var = "drug_conc")
 
 cluster_rows = ifelse(nrow(TIF_synergy_matrix) > 1, TRUE, FALSE)
@@ -1192,7 +542,7 @@ p = pheatmap(TIF_synergy_matrix[, TRIP_chrom_clust$labels],
              cluster_rows = cluster_rows,
              breaks = breaks,
              cluster_cols = TRIP_chrom_clust,
-             annotation_row = target.cluster1,
+             annotation_row = target.HDAC,
              clustering_method = "ward.D2",
              main = paste("Chromatin synergies - TIF HDAC cluster"),
              color = colors,
@@ -1201,15 +551,13 @@ p = pheatmap(TIF_synergy_matrix[, TRIP_chrom_clust$labels],
              cutree_rows = 3)
 
 TIF_synergy_cluster <- TIF_synergy_matrix %>%
-  rownames_to_column("drug_conc") %>%
-  left_join(cluster_HDAC) %>%
-  mutate(cluster_HDAC = as.character(cluster_HDAC))
+  rownames_to_column("drug_conc")
 ```
 ## HDAC2/3 CCD
-```{r}
+```{r, eval = F}
 hdac2_3 <- TIF_synergy_cluster %>%
   distinct(drug_conc, H3K27me3, H3K4me1, EZH2) %>%
-  left_join(target.cluster1 %>% rownames_to_column("drug_conc")) %>%
+  left_join(target.HDAC %>% rownames_to_column("drug_conc")) %>%
   mutate(hdac3_pan = ifelse(HDAC3 == 1 | pan_HDAC == 1, 1, 0))
 
 ggplot(hdac2_3,
@@ -1361,8 +709,8 @@ for(i in unique(CCD_tib$feature)) {
 ```
 
 
-## 3E m5C top CCDs
-```{r 3E m5C synergies, fig.width = 6, fig.height = 6}
+## 4C m5C top CCDs
+```{r 4C m5C synergies, fig.width = 6, fig.height = 6}
 rank_dt = CCD_tib %>% 
   left_join(rownames_to_column(target, var = "drug_conc")) %>%
   filter(feature == "m5C", !is.na(indelrate_slope_plot)) %>%
@@ -1436,110 +784,43 @@ all_compounds_epistasis_TIF %>%
   filter(!between(m5C, -0.01, .01)) %>%
   rownames()
 ```
-
-## 3F HDAC CCD Heatmap
-```{r 3F HDAC CCD, fig.width= 14, fig.height= 14}
-target_drugs = cluster_HDAC %>% pull(drug_conc)
+# Supplementary Figures
+## S4A HMT CCD Heatmap
+```{r S4A HMT CCD, fig.width= 6, fig.height= 6}
+DNMT_drugs = target_set_drugs %>% 
+  rownames_to_column(var = "drug_conc") %>% 
+  filter(target == "DNMT") %>% pull(drug_conc)
 
 # Make matrix with drugs from selected target
-TIF_synergy_matrix = all_compounds_epistasis_TIF %>% 
+TIF_synergy_matrix_DNMT = all_compounds_epistasis_TIF %>% 
   rownames_to_column(var = "drug_conc") %>%
-  filter(drug_conc %in% target_drugs) %>%
+  filter(drug_conc %in% DNMT_drugs) %>%
   column_to_rownames(var = "drug_conc")
 
-cluster_rows = ifelse(nrow(TIF_synergy_matrix) > 1, TRUE, FALSE)
+cluster_rows = ifelse(nrow(TIF_synergy_matrix_DNMT) > 1, TRUE, FALSE)
 
 # # change these numbers according to where you want to set the cutoff
-# quant_breaks_ <- quantile(TIF_synergy_matrix, c(.01,.99), na.rm = T) 
-# max_quant = max(abs(quant_breaks))
-# palette_length <- 100
-# breaks <- c(seq(-max_quant, 0, length.out=ceiling(palette_length/2) + 1), 
-#             seq(max_quant/palette_length, max_quant, length.out=floor(palette_length/2)))
-# slope.colors.temp = slope.colors
-# colors = colorRampPalette(slope.colors.temp %>% pull(color))(length(breaks))
-# colors[which(quant_breaks == 0)-1] = "gray90"
+quant_breaks <- quantile(TIF_synergy_matrix_DNMT, c(.01,.99), na.rm = T)
+max_quant = max(abs(quant_breaks))
+palette_length <- 100
+breaks <- c(seq(-max_quant, 0, length.out=ceiling(palette_length/2) + 1),
+            seq(max_quant/palette_length, max_quant, length.out=floor(palette_length/2)))
+slope.colors.temp = slope.colors
+colors = colorRampPalette(slope.colors.temp %>% pull(color))(length(breaks))
+colors[which(quant_breaks == 0)-1] = "gray90"
 
-p = pheatmap(TIF_synergy_matrix[, TRIP_chrom_clust$labels],
+p = pheatmap(TIF_synergy_matrix_DNMT[, TRIP_chrom_clust$labels],
              border_color = F,
              cellwidth = 8,
              cellheight = 8,
              cluster_rows = cluster_rows,
              breaks = breaks,
              cluster_cols = TRIP_chrom_clust,
-             annotation_row = target.cluster1,
              clustering_method = "ward.D2",
-             main = paste("Chromatin synergies - TIF HDAC cluster"),
+             main = paste("Chromatin synergies - TIF DNMT cluster"),
              color = colors,
              annotation_colors = annotation_colors_scr, 
-             annotation_legend = T,
-             cutree_rows = 3)
-
-TIF_synergy_cluster <- TIF_synergy_matrix %>%
-  rownames_to_column("drug_conc") %>%
-  left_join(cluster_HDAC) %>%
-  mutate(cluster_HDAC = as.character(cluster_HDAC))
-```
-
-## 3.. Pool CCD TIF
-
-```{r GH CCD in the pool}
-quant_breaks <- quantile(validation_epistasis_TIF, c(.01,.99), na.rm = T)
-palette_length <- 100
-breaks.validation <- c(seq(quant_breaks[1], 0, length.out=ceiling(palette_length/2) + 1), 
-            seq(quant_breaks[2]/palette_length, quant_breaks[2], length.out=floor(palette_length/2)))
-colors.validations = colorRampPalette(slope.colors %>% pull(color))(length(breaks.validation))
-colors.validations[which(quant_breaks == 0)-1] = "gray90"
-
-
-order_chrom = TRIP_chrom_clust$labels
-order_chrom = order_chrom[!grepl("H3K9me3", order_chrom)]
-
-
-pheatmap(validation_epistasis_TIF[ , order_chrom],
-             border_color = F,
-             cellwidth = 8,
-             cellheight = 8,
-             breaks = breaks.validation,
-             main = paste("Chromatin synergies - TIF"),
-             color = colors.validations,
              annotation_legend = T)
-```
-
-# Supplementary Figures
-
-## S3DE K27me3 and CTCF correlation
-```{r 3DE K37me3 vs CTCF CCD correlation, fig.width= 10, fig.height= 5}
-K27me3_CTCF = all_compounds_epistasis_TIF %>% rownames_to_column(var = "drug_conc") %>%
-  distinct(drug_conc, CTCF, SMC3, H3K27me3) %>% 
-  mutate(CTCF = replace(CTCF, CTCF == 0, NA), 
-         SMC3 = replace(SMC3, SMC3 == 0, NA), 
-         H3K27me3 = replace(H3K27me3, H3K27me3 == 0, NA))
-
-p1 = ggplot(K27me3_CTCF,
-            aes(x = H3K27me3, y = CTCF)) +
-  geom_point() +
-  geom_abline(lty = "twodash") +
-  geom_smooth(method = "lm") +
-  stat_cor(method = "pearson") +
-  theme_classic2(base_size = 16) +
-  xlab("Slope H3K27me3") +
-  ylab("Slope CTCF") 
-
-
-
-K27me3_CTCF = indel.data %>% distinct(IPR, CTCF, SMC3, H3K27me3)
-
-p2 = ggplot(K27me3_CTCF,
-            aes(x = H3K27me3, y = CTCF)) +
-  geom_point() +
-  geom_abline(lty = "twodash") +
-  geom_smooth(method = "lm") +
-  stat_cor(method = "pearson") +
-  theme_classic2(base_size = 16) +
-  xlab("H3K27me3 z-score") +
-  ylab("CTCF z-score")
-
-plot_grid(p1, p2, nrow = 1, labels = c("F", "G"))
 ```
 
 

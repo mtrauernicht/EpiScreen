@@ -726,47 +726,6 @@ eff.data.heatmap2 <- eff.data.heatmap2[,c("drug", "target", "conc_char", iprs)]
 eff.data.heatmap2$drug <- gsub(" [(].*[)]", "", eff.data.heatmap2$drug) #shorten name of drug
 ```
 
-#### HDAC only heatmap
-```{r HDAC heatmap processing}
-eff.data.heatmap.cluster1 = eff.data.heatmap2 %>% 
-  filter(target == "HDAC" & drug != "Nullscript") %>%
-  mutate(drug_conc = paste(drug, conc_char, sep = " "))
-
-# Add cluster annotation
-cluster_HDAC <- hclust(dist(eff.data.heatmap.cluster1), method = "ward.D")
-cluster_HDAC <- cutree(tree = cluster_HDAC, k = 3)
-cluster_HDAC <- data.frame(cluster_HDAC)
-
-eff.data.heatmap.cluster1 <- cbind(eff.data.heatmap.cluster1, cluster_HDAC) %>% 
-  as_tibble()
-
-breaks <- quantile(unlist(eff.data.heatmap.cluster1 %>% 
-                            dplyr::select(contains('IPR'))), c(.01,.99), na.rm = T) # change these numbers according to where you want to set the cutoff
-palette_length <- 100
-
-myBreaks <- c(seq(-breaks[2], 0, length.out=ceiling(palette_length/2) + 1), 
-              seq(breaks[2]/palette_length, breaks[2], length.out=floor(palette_length/2)))
-
-
-cluster_HDAC <- eff.data.heatmap.cluster1 %>%
-  distinct(drug_conc, cluster_HDAC)
-
-target.cluster1 <- target_set_drugs %>%
-  rownames_to_column("drug_conc") %>%
-  left_join(HDAC_tib) %>%
-  left_join(cluster_HDAC) %>%
-  filter(!is.na(cluster_HDAC)) %>%
-  replace(is.na(.), 0)
-
-rownames(target.cluster1) <- target.cluster1$drug_conc
-target.cluster1 <- target.cluster1 %>%
-  dplyr::select(cluster_HDAC, conc_char, pan_HDAC, HDAC1,HDAC2, HDAC3,
-                HDAC4, HDAC6, HDAC8, HDAC10, viab)
-
-target.cluster1
-```
-
-
 # CCD Data Screen
 ###Load data
 ```{r}
