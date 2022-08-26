@@ -690,7 +690,7 @@ min.value = min(balance.data.heatmap$MMEJ_log2_FC_mean[is.finite(balance.data.he
 top_50_hits = balance.data.heatmap %>% 
   distinct(drug_conc, min_score) %>%
   arrange(desc(abs(min_score))) %>% 
-  #dplyr::slice_tail(n = 50) %>%
+  dplyr::slice_tail(n = 60) %>%
   distinct(drug_conc)
 
 
@@ -709,11 +709,11 @@ breaks <- quantile(unlist(balance.data.heatmap2 %>%
                             dplyr::select(contains('IPR'))), c(.05,.95), na.rm = T) # change these numbers according to where you want to set the cutoff
 palette_length <- 100
 
-# myBreaks <- c(seq(breaks[1], 0, length.out=ceiling(palette_length/2) + 1),
-#               seq(-breaks[1]/palette_length, -breaks[1], length.out=floor(palette_length/2)))
-
 myBreaks <- c(seq(breaks[1], 0, length.out=ceiling(palette_length/2) + 1),
-              seq(breaks[2]/palette_length, breaks[2]+.5, length.out=floor(palette_length/2)))
+              seq(-breaks[1]/palette_length, -breaks[1], length.out=floor(palette_length/2)))
+
+# myBreaks <- c(seq(breaks[1], 0, length.out=ceiling(palette_length/2) + 1),
+#               seq(breaks[2]/palette_length, breaks[2]+.5, length.out=floor(palette_length/2)))
 
 # myBreaks <- c(seq(-0.5, 0, length.out=ceiling(palette_length/2) + 1), 
 #               seq(0.5/palette_length, 0.5, length.out=floor(palette_length/2)))
@@ -759,7 +759,7 @@ plt1 = pheatmap(balance.data.matrix[ , clone5_map_ipr$labels],
                 cellwidth = 8,
                 cellheight = 8,
                 breaks = myBreaks,
-                clustering_method = "ward.D2",
+                clustering_method = "ward.D",
                 cluster_rows = T,
                 na_col = "white",
                 main = 'MMEJ ratio FC (log2), all concentrations',
@@ -952,135 +952,6 @@ top_hits = indel.data  %>%
 ```
 *Conclusion Figure 4C: Many AURKi are the most stron MMEJ ratio reducers. Also Decitabine and a HDAC inhibitor are amongst the strongest.*
 
-Indel plot Vorinostat
-Aim: Zoom in on Vorinostat to showcase the chromatin-specific MMEJ ratio reduction. 
-```{r}
-# # Import data from preprocessing script
-#mutation.data <- readRDS("data/episcreen_mutations_mt20220819.RDS")
-# 
-# chrom <- chromatin %>%
-#   rownames_to_column("IPR") 
-# 
-# label_ratio <- indel.data %>%
-#   mutate(drug_conc = paste(drug, conc_char, sep = " ")) %>%
-#   filter(drug_conc %in% c("DMSO control", "Vorinostat (SAHA, MK0683) 1 µM")) %>% 
-#   na.omit() %>%
-#   group_by(drug_conc, IPR) %>%
-#   dplyr::summarise(MMEJratio_mean = mean(MMEJratio),
-#                    MMEJratio_sd = sd(MMEJratio),
-#                    freqCut_mean = mean(freqCut),
-#                    freqCut_sd = sd(freqCut)) %>%
-#   ungroup() %>%
-#   left_join(chrom, by = "IPR")
-# 
-# FC_df <- indel.data %>% 
-#   filter(drug == "Vorinostat (SAHA, MK0683)" & conc_char == "1 µM") %>% 
-#   distinct(drug, MMEJ_log2_FC, freqCut_diff_mean, IPR) %>% 
-#   mutate(MMEJ_log2_FC = ave(MMEJ_log2_FC, IPR, FUN = function(x) mean(x, na.rm = T))) %>% 
-#   mutate(freqCut_diff_mean = ave(freqCut_diff_mean, IPR, FUN = function(x) mean(x, na.rm = T))) %>% 
-#   distinct() %>%   
-#   left_join(chrom, by = "IPR") %>% 
-#   mutate(chrom_mmej_FC = ave(MMEJ_log2_FC, chromatin, FUN = mean)) %>% 
-#   mutate(chrom_tif_FC = ave(freqCut_diff_mean, chromatin, FUN = mean)) %>% 
-#   mutate(chrom_mmej_FC_sd = ave(MMEJ_log2_FC, chromatin, FUN = sd)) %>% 
-#   mutate(chrom_tif_FC_sd = ave(freqCut_diff_mean, chromatin, FUN = sd)) 
-# 
-# 
-# label_ratio <- label_ratio %>%
-#   mutate(MMEJratio_mean_chrom = ave(MMEJratio_mean, drug_conc, chromatin, FUN = mean)) %>%
-#   mutate(MMEJratio_sd_chrom = ave(MMEJratio_mean, drug_conc, chromatin, FUN = sd)) %>%
-#   mutate(freqCut_mean_chrom = ave(freqCut_mean, drug_conc, chromatin, FUN = mean)) %>%
-#   mutate(freqCut_sd_chrom = ave(freqCut_mean, drug_conc, chromatin, FUN = sd))  %>%
-#   mutate(label_efficiency = paste0(drug_conc, " TIF = ", round(freqCut_mean_chrom*100, 1),"% ±", round(freqCut_sd_chrom*100, 1),"%"), 
-#          label_ratio = paste0(drug_conc, "MMEJ ratio = ", round(MMEJratio_mean_chrom, 2)," ±", round(MMEJratio_sd_chrom, 2))) 
-# 
-# label_ratio$drug_conc[label_ratio$drug_conc == "Vorinostat (SAHA, MK0683) 1 µM"] <- "Vorinostat 1 µM"
-# 
-# bc_mut_tib_mean <- mutation.data %>% 
-#   mutate(drug = gsub(" [(].*[)]", "", drug),
-#          drug_conc = paste(drug, conc_char, sep = " ")) %>%
-#   distinct(IPR, drug_conc, freq_mean,freq_sd, color, mutation, type) %>%
-#   filter(drug_conc %in% c("DMSO control", "Vorinostat 1 µM"), type %in% c("core", "grouped_indel")) %>% 
-#   na.omit() %>%
-#   left_join(label_ratio, by = c("drug_conc", "IPR"))
-# 
-# ggplot(bc_mut_tib_mean, 
-#             aes(mutation, freq_mean, color = color, fill = drug_conc)) + 
-#   geom_boxplot(position = position_dodge(0.75), aes(alpha = 0.7)) +
-#   geom_quasirandom(dodge.width = 0.75, shape = 21) + 
-#   scale_fill_manual("legend", values = c("white", "#60988D")) + 
-#   scale_color_manual("legend", values = colors_pathways) + 
-#   #scale_y_continuous(name="frequency", labels = percent) +
-#   scale_x_discrete(name="indel size", breaks = c("<-14", -7, 0, 1, ">2")) + 
-#   facet_wrap( ~ chromatin, ncol = 2) +
-#   geom_text(aes(x = 7, y = .7, label = label_efficiency)) +
-#   geom_text(aes(x = 7, y = .6, label = label_ratio)) + 
-#   theme_pubr(border = T)
-# 
-# ggplot(bc_mut_tib_mean %>%
-#          mutate(freq_mean_mean = ave(freq_mean, mutation, chromatin, drug_conc, FUN = mean)) %>%
-#          mutate(freq_sd = ave(freq_mean, mutation, chromatin, drug_conc, FUN = sd)) %>%
-#          distinct(freq_mean_mean, freq_sd, label_efficiency, label_ratio, mutation, drug_conc, chromatin, color), 
-#             aes(mutation, freq_mean_mean, color = color, fill = drug_conc)) + 
-#   geom_bar(stat = "identity", position = position_dodge(0.75), aes(alpha = 0.7), width = .7) +
-#   geom_errorbar(aes(ymin=freq_mean_mean-freq_sd, ymax=freq_mean_mean+freq_sd), width=.2,
-#                  position=position_dodge(.75))  +
-#   scale_fill_manual("legend", values = c("white", "#60988D")) + 
-#   scale_color_manual("legend", values = colors_pathways) + 
-#   #scale_y_continuous(name="frequency", labels = percent) +
-#   scale_x_discrete(name="indel size", breaks = c("<-14", -7, 0, 1, ">2")) + 
-#   facet_wrap( ~ chromatin, ncol = 2) +
-#   geom_text(aes(x = 7, y = .7, label = label_efficiency)) +
-#   geom_text(aes(x = 7, y = .6, label = label_ratio)) + 
-#   theme_pubr(border = T)
-```
-*Conclusion: Vorinostat reduces MMEJ more in H3K27me3 regions*
-
-
-Indel plot decitabine
-Aim: Zoom in on Decitabine to showcase the strong MMEJ reduction. 
-```{r}
-# label_ratio <- indel.data %>%
-#   mutate(drug_conc = paste(drug, conc_char, sep = " ")) %>%
-#   filter(drug_conc %in% c("DMSO control", "Decitabine 1 µM")) %>% 
-#   na.omit() %>%
-#   group_by(drug_conc, IPR) %>%
-#   dplyr::summarise(MMEJratio_mean = mean(MMEJratio),
-#                    MMEJratio_sd = sd(MMEJratio),
-#                    freqCut_mean = mean(freqCut),
-#                    freqCut_sd = sd(freqCut)) %>%
-#   ungroup() %>%
-#   left_join(chrom, by = "IPR") %>%
-#   mutate(MMEJratio_mean_chrom = ave(MMEJratio_mean, drug_conc, chromatin, FUN = mean)) %>%
-#   mutate(MMEJratio_sd_chrom = ave(MMEJratio_mean, drug_conc, chromatin, FUN = sd)) %>%
-#   mutate(freqCut_mean_chrom = ave(freqCut_mean, drug_conc, chromatin, FUN = mean)) %>%
-#   mutate(freqCut_sd_chrom = ave(freqCut_mean, drug_conc, chromatin, FUN = sd))  %>%
-#   mutate(label_efficiency = paste0(drug_conc, " TIF = ", round(freqCut_mean_chrom*100, 1),"% ±", round(freqCut_sd_chrom*100, 1),"%"), 
-#          label_ratio = paste0(drug_conc, "MMEJ ratio = ", round(MMEJratio_mean_chrom, 2)," ±", round(MMEJratio_sd_chrom, 2))) 
-# 
-# bc_mut_tib_mean <- mutation.data %>% 
-#   mutate(drug = gsub(" [(].*[)]", "", drug),
-#          drug_conc = paste(drug, conc_char, sep = " ")) %>%
-#   distinct(IPR, drug_conc, freq_mean,freq_sd, color, mutation, type) %>%
-#   filter(drug_conc %in% c("DMSO control", "Decitabine 1 µM"), type %in% c("core", "grouped_indel")) %>% 
-#   na.omit() %>%
-#   left_join(label_ratio, by = c("drug_conc", "IPR"))
-# 
-# ggplot(bc_mut_tib_mean, 
-#             aes(mutation, freq_mean, color = color, fill = drug_conc)) + 
-#   geom_boxplot(position = position_dodge(0.75), aes(alpha = 0.7)) +
-#   geom_quasirandom(dodge.width = 0.75, shape = 21) + 
-#   scale_fill_manual("legend", values = c("#D69C81", "white")) + 
-#   scale_color_manual("legend", values = colors_pathways) + 
-#   #scale_y_continuous(name="frequency", labels = percent) +
-#   scale_x_discrete(name="indel size", breaks = c("<-14", -7, 0, 1, ">2")) + 
-#   #facet_wrap( ~ chromatin, ncol = 2) +
-#   geom_text(aes(x = 7, y = .7, label = label_efficiency)) +
-#   geom_text(aes(x = 7, y = .6, label = label_ratio)) + 
-#   theme_pubr(border = T)
-```
-*Conclusion Figure 4D: Decitabine reduces MMEJ drastically*
-
 
 ## 5C: Decitabine combined with NU7441
 
@@ -1164,44 +1035,48 @@ Dec_NU_tib %>%
 
 
 ```
+*Conclusion Figure 5C: Decitabine blocks resection-dependent repair.*
+
+
+
 
 ```{r}
-rel_bc_count = data.table(Dec_NU_tib)
-
-
-rel_bc_count[, rel_broken:=relative_reads/relative_reads[time==72],
-             by=c('barcode', 'drug')]
-
-rel_bc_count[, rel_count:=relative_reads * length(unique(barcode)),
-             by=c('drug')]
-
-
-rel_bc_med = rel_bc_count[, list(rel_measured = median(rel_broken),
-                                 rel_count = median(rel_count)),
-                          by=c('barcode', 'drug', 'time')]
-# This does not work
-# fit_loess <- function(dt){
-#     time = 72:144
-#     fit = loess(rel_measured ~ time, data=dt)
-#     print(fit)
-#     p = predict(fit, time)
-#     return(list(time=time, loess=p))
-# }
+# rel_bc_count = data.table(Dec_NU_tib)
 # 
 # 
-# loess_dt = rel_bc_med[ ,fit_loess(.SD),
-#                         by=c('barcode', 'drug')]
-# loess_dt[,group:=domain_dt[barcode, 'group']]
-# setkey(clone_dt, 'barcode')
-# loess_dt[,seqnames:=clone_dt[barcode, 'seqnames']]
-
-
-
-rel_bc_med %>% left_join(bc_IPR) %>%
-  ggplot(., aes(time, rel_measured, group = IPR, color = chromatin)) + 
-  geom_point() + 
-  geom_line() + 
-  facet_grid(drug ~ .)
+# rel_bc_count[, rel_broken:=relative_reads/relative_reads[time==72],
+#              by=c('barcode', 'drug')]
+# 
+# rel_bc_count[, rel_count:=relative_reads * length(unique(barcode)),
+#              by=c('drug')]
+# 
+# 
+# rel_bc_med = rel_bc_count[, list(rel_measured = median(rel_broken),
+#                                  rel_count = median(rel_count)),
+#                           by=c('barcode', 'drug', 'time')]
+# # This does not work
+# # fit_loess <- function(dt){
+# #     time = 72:144
+# #     fit = loess(rel_measured ~ time, data=dt)
+# #     print(fit)
+# #     p = predict(fit, time)
+# #     return(list(time=time, loess=p))
+# # }
+# # 
+# # 
+# # loess_dt = rel_bc_med[ ,fit_loess(.SD),
+# #                         by=c('barcode', 'drug')]
+# # loess_dt[,group:=domain_dt[barcode, 'group']]
+# # setkey(clone_dt, 'barcode')
+# # loess_dt[,seqnames:=clone_dt[barcode, 'seqnames']]
+# 
+# 
+# 
+# rel_bc_med %>% left_join(bc_IPR) %>%
+#   ggplot(., aes(time, rel_measured, group = IPR, color = chromatin)) + 
+#   geom_point() + 
+#   geom_line() + 
+#   facet_grid(drug ~ .)
 ```
 
 
