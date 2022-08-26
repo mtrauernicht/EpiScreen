@@ -684,3 +684,38 @@ We know that the cutting efficiency does not correlate well if all data is taken
 #   ylab("Cutting efficiency") +
 #   scale_color_manual(values = colors_diverse)
 ```
+
+## S3DE K27me3 and CTCF correlation
+```{r 3DE K37me3 vs CTCF CCD correlation, fig.width= 10, fig.height= 5}
+K27me3_CTCF = all_compounds_epistasis_TIF %>% rownames_to_column(var = "drug_conc") %>%
+  distinct(drug_conc, CTCF, SMC3, H3K27me3) %>% 
+  mutate(CTCF = replace(CTCF, CTCF == 0, NA), 
+         SMC3 = replace(SMC3, SMC3 == 0, NA), 
+         H3K27me3 = replace(H3K27me3, H3K27me3 == 0, NA))
+
+p1 = ggplot(K27me3_CTCF,
+            aes(x = H3K27me3, y = CTCF)) +
+  geom_point() +
+  geom_abline(lty = "twodash") +
+  geom_smooth(method = "lm") +
+  stat_cor(method = "pearson") +
+  theme_classic2(base_size = 16) +
+  xlab("Slope H3K27me3") +
+  ylab("Slope CTCF") 
+
+
+
+K27me3_CTCF = indel.data %>% distinct(IPR, CTCF, SMC3, H3K27me3)
+
+p2 = ggplot(K27me3_CTCF,
+            aes(x = H3K27me3, y = CTCF)) +
+  geom_point() +
+  geom_abline(lty = "twodash") +
+  geom_smooth(method = "lm") +
+  stat_cor(method = "pearson") +
+  theme_classic2(base_size = 16) +
+  xlab("H3K27me3 z-score") +
+  ylab("CTCF z-score")
+
+plot_grid(p1, p2, nrow = 1, labels = c("F", "G"))
+```
