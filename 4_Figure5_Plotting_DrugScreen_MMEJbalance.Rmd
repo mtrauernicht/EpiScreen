@@ -953,8 +953,6 @@ top_hits = indel.data  %>%
 *Conclusion Figure 4C: Many AURKi are the most stron MMEJ ratio reducers. Also Decitabine and a HDAC inhibitor are amongst the strongest.*
 
 
-## 5C: Decitabine combined with NU7441
-
 ```{r 4E HTS Decitabine + NU7441}
 # plot pathway balance in both replicates
 Dec_NU_tib = indel.data.validation %>% filter(grepl("DecNU_", replicate) & plasmid == "LBR2") %>% 
@@ -1035,7 +1033,7 @@ Dec_NU_tib %>%
 
 
 ```
-*Conclusion Figure 5C: Decitabine blocks resection-dependent repair.*
+
 
 
 
@@ -1079,6 +1077,8 @@ Dec_NU_tib %>%
 #   facet_grid(drug ~ .)
 ```
 
+
+## 5C: Decitabine combined with NU7441
 
 ```{r 4E TIDE}
 decitabine_nu7441_df <- read_csv("/DATA/usr/m.trauernicht/projects/EpiScreen/data/decitabine_synergy_indels.csv")
@@ -1137,7 +1137,7 @@ for (i in unique(decitabine_nu7441_df$mutation)) {
                   decitabine_nu7441_df$percentage[decitabine_nu7441_df$mutation == i & decitabine_nu7441_df$condition == "DMSO_ssODN"])$p.value))
 }
 ```
-
+*Conclusion Figure 5C: Decitabine blocks resection-dependent repair.*
 
 
 
@@ -1348,26 +1348,6 @@ GSK.dt %>% wilcox_test(., log2_FC_MMEJ_NHEJ ~ state)%>%
   add_significance("p.adj")
 ```
 *Conclusion Figure 5D: MMEJ ratio FC is the strongest in H3K27me3 domains*
-
-## 5x CCD Pool
-```{r}
-quant_breaks <- quantile(validation_epistasis_bal, c(.01,.99), na.rm = T)
-palette_length <- 100
-breaks.validation <- c(seq(quant_breaks[1], 0, length.out=ceiling(palette_length/2) + 1), 
-            seq(quant_breaks[2]/palette_length, quant_breaks[2], length.out=floor(palette_length/2)))
-colors.validations = colorRampPalette(slope.colors %>% pull(color))(length(breaks.validation))
-colors.validations[which(quant_breaks == 0)-1] = "gray90"
-
-
-pheatmap(validation_epistasis_bal[ , order_chrom],
-             border_color = F,
-             cellwidth = 8,
-             cellheight = 8,
-             breaks = breaks.validation,
-             main = paste("Chromatin synergies - Balance"),
-             color = colors.validations,
-             annotation_legend = T)
-```
 
 
 
@@ -1598,10 +1578,10 @@ target_ctrl = target %>%
 #   
 
 # Make matrix with drugs from selected target
-TIF_synergy_matrix = all_compounds_epistasis_TIF %>% 
-  rownames_to_column(var = "drug_conc") %>%
-  filter(drug_conc %in% target_set_all$drug_conc) %>%
-  column_to_rownames(var = "drug_conc")
+TIF_synergy_matrix = all_compounds_epistasis_TIF #%>% 
+  # rownames_to_column(var = "drug_conc") %>%
+  # filter(drug_conc %in% target_set_all$drug_conc) %>%
+  # column_to_rownames(var = "drug_conc")
 
 cluster_rows = ifelse(nrow(TIF_synergy_matrix) > 1, TRUE, FALSE)
 
@@ -1753,6 +1733,47 @@ for(i in unique(CCD_tib$feature)) {
   }
 }
 ```
+
+
+
+## 5x CCD Pool
+```{r}
+# Load pool data
+validation_epistasis_bal <- read.csv2("/DATA/usr/m.trauernicht/projects/EpiScreen/data/validation_epistasis_bal.csv") %>%
+  mutate(X = gsub("(.*)", "\\1_pool", X))
+
+# Include screen data
+all_compounds_epistasis_TIF_selection <- all_compounds_epistasis_TIF %>%
+  rownames_to_column("X") %>%
+  filter(X %in% c("Vorinostat 1 µM", "EPZ-6438 10 µM", "3-Deazaneplanocin A 1 µM")) %>%
+  dplyr::select(-H3K9me3)
+
+validation_epistasis_bal <- rbind(validation_epistasis_bal, all_compounds_epistasis_TIF_selection) %>%
+  column_to_rownames("X")
+
+quant_breaks <- quantile(validation_epistasis_bal, c(.01,.99), na.rm = T)
+palette_length <- 100
+breaks.validation <- c(seq(quant_breaks[1], 0, length.out=ceiling(palette_length/2) + 1), 
+            seq(-quant_breaks[1]/palette_length, -quant_breaks[1], length.out=floor(palette_length/2)))
+colors.validations = colorRampPalette(slope.colors %>% pull(color))(length(breaks.validation))
+#colors.validations[which(quant_breaks == 0)-1] = "gray90"
+
+order_chrom = TRIP_chrom_clust$labels
+order_chrom = order_chrom[!grepl("H3K9me3", order_chrom)]
+
+
+pheatmap(validation_epistasis_bal[ , order_chrom],
+             border_color = F,
+             cellwidth = 8,
+             cellheight = 8,
+             breaks = breaks.validation,
+             main = paste("Chromatin synergies - Balance"),
+             color = colors.validations,
+             annotation_legend = T)
+```
+
+
+
 
 # Session Info
 ```{r}
