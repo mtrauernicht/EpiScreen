@@ -275,7 +275,7 @@ ordered_marks2 <- c("Negative Control", "MRN", "DNA-PK","Epigenetic Reader Domai
 ## Initial filtering and preparing the tables for mean log2 FC calculation
 ```{r}
 # Data table and compute log2_ratio (This line needs to be adjusted)
-filtered_drug_pvals = indel.data %>%
+filtered_drug_conc = indel.data %>%
   distinct(drug, conc_char, IPR, zscore_TIF_comb_rep, zscore_bal_comb_rep, filter_zscore_TIF_comb_rep, filter_zscore_bal_comb_rep) %>%
   filter(!is.na(zscore_bal_comb_rep), !is.na(zscore_TIF_comb_rep)) %>%
   mutate(zscore_TIF_comb_rep_temp = ifelse(!filter_zscore_TIF_comb_rep, 0, zscore_TIF_comb_rep),
@@ -283,12 +283,9 @@ filtered_drug_pvals = indel.data %>%
          p_val_TIF = 2*pnorm(q = abs(zscore_TIF_comb_rep_temp), lower.tail = F),
          p_val_bal = 2*pnorm(q = abs(zscore_bal_comb_rep_temp), lower.tail = F),
          # Adjust p value for false discovery rate
-         adj_pval_TIF = p.adjust(p_val_TIF, method = 'holm'),
-         adj_pval_bal = p.adjust(p_val_bal, method = 'holm'))
-
-# Make a table with the orientation of effect, used later for filtering. 
-filtered_drug_conc = filtered_drug_pvals %>%
-  filter(adj_pval_TIF < 0.01 | adj_pval_bal < 0.01 | drug == "DMSO") %>%
+         adj_pval_TIF = p.adjust(p_val_TIF, method = 'BH'),
+         adj_pval_bal = p.adjust(p_val_bal, method = 'BH')) %>%
+  filter(adj_pval_TIF < 0.01 | adj_pval_bal < 0.01 |drug == "DMSO") %>%
   mutate(drug_conc = paste(drug, conc_char,sep = " "),
          # List if they affect the variable.
          effect_on_indelrate = ifelse(adj_pval_TIF < 0.01, TRUE, FALSE),
@@ -306,46 +303,22 @@ filtered_drug_conc = filtered_drug_pvals %>%
   mutate(effect_on_indelrate = ifelse(effect_on_ratio, TRUE, effect_on_indelrate),
          # same for the ratio
          effect_on_ratio = ifelse(effect_on_indelrate, TRUE, effect_on_ratio)) %>%
-  distinct(drug, conc_char, drug_conc, effect_on_indelrate, effect_on_ratio) 
-
-
-
-## From Xabi Vergara to filter on effect and not on intercept.
-effect_of_compound_tib = filtered_drug_pvals %>%
-dplyr::group_by(drug, conc_char) %>% 
-  dplyr::summarise(MMEJ_signif = sum(zscore_bal_comb_rep_temp < -1.96), #Summarise number of significant barcodes per compound for balance
-                   NHEJ_signif = sum(zscore_bal_comb_rep_temp > 1.96),
-                   TIF_down_signif = sum(zscore_TIF_comb_rep_temp < -1.96), #Summarise number of significant barcodes per compound for TIF
-                   TIF_up_signif = sum(zscore_TIF_comb_rep_temp > 1.96)) %>% 
-  mutate(bal_signif = case_when(MMEJ_signif <= 1 & NHEJ_signif > 1 ~ "NHEJ", #Annotate if a protein favors NHEJ, MMEJ or both
-                                    NHEJ_signif <= 1 & MMEJ_signif > 1 ~ "MMEJ", 
-                                    T ~ "both"),
-         TIF_signif = case_when(TIF_up_signif <= 1 & TIF_down_signif > 1 ~ "TIF_down", #Annotate if a protein favors NHEJ, MMEJ or both
-                                    TIF_down_signif <= 1 & TIF_up_signif > 1 ~ "TIF_up", 
-                                    T ~ "TIF_both")) %>%
-  mutate(drug_conc = paste(drug, conc_char, sep = " ")) %>%
-  semi_join(filtered_drug_conc) # Semi-join the filtered druc conc to keep only the significant ones after p adjustment.
-
-
+  distinct(drug, conc_char, drug_conc, effect_on_indelrate, effect_on_ratio)
 
 ratios_tib <- indel.data %>%
   mutate(drug_conc = paste(drug, conc_char, sep = " ")) %>%
   semi_join(filtered_drug_conc) %>%
-  distinct(MMEJratio_mean, freqCut_mean, drug, conc_char, drug_conc, target, IPR) %>%
-  mutate(MMEJratio.log2 = log2(MMEJratio_mean),
-         MMEJratio.log2 = ave(MMEJratio.log2, drug, conc_char, IPR, FUN = mean),
-         freqCut.log2 = log2(freqCut_mean),
-         freqCut.log2 = (ave(freqCut.log2, drug, conc_char, IPR, FUN = mean))) %>%
-  dplyr::select(-MMEJratio_mean, -freqCut_mean) %>%
+  distinct(MMEJratio, freqCut, drug, conc_char, drug_conc, target, IPR, tech, replicate) %>%
+  mutate(MMEJratio.log2 = log2(MMEJratio),
+         freqCut.log2 = log2(freqCut)) %>%
+  dplyr::select(-MMEJratio, -freqCut) %>%
   distinct()
 
 dmso_ratios_tib <- indel.data %>%
   filter(drug == "DMSO") %>%
-  distinct(MMEJratio_mean, freqCut_mean, IPR) %>%
+  distinct(MMEJratio_mean, freqCut_mean, IPR, tech, replicate) %>%
   mutate(DMSO.ratio.log2 = log2(MMEJratio_mean),
-         DMSO.ratio.log2 = ave(DMSO.ratio.log2, IPR, FUN = mean),
-         DMSO.freqCut.log2 = log2(freqCut_mean),
-         DMSO.freqCut.log2 = (ave(DMSO.freqCut.log2, IPR, FUN = mean))) %>%
+         DMSO.freqCut.log2 = log2(freqCut_mean)) %>%
   dplyr::select(-MMEJratio_mean, -freqCut_mean) %>%
   distinct()
 
@@ -358,17 +331,18 @@ The log2 distance ratio in our case is positive if it promotes NHEJ and negative
 ```{r}
 # Each replicate has a different value (compute differences by replicate)
 ratios_tib_fc <- ratios_tib %>% 
-  dplyr::group_by(IPR, drug, conc_char) %>% 
+  dplyr::group_by(IPR, drug, conc_char, tech, replicate) %>% 
   mutate(log2.fc.ratio = MMEJratio.log2 - DMSO.ratio.log2, 
          log2.fc.freqCut = freqCut.log2 - DMSO.freqCut.log2) %>%
-  left_join(chrom_data)
+  ungroup %>% 
+  left_join(chrom_data) 
 ```
 
 # Calculating the Chromatin Context Dependency (CCD)
 ## Extract slopes for all genes
 ```{r}
 # Perform analysis across all features for three test genes
-ratios_tib_fc %<>% mutate(drug_conc = paste(drug, conc_char, sep = " "))
+ratios_tib_fc %<>% mutate(drug_conc = paste(drug, conc_char, sep = " ")) %>% filter(!is.na(MMEJratio.log2))
 
 slope.protein.features <- tibble(drug_conc = NA, feature = NA,  term = NA, 
                                  indelrate = NA, p.value.indelrate = NA, 
@@ -494,48 +468,42 @@ effect_compounds = ratios_tib_fc %>%
   left_join(distinct(filtered_drug_conc, drug_conc, effect_on_indelrate, effect_on_ratio))
 
 
-### WIP #####
-
-epistasis_tib %>% 
+epistasis_tib %<>% 
   left_join(effect_compounds)  %>% 
   left_join(signif_hits) %>%
-  left_join(effect_of_compound_tib) %>%
   mutate(
+    # x_intercept_indelrate = ifelse(p.value.indelrate < 0.05,
+    #                                x_intercept_indelrate, NA),
+    # x_intercept_ratio = ifelse(p.value.ratio < 0.05,
+    #                            x_intercept_ratio, NA),
     indelrate_slope_plot = ifelse(x_intercept_indelrate < 1 & effect_on_indelrate & signif.freqCut, indelrate_slope, NA),
     ratio_slope_plot = ifelse(x_intercept_ratio < 1 & effect_on_ratio & signif.ratio, ratio_slope, NA)) %>%
-  distinct(drug_conc, feature, indelrate_slope_plot, ratio_slope_plot) %>% summarise(TIF = sum(is.na(indelrate_slope_plot)),
-                                                                                     bal = sum(is.na(ratio_slope_plot)))
+  distinct(drug_conc, feature, indelrate_slope_plot, ratio_slope_plot) 
 
-
-epistasis_tib %>% 
-  left_join(effect_compounds)  %>% 
-  left_join(signif_hits) %>%
-  left_join(effect_of_compound_tib) %>%
-  mutate(
-    indelrate_slope_plot = ifelse(effect_on_indelrate & signif.freqCut, indelrate_slope, NA),
-    ratio_slope_plot = ifelse(effect_on_ratio & signif.ratio, ratio_slope, NA)) %>%
-  distinct(drug_conc, feature, indelrate_slope_plot, ratio_slope_plot) %>% summarise(TIF = sum(is.na(indelrate_slope_plot)),
-                                                                                     bal = sum(is.na(ratio_slope_plot)))
-
-
-epistasis_tib %>% 
-  left_join(effect_compounds)  %>% 
-  left_join(signif_hits) %>%
-  left_join(effect_of_compound_tib) %>%
-  mutate(
-    indelrate_slope_plot = ifelse(signif.freqCut, indelrate_slope, NA),
-    ratio_slope_plot = ifelse(signif.ratio, ratio_slope, NA)) %>%
-  distinct(drug_conc, feature, indelrate_slope_plot, ratio_slope_plot, bal_signif) %>% 
-  mutate(CCD_value = case_when(bal_signif == "MMEJ" & ratio_slope_plot < 0 ~ ratio_slope_plot, 
-                               bal_signif == "MMEJ" & ratio_slope_plot > 0 ~ NA, 
-                               bal_signif == "NHEJ" & ratio_slope_plot > 0 ~ ratio_slope_plot, 
-                               bal_signif == "NHEJ" & ratio_slope_plot < 0 ~ NA, 
-                               T ~ ratio_slope_plot)) %>% #Call M-synergies, N-synergies or no synergies based on the slope and MMEJ:NHEJ differentials
-  summarise(TIF = sum(is.na(indelrate_slope_plot)),
-            bal = sum(is.na(ratio_slope_plot)),
-            CCD_value = sum(is.na(CCD_value)))
-
-#################
+# 
+# without_slop = epistasis_tib %>% 
+#   left_join(effect_compounds)  %>% 
+#   left_join(signif_hits) %>%
+#   mutate(
+#     # x_intercept_indelrate = ifelse(p.value.indelrate < 0.05,
+#     #                                x_intercept_indelrate, NA),
+#     # x_intercept_ratio = ifelse(p.value.ratio < 0.05,
+#     #                            x_intercept_ratio, NA),
+#     indelrate_slope_plot = ifelse(indelrate_slope > 0 & effect_on_indelrate & signif.freqCut, indelrate_slope, NA),
+#     ratio_slope_plot = ifelse(effect_on_ratio & signif.ratio, ratio_slope, NA)) %>%
+#   distinct(drug_conc, feature, indelrate_slope_plot, ratio_slope_plot) 
+# 
+# with_slop = epistasis_tib %>% 
+#   left_join(effect_compounds)  %>% 
+#   left_join(signif_hits) %>%
+#   mutate(
+#     # x_intercept_indelrate = ifelse(p.value.indelrate < 0.05,
+#     #                                x_intercept_indelrate, NA),
+#     # x_intercept_ratio = ifelse(p.value.ratio < 0.05,
+#     #                            x_intercept_ratio, NA),
+#     indelrate_slope_plot = ifelse(x_intercept_indelrate < 1 & effect_on_indelrate & signif.freqCut, indelrate_slope, NA),
+#     ratio_slope_plot = ifelse(x_intercept_ratio < 1 & effect_on_ratio & signif.ratio, ratio_slope, NA)) %>%
+#   distinct(drug_conc, feature, indelrate_slope_plot, ratio_slope_plot) 
 ```
 
 ## Heatmap annoation

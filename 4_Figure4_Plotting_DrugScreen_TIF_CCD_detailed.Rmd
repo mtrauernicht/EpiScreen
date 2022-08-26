@@ -684,7 +684,7 @@ for(i in unique(CCD_tib$feature)) {
     
     
     p2 = rank_dt %>% 
-      filter(!between(rank, 6, maxrank-5)) %>%
+      filter(!between(rank, 11, maxrank-10)) %>%
       mutate(rank = seq(1:n())) %>% 
       ggplot(., aes(x = rank, y = indelrate_slope_plot, fill = target)) +
       geom_bar(stat = "identity") + 
@@ -789,7 +789,7 @@ all_compounds_epistasis_TIF %>%
 ```{r S4A HMT CCD, fig.width= 6, fig.height= 6}
 DNMT_drugs = target_set_drugs %>% 
   rownames_to_column(var = "drug_conc") %>% 
-  filter(target == "DNMT") %>% pull(drug_conc)
+  filter(target == "DNMT" & conc_char == "1 µM") %>% pull(drug_conc)
 
 # Make matrix with drugs from selected target
 TIF_synergy_matrix_DNMT = all_compounds_epistasis_TIF %>% 
