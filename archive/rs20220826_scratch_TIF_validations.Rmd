@@ -12,6 +12,7 @@ knitr::opts_chunk$set(echo = TRUE)
 # Data import
 ```{r}
 # Import data validation data
+in.dir = list.dirs(path = "/DATA/projects/DSBrepair/data/R") %>% .[grepl("episcreen", .)] %>% tail(n = 1)
 file = list.files(in.dir, pattern = "validation_ratios", full.names = T) %>% tail(n = 1)
 indel.validation.data <- readRDS(file) # %>% filter(pathway_bal_filter == TRUE & viab_reproducibility == TRUE)
 
@@ -435,18 +436,18 @@ vorino_screen_K27 = indel.data %>%
   filter((grepl("Vorinostat", drug) & conc_char == "1 µM") | 
            (grepl("EPZ-64", drug) & conc_char == "10 µM")) %>% 
   distinct(drug, barcode, replicate, tech, freqCut_norm_mean, 
-           H3K27me3,LMNB1, MMEJ_FC) %>%
+           H3K27me3,POL2, MMEJ_FC) %>%
   group_by(barcode, drug) %>% 
   summarise(log2_FC_TIF = log2(mean(freqCut_norm_mean)),
             log2_FC_MMEJ_NHEJ = log2(mean(MMEJ_FC, na.rm = TRUE)),
             H3K27me3 = mean(H3K27me3),
-            LMNB1 = mean(LMNB1),
+            POL2 = mean(POL2),
             source = "screen") %>%
-  pivot_longer(cols = c("LMNB1", "H3K27me3"), names_to = "feature", values_to = "zscore") %>%
+  pivot_longer(cols = c("POL2", "H3K27me3"), names_to = "feature", values_to = "zscore") %>%
   mutate(drug = ifelse(grepl("Vorinostat", drug), "HDACi", "EZH2i"))
 
 vorino_pool_K27 = valid_ratios_long%>% 
-  filter(feature %in% c("H3K27me3" , "LMNB1"), 
+  filter(feature %in% c("H3K27me3" , "POL2"), 
          # barcode %in% barcode_set_match_clone
          barcode %in% c(vorino_bc_85, gsk_bc_85)
          ) %>%
@@ -454,7 +455,7 @@ vorino_pool_K27 = valid_ratios_long%>%
          drug = ifelse(grepl("Vorinostat", drug), "HDACi", "EZH2i"))
 
 vorino_pool_K27_cloneset = valid_ratios_long %>% 
-  filter(feature %in% c("H3K27me3" , "LMNB1"), barcode %in% paste0(unique(indel.data$barcode), ".B")) %>%
+  filter(feature %in% c("H3K27me3" , "POL2"), barcode %in% paste0(unique(indel.data$barcode), ".B")) %>%
   mutate(source = "pool_clone",
          drug = ifelse(grepl("Vorinostat", drug), "HDACi", "EZH2i"))
 
@@ -484,6 +485,39 @@ ggplot(vorino_k27, aes(zscore, log2_FC_MMEJ_NHEJ, color = source)) +
                label.x = "left", label.y = "bottom") +
   facet_grid(drug ~ feature) +
   theme_bw(base_size = 16)
+
+vorino_k27.plot <- vorino_k27 %>%
+  mutate(source_2 = ifelse(source %in% c("pool_clone", "pool"), "1_pool", "0_screen")) %>%
+  mutate(source = ifelse(source %in% c("pool_clone", "screen"), "screen", "pool"))
+
+ggplot(vorino_k27.plot %>%
+         filter(feature == "H3K27me3"), 
+       aes(zscore, log2_FC_MMEJ_NHEJ, color = drug)) + 
+  geom_point(aes(alpha = source))+
+  geom_smooth(method = "lm", se = F) +
+  stat_cor(method = "pearson") +
+  ggtitle("log2 FC Balance") +
+  stat_poly_eq(aes(label = paste(after_stat(eq.label),
+                                 after_stat(rr.label), sep = "*\", \"*")),
+               label.x = "left", label.y = "bottom") +
+  facet_grid(drug~source_2) +
+  scale_alpha_discrete(range = c(0.2,1)) +
+  scale_color_manual(values = c("HDACi" = "#60988D", "EZH2i" = "#FDCDAC"))
+
+
+ggplot(vorino_k27.plot %>%
+         filter(feature == "H3K27me3"), 
+       aes(zscore, log2_FC_MMEJ_NHEJ, color = drug)) + 
+  geom_point(aes(alpha = source))+
+  geom_smooth(method = "lm", se = F) +
+  stat_cor(method = "pearson") +
+  ggtitle("log2 FC Balance") +
+  stat_poly_eq(aes(label = paste(after_stat(eq.label),
+                                 after_stat(rr.label), sep = "*\", \"*")),
+               label.x = "left", label.y = "bottom") +
+  facet_grid(drug~source_2) +
+  scale_alpha_discrete(range = c(0.2,1)) +
+  scale_color_manual(values = c("HDACi" = "#60988D", "EZH2i" = "#FDCDAC"))
 
 dev.off()
 ```
