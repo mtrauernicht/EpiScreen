@@ -26,6 +26,75 @@ RSTP2_IndelRatios_Chromatin_2kb <- readRDS("/DATA/usr/r.schep/DSBrepair/data/R/r
   dplyr::select(-NHEJ, -MMEJ)
 ```
 
+
+### Process Vorinostat & GSK126 validations
+```{r}
+vorinostat_validation = indel.validation.data %>% 
+  filter(replicate == "mean" & plasmid == "LBR2", drug %in% c("DMSO", "Vorinostat"), sum_bc_reads > 1000)%>% 
+  dplyr::select(barcode, drug, MMEJ_NHEJ, efficiency, all_of(chromatin_cols)) %>%
+  distinct() 
+
+barcde_all_reps_vorino = vorinostat_validation %>% 
+  distinct(barcode, drug) %>% 
+  group_by(barcode) %>%
+  summarise(bccount = n()) %>% 
+  filter(bccount == 2) %>%
+  pull(barcode)
+
+vorinostat_ratios = vorinostat_validation  %>% 
+  filter(barcode %in% barcde_all_reps_vorino) %>%
+  pivot_wider(names_from = drug, values_from = c(efficiency, MMEJ_NHEJ)) %>%
+  mutate(diff_TIF = efficiency_Vorinostat - efficiency_DMSO,
+         ratio_TIF = efficiency_Vorinostat/efficiency_DMSO,
+         log2_FC_TIF = log2(ratio_TIF),
+         diff_MMEJ_NHEJ = MMEJ_NHEJ_Vorinostat - MMEJ_NHEJ_DMSO,
+         ratio_MMEJ_NHEJ = MMEJ_NHEJ_Vorinostat/MMEJ_NHEJ_DMSO,
+         log2_FC_MMEJ_NHEJ = log2(ratio_MMEJ_NHEJ),
+         drug = "Vorinostat") 
+
+barcde_all_reps_gsk = RSTP2_IndelRatios_Chromatin_2kb %>% 
+  distinct(barcode, drug) %>% 
+  group_by(barcode) %>%
+  summarise(bccount = n()) %>% 
+  filter(bccount == 2) %>%
+  pull(barcode)
+
+GSK_ratios = RSTP2_IndelRatios_Chromatin_2kb %>% 
+  filter(barcode %in% barcde_all_reps_gsk) %>%
+  # distinct(barcode, drug, MMEJ_NHEJ , efficiency) %>% 
+  pivot_wider(names_from = drug, values_from = c(efficiency, MMEJ_NHEJ)) %>%
+  mutate(diff_TIF = efficiency_GSK126 - efficiency_DMSO_GSK,
+         ratio_TIF = efficiency_GSK126/efficiency_DMSO_GSK,
+         log2_FC_TIF = log2(ratio_TIF),
+         diff_MMEJ_NHEJ = MMEJ_NHEJ_GSK126 - MMEJ_NHEJ_DMSO_GSK,
+         ratio_MMEJ_NHEJ = MMEJ_NHEJ_GSK126/MMEJ_NHEJ_DMSO_GSK,
+         log2_FC_MMEJ_NHEJ = log2(ratio_MMEJ_NHEJ),
+         drug = "GSK-126")
+
+vorinostat_ctrl <- vorinostat_ratios %>%
+  distinct(efficiency_DMSO, barcode)
+
+
+## Compare controls, just to check
+GSK_ratios2 <- GSK_ratios %>%
+  distinct(efficiency_DMSO_GSK, barcode)
+
+ctrl_compare <- merge(vorinostat_ctrl, GSK_ratios2, by = "barcode")
+
+# Spearman correlation
+cor(ctrl_compare$efficiency_DMSO, ctrl_compare$efficiency_DMSO_GSK, method = "spearman")
+
+# ggplot(ctrl_compare,
+#        aes(x = efficiency_DMSO, y = efficiency_DMSO_GSK)) +
+#   geom_point() +
+#   geom_smooth(method = "lm")
+
+pool_validation_ratios = bind_rows(vorinostat_ratios, GSK_ratios) %>% 
+  dplyr::select(-efficiency_Vorinostat, -efficiency_DMSO, -MMEJ_NHEJ_DMSO, 
+                -MMEJ_NHEJ_Vorinostat, -MMEJ_NHEJ_DMSO_GSK, -efficiency_DMSO_GSK, 
+                -MMEJ_NHEJ_DMSO_GSK, -MMEJ_NHEJ_GSK126, -efficiency_GSK126)
+```
+
 # Calculating the Chromatin Context Dependency (CCD)
 ## Extract slopes for all features
 ```{r}
@@ -261,7 +330,55 @@ valid_ratios_long = pool_validation_ratios %>%
   pivot_longer(cols = chromatin.features.short, names_to = "feature", values_to = "zscore")
 ```
 
-### CCD processing of the pool data
+
+
+## 2EF Upset plots pool
+```{r Upset prep}
+domain_levels = c('late_replicating', 'LAD', 'H3K9me2', 'H3K27me3')
+domains = paste0(domain_levels, '_domain')
+opt_df = get_combinations(domain_levels)
+
+# Prepare Vorinostat table 
+vorino.dt = vorinostat_ratios %>%
+  filter(!is.na(diff_TIF)) %>%
+  dplyr::select(barcode, diff_TIF, log2_FC_TIF, domains) %>%
+  distinct(barcode, .keep_all = TRUE) %>%
+  data.table()
+
+vorino.dt[vorino.dt=='iDomain'] <- 0
+vorino.dt[vorino.dt=='Domain'] <- 1
+vorino.dt[vorino.dt=='DHS'] <- 1
+
+vorino.dt[is.na(LAD_domain), LAD_domain:=0]
+
+vorino.dt[, (domains) := lapply(.SD, as.numeric), .SDcols = domains]
+colnames(vorino.dt) = gsub('_domain', '', colnames(vorino.dt))
+
+
+# Prepare GSK table 
+GSK.dt = GSK_ratios %>%
+  filter(!is.na(diff_TIF)) %>%
+  dplyr::select(barcode, diff_TIF, log2_FC_TIF, 
+                efficiency_GSK126, efficiency_DMSO_GSK, domains) %>%
+  distinct(barcode, .keep_all = TRUE) %>%
+  data.table()
+
+GSK.dt[GSK.dt=='iDomain'] <- 0
+GSK.dt[GSK.dt=='Domain'] <- 1
+GSK.dt[GSK.dt=='DHS'] <- 1
+GSK.dt[is.na(LAD_domain), LAD_domain:=0]
+
+GSK.dt[, (domains) := lapply(.SD, as.numeric), .SDcols = domains]
+colnames(GSK.dt) = gsub('_domain', '', colnames(GSK.dt))
+```
+
+```{r 2EF Upset plots pool TIF FC, fig.width= 14, fig.height= 6}
+p1 = plot_comb_grid_beeswarm(vorino.dt, opt_df,
+                             domain_levels, 'diff_TIF', min_count = 10, y_plabel=c(-0.15, 0.15))
+p2 = plot_comb_grid_beeswarm(GSK.dt, opt_df,
+                             domain_levels, 'diff_TIF', min_count = 10, y_plabel=c(-0.15, 0.15))
+plot_grid(p1, p2, labels = c("TIF FC HDACi", "TIF FC EZH2i"))
+```
 
 ```{r all scatterplots pool, eval = FALSE}
 pdf("/DATA/projects/DSBrepair/git/EpiScreen/figures/rs20220824_CCD_pool.pdf", height = 20, width = 20)
