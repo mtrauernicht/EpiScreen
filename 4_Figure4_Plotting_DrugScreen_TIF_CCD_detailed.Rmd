@@ -547,8 +547,7 @@ p = pheatmap(TIF_synergy_matrix[, TRIP_chrom_clust$labels],
              main = paste("Chromatin synergies - TIF HDAC cluster"),
              color = colors,
              annotation_colors = annotation_colors_scr, 
-             annotation_legend = T,
-             cutree_rows = 3)
+             annotation_legend = T)
 
 TIF_synergy_cluster <- TIF_synergy_matrix %>%
   rownames_to_column("drug_conc")
@@ -789,7 +788,9 @@ all_compounds_epistasis_TIF %>%
 ```{r S4A HMT CCD, fig.width= 6, fig.height= 6}
 DNMT_drugs = target_set_drugs %>% 
   rownames_to_column(var = "drug_conc") %>% 
-  filter(target == "DNMT" & conc_char == "1 µM") %>% pull(drug_conc)
+  filter(target == "DNMT"
+         & conc_char == "1 µM"
+         ) %>% pull(drug_conc)
 
 # Make matrix with drugs from selected target
 TIF_synergy_matrix_DNMT = all_compounds_epistasis_TIF %>% 

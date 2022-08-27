@@ -1020,6 +1020,12 @@ plot_grid(p1, p2, nrow = 1, labels = c("C", "D"))
 CCD_tib %>% filter(feature == "H3K36me3" & drug_conc == "EPZ-6438 10 µM") %>% pull(indelrate_slope_plot)
 ```
 
+```{r}
+
+```
+
+
+
 ```{r eval=FALSE}
 indel.data %>% filter(!between(zscore_TIF_comb_rep, -3.2905, 3.2905) & conc_char != "control" & viab_reproducibility & cor_TIF_filter & filter_zscore_TIF_comb_rep) %>% 
   # distinct(IPR, drug, replicate, target, tech, conc_char, zscore_TIF, zscore_TIF_comb_tech, zscore_TIF_comb_rep) %>% 
