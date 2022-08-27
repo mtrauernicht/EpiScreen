@@ -313,6 +313,9 @@ filtered_drug_conc = filtered_drug_pvals %>%
 ## From Xabi Vergara to filter on effect and not on intercept.
 effect_of_compound_tib = filtered_drug_pvals %>%
 dplyr::group_by(drug, conc_char) %>% 
+  # Change the non significant ones to 0, so we filter them out.
+  mutate(zscore_TIF_comb_rep_temp = ifelse(adj_pval_TIF >= 0.01, 0, zscore_TIF_comb_rep_temp),
+         zscore_bal_comb_rep_temp = ifelse(adj_pval_bal >= 0.01, 0, zscore_bal_comb_rep_temp)) %>%
   dplyr::summarise(MMEJ_signif = sum(zscore_bal_comb_rep_temp < -1.96), #Summarise number of significant barcodes per compound for balance
                    NHEJ_signif = sum(zscore_bal_comb_rep_temp > 1.96),
                    TIF_down_signif = sum(zscore_TIF_comb_rep_temp < -1.96), #Summarise number of significant barcodes per compound for TIF
@@ -474,68 +477,25 @@ signif_hits = adj_p.value_KO_model %>% filter(p.adj < 0.01) %>%
 epistasis_tib = slope.protein.features %>% 
   distinct(drug_conc, term, feature, indelrate, ratio) %>% 
   pivot_wider(., names_from = term, values_from = c(indelrate, ratio)) %>%
-  mutate(feature = gsub(".zscore", "", feature),
-         x_intercept_indelrate = -indelrate_intercept / indelrate_slope,
-         x_intercept_ratio = -ratio_intercept / ratio_slope)
+  mutate(feature = gsub(".zscore", "", feature))
 
-effect_compounds = ratios_tib_fc %>%
-  group_by(drug_conc)  %>% 
-  #
-  mutate(indelrate_pos = sum(log2.fc.freqCut > 0),
-         #
-         indelrate_effect = ifelse(indelrate_pos >= 17, "indel_rate_increase", 
-                                   ifelse(indelrate_pos <= 1, "indel_rate_decrease", "mixed")),
-         #
-         ratio_pos = sum(log2.fc.ratio > 0),
-         #
-         ratio_effect = ifelse(ratio_pos >= 17, "NHEJ_increase", 
-                               ifelse(ratio_pos <= 1, "MMEJ_increase", "mixed"))) %>%
-  distinct(drug_conc, indelrate_effect, ratio_effect) %>% 
-  left_join(distinct(filtered_drug_conc, drug_conc, effect_on_indelrate, effect_on_ratio))
-
-
-### WIP #####
-
-epistasis_tib %>% 
-  left_join(effect_compounds)  %>% 
+epistasis_tib %<>% 
   left_join(signif_hits) %>%
   left_join(effect_of_compound_tib) %>%
-  mutate(
-    indelrate_slope_plot = ifelse(x_intercept_indelrate < 1 & effect_on_indelrate & signif.freqCut, indelrate_slope, NA),
-    ratio_slope_plot = ifelse(x_intercept_ratio < 1 & effect_on_ratio & signif.ratio, ratio_slope, NA)) %>%
-  distinct(drug_conc, feature, indelrate_slope_plot, ratio_slope_plot) %>% summarise(TIF = sum(is.na(indelrate_slope_plot)),
-                                                                                     bal = sum(is.na(ratio_slope_plot)))
+  distinct(signif.ratio, signif.freqCut, drug_conc, feature, indelrate_slope, ratio_slope, bal_signif, TIF_signif) %>% 
+  mutate(ratio_slope_plot = case_when(signif.ratio & bal_signif == "MMEJ" & ratio_slope < 0 ~ ratio_slope, 
+                               bal_signif == "MMEJ" & ratio_slope > 0 ~ as.double(NA), 
+                               signif.ratio & bal_signif == "NHEJ" & ratio_slope > 0 ~ ratio_slope, 
+                               bal_signif == "NHEJ" & ratio_slope < 0 ~ as.double(NA), 
+                               signif.freqCut & TIF_signif == "bal_both" ~ indelrate_slope,
+                               T ~ as.double(NA)),
+         indelrate_slope_plot = case_when(signif.freqCut & TIF_signif == "TIF_down" & indelrate_slope < 0 ~ indelrate_slope, 
+                               TIF_signif == "TIF_down" & indelrate_slope > 0 ~ as.double(NA), 
+                               signif.freqCut & TIF_signif == "TIF_up" & indelrate_slope > 0 ~ indelrate_slope, 
+                               TIF_signif == "TIF_up" & indelrate_slope < 0 ~ as.double(NA), 
+                               signif.freqCut & TIF_signif == "TIF_both" ~ indelrate_slope,
+                               T ~ as.double(NA)))
 
-
-epistasis_tib %>% 
-  left_join(effect_compounds)  %>% 
-  left_join(signif_hits) %>%
-  left_join(effect_of_compound_tib) %>%
-  mutate(
-    indelrate_slope_plot = ifelse(effect_on_indelrate & signif.freqCut, indelrate_slope, NA),
-    ratio_slope_plot = ifelse(effect_on_ratio & signif.ratio, ratio_slope, NA)) %>%
-  distinct(drug_conc, feature, indelrate_slope_plot, ratio_slope_plot) %>% summarise(TIF = sum(is.na(indelrate_slope_plot)),
-                                                                                     bal = sum(is.na(ratio_slope_plot)))
-
-
-epistasis_tib %>% 
-  left_join(effect_compounds)  %>% 
-  left_join(signif_hits) %>%
-  left_join(effect_of_compound_tib) %>%
-  mutate(
-    indelrate_slope_plot = ifelse(signif.freqCut, indelrate_slope, NA),
-    ratio_slope_plot = ifelse(signif.ratio, ratio_slope, NA)) %>%
-  distinct(drug_conc, feature, indelrate_slope_plot, ratio_slope_plot, bal_signif) %>% 
-  mutate(CCD_value = case_when(bal_signif == "MMEJ" & ratio_slope_plot < 0 ~ ratio_slope_plot, 
-                               bal_signif == "MMEJ" & ratio_slope_plot > 0 ~ NA, 
-                               bal_signif == "NHEJ" & ratio_slope_plot > 0 ~ ratio_slope_plot, 
-                               bal_signif == "NHEJ" & ratio_slope_plot < 0 ~ NA, 
-                               T ~ ratio_slope_plot)) %>% #Call M-synergies, N-synergies or no synergies based on the slope and MMEJ:NHEJ differentials
-  summarise(TIF = sum(is.na(indelrate_slope_plot)),
-            bal = sum(is.na(ratio_slope_plot)),
-            CCD_value = sum(is.na(CCD_value)))
-
-#################
 ```
 
 ## Heatmap annoation
