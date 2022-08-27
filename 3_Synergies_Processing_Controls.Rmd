@@ -308,9 +308,9 @@ dmso.TIF.score <- mean_sd_fits %>% filter(!is.na(term)) %>%
 ```{r combine DMSO TIF in table}
 TIF_zscore_calc = indel.data %>% 
   filter(!is.na(freqCut)) %>%
-  mutate(drug = ifelse(drug == "DMSO" & plate %in% c(1,2,7,8,13,14), paste(drug, drug_plate, well, "1", sep = " "), 
-                       ifelse(drug == "DMSO" & plate %in% c(3,4,9,10,15,16), paste(drug, drug_plate, well, "2", sep = " "),
-                              ifelse(drug == "DMSO" & plate %in% c(5,6,11,12,17,18), paste(drug, drug_plate, well, "3", sep = " "),drug)))) %>%
+  mutate(drug = ifelse(drug == "DMSO" & plate %in% c(1:6), paste(drug, drug_plate, well, "1", sep = " "), 
+                       ifelse(drug == "DMSO" & plate %in% c(7:12), paste(drug, drug_plate, well, "2", sep = " "),
+                              ifelse(drug == "DMSO" & plate %in% c(13:18), paste(drug, drug_plate, well, "3", sep = " "),drug)))) %>%
   distinct(IPR, replicate, tech, drug, freqCut, conc_char) %>% 
   left_join(dmso.TIF.score)
 ```
@@ -430,9 +430,9 @@ cols_to_replace_2 = bal.zscore %>% dplyr::select(-IPR, -replicate, -tech, -drug,
 cols_remove = c(cols_to_replace_1, cols_to_replace_2)
 indel.data2 <- indel.data %>% 
   # distinct(MMEJratio, freqCut, drug, conc_char, target, IPR, drug_plate, well, tech, replicate) %>%
-  mutate(drug = ifelse(drug == "DMSO" & plate %in% c(1,2,7,8,13,14), paste(drug, drug_plate, well, "1", sep = " "), 
-                       ifelse(drug == "DMSO" & plate %in% c(3,4,9,10,15,16), paste(drug, drug_plate, well, "2", sep = " "),
-                              ifelse(drug == "DMSO" & plate %in% c(5,6,11,12,17,18), paste(drug, drug_plate, well, "3", sep = " "),drug)))) %>%
+  mutate(drug = ifelse(drug == "DMSO" & plate %in% c(1:6), paste(drug, drug_plate, well, "1", sep = " "), 
+                       ifelse(drug == "DMSO" & plate %in% c(7:12), paste(drug, drug_plate, well, "2", sep = " "),
+                              ifelse(drug == "DMSO" & plate %in% c(13:18), paste(drug, drug_plate, well, "3", sep = " "),drug)))) %>%
   # dplyr::select(-all_of(cols_remove)) %>%
   left_join(TIF.zscore) %>%
   left_join(bal.zscore)
@@ -448,8 +448,8 @@ filtered_drug_conc = indel.data2 %>%
   mutate(p_val_TIF = 2*pnorm(q = abs(zscore_TIF_comb_rep), lower.tail = F),
          p_val_bal = 2*pnorm(q = abs(zscore_bal_comb_rep), lower.tail = F),
          # Adjust p value for false discovery rate
-         adj_pval_TIF = p.adjust(p_val_TIF, method = 'BH'),
-         adj_pval_bal = p.adjust(p_val_bal, method = 'BH')) %>%
+         adj_pval_TIF = p.adjust(p_val_TIF, method = 'holm'),
+         adj_pval_bal = p.adjust(p_val_bal, method = 'holm')) %>%
   filter(adj_pval_TIF < 0.01 | adj_pval_bal < 0.01) %>%
   mutate(drug_conc = paste(drug, conc_char, sep = " "),
          # List if they affect the variable.
@@ -473,7 +473,6 @@ filtered_drug_conc = indel.data2 %>%
 
 ratios_tib <- indel.data2 %>%
   mutate(drug_conc = paste(drug, conc_char, sep = " ")) %>%
-  semi_join(filtered_drug_conc) %>%
   distinct(MMEJratio, freqCut, drug, conc_char, drug_conc, target, IPR) %>%
   mutate(MMEJratio = ave(MMEJratio, drug_conc, IPR, FUN = mean)) %>%
   mutate(MMEJratio.log2 = log2(MMEJratio)) %>%
@@ -599,7 +598,7 @@ for (i in unique(CCD_tib$drug_conc)){
 adj_p.value_KO_model <- drug_conc_CCDs_dt %>% 
   dplyr::select(var, num_comp, p.value, drug_conc) %>% 
   group_by(var) %>%
-  mutate(p.adj = p.adjust(p.value, method = "BH")) %>% 
+  mutate(p.adj = p.adjust(p.value, method = "holm")) %>% 
   dplyr::select(var, drug_conc,p.value,p.adj)
 
 signif_hits = adj_p.value_KO_model %>% filter(p.adj < 0.01) %>% 
@@ -701,24 +700,5 @@ TIF_IPR = indel.data %>% filter(drug == "DMSO") %>%
 chromatin_TIF = chromatin %>% rownames_to_column(var = "IPR") %>%
   left_join(TIF_IPR) %>%
   column_to_rownames("IPR")
-```
-
-# Export
-```{r export, eval = FALSE}
-# The mutations list that can be loaded for the indel spectra plots.
-filename <- SetFileName("CCD_table", initials = initials, extension = "RDS")
-saveRDS(epistasis_tib, file = filename)
-
-# The ratios list of the split technical replicates
-filename <- SetFileName("IPR_annotation_heatmap", initials = initials, extension = "RDS")
-saveRDS(chromatin_TIF, file = filename)
-
-# The ratios list of the split technical replicates
-filename <- SetFileName("compound_annotation_heatmap", initials = initials, extension = "RDS")
-saveRDS(target, file = filename)
-
-# The ratios list of the split technical replicates
-filename <- SetFileName("chrom_cluster_heatmap", initials = initials, extension = "RDS")
-saveRDS(TRIP_chrom_clust, file = filename)
-```
+```1
 

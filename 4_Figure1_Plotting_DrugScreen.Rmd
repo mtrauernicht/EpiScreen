@@ -748,7 +748,7 @@ viab_mmej_cor <- indel.data.nofilter %>%
 ggplot_custom(viab_mmej_cor,
               aes(x = viab_norm_split, y = log2(MMEJratio), color = sample)) +
   geom_point_rast(raster.dpi = 300) +
-  geom_vline(xintercept = 0.50, color = "red") +
+  geom_vline(xintercept = 0.40, color = "red") +
   annotate("rect",xmin=0,xmax=0.50,ymin=-Inf,ymax=Inf, alpha=0.1, fill="red") +
   scale_x_continuous(breaks = seq(0, 1, by = 0.25), limits = c(0.1, 1.2)) +
   xlab("Normalised viability") +
@@ -760,16 +760,19 @@ ggplot_custom(viab_mmej_cor,
 
 ## S1E: Comparison between technical replicates of efficiency in DMSO
 
-```{r S1E comparison for mean indel rate across replicates, warning = FALSE, fig.height=3, fig.width=2}
+```{r S1E comparison for mean indel rate across replicates, warning = FALSE, fig.height=5, fig.width=3}
 indel.data %>%
-         filter(drug == "DMSO") %>%
-         dplyr::distinct(freqCut, well, drug_plate, conc_char, tech, replicate) %>%
-         mutate(freqCut = ave(freqCut, well, drug_plate, conc_char, tech, replicate, FUN = mean)) %>%
-         distinct() %>%
-         mutate(rep = paste(replicate, "tech", tech, sep = "_")) %>%
+  filter(drug == "DMSO") %>%
+  mutate(drug = case_when(drug == "DMSO" & plate %in% c(1:6) ~ paste(drug, drug_plate, well, "1", sep = " "), 
+                          drug == "DMSO" & plate %in% c(7:12) ~ paste(drug, drug_plate, well, "2", sep = " "),
+                          drug == "DMSO" & plate %in% c(13:18) ~ paste(drug, drug_plate, well, "3", sep = " ")))  %>%
+  dplyr::distinct(freqCut, well, drug, drug_plate, conc_char, tech, replicate) %>%
+  mutate(freqCut = ave(freqCut, well, drug, drug_plate, conc_char, tech, replicate, FUN = mean)) %>%
+  distinct() %>%
+  mutate(rep = paste(replicate, "tech", tech, sep = "_")) %>%
   ggplot(.,
-       aes(x = rep, y = freqCut)) +
-  geom_quasirandom_rast(aes(color = replicate), dodge.width = 0.75, raster.dpi = 600) +
+         aes(x = rep, y = freqCut)) +
+  geom_quasirandom(aes(color = replicate)) +
   scale_color_manual(values = c(colors_drugs[8], colors_drugs[7])) +
   theme_classic_lines_90() +
   ylim(0,1)
@@ -835,7 +838,7 @@ ggplot(zscore_dt,
   geom_hline(linetype = "dashed", yintercept = 2.58) +
   geom_hline(linetype = "dashed", yintercept = -2.58) +
   theme_classic_nolines_90() + 
-  ylab("TIF z-score")
+  ylab("MMEJ:NHEJ z-score")
 ```
 
 ## S1J: Correlation between technical replicates MMEJ score

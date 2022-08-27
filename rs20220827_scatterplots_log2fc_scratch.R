@@ -2,6 +2,7 @@
 library(tidyverse)
 library(ggplot2)
 library(ggpmisc)
+library(ggpubr)
 
 
 k27_drugs = CCD_tib %>% filter(!is.na(ratio_slope_plot) & ratio_slope_plot < -0.08 &  feature == "H3K27me3")  %>% distinct(drug_conc) %>% pull(drug_conc)
@@ -44,3 +45,23 @@ ggsave("/DATA/projects/DSBrepair/git/EpiScreen/figures/rs20220826_5mC_CCD_screen
 
 ratios_tib_fc %>% distinct(IPR, drug, conc_char, target, log2.fc.freqCut, log2.fc.ratio) %>%
   pivot_longer(cols = c("log2.fc.freqCut", "log2.fc.ratio")) %>% ggplot(., aes(value, fill = name, alpha = 0.5)) + geom_density()
+
+
+
+
+m5c_drugs = CCD_tib %>% filter(!is.na(indelrate_slope_plot) &  feature == "m5C")  %>% distinct(drug_conc) %>% pull(drug_conc)
+CCD_tib %>% filter(!is.na(indelrate_slope_plot) & feature == "m5C")  %>% distinct(drug_conc, indelrate_slope_plot) %>% kable()
+
+
+ratios_tib_fc %>% filter(drug_conc == "Apicidin 10 µM") %>%
+  pivot_longer(cols = chromatin.features.short) %>%
+  distinct(IPR, drug_conc, target, log2.fc.freqCut, value, name) %>%
+  ggplot(.,aes(value, log2.fc.freqCut))  + geom_point() +
+  geom_smooth(method = "lm", se = F) +
+  stat_cor(method = "pearson") +
+  stat_poly_eq(aes(label = paste(after_stat(eq.label),
+                                 after_stat(rr.label), sep = "*\", \"*")),
+               label.x = "left", label.y = "bottom") +
+  facet_wrap(. ~ name) +
+  theme_bw(base_size = 16) 
+

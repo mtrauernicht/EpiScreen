@@ -458,7 +458,7 @@ for (i in unique(CCD_tib$drug_conc)){
 adj_p.value_KO_model <- drug_conc_CCDs_dt %>% 
   dplyr::select(var, num_comp, p.value, drug_conc) %>% 
   group_by(var) %>%
-  mutate(p.adj = p.adjust(p.value, method = "BH")) %>% 
+  mutate(p.adj = p.adjust(p.value, method = "holm")) %>% 
   dplyr::select(var, drug_conc,p.value,p.adj)
 
 signif_hits = adj_p.value_KO_model %>% filter(p.adj < 0.01) %>% 
