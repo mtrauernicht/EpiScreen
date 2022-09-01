@@ -299,7 +299,7 @@ eff.data <- indel.data.freq %>%
            zscore_TIF_comb_rep , filter_zscore_TIF_comb_rep, 
            drug, target, conc_char, freqCut_diff_global_mean) %>%
   mutate(mean_eff_pval_comb = 2*pnorm(q = abs(zscore_TIF_comb_rep), lower.tail = FALSE),
-         mean_eff_pval_adj_comb = p.adjust(mean_eff_pval_comb, method = 'bonferroni'),
+         mean_eff_pval_adj_comb = p.adjust(mean_eff_pval_comb, method = 'holm'),
          sign_local = ifelse((mean_eff_pval_adj_comb < 0.01 & 
                                 filter_zscore_TIF_comb_rep &
                                  zscore_TIF_comb_rep > 2.58), "TIF_Increase", 
@@ -348,17 +348,47 @@ target_effects = global.effects %>%
 #   scale_fill_manual(values = c("TIF_Decrease" = "#023FA5", "Local_TIF_Decrease" = "#A1A6C8", "Mixed_TIF_effect" = "gray30", "No_Change" = "#E2E2E2","Local_TIF_Increase" = "#CA9CA4", "TIF_Increase" = "#8E063B")) +
 #   theme_pubr(border = T)
 
-target_effects %>% filter(sign_global != "No_Change") %>% distinct(target, conc_char, n) %>% group_by(conc_char) %>% summarise(count = sum(n))
+target_effects %>% filter(sign_global %in% c("TIF_Decrease", "Mixed_TIF_effect", "TIF_Increase")) %>% distinct(sign_global, target, conc_char, n) %>% group_by(conc_char) %>% summarise(count = sum(n))
 
 mean_viab_table = indel.data %>% distinct(drug, conc_char, replicate, viab_mean, target ) %>%
-  group_by(conc_char, drug, target) %>% summarise(mean_viab = mean(viab_mean)*100,
-                                                  sd_viab = sd(viab_mean))
+  group_by(conc_char, drug, target) %>% 
+  summarise(mean_viab = mean(viab_mean)*100,
+            sd_viab = sd(viab_mean)) %>% 
+  mutate(drug = gsub(" [(].*[)]", "", drug),
+         drug_conc = paste(drug, conc_char, sep = " "))
 
 eff.data %>% 
+  mutate(drug = gsub(" [(].*[)]", "", drug),
+         drug_conc = paste(drug, conc_char, sep = " ")) %>% 
   filter(sign_global != "No_Change") %>% 
   distinct(drug, conc_char, sign_global, target) %>%
   left_join(mean_viab_table) %>% 
   arrange(mean_viab)
+
+
+
+global_effects = indel.data %>%
+  filter(sample == "Epigenetic Compound") %>%
+  distinct(zscore_TIF_global_comb_rep, filter_zscore_TIF_global_comb_rep, 
+           drug, target, conc_char, freqCut_diff_global_mean) %>%
+  mutate(mean_TIF_global_pval_comb = 2*pnorm(q = abs(zscore_TIF_global_comb_rep), lower.tail = FALSE),
+         mean_TIF_global_pval_adj_comb = p.adjust(mean_TIF_global_pval_comb, method = 'holm'))  %>% 
+  mutate(drug = gsub(" [(].*[)]", "", drug),
+         drug_conc = paste(drug, conc_char, sep = " ")) %>%
+  left_join(mean_viab_table) %>%
+  filter(mean_TIF_global_pval_adj_comb < 0.01 & !(freqCut_diff_global_mean < -0.05 & mean_viab < 60)) %>%
+  distinct(drug, drug_conc, conc_char, target, mean_TIF_global_pval_adj_comb, mean_viab) 
+
+global_effects %>%
+  group_by(target, conc_char) %>% 
+  dplyr::count() %>%
+  kable()
+
+
+global_effects %>%
+  group_by(conc_char) %>% 
+  dplyr::count() %>%
+  kable()
 ```
 
 Are there any drugs (per concentration) that significantly change the cutting efficiency significantly across all IPRs?
@@ -379,42 +409,60 @@ dmso.eff.score <- indel.data %>%
 ```{r Compounds that affect the balance at all the sites}
 ## Which compounds change the balance at all the sites in both screens?
 all_TIF = indel.data %>% 
-  distinct(drug, conc_char, replicate, zscore_TIF_comb_tech, filter_zscore_TIF_comb_tech, target, 
-           barcode, viab_reproducibility, indel_freq_filter) %>% 
+  distinct(drug, conc_char, replicate, zscore_TIF_comb_tech, filter_zscore_TIF_comb_rep, target, 
+           barcode, viab_reproducibility, indel_freq_filter, viab_mean) %>% 
   mutate(mean_eff_pval_comb = 2*pnorm(q = abs(zscore_TIF_comb_tech), lower.tail = FALSE),
-         mean_eff_pval_adj_comb = p.adjust(mean_eff_pval_comb, method = 'bonferroni')) %>%
-  filter(filter_zscore_TIF_comb_tech & 
+         mean_eff_pval_adj_comb = p.adjust(mean_eff_pval_comb, method = 'holm')) %>%
+  filter(filter_zscore_TIF_comb_rep & 
            !is.na(zscore_TIF_comb_tech) & 
            # !between(zscore_TIF_comb_tech, -1.96, 1.96) & 
            viab_reproducibility == T & 
-           indel_freq_filter == T,
-         mean_eff_pval_adj_comb < 0.01) %>% 
-  group_by(drug, conc_char, target) %>% 
+           indel_freq_filter == T &
+           viab_mean > 0.6 &
+           mean_eff_pval_adj_comb < 0.01) %>% 
   mutate(drug = gsub(" [(].*[)]", "", drug),
          drug_conc = paste(drug, conc_char, sep = " ")) %>%
+  group_by(drug_conc, target, replicate) %>% 
   dplyr::count() %>% 
-  filter(n == 36) # 2 x 18
+  filter(n == 18) %>% # All 18 sites
+  group_by(drug_conc, target) %>% 
+  dplyr::count() %>% 
+  filter(n == 2) # Both replicates
 
 kable(all_TIF)
+paste("Compounds that significantly (p holm adj < 0.01) changed the TIF in all 18 sites in both replicates: ", paste(all_TIF$drug_conc, collapse = ", "))
+
 
 ## Now with 16/18 (~ 90%) of the sites with an effect. Near global
 near_all_TIF = indel.data %>% 
-  distinct(drug, conc_char, replicate, zscore_TIF_comb_tech, filter_zscore_TIF_comb_tech, target, 
-           barcode, viab_reproducibility, indel_freq_filter) %>% 
+  distinct(drug, conc_char, replicate, zscore_TIF_comb_tech, filter_zscore_TIF_comb_rep, target, 
+           barcode, viab_reproducibility, indel_freq_filter, viab_mean) %>% 
   mutate(mean_eff_pval_comb = 2*pnorm(q = abs(zscore_TIF_comb_tech), lower.tail = FALSE),
-         mean_eff_pval_adj_comb = p.adjust(mean_eff_pval_comb, method = 'bonferroni')) %>%
-  filter(filter_zscore_TIF_comb_tech & 
+         mean_eff_pval_adj_comb = p.adjust(mean_eff_pval_comb, method = 'BH')) %>%
+  filter(filter_zscore_TIF_comb_rep & 
            !is.na(zscore_TIF_comb_tech) & 
            # !between(zscore_TIF_comb_tech, -1.96, 1.96) & 
            viab_reproducibility == T & 
-           indel_freq_filter == T,
-         mean_eff_pval_adj_comb < 0.01) %>% 
-  group_by(drug, conc_char, target) %>% 
+           indel_freq_filter == T &
+           mean_eff_pval_adj_comb < 0.05) %>% 
+  mutate(drug = gsub(" [(].*[)]", "", drug),
+         drug_conc = paste(drug, conc_char, sep = " ")) %>%
+  group_by(drug, conc_char, drug_conc, target, replicate) %>% 
   dplyr::count() %>% 
-  filter(n >= 32) # 2 x 16
+  filter(n >= 15) 
 
+comp_near_all_TIF = near_all_TIF %>% # At least 15 sites
+  group_by(drug, conc_char, drug_conc, target) %>% 
+  dplyr::count() %>% 
+  left_join(mean_viab_table) %>%
+  filter(n == 2 & mean_viab > 60) # Both replicates
 
-kable(near_all_TIF)
+near_all_TIF %>%
+  left_join(mean_viab_table) %>% 
+  filter(mean_viab > 60) %>%
+  kable()
+
+paste("Compounds that significantly (p holm adj < 0.01) changed the TIF in all 16 of the 18 sites in both replicates: ", paste(comp_near_all_TIF$drug_conc, collapse = ", "))
 ```
 
 ---
@@ -525,8 +573,7 @@ annotation_colors_scr$chromatin <- annotation_colors_scr$chromatin[ordered_marks
 eff.data <- indel.data %>%
   #filter(target != "Aurora Kinase") %>%
   filter(sample == "Epigenetic Compound", indel_freq_filter, viab_reproducibility) %>%
-  filter(abs(zscore_TIF_global_comb_rep) >= 2.58 & 
-           !(viab_mean < .60 & zscore_TIF_global_comb_rep < -2.54)) %>%  # we can choose to display all drugs that have significant global hits
+  filter(!(viab_mean < .60 & zscore_TIF_global_comb_rep < -2.54)) %>%  # we can choose to display all drugs that have significant global hits
   distinct(conc_char, drug, target, IPR, zscore_TIF_comb_rep, freqCut_diff_mean, replicate, tech, filter_zscore_TIF_comb_rep)
 
 eff.data.heatmap <- eff.data %>%
@@ -535,11 +582,11 @@ eff.data.heatmap <- eff.data %>%
   mutate(freqCut_diff_mean = ave((freqCut_diff_mean*100), IPR, FUN = function(x) mean(x, na.rm = TRUE)),
   ## Select drugs that have a large effect size in at least one location 
          ## (some drugs might have a small global effect size, but large local)
-         zscore_TIF_comb_rep_temp = ifelse(!filter_zscore_TIF_comb_rep, 0, zscore_TIF_comb_rep)) %>%
+         zscore_TIF_comb_rep_temp = ifelse(filter_zscore_TIF_comb_rep, zscore_TIF_comb_rep, 0)) %>%
   ungroup() %>%
   mutate(p_value = 2*pnorm(q = abs(zscore_TIF_comb_rep_temp), lower.tail = F),
          # Adjust p value for false discovery rate
-         adj_pvalue = p.adjust(p_value, method = 'bonferroni')) %>%
+         adj_pvalue = p.adjust(p_value, method = 'holm')) %>%
          # Pick the smallest per compound & concentration
   group_by(drug, conc_char) %>%
          mutate(min_score = min(adj_pvalue)) %>%
@@ -601,8 +648,7 @@ plt1 = pheatmap(eff.data.matrix[ , clone5_map_ipr$labels] %>% as.matrix(),
                 # color = colorRampPalette(c("#e07a5f", "#e5e5e5", "#3d405b"))(palette_length),
                 color = diverge_hcl(palette_length, "Blue-Red"),
                 annotation_colors = annotation_colors_scr_set,
-                annotation_legend = T,
-                cutree_row = 5)
+                annotation_legend = T)
 
 ```
 
@@ -615,7 +661,7 @@ rank_dt = indel.data %>%
   distinct(drug, conc_char, zscore_TIF_global_comb_rep , target, viab_mean, viab_reproducibility, filter_zscore_TIF_global_comb_rep) %>% 
   mutate(viab_mean = ave(viab_mean, drug, conc_char, FUN = mean),
          mean_eff_pval_comb = 2*pnorm(q = abs(zscore_TIF_global_comb_rep), lower.tail = FALSE),
-         mean_eff_pval_adj_comb = p.adjust(mean_eff_pval_comb, method = 'bonferroni')) %>%
+         mean_eff_pval_adj_comb = p.adjust(mean_eff_pval_comb, method = 'holm')) %>%
   distinct() %>%
   filter(!(viab_mean < .60 & zscore_TIF_global_comb_rep < -2.54)) %>% 
   arrange(desc(zscore_TIF_global_comb_rep )) %>%
@@ -758,7 +804,7 @@ all_compounds_lowerTIF = indel.data %>%
   mutate(viab = ave(viab_mean, drug_conc, target, FUN = mean),
          TIF_diff = ave(freqCut_diff_global_mean, drug_conc, target,  FUN = mean),
          mean_eff_pval_comb = 2*pnorm(q = abs(zscore_TIF_global_comb_rep), lower.tail = FALSE),
-         mean_eff_pval_adj_comb = p.adjust(mean_eff_pval_comb, method = 'bonferroni')) %>%
+         mean_eff_pval_adj_comb = p.adjust(mean_eff_pval_comb, method = 'holm')) %>%
   distinct(target, drug_conc, TIF_diff, viab, mean_eff_pval_adj_comb)
 
 p1 = indel.data %>% mutate(drug = gsub(" [(].*[)]", "", drug),

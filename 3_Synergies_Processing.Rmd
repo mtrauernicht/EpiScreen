@@ -117,6 +117,7 @@ SetFileName <- function(filename, initials, extension) {
 # Import data from preprocessing script
 in.dir = list.dirs(path = "/DATA/projects/DSBrepair/data/R") %>% .[grepl("episcreen", .)] %>% tail(n = 1)
 file = list.files(in.dir, pattern = "episcreen_ratios", full.names = T) %>% tail(n = 1)
+
 indel.data <- readRDS(file) %>% filter(viab_reproducibility) %>%
   mutate(drug = gsub(" [(].*[)]", "", drug)) %>%
   # We remove the HDAC1 and HDAC2 chromatin features as we do not have a sufficient dynamic range in
@@ -273,13 +274,13 @@ ordered_marks2 <- c("Negative Control", "MRN", "DNA-PK","Epigenetic Reader Domai
 ```
 
 ## Initial filtering and preparing the tables for mean log2 FC calculation
-```{r}
+```{r, warning=FALSE}
 # Data table and compute log2_ratio (This line needs to be adjusted)
 filtered_drug_pvals = indel.data %>%
   distinct(drug, conc_char, IPR, zscore_TIF_comb_rep, zscore_bal_comb_rep, filter_zscore_TIF_comb_rep, filter_zscore_bal_comb_rep) %>%
   filter(!is.na(zscore_bal_comb_rep), !is.na(zscore_TIF_comb_rep)) %>%
-  mutate(zscore_TIF_comb_rep_temp = ifelse(!filter_zscore_TIF_comb_rep, 0, zscore_TIF_comb_rep),
-         zscore_bal_comb_rep_temp = ifelse(!filter_zscore_bal_comb_rep, 0, zscore_bal_comb_rep),
+  mutate(zscore_TIF_comb_rep_temp = ifelse(filter_zscore_TIF_comb_rep, zscore_TIF_comb_rep, 0),
+         zscore_bal_comb_rep_temp = ifelse(filter_zscore_bal_comb_rep, zscore_bal_comb_rep, 0),
          p_val_TIF = 2*pnorm(q = abs(zscore_TIF_comb_rep_temp), lower.tail = F),
          p_val_bal = 2*pnorm(q = abs(zscore_bal_comb_rep_temp), lower.tail = F),
          # Adjust p value for false discovery rate
@@ -295,19 +296,20 @@ filtered_drug_conc = filtered_drug_pvals %>%
          effect_on_ratio = ifelse(adj_pval_bal < 0.01, TRUE, FALSE)) %>%
   distinct(IPR, drug, conc_char, drug_conc, effect_on_indelrate, effect_on_ratio) %>%
   mutate(# Count add conting of IPR per compound that have an effect. We want at least 2 (avoid outlyers)
-         counts = as.numeric(ave(drug_conc, drug, conc_char, FUN = function(x) length(x))),
-         # Keep here to at least 2 sites are significant. 
-         keep = ifelse(!effect_on_indelrate & !effect_on_ratio | 
-                         counts < 2, 
-                       FALSE, TRUE)) %>%
-  filter(keep) %>% 
+    counts = as.numeric(ave(drug_conc, drug, conc_char, FUN = function(x) length(x))),
+    # Keep here to at least 2 sites are significant. 
+    keep = ifelse(!effect_on_indelrate & !effect_on_ratio | 
+                    counts < 2, 
+                  FALSE, TRUE)) %>%
+  filter(keep)  %>%
+  distinct(drug, conc_char, drug_conc, effect_on_indelrate, effect_on_ratio) %>% 
+  left_join(count(., drug_conc)) %>%
   # There are duplicates, we want to remove them too. To do so let's replace the 
   # FALSE with TRUE in one column if the other is TRUE. And then unique the set.
-  mutate(effect_on_indelrate = ifelse(effect_on_ratio, TRUE, effect_on_indelrate),
+  mutate(effect_on_indelrate = ifelse(n > 1, TRUE, effect_on_indelrate),
          # same for the ratio
-         effect_on_ratio = ifelse(effect_on_indelrate, TRUE, effect_on_ratio)) %>%
-  distinct(drug, conc_char, drug_conc, effect_on_indelrate, effect_on_ratio) 
-
+         effect_on_ratio = ifelse(n > 1, TRUE, effect_on_ratio)) %>%
+  distinct(drug, conc_char, drug_conc, effect_on_indelrate, effect_on_ratio)
 
 
 ## From Xabi Vergara to filter on effect and not on intercept.
@@ -380,7 +382,7 @@ slope.protein.features <- tibble(drug_conc = NA, feature = NA,  term = NA,
 for (i in unique(ratios_tib_fc$drug_conc)) {
   for (j in chromatin.features.short) {
     model_tib <- ratios_tib_fc %>% filter(drug_conc == i) 
-    
+
     # Indel rates
     model.indelrate.log2 <- lm(formula = log2.fc.freqCut ~ unlist(model_tib[j]), 
                                data = model_tib) %>% 
@@ -456,9 +458,10 @@ for (i in unique(CCD_tib$drug_conc)){
 
 #Correct model to adjust for multiple testing correction
 adj_p.value_KO_model <- drug_conc_CCDs_dt %>% 
+  filter(!is.na(var)) %>%
   dplyr::select(var, num_comp, p.value, drug_conc) %>% 
   group_by(var) %>%
-  mutate(p.adj = p.adjust(p.value, method = "holm")) %>% 
+  mutate(p.adj = p.adjust(p.value, method = "BH")) %>% 
   dplyr::select(var, drug_conc,p.value,p.adj)
 
 signif_hits = adj_p.value_KO_model %>% filter(p.adj < 0.01) %>% 
@@ -481,21 +484,29 @@ epistasis_tib = slope.protein.features %>%
 
 epistasis_tib %<>% 
   left_join(signif_hits) %>%
-  left_join(effect_of_compound_tib) %>%
-  distinct(signif.ratio, signif.freqCut, drug_conc, feature, indelrate_slope, ratio_slope, bal_signif, TIF_signif) %>% 
-  mutate(ratio_slope_plot = case_when(signif.ratio & bal_signif == "MMEJ" & ratio_slope < 0 ~ ratio_slope, 
-                               bal_signif == "MMEJ" & ratio_slope > 0 ~ as.double(NA), 
-                               signif.ratio & bal_signif == "NHEJ" & ratio_slope > 0 ~ ratio_slope, 
-                               bal_signif == "NHEJ" & ratio_slope < 0 ~ as.double(NA), 
-                               signif.freqCut & TIF_signif == "bal_both" ~ indelrate_slope,
-                               T ~ as.double(NA)),
-         indelrate_slope_plot = case_when(signif.freqCut & TIF_signif == "TIF_down" & indelrate_slope < 0 ~ indelrate_slope, 
-                               TIF_signif == "TIF_down" & indelrate_slope > 0 ~ as.double(NA), 
-                               signif.freqCut & TIF_signif == "TIF_up" & indelrate_slope > 0 ~ indelrate_slope, 
-                               TIF_signif == "TIF_up" & indelrate_slope < 0 ~ as.double(NA), 
-                               signif.freqCut & TIF_signif == "TIF_both" ~ indelrate_slope,
-                               T ~ as.double(NA)))
-
+  left_join(effect_of_compound_tib) %>% 
+  left_join(filtered_drug_conc) %>%
+  distinct(signif.ratio, signif.freqCut, # These are p values for a significant CCD
+           drug_conc, feature, 
+           indelrate_slope, ratio_slope, # The slopes
+           bal_signif, TIF_signif, # What effect the compounds have
+           effect_on_indelrate, effect_on_ratio # If the effect is significant (from above)
+           ) %>% 
+  mutate(ratio_slope_plot = case_when(
+      effect_on_ratio & signif.ratio & bal_signif == "MMEJ" & ratio_slope < 0 ~ ratio_slope, 
+      bal_signif == "MMEJ" & ratio_slope > 0 ~ as.double(NA), 
+      effect_on_ratio & signif.ratio & bal_signif == "NHEJ" & ratio_slope > 0 ~ ratio_slope, 
+      bal_signif == "NHEJ" & ratio_slope < 0 ~ as.double(NA), 
+      effect_on_ratio & signif.freqCut & TIF_signif == "bal_both" ~ indelrate_slope,
+      T ~ as.double(NA)),
+    indelrate_slope_plot = case_when(
+      effect_on_indelrate & signif.freqCut & TIF_signif == "TIF_down" & indelrate_slope < 0 ~ indelrate_slope, 
+      TIF_signif == "TIF_down" & indelrate_slope > 0 ~ as.double(NA), 
+      effect_on_indelrate & signif.freqCut & TIF_signif == "TIF_up" & indelrate_slope > 0 ~ indelrate_slope, 
+      TIF_signif == "TIF_up" & indelrate_slope < 0 ~ as.double(NA), 
+      effect_on_indelrate & signif.freqCut & TIF_signif == "TIF_both" ~ indelrate_slope,
+      T ~ as.double(NA))) %>%
+  distinct(drug_conc, feature, indelrate_slope_plot, ratio_slope_plot)
 ```
 
 ## Heatmap annoation
@@ -571,5 +582,9 @@ saveRDS(target, file = filename)
 # The ratios list of the split technical replicates
 filename <- SetFileName("chrom_cluster_heatmap", initials = initials, extension = "RDS")
 saveRDS(TRIP_chrom_clust, file = filename)
+
+# Export the FC ratios tibble for plotting
+filename <- SetFileName("FC_ratios", initials = initials, extension = "RDS")
+saveRDS(ratios_tib_fc, file = filename)
 ```
 

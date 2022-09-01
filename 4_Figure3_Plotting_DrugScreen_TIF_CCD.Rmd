@@ -73,6 +73,7 @@ library(RColorBrewer)
 # # library(ggrastr)
 library(broom)
 # library(ggsignif)
+library(ggpmisc)
 library(cowplot)
 library(rstatix)
 library(colorspace)
@@ -104,279 +105,6 @@ CorrelationDFMean <- function(data, feature_name, targets, p.value=0.001){
   return(histone.corr.df=histone.corr.df)
 }
 
-
-CorrelationPlotMean <- function(data, feature_name, targets, title = "with treatment", p.value=0.01, alfa = c(0.5, 1)){
-  cor.df = data.frame()
-  for (i in feature_name){
-    corr.list <- data %>% 
-      dplyr::select(all_of(i), as.character(targets)) %>% 
-      as.matrix() %>% 
-      rcorr(type = "spearman")
-    
-    df <- data.frame(rowname = names(corr.list$r[1, -1]),
-                     corr = corr.list$r[1, -1],
-                     pvalue = corr.list$P[1, -1],
-                     feature = i)
-    cor.df <- rbind(cor.df, df) %>%
-      transform(rowname = factor(rowname, levels = levels(targets)),
-                corr = corr,
-                pvalue = pvalue) %>% 
-      mutate(p.adj = p.adjust(pvalue)) %>%
-      add_significance("p.adj")
-  }
-  p <-  ggplot(cor.df, aes(x = rowname, y = corr, fill = p.adj.signif)) +
-    geom_bar(stat = "identity", position = "dodge") +
-    ylab(paste("Spearman correlation ",title)) +
-    xlab("Chromatin Feature") +
-    # ggtitle(paste("Repair pathways correlation with chromatin features in", condition_name, "exps"))  +
-    theme_classic2(base_size = 16) +
-    scale_y_continuous(breaks=seq(-1,1, .1)) +
-    scale_fill_manual(values = c("****" = "black", "***" = "gray20", "**" = "gray40", 
-                                 "*" = "gray50", "ns" = "gray80")) +
-    coord_flip()
-  return(list(dataframe=cor.df, plot = p))
-}
-
-clustering = data.frame(row.names=c('LMNB1', 'late_replicating', 'H3K9me2',
-                                    'H3K27me3', 'EZH2', 'CTCF', 'SMC3',
-                                    'HDAC3', 'HDAC2', 'HDAC1', 'H3K4me1',
-                                    'H3K4me2', 'H3K4me3', 'H3K27ac',
-                                    'H4K5acK8ac', 'H2AFZ', 'DNAse', 'Dam', 
-                                    'm5C', 'H3K79me2', 'TTseq', 'H3K36me3', 
-                                    'POL2AS2', 'POL2'),
-                        group=factor(c(rep('repressive', 5), rep('insulator', 2),
-                                       rep('HDAC', 3), rep('euchromatin', 6),
-                                       rep('accessibility', 2), 'methylation',
-                                       rep('transcribing', 5)),
-                                     levels=c('transcribing', 'accessibility',
-                                              'methylation', 'euchromatin',
-                                              'HDAC', 'insulator', 'repressive')))
-
-cor_test <- function(y, X, left, right){
-  cor_list = lapply(X, function(x){
-    cor.test(x,y)
-  })
-  p_vec = unlist(lapply(cor_list, function(x){x$p.value}))
-  cor_vec = unlist(lapply(cor_list, function(x){x$estimate}))
-  p_adj = p.adjust(p_vec, method = "holm")
-  color = ifelse(p_adj < 0.05, ifelse(cor_vec > 0, left, right),
-                 'None')
-  importance = abs(cor_vec)
-  target=factor(colnames(X), levels=rownames(clustering))
-  feature_group = clustering[colnames(X), ]
-  return(list(correlation=cor_vec,importance = importance, p=p_vec,
-              p_adj=p_adj, target=target, color=color,
-              feature_group=feature_group))
-}
-
-get_combinations <- function(domain_vec){
-  n_domain = length(domain_vec)
-  get_ivec <-function (last_x, n_domain){
-    if (last_x < n_domain){
-      i_vec = c(0, c((last_x+1):n_domain))
-    } else{
-      i_vec = c(0)
-    }
-  }
-  
-  combine <- function(x_new, x_vec, n_domain){
-    new_vec = c(x_vec, x_new)
-    if (length(new_vec)==n_domain){
-      return(new_vec)
-    } else {
-      i_vec = get_ivec(max(new_vec), n_domain)
-      x_list = lapply(i_vec, combine, x_vec=new_vec,
-                      n_domain=n_domain)
-      return(do.call(rbind, x_list))
-    }
-  }
-  
-  comb_list = lapply(c(0:n_domain), combine, x_vec=c(), n_domain=n_domain)
-  
-  comb = do.call(rbind, comb_list)
-  comb_df = unique(t(apply(comb, 1, function(x){x[order(x)]})))
-  
-  name_list = apply(comb_df, 1, function(x){
-    name = paste(domain_vec[x], collapse='-')
-    if (name == ''){
-      name = 'iDomain'
-    }
-    return(name)
-  })
-  
-  opt_list = lapply(domain_vec, function(d){
-    apply(comb_df, 1, function(x){
-      opt = domain_vec[x]
-      return(d%in%opt)
-    })
-  })
-  
-  opt_df = do.call(cbind, opt_list)
-  colnames(opt_df) = domain_vec
-  rownames(opt_df) = name_list
-  
-  return(opt_df)
-}
-
-quantiles_95 <- function(x) {
-  r <- quantile(x, probs=c(0.05, 0.25, 0.5, 0.75, 0.95))
-  names(r) <- c("ymin", "lower", "middle", "upper", "ymax")
-  r
-}
-
-plot_comb_grid_beeswarm <- function(dt, opt_df, domains, y_name, min_count=0,
-                                    max_count=Inf, group_by=NULL, color=NULL, y_plabel=c(-1.5, 1.5)){
-  
-  opt_melt = reshape2::melt(opt_df)
-  colnames(opt_melt) = c('group', 'domain', 'is_in')
-  
-  opt_melt$is_in = ifelse(opt_melt$is_in, 'in', 'out')
-  opt_melt$domain = factor(opt_melt$domain, levels=domains)
-  
-  
-  group_list = lapply(rownames(opt_df), function(opt_name){
-    opt = opt_df[opt_name, ]
-    in_vec = domains[opt]
-    out_vec = domains[!opt]
-    
-    in_sum = rowSums(dt[,..in_vec])
-    out_sum = rowSums(dt[,..out_vec])
-    if (length(in_vec)==0){
-      in_group = which(out_sum == 0)
-    } else if (length(out_vec) == 0){
-      in_group = which(in_sum==length(in_vec))
-    } else  {
-      in_group = which(in_sum == length(in_vec) & out_sum==0)
-    }
-    return(in_group)
-  })
-  
-  names(group_list) = rownames(opt_df)
-  for (opt_name in names(group_list)){
-    i_vec = group_list[[opt_name]]
-    dt[i_vec, group := opt_name]
-  }
-  if (is.null(group_by)){
-    group_count_df = data.frame(dt[,table(group)])
-  } else {
-    group_count_df = data.frame(dt[,table(group)/length(unique(get(group_by)))])
-  }
-  group_count_df = group_count_df[order(match(group_count_df$group, rownames(opt_df))),]
-  # print(group_count_df)
-  group_count_sel = group_count_df[group_count_df$Freq>=min_count,]
-  group_count_sel = group_count_sel[group_count_sel$Freq<=max_count,]
-  group_levels =  group_count_sel$group
-  opt_sel = opt_melt[opt_melt$group %in% group_levels, ]
-  
-  opt_sel$group = factor(opt_sel$group, levels=group_levels)
-  # print(opt_sel)
-  
-  indel_selection = dt[group%in%group_levels, ]
-  indel_selection[,group:=factor(group, levels=group_levels)]
-  
-  # wilcox_list = lapply(group_levels[group_levels!='iDomain'],
-  #                      function(g){
-  #                          x = indel_selection[group==g, y_name, with=F]
-  #                          y = indel_selection[group=='iDomain', y_name,
-  #                                              with=F]
-  #                          wilcox.test(unlist(x),unlist(y))
-  #                      })
-  
-  group_count_sel$group = factor(group_count_sel$group, levels=group_levels)
-  
-  count_plot = ggplot(group_count_sel, aes(x=group,y=1, label=Freq)) +
-    geom_label() +
-    theme_void()
-  
-  
-  
-  dots = ggplot(opt_sel, aes(x=group, y=domain, color=is_in)) +
-    geom_point(size=2) +
-    geom_line(data=opt_sel[opt_sel$is_in=='in',], aes(group=group)) +
-    theme_bw() +
-    scale_color_manual(values=c('in'='black', 'out'='grey70')) +
-    guides(color="none")  +
-    geom_vline(xintercept=seq(1.5, length(unique(dt$group))-0.5, 1),
-               lwd=0.5, colour="grey90") +
-    theme(axis.title=element_blank(),
-          axis.text=element_blank(),
-          axis.ticks=element_blank(),
-          panel.grid.major = element_blank())
-  
-  symnum = list(cutpoints = c(0, 0.0001, 0.001, 0.01, 0.05, 1),
-                symbols = c("****", "***", "**", "*", " "))
-  
-  
-  if (is.null(group_by)){
-    beeswarm = ggplot(indel_selection, aes_string(x='group', y=y_name)) +
-      geom_quasirandom(width=0.3) +
-      stat_summary(fun=median, fun.min = median,
-                   fun.max = median,
-                   geom="crossbar", width = 0.5,
-                   color='red') +
-      stat_compare_means(aes(label = ..p.signif..),
-                         symnum.args = symnum,
-                         method = 'wilcox.test',
-                         ref.group='iDomain')
-    
-  } else {
-    wilcox_dt = indel_selection[,test_wilcox(.SD, group_by, y_name),
-                                by='group']
-    wilcox_dt[,p_adj:=p.adjust(p_value, method = "holm")]
-    wilcox_dt[,p_signif:=symnum(p_adj, cutpoints=symnum$cutpoints,
-                                symbols=symnum$symbols)]
-    
-    
-    beeswarm = ggplot(indel_selection,
-                      aes_string(x='group', y=y_name, color=group_by)) +
-      geom_quasirandom(dodge.width=1) +
-      scale_color_manual(values=color) +
-      stat_summary(aes_string(group=group_by), fun=median,
-                   fun.min = median, fun.max = median,
-                   geom="crossbar", width = 0.5,
-                   color='red',
-                   position= position_dodge(width =1)) +
-      geom_text(data=wilcox_dt, aes(x=group, y=0.8, label=p_signif),
-                inherit.aes=F)
-    print(wilcox_dt)
-  }
-  beeswarm = beeswarm +
-    theme_bw() +
-    geom_vline(xintercept=seq(1.5, length(unique(dt$group))-0.5, 1),
-               lwd=0.5, colour="grey90") +
-    theme(axis.title=element_blank(),
-          axis.text.x=element_blank(),
-          panel.grid.major.x = element_blank(),
-          axis.ticks.x=element_blank()) +
-    ylim(y_plabel)
-  
-  count = data.frame(domain=gsub('_domain', '', domains),
-                     count=colSums(dt[,..domains], na.rm=T))
-  
-  count$domain = factor(count$domain, levels=domain_levels)
-  
-  histogram = ggplot(count, aes(x=1, y=domain, label = count)) +
-    geom_label() +
-    theme_bw() +
-    theme(plot.background = element_blank(),
-          panel.grid.major = element_blank(),
-          panel.grid.minor = element_blank(),
-          panel.border = element_blank(),
-          axis.title=element_blank(),
-          axis.text.x=element_blank(),
-          axis.ticks=element_blank())
-  
-  empty = ggplot(data=data.frame(1,1),aes(x=1,y=1)) +
-    geom_point() +
-    theme_void()
-  
-  count_beeswarm = plot_grid(beeswarm, count_plot, ncol=1, rel_heights=c(20,1),
-                             align='v', axis='lr')
-  return(plot_grid(empty, beeswarm, empty, count_plot,
-                   histogram, dots, nrow=3,
-                   rel_widths=c(1,10), rel_heights=c(15,1,5), align='vh',
-                   axis='tlbr'))
-}
 
 p.adjust <- function(p, method = p.adjust.methods, n = length(p))
 {
@@ -737,6 +465,9 @@ file = list.files(in.dir, pattern = "compound_annotation_heatmap", full.names = 
 target <- readRDS(file)
 file = list.files(in.dir, pattern = "chrom_cluster_heatmap", full.names = T) %>% tail(n = 1)
 TRIP_chrom_clust <- readRDS(file)
+file = list.files(in.dir, pattern = "FC_ratios", full.names = T) %>% tail(n = 1)
+ratios_tib_fc <- readRDS(file)
+
 ```
 
 ### Annotation
@@ -915,7 +646,7 @@ pheatmap(all_compounds_epistasis_TIF[, TRIP_chrom_clust$labels],
          cellheight = 8,
          breaks = breaks,
          cluster_cols = TRIP_chrom_clust,
-         clustering_method = "ward.D",
+         clustering_method = "ward.D2",
          annotation_row = target_ctrl,
          main = "Chromatin synergies - TIF all",
          color = colors,
@@ -982,9 +713,8 @@ for(i in unique(CCD_tib$feature)) {
 
 
 # Supplementary Figures
-## S3AB Example CCD
+## S3AB Example mock filtered out CCD
 ```{r S3AB example of filtered out CCDs,  fig.width = 8, fig.height = 3}
-
 #Create mock examples
 mock.slopes <- tibble(z_score = seq(-3,3,0.25), 
                       A = z_score*0.1 -0.6, 
@@ -1018,10 +748,135 @@ p2 = ggplot(CCD_example_tib,
 plot_grid(p1, p2, nrow = 1, labels = c("C", "D"))
 
 CCD_tib %>% filter(feature == "H3K36me3" & drug_conc == "EPZ-6438 10 µM") %>% pull(indelrate_slope_plot)
+
+chromatin.features <- colnames(indel.data)[grepl("[.]zscore", colnames(indel.data))]
+chromatin.features.short = gsub(".zscore", "", chromatin.features)
 ```
 
-```{r}
 
+## PCR plots
+```{r PCR of the chromatin features, eval = FALSE}
+PCR_tib = indel.data %>% filter(drug == "DMSO") %>% 
+  dplyr::select(IPR, drug, replicate, freqCut_mean, MMEJratio_mean, all_of(chromatin.features)) %>% 
+  distinct() %>%
+  mutate(mean_TIF = ave(freqCut_mean, IPR, FUN = mean),
+         mean_bal = ave(MMEJratio_mean, IPR, FUN = mean),) %>%
+  rename_with(., ~gsub(".zscore", "", .x)) %>%
+  dplyr::select(-replicate, -freqCut_mean, -MMEJratio_mean) %>%
+  distinct()
+
+heatmap_order <- c("LMNB1", "late_replicating", "H3K9me2", "H3K9me3", "EZH2",
+                   "H3K27me3", "CTCF", "SMC3", "HDAC1", "HDAC2", "HDAC3", "TTseq",
+                   "POL2", "POL2AS2", "H3K36me3", "H3K79me2", "m5C", "Dam",
+                   "DNAse", "H2AFZ", "H4K5acK8ac", "H3K27ac",  "H3K4me1",
+                   "H3K4me2", "H3K4me3")
+
+chrom_formula = reformulate(chromatin.features.short, response = "mean_TIF")
+
+PCR_model_TIF<- pcr(chrom_formula, data=PCR_tib,
+                     validation="CV")
+
+summary(PCR_model_TIF)
+# Variance explained by PC
+explvar(PCR_model_TIF)
+
+RMSEP(PCR_model_TIF)
+
+PCR_model_TIF
+
+projection_df = data.frame((PCR_model_TIF)$projection)
+colnames(projection_df) = gsub('Comp.', 'PC', colnames(projection_df))
+projection_df$feature = factor(rownames(projection_df),
+                               levels=heatmap_order)
+projection_df$group=clustering[rownames(projection_df),'group']
+
+
+projection_melt = melt(projection_df, measure.vars=c('PC1', 'PC2', 'PC3'))
+
+ggplot(projection_melt, aes(x=feature, y=value, fill=group)) +
+    geom_bar(stat='identity') +
+    scale_fill_manual(values=feature_fill) +
+    theme(axis.text.x = element_text(angle=90, vjust=0.5, hjust=1)) +
+    facet_nested(rows=vars(variable))
+```
+
+## S3C Example PCR plots
+```{r S3C Example PCR prediction, fig.width = 6, fig.height = 6}
+FC_tib = ratios_tib_fc %>% dplyr::select(IPR, drug_conc, log2.fc.freqCut, log2.fc.ratio, all_of(chromatin.features.short)) %>% ungroup()
+
+for (i in c("BMN 673 10 µM", "Apicidin 100 nM")){
+  drug_conc_dt <- filter(FC_tib, drug_conc == i)
+  # Run a model per drug_conc
+  set.seed(1)
+  chrom_formula = reformulate(chromatin.features.short, response = "log2.fc.freqCut")
+  PCR_model_DDR_test <- pcr(chrom_formula,
+                            data=drug_conc_dt , 
+                            validation="CV")
+  
+  pcr_pred <- predict(PCR_model_DDR_test, 
+                      drug_conc_dt, ncomp = 3)
+  
+  combined.dt <- tibble(measured = drug_conc_dt %>% pull("log2.fc.freqCut"), 
+                        predicted = as.numeric(pcr_pred))
+  
+  pred_vs_estim <- lm(formula = measured ~ predicted, 
+                      data = combined.dt) %>% 
+    glance()
+  
+  p =  ggplot(combined.dt, aes(measured, predicted)) +
+    geom_point() +
+    geom_smooth(method = "lm", se = F) +
+    stat_cor(method = "pearson") +
+    stat_poly_eq(aes(label = paste(after_stat(eq.label),
+                                   after_stat(rr.label), sep = "*\", \"*")),
+                 label.x = "left", label.y = "bottom") +
+    ggtitle(i) +
+    theme_classic2(base_size = 16) 
+  
+  print(p)
+}
+
+# adjusted pvals from the Synergies preprocessing scripts: 
+# adj_p.value_KO_model %>% filter(drug_conc %in% c("BMN 673 10 µM", "Apicidin 100 nM"), var == "log2.fc.freqCut")
+# BMN 673 10 µM : 0.1697062666
+# Apicidin 100 nM : 0.0001259269
+```
+
+
+## S3EF Example CCDs
+```{r S3C Example strong synergy hits with LMNB1,  fig.width = 6, fig.height = 4}
+top_hit_drugs = CCD_tib %>% filter(!is.na(ratio_slope_plot) & abs(ratio_slope_plot) > 0.2)  %>% distinct(drug_conc) %>% pull(drug_conc)
+
+# Highligh top 4 strongest hits + and - TIF. In the end we kept only LMNB1, but let's keep this code for flexibility.
+ratios_tib_fc %>% 
+  filter(drug_conc == "Resveratrol 10 µM" |
+         drug_conc == "PCI-24781 100 nM"
+  )  %>% 
+  ggplot(.,aes(LMNB1, log2.fc.freqCut)) + geom_point() +
+  geom_smooth(method = "lm", se = F) +
+  stat_cor(method = "pearson") +
+  stat_poly_eq(aes(label = paste(after_stat(eq.label),
+                                 after_stat(rr.label), sep = "*\", \"*")),
+               label.x = "left", label.y = "bottom") +
+  ylim(-0.05, 0.45) +
+  facet_wrap(. ~ drug_conc) +
+  theme_classic(base_size = 16) 
+
+# Highligh top 4 strongest hits + and - TIF. In the end we kept only LMNB1, but let's keep this code for flexibility.
+ratios_tib_fc %>%
+  filter(
+  drug_conc == "Azacitidine 10 µM" |
+  drug_conc == "GSK J4 HCl 10 µM" 
+  )  %>%
+  ggplot(.,aes(LMNB1, log2.fc.freqCut)) + geom_point() +
+  geom_smooth(method = "lm", se = F) +
+  stat_cor(method = "pearson") +
+  stat_poly_eq(aes(label = paste(after_stat(eq.label),
+                                 after_stat(rr.label), sep = "*\", \"*")),
+               label.x = "left", label.y = "bottom") +
+  ylim(-1.25, 0.25) +
+  facet_wrap(. ~ drug_conc) +
+  theme_classic(base_size = 16) 
 ```
 
 

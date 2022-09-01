@@ -373,7 +373,8 @@ clone5_map_ipr = hclust(dist(clone5.matrix), method = "ward.D")
 
 # Feature clustering based on whole TRIP pool
 TRIP_chrom_tib <- readRDS('/DATA/projects/DSBrepair/data/R/cl20201026_ChIP_zscore_selection.RDS') %>% 
-  # Same for the TRIP chromatin features
+  # Remove HDAC1 and 2 as they do not reach higher than the 80th percentile of the HDAC 
+  # districtubion in the TRIP pool for the reporters in Clone 5. 
   dplyr::select(-HDAC1, -HDAC2)
 
 TRIP_chrom = TRIP_chrom_tib %>% dplyr::select(-binsize, -pool) %>% column_to_rownames("ID")

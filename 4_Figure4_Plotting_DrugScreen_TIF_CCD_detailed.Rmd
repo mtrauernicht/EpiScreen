@@ -81,6 +81,7 @@ library(pls)
 library(MASS)
 library(corrr)
 library(ggstatsplot)
+library(ggpmisc)
 
 
 ## Select outdir
@@ -206,20 +207,6 @@ ggplot_custom <- function(...) ggplot2::ggplot(...) +
 in.dir = list.dirs(path = "/DATA/projects/DSBrepair/data/R") %>% .[grepl("episcreen", .)] %>% tail(n = 1)
 file = list.files(in.dir, pattern = "episcreen_ratios", full.names = T) %>% tail(n = 1)
 indel.data <- readRDS(file) # %>% filter(pathway_bal_filter == TRUE & viab_reproducibility == TRUE)
-
-# Import data validation data
-file = list.files(in.dir, pattern = "validation_ratios", full.names = T) %>% tail(n = 1)
-indel.validation.data <- readRDS(file) # %>% filter(pathway_bal_filter == TRUE & viab_reproducibility == TRUE)
-
-# List chromatin name columns from this table
-chromatin_cols = colnames(indel.validation.data)[42:75]
-# Import data from DSB TRIP paper
-RSTP2_IndelRatios_Chromatin_2kb <- readRDS("/DATA/usr/r.schep/DSBrepair/data/R/rs20210311/RSTP2_IndelRatios_Chromatin_2kb.RDS") %>% 
-  filter(replicate == "mean" & drug %in% c("DMSO_GSK", "GSK126") & plasmid == "LBR2") %>%
-  dplyr::select(barcode, drug, MMEJ, NHEJ, efficiency, all_of(chromatin_cols)) %>%
-  distinct() %>%
-  mutate(MMEJ_NHEJ = MMEJ/NHEJ) %>%
-  dplyr::select(-NHEJ, -MMEJ)
 ```
 
 ---
@@ -423,6 +410,8 @@ file = list.files(in.dir, pattern = "compound_annotation_heatmap", full.names = 
 target <- readRDS(file)
 file = list.files(in.dir, pattern = "chrom_cluster_heatmap", full.names = T) %>% tail(n = 1)
 TRIP_chrom_clust <- readRDS(file)
+file = list.files(in.dir, pattern = "FC_ratios", full.names = T) %>% tail(n = 1)
+ratios_tib_fc <- readRDS(file)
 ```
 
 ### Annotation
@@ -709,7 +698,7 @@ for(i in unique(CCD_tib$feature)) {
 
 
 ## 4C m5C top CCDs
-```{r 4C m5C synergies, fig.width = 6, fig.height = 6}
+```{r 4C m5C synergies, fig.width = 8, fig.height = 6}
 rank_dt = CCD_tib %>% 
   left_join(rownames_to_column(target, var = "drug_conc")) %>%
   filter(feature == "m5C", !is.na(indelrate_slope_plot)) %>%
@@ -822,6 +811,35 @@ p = pheatmap(TIF_synergy_matrix_DNMT[, TRIP_chrom_clust$labels],
              color = colors,
              annotation_colors = annotation_colors_scr, 
              annotation_legend = T)
+```
+
+## S4B Scatter plot HMT inhibotors 5mC
+```{r S4B HMT inhibitor synergy with 5mC,  fig.width = 6, fig.height = 4}
+ratios_tib_fc %>% 
+  filter(drug_conc %in% DNMT_drugs)  %>% 
+  ggplot(.,aes(m5C, log2.fc.freqCut)) + geom_point() +
+  geom_smooth(method = "lm", se = F) +
+  stat_cor(method = "pearson") +
+  stat_poly_eq(aes(label = paste(after_stat(eq.label),
+                                 after_stat(rr.label), sep = "*\", \"*")),
+               label.x = "left", label.y = "bottom") +
+  facet_wrap(. ~ drug_conc) +
+  theme_classic(base_size = 16) 
+```
+
+
+## S4B Scatter plot EPZ & Vorniostat in K27me3
+```{r S4C Bossing in H3K27me3 specifically,  fig.width = 6, fig.height = 4}
+ratios_tib_fc %>% 
+  filter(drug_conc %in% c("Vorinostat 1 µM", "EPZ-6438 10 µM", "GSK J4 HCl 10 µM"))  %>% 
+  ggplot(.,aes(H3K27me3, log2.fc.freqCut)) + geom_point() +
+  geom_smooth(method = "lm", se = F) +
+  stat_cor(method = "pearson") +
+  stat_poly_eq(aes(label = paste(after_stat(eq.label),
+                                 after_stat(rr.label), sep = "*\", \"*")),
+               label.x = "left", label.y = "bottom") +
+  facet_wrap(. ~ drug_conc) +
+  theme_classic(base_size = 16) 
 ```
 
 
