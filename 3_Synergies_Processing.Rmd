@@ -81,7 +81,7 @@ library(pls)
 
 ```{r outdir}
 ## Select outdir
-out.dir = list.dirs(path = "/DATA/projects/DSBrepair/data/R") %>% .[grepl("episcreen", .)] %>% tail(n = 1)
+out.dir = list.dirs(path = "/DATA/projects/DSBrepair/data/R") %>% .[grepl("episcreen_new_filter", .)] %>% tail(n = 1)
 in.dir = out.dir
 dir.create(out.dir, showWarnings = FALSE)
 
