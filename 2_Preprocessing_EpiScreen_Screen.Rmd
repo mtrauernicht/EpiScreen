@@ -872,12 +872,13 @@ mean.TIF.zscore.comb = TIF.zscore %>% distinct(drug, conc_char, barcode, replica
          zscore_TIF_comb_rep = ave(zscore_TIF, drug, conc_char, barcode,
                                    FUN = function(x) sum(x)/sqrt(length(x))),
          # Make filter for replicate, here both tech filters need to be true.
-         sum_rep = ave(as.integer(filter_zscore_TIF_comb_tech), drug, conc_char, barcode,
+         sum_rep = ave(as.integer(binary_zscore), drug, conc_char, barcode,
                              FUN = sum),
          filter_zscore_TIF_comb_rep = ifelse(sum_rep >= 4, TRUE, FALSE),         
          sum_sign = ave(zscore_TIF_comb_tech, drug, conc_char, barcode,
                              FUN = function(x) length(table(sign(x)))),
-         filter_zscore_TIF_comb_rep = ifelse(sum_sign == 1, filter_zscore_TIF_comb_rep, FALSE)) %>%
+         filter_zscore_TIF_comb_rep = ifelse(sum_sign == 1, filter_zscore_TIF_comb_rep, FALSE)
+         ) %>%
   dplyr::select(-sum_tech, -sum_rep, -binary_zscore, -sum_sign)
 
 TIF.zscore %<>% left_join(mean.TIF.zscore.comb)
@@ -903,12 +904,13 @@ TIF.zscore.global.comb = TIF.zscore.global %>% distinct(drug, conc_char, replica
          zscore_TIF_global_comb_rep = ave(zscore_TIF_global, drug, conc_char, 
                                    FUN = function(x) sum(x)/sqrt(length(x))),
          # Make filter for replicate, here both tech filters need to be true.
-         sum_rep = ave(as.integer(filter_zscore_TIF_global_comb_tech), drug, conc_char, 
+         sum_rep = ave(as.integer(binary_zscore), drug, conc_char, 
                        FUN = sum),
          filter_zscore_TIF_global_comb_rep = ifelse(sum_rep >= 4, TRUE, FALSE),         
          sum_sign = ave(zscore_TIF_global_comb_tech, drug, conc_char,
                              FUN = function(x) length(table(sign(x)))),
-         filter_zscore_TIF_global_comb_rep = ifelse(sum_sign == 1, filter_zscore_TIF_global_comb_rep, FALSE)) %>%
+         filter_zscore_TIF_global_comb_rep = ifelse(sum_sign == 1, filter_zscore_TIF_global_comb_rep, FALSE)
+        ) %>%
   dplyr::select(-sum_tech, -sum_rep, -binary_zscore, -sum_sign)
 
 TIF.zscore.global %<>% left_join(TIF.zscore.global.comb)
@@ -1028,12 +1030,13 @@ mean.bal.zscore.comb = bal.zscore %>% distinct(drug, conc_char, barcode, replica
          zscore_bal_comb_rep = ave(zscore_bal, drug, conc_char, barcode,
                                    FUN = function(x) sum(x)/sqrt(length(x))),
          # Make filter for replicate, here both tech filters need to be true.
-         sum_rep = ave(as.integer(filter_zscore_bal_comb_tech), drug, conc_char, barcode,
+         sum_rep = ave(binary_zscore, drug, conc_char, barcode,
                              FUN = sum),
          filter_zscore_bal_comb_rep = ifelse(sum_rep >= 4, TRUE, FALSE),         
          sum_sign = ave(zscore_bal_comb_tech, drug, conc_char, barcode,
                              FUN = function(x) length(table(sign(x)))),
-         filter_zscore_bal_comb_rep = ifelse(sum_sign == 1, filter_zscore_bal_comb_rep, FALSE)) %>%
+         filter_zscore_bal_comb_rep = ifelse(sum_sign == 1, filter_zscore_bal_comb_rep, FALSE)
+         ) %>%
   dplyr::select(-sum_tech, -sum_rep, -binary_zscore, -sum_sign)
 
 bal.zscore %<>% left_join(mean.bal.zscore.comb)
@@ -1074,12 +1077,13 @@ bal.zscore.global.comb = bal.zscore.global %>% distinct(drug, conc_char, replica
          zscore_bal_global_comb_rep = ave(zscore_bal_global, drug, conc_char, 
                                    FUN = function(x) sum(x)/sqrt(length(x))),
          # Make filter for replicate, here both tech filters need to be true.
-         sum_rep = ave(as.integer(filter_zscore_bal_global_comb_tech), drug, conc_char, 
+         sum_rep = ave(binary_zscore, drug, conc_char, 
                              FUN = sum),
          filter_zscore_bal_global_comb_rep = ifelse(sum_rep >= 4, TRUE, FALSE),         
          sum_sign = ave(zscore_bal_global_comb_tech, drug, conc_char,
                              FUN = function(x) length(table(sign(x)))),
-         filter_zscore_bal_global_comb_rep = ifelse(sum_sign == 1, filter_zscore_bal_global_comb_rep, FALSE)) %>%
+         filter_zscore_bal_global_comb_rep = ifelse(sum_sign == 1, filter_zscore_bal_global_comb_rep, FALSE)
+         ) %>%
   dplyr::select(-sum_tech, -sum_rep, -binary_zscore, -sum_sign)
 
 bal.zscore.global %<>% left_join(bal.zscore.global.comb)

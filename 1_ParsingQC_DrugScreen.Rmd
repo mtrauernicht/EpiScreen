@@ -25,7 +25,7 @@ Here we want to do a QC of the parsing of the mapping, the barcodes and mutation
 Pasted the result in a text editor and changes all `^ ` and changed the spaces to `\t`, removed the last total row, removed `.table` at the end and saved as text file. 
 I will export a bed file also containing the broad integrations for the generation of mean chip values over the integration sites. 
 ```{r render processing pipeline}
-# Render Parsing QC
+# Render Processing of the screen
 render_processing = TRUE
 
 # Render Validation Processing
