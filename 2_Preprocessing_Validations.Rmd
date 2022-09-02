@@ -1,27 +1,20 @@
 --- 
 title: "Indels Preprocessing"
 author: 
-  - name: "Ruben Schep"
+    name: "Ruben Schep"
     email: "r.schep@nki.nl"
     affiliation: "Netherlands Cancer Institute"
 date: "`r format(Sys.time(), '%Y-%m-%d')`"
 output:
   html_document:
-    theme: united
-    highlight: pygments
-    fig_caption: yes
-    code_folding: hide
-    df_print: kable
-    toc: yes
-    toc_depth: 4
-    toc_float:
-      collapsed: no
-  pdf_document:
-    toc: yes
-    toc_depth: '4'
+    theme: journal #cerulean
+    highlight: monochrome
+    toc: true
+    toc_float: true
+    code_folding: show
+  editor_options:
+    chunk_output_type: console
 ---
-
-*knitr document van Steensel lab*
 
 # Introduction
 
@@ -45,7 +38,7 @@ In this dataframe I would also like to have the means of the samples (here I wil
 * Mean ratio  
 * Total reads  
 * Mean reads  
-* Median reads  
+* Median reads
 
 ## Description of Data
 
@@ -67,22 +60,9 @@ Mutations files : *genuine_mapped.table
 | CCATAGTAGTGATTAC | del | -4 |
 
 
+# Data importing and processing
 
-# Data importing and processing {.tabset}
-
-<!-- little HTML script to do indentation of the table of contents -->
-<script>
-$(document).ready(function() {
-$items = $('div#TOC li');
-$items.each(function(idx) {
-num_ul = $(this).parentsUntil('#TOC').length;
-$(this).css({'text-indent': num_ul * 10, 'padding-left': 0});
-});
-
-});
-</script>
-
-## Path, Libraries, Parameters and Useful Functions
+## Libaries
 
 ```{r setup validation, message=FALSE, warnings=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
@@ -92,6 +72,7 @@ StarttimeValidations <-Sys.time()
 Date <- substr(gsub("-","",Sys.time()),1,8)
 
 # libraries:
+library(knitr)
 library(tidyverse)
 library(data.table)
 library(ggplot2)
@@ -100,14 +81,14 @@ library(parallel)
 library(gtools)
 
 ## Select outdir
-out.dir = paste0("/DATA/projects/DSBrepair/data/R/rs", Date, "_episcreen/")
+out.dir = paste0("/DATA/projects/DSBrepair/data/R/rs", Date, "_episcreen_new_filter/")
 dir.create(out.dir)
 
 # initials (for file export)
 initials = "rs"
 ``` 
 
-## Custom functions
+# Functions
 
 ```{r functions validations}
 MeanExperiments <- function(mutdt) {
@@ -164,6 +145,7 @@ CallTrueBarcodes <- function(df) {
 ```
 
 ## Data import
+
 Data import from mapping. These files were generated on 30.09.2018, with a minimum of 500 reads per barcode in the mutation calling.
 
 ```{r import validation}
@@ -215,6 +197,7 @@ barcodes.list <- c("AGGGCGTAAAATATTT", "TATGGCTGTCGGGTAG", "TGTCCCTTAGTACTTT",
 clone5barcodes <- paste0(barcodes.list, ".clone5")
 ```
 
+
 # Data processing into large data table
 
 Set everything in a datafram that contains the barcodes, indel ratios, and efficiencies.
@@ -237,12 +220,10 @@ mut.list = mclapply(names(df.list), function(exp){
 }, mc.cores = 10)
 ```
 
-
 ## list of mapped barcodes
 ```{r generating mapped barcode list validation}
 mapped_barcodes <- c(analysis.mapped.integrations.df$barcode, barcodes.list, clone5barcodes)
 ```
-
 
 ## Combining data tables and adding metadata
 ```{r bind data tables validation}
@@ -726,7 +707,7 @@ filename <- SetFileName("validation_ratios", initials = initials, extension = "R
 saveRDS(validation_ratios_tib, file = filename)
 ```
 # Conclusions
-I"m happy with the output I"ve generated. I should still work on checking what the best amount of reads is that I need for correct correlations etc.
+Data ready for analysis.
 
 
 # Bibliography
@@ -744,3 +725,4 @@ paste("Run time: ",format(Sys.time()-StarttimeValidations))
 # rm(list = ls(all.names = TRUE)) #will clear all objects includes hidden objects.
 # gc() #free up memrory and report the memory usage.
 ```
+

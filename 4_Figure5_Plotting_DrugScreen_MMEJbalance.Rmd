@@ -80,9 +80,9 @@ library(cowplot)
 library(Hmisc)
 
 ## Select outdir
-out.dir = paste0("./figures/", Date, "/")
+out.dir = paste0("./figures_new_filter/", Date, "/")
 dir.create(out.dir)
-in.dir = list.dirs(path = "/DATA/projects/DSBrepair/data/R") %>% .[grepl("episcreen", .)] %>% tail(n = 1)
+in.dir = list.dirs(path = "/DATA/projects/DSBrepair/data/R") %>% .[grepl("episcreen_new_filter", .)] %>% tail(n = 1)
 opts_chunk$set(dev=c('png', 'pdf'), fig.path = file.path(out.dir))
 pdf.options(useDingbats = FALSE)
 ```
@@ -539,7 +539,7 @@ RSTP2_IndelRatios_Chromatin_2kb <- readRDS("/DATA/usr/r.schep/DSBrepair/data/R/r
 ```
 
 ## Prepare heatmaps
-```{r prepare data for heatmaps}
+```{r prepare data for heatmap}
 # Order IPRs by their starting freqCut value
 dmso_freq <- indel.data %>%
   filter(drug == "DMSO") %>%
@@ -1453,7 +1453,7 @@ ggplot(all.samples.plot %>%
 
 
 ## S5D: HDACi only heatmap
-```{r}
+```{r, eval = FALSE}
 HDAC_tib = read.table("rs20220708_HDAC_targets.txt", sep = "\t", fill = NA, header = T) %>%
   dplyr::select(-target_main, -target_second) %>%
   as_tibble()
@@ -1608,11 +1608,6 @@ p = pheatmap(TIF_synergy_matrix[, TRIP_chrom_clust$labels],
              color = colors,
              annotation_colors = annotation_colors_scr_set, 
              annotation_legend = T)
-
-TIF_synergy_cluster <- TIF_synergy_matrix %>%
-  rownames_to_column("drug_conc") %>%
-  left_join(cluster_HDAC) %>%
-  mutate(cluster_HDAC = as.character(cluster_HDAC))
 ```
 
 

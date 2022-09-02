@@ -510,7 +510,7 @@ ratios_tib_fc <- ratios_tib %>%
 ## Extract slopes for all genes
 ```{r}
 # Perform analysis across all features for three test genes
-ratios_tib_fc %<>% 
+ratios_tib_fc %<>% ungroup %>%
   filter(!is.na(MMEJratio.log2))
 
 slope.protein.features <- tibble(drug_conc = NA, feature = NA,  term = NA, 
@@ -609,6 +609,8 @@ signif_hits = adj_p.value_KO_model %>% filter(p.adj < 0.01) %>%
   pivot_wider(names_from = var, 
               values_from = val, 
               values_fill = FALSE) 
+
+adj_p.value_KO_model %>% filter(p.adj < 0.01) %>% filter(grepl("DMSO", drug_conc))
 ```
 
 ### Filtering the epistasis
@@ -700,5 +702,5 @@ TIF_IPR = indel.data %>% filter(drug == "DMSO") %>%
 chromatin_TIF = chromatin %>% rownames_to_column(var = "IPR") %>%
   left_join(TIF_IPR) %>%
   column_to_rownames("IPR")
-```1
+```
 
