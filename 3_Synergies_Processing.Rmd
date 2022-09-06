@@ -91,7 +91,7 @@ initials = "rs"
 
 
 ## Custom functions
-```{r functions}
+```{r functions validations}
 serialNext = function(prefix, extension){
   i=0
   repeat {

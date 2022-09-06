@@ -78,7 +78,7 @@ library(MASS)
 library(magrittr)
 
 ## Select outdir
-out.dir = paste0("./figures/", Date, "/")
+out.dir = paste0("./figures/", Date, "_master/")
 dir.create(out.dir)
 in.dir = list.dirs(path = "/DATA/projects/DSBrepair/data/R") %>% .[grepl("episcreen", .)] %>% tail(n = 1)
 opts_chunk$set(dev=c('png', 'pdf'), fig.path = file.path(out.dir))
@@ -257,7 +257,7 @@ sigFunc = function(x){
 
 ```{r data import, results = 'hide', warning = FALSE}
 # Import data from preprocessing script
-in.dir = list.dirs(path = "/DATA/projects/DSBrepair/data/R") %>% .[grepl("episcreen", .)] %>% tail(n = 1)
+in.dir = list.dirs(path = "/DATA/projects/DSBrepair/data/R") %>% .[grepl("episcreen_master", .)] %>% tail(n = 1)
 file = list.files(in.dir, pattern = "episcreen_ratios", full.names = T) %>% tail(n = 1)
 indel.data <- readRDS(file)
 
