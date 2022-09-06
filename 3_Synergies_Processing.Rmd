@@ -81,7 +81,7 @@ library(pls)
 
 ```{r outdir}
 ## Select outdir
-out.dir = list.dirs(path = "/DATA/projects/DSBrepair/data/R") %>% .[grepl("episcreen", .)] %>% tail(n = 1)
+out.dir = list.dirs(path = "/DATA/projects/DSBrepair/data/R") %>% .[grepl("episcreen_Bas_way", .)] %>% tail(n = 1)
 in.dir = out.dir
 dir.create(out.dir, showWarnings = FALSE)
 
@@ -115,7 +115,7 @@ SetFileName <- function(filename, initials, extension) {
 ```{r}
 #Chromatin data (it needs a IPR column)
 # Import data from preprocessing script
-in.dir = list.dirs(path = "/DATA/projects/DSBrepair/data/R") %>% .[grepl("episcreen", .)] %>% tail(n = 1)
+in.dir = list.dirs(path = "/DATA/projects/DSBrepair/data/R") %>% .[grepl("episcreen_Bas_way", .)] %>% tail(n = 1)
 file = list.files(in.dir, pattern = "episcreen_ratios", full.names = T) %>% tail(n = 1)
 
 indel.data <- readRDS(file) %>% filter(viab_reproducibility) %>%

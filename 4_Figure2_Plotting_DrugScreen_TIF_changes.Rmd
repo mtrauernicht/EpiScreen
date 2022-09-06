@@ -78,9 +78,9 @@ library(MASS)
 library(magrittr)
 
 ## Select outdir
-out.dir = paste0("./figures/", Date, "/")
+out.dir = paste0("./figures/", Date, "_Bas_way/")
 dir.create(out.dir)
-in.dir = list.dirs(path = "/DATA/projects/DSBrepair/data/R") %>% .[grepl("episcreen", .)] %>% tail(n = 1)
+in.dir = list.dirs(path = "/DATA/projects/DSBrepair/data/R") %>% .[grepl("episcreen_Bas_way", .)] %>% tail(n = 1)
 opts_chunk$set(dev=c('png', 'pdf'), fig.path = file.path(out.dir))
 pdf.options(useDingbats = FALSE)
 ```
@@ -409,13 +409,13 @@ dmso.eff.score <- indel.data %>%
 ```{r Compounds that affect the balance at all the sites}
 ## Which compounds change the balance at all the sites in both screens?
 all_TIF = indel.data %>% 
-  distinct(drug, conc_char, replicate, zscore_TIF_comb_tech, filter_zscore_TIF_comb_rep, target, 
+  distinct(drug, conc_char, replicate, zscore_TIF_comb_rep, filter_zscore_TIF_comb_rep, target, 
            barcode, viab_reproducibility, indel_freq_filter, viab_mean) %>% 
-  mutate(mean_eff_pval_comb = 2*pnorm(q = abs(zscore_TIF_comb_tech), lower.tail = FALSE),
+  mutate(mean_eff_pval_comb = 2*pnorm(q = abs(zscore_TIF_comb_rep), lower.tail = FALSE),
          mean_eff_pval_adj_comb = p.adjust(mean_eff_pval_comb, method = 'holm')) %>%
   filter(filter_zscore_TIF_comb_rep & 
-           !is.na(zscore_TIF_comb_tech) & 
-           # !between(zscore_TIF_comb_tech, -1.96, 1.96) & 
+           !is.na(zscore_TIF_comb_rep) & 
+           # !between(zscore_TIF_comb_rep, -1.96, 1.96) & 
            viab_reproducibility == T & 
            indel_freq_filter == T &
            viab_mean > 0.6 &
@@ -435,13 +435,13 @@ paste("Compounds that significantly (p holm adj < 0.01) changed the TIF in all 1
 
 ## Now with 16/18 (~ 90%) of the sites with an effect. Near global
 near_all_TIF = indel.data %>% 
-  distinct(drug, conc_char, replicate, zscore_TIF_comb_tech, filter_zscore_TIF_comb_rep, target, 
+  distinct(drug, conc_char, replicate, zscore_TIF_comb_rep, filter_zscore_TIF_comb_rep, target, 
            barcode, viab_reproducibility, indel_freq_filter, viab_mean) %>% 
-  mutate(mean_eff_pval_comb = 2*pnorm(q = abs(zscore_TIF_comb_tech), lower.tail = FALSE),
+  mutate(mean_eff_pval_comb = 2*pnorm(q = abs(zscore_TIF_comb_rep), lower.tail = FALSE),
          mean_eff_pval_adj_comb = p.adjust(mean_eff_pval_comb, method = 'BH')) %>%
   filter(filter_zscore_TIF_comb_rep & 
-           !is.na(zscore_TIF_comb_tech) & 
-           # !between(zscore_TIF_comb_tech, -1.96, 1.96) & 
+           !is.na(zscore_TIF_comb_rep) & 
+           # !between(zscore_TIF_comb_rep, -1.96, 1.96) & 
            viab_reproducibility == T & 
            indel_freq_filter == T &
            mean_eff_pval_adj_comb < 0.05) %>% 

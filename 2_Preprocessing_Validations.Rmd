@@ -1,27 +1,19 @@
---- 
-title: "Indels Preprocessing"
-author: 
-  - name: "Ruben Schep"
-    email: "r.schep@nki.nl"
-    affiliation: "Netherlands Cancer Institute"
+---
+title: "Validation experiments preprocessing"
+author: "Max Trauernicht & Ruben Schep"
 date: "`r format(Sys.time(), '%Y-%m-%d')`"
 output:
   html_document:
-    theme: united
-    highlight: pygments
-    fig_caption: yes
-    code_folding: hide
-    df_print: kable
-    toc: yes
-    toc_depth: 4
-    toc_float:
-      collapsed: no
-  pdf_document:
-    toc: yes
-    toc_depth: '4'
+    theme: journal #cerulean
+    highlight: monochrome
+    toc: true
+    toc_float: true
+    code_folding: show
+  editor_options:
+    chunk_output_type: console
 ---
 
-*knitr document van Steensel lab*
+knitr document van Steensel lab
 
 # Introduction
 
@@ -82,6 +74,7 @@ $(this).css({'text-indent': num_ul * 10, 'padding-left': 0});
 });
 </script>
 
+
 ## Path, Libraries, Parameters and Useful Functions
 
 ```{r setup validation, message=FALSE, warnings=FALSE}
@@ -100,14 +93,15 @@ library(parallel)
 library(gtools)
 
 ## Select outdir
-out.dir = paste0("/DATA/projects/DSBrepair/data/R/rs", Date, "_episcreen/")
-dir.create(out.dir)
+out.dir = list.dirs(path = "/DATA/projects/DSBrepair/data/R") %>% .[grepl("episcreen_Bas_way", .)] %>% tail(n = 1)
+in.dir = out.dir
+dir.create(out.dir, showWarnings = FALSE)
 
 # initials (for file export)
 initials = "rs"
 ``` 
 
-## Custom functions
+# Custom functions
 
 ```{r functions validations}
 MeanExperiments <- function(mutdt) {

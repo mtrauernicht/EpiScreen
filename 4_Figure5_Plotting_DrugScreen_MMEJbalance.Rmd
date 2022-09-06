@@ -80,9 +80,9 @@ library(cowplot)
 library(Hmisc)
 
 ## Select outdir
-out.dir = paste0("./figures/", Date, "/")
+out.dir = paste0("./figures/", Date, "_Bas_way/")
 dir.create(out.dir)
-in.dir = list.dirs(path = "/DATA/projects/DSBrepair/data/R") %>% .[grepl("episcreen", .)] %>% tail(n = 1)
+in.dir = list.dirs(path = "/DATA/projects/DSBrepair/data/R") %>% .[grepl("episcreen_Bas_way", .)] %>% tail(n = 1)
 opts_chunk$set(dev=c('png', 'pdf'), fig.path = file.path(out.dir))
 pdf.options(useDingbats = FALSE)
 ```
@@ -539,7 +539,7 @@ RSTP2_IndelRatios_Chromatin_2kb <- readRDS("/DATA/usr/r.schep/DSBrepair/data/R/r
 ```
 
 ## Prepare heatmaps
-```{r prepare data for heatmaps}
+```{r prepare data for heatmaps 1}
 # Order IPRs by their starting freqCut value
 dmso_freq <- indel.data %>%
   filter(drug == "DMSO") %>%
