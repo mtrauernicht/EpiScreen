@@ -409,9 +409,9 @@ dmso.eff.score <- indel.data %>%
 ```{r Compounds that affect the balance at all the sites}
 ## Which compounds change the balance at all the sites in both screens?
 all_TIF = indel.data %>% 
-  distinct(drug, conc_char, replicate, zscore_TIF_comb_rep, filter_zscore_TIF_comb_rep, target, 
+  distinct(drug, conc_char, replicate, zscore_TIF_tech, zscore_TIF_comb_rep, filter_zscore_TIF_comb_rep, target, 
            barcode, viab_reproducibility, indel_freq_filter, viab_mean) %>% 
-  mutate(mean_eff_pval_comb = 2*pnorm(q = abs(zscore_TIF_comb_rep), lower.tail = FALSE),
+  mutate(mean_eff_pval_comb = 2*pnorm(q = abs(zscore_TIF_tech), lower.tail = FALSE),
          mean_eff_pval_adj_comb = p.adjust(mean_eff_pval_comb, method = 'holm')) %>%
   filter(filter_zscore_TIF_comb_rep & 
            !is.na(zscore_TIF_comb_rep) & 
@@ -435,21 +435,21 @@ paste("Compounds that significantly (p holm adj < 0.01) changed the TIF in all 1
 
 ## Now with 16/18 (~ 90%) of the sites with an effect. Near global
 near_all_TIF = indel.data %>% 
-  distinct(drug, conc_char, replicate, zscore_TIF_comb_rep, filter_zscore_TIF_comb_rep, target, 
+  distinct(drug, conc_char, replicate, zscore_TIF_tech, zscore_TIF_comb_rep, filter_zscore_TIF_comb_rep, target, 
            barcode, viab_reproducibility, indel_freq_filter, viab_mean) %>% 
-  mutate(mean_eff_pval_comb = 2*pnorm(q = abs(zscore_TIF_comb_rep), lower.tail = FALSE),
-         mean_eff_pval_adj_comb = p.adjust(mean_eff_pval_comb, method = 'BH')) %>%
+  mutate(mean_eff_pval_comb = 2*pnorm(q = abs(zscore_TIF_tech), lower.tail = FALSE),
+         mean_eff_pval_adj_comb = p.adjust(mean_eff_pval_comb, method = 'holm')) %>%
   filter(filter_zscore_TIF_comb_rep & 
            !is.na(zscore_TIF_comb_rep) & 
            # !between(zscore_TIF_comb_rep, -1.96, 1.96) & 
            viab_reproducibility == T & 
            indel_freq_filter == T &
-           mean_eff_pval_adj_comb < 0.05) %>% 
+           mean_eff_pval_adj_comb < 0.01) %>% 
   mutate(drug = gsub(" [(].*[)]", "", drug),
          drug_conc = paste(drug, conc_char, sep = " ")) %>%
   group_by(drug, conc_char, drug_conc, target, replicate) %>% 
   dplyr::count() %>% 
-  filter(n >= 15) 
+  filter(n >= 16) 
 
 comp_near_all_TIF = near_all_TIF %>% # At least 15 sites
   group_by(drug, conc_char, drug_conc, target) %>% 
@@ -573,7 +573,7 @@ annotation_colors_scr$chromatin <- annotation_colors_scr$chromatin[ordered_marks
 eff.data <- indel.data %>%
   #filter(target != "Aurora Kinase") %>%
   filter(sample == "Epigenetic Compound", indel_freq_filter, viab_reproducibility) %>%
-  filter(!(viab_mean < .60 & zscore_TIF_global_comb_rep < -2.54)) %>%  # we can choose to display all drugs that have significant global hits
+  filter(!(viab_mean < .60 & zscore_TIF_global_comb_rep < -1.96)) %>%  # we can choose to display all drugs that have significant global hits
   distinct(conc_char, drug, target, IPR, zscore_TIF_comb_rep, freqCut_diff_mean, replicate, tech, filter_zscore_TIF_comb_rep)
 
 eff.data.heatmap <- eff.data %>%
@@ -627,7 +627,7 @@ target_all <- target_set_drugs %>%
 ```
 
 ### Plot the heatmap
-```{r 2A TIF heatmap, warning = FALSE, fig.width = 10, fig.height = 20}
+```{r 2A TIF heatmap, warning = FALSE, fig.width = 10, fig.height = 30}
 # pdf(paste0(figure_out, "rs20220623_indelfrequency_heatmap_allconc.pdf"), width=20, height=8)
 eff.data.matrix = eff.data.heatmap2 %>%
   column_to_rownames('drug_conc') %>%
