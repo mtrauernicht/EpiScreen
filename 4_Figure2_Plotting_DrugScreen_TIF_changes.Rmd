@@ -257,7 +257,6 @@ sigFunc = function(x){
 
 ```{r data import, results = 'hide', warning = FALSE}
 # Import data from preprocessing script
-in.dir = list.dirs(path = "/DATA/projects/DSBrepair/data/R") %>% .[grepl("episcreen", .)] %>% tail(n = 1)
 file = list.files(in.dir, pattern = "episcreen_ratios", full.names = T) %>% tail(n = 1)
 indel.data <- readRDS(file)
 
@@ -595,9 +594,25 @@ eff.data.heatmap <- eff.data %>%
   distinct(drug, target, conc_char, freqCut_diff_mean, IPR, min_score) %>%
   ungroup()
 
-eff.data.heatmap2 <- eff.data.heatmap %>%
+kinase_andco_targets = c("PIM", "Aurora Kinase", "JAK", "HIF", "PARP", "HIF", "Epigenetic Reader Domain")
+chromatin_targets = c("HDAC", "HAT", "Sirtuin", "HMT",  "DNMT", "Histone Demethylase")
+
+
+top_50_hits = eff.data.heatmap %>% 
+  arrange(desc(abs(freqCut_diff_mean))) %>% 
+  distinct(drug, target, conc_char, min_score) %>%
+  slice(1:60) #%>%
+  # filter(
+  #   target %in% kinase_andco_targets,
+  #   # target %in% chromatin_targets,
+  # )
+
+eff.data.heatmap2 <- top_50_hits %>% 
+  left_join(eff.data.heatmap)%>%
+  dplyr::select(-min_score) %>%
   spread(IPR, freqCut_diff_mean) %>%
   filter(!is.nan(IPR3))
+
 
 eff.data.heatmap2 <- eff.data.heatmap2[,c("drug", "target", "conc_char", iprs)]
 eff.data.heatmap2 %<>% mutate(drug = gsub(" [(].*[)]", "", drug), #shorten name of drug
@@ -624,10 +639,12 @@ annotation_colors_scr_set$target <- annotation_colors_scr_set$target[ordered_mar
 target_all <- target_set_drugs %>% 
   filter(rownames(.) %in% eff.data.heatmap2$drug_conc) %>%
   dplyr::select(target, viab)
+
+dplyr::select(eff.data.heatmap2, contains('IPR')) %>% summary()
 ```
 
 ### Plot the heatmap
-```{r 2A TIF heatmap, warning = FALSE, fig.width = 10, fig.height = 30}
+```{r 2A TIF heatmap, warning = FALSE, fig.width = 10, fig.height = 25}
 # pdf(paste0(figure_out, "rs20220623_indelfrequency_heatmap_allconc.pdf"), width=20, height=8)
 eff.data.matrix = eff.data.heatmap2 %>%
   column_to_rownames('drug_conc') %>%

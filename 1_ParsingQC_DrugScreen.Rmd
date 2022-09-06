@@ -32,7 +32,7 @@ render_processing = TRUE
 render_validations = TRUE
 
 # Render Synergies 
-render_validations = TRUE
+render_synergies = TRUE
 ```
 
 
@@ -698,6 +698,11 @@ rmarkdown::render("2_Preprocessing_EpiScreen_Screen.Rmd")
 # Render validations
 if(render_validations) {
 rmarkdown::render("2_Preprocessing_Validations.Rmd")
+}
+
+# Render validations
+if(render_synergies) {
+rmarkdown::render("3_Synergies_Processing.Rmd")
 }
 ```
 

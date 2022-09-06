@@ -91,7 +91,7 @@ initials = "rs"
 
 
 ## Custom functions
-```{r functions}
+```{r functions synergies}
 serialNext = function(prefix, extension){
   i=0
   repeat {
