@@ -512,7 +512,7 @@ ordered_marks2 <- c("Negative Control", "MRN", "DNA-PK","Epigenetic Reader Domai
                     "Aurora Kinase", "PARP")
 
 #Epistatic interaction colors
-slope.colors <- tibble(color = c("#8c510a", "#f5f5f5","#01665e"),label = c("negative","none","positive"), feature = "epistasis")
+slope.colors <- tibble(color = c("grey60", "#f5f5f5","#84a98c"),label = c("negative","none","positive"), feature = "epistasis")
 
 annotation_colors_scr$target <- annotation_colors_scr$target[ordered_marks2]
 
@@ -567,9 +567,9 @@ CCD_example_tib = indel.data %>%
   mutate(drug = gsub(" [(].*[)]", "", drug),
          drug_conc = paste(drug, conc_char, sep = " ")) %>%
   filter(drug_conc %in% c("EPZ-6438 10 µM", "Decitabine 1 µM", "Scriptaid 1 µM", "Apicidin 100 nM", "DMSO control", "SNS-314 Mesylate 1 µM")) %>%
-  distinct(IPR, drug, freqCut, H3K27me3.zscore, LMNB1.zscore, m5C.zscore, tech, replicate, H3K36me3.zscore) %>%
+  distinct(IPR, drug, freqCut, H3K27me3.zscore, LMNB1.zscore, m5C.zscore, HDAC1.zscore, tech, replicate, H3K36me3.zscore) %>%
   mutate(freqCut_mean = ave(freqCut, IPR, drug, FUN = mean)) %>%
-  distinct(IPR, drug, freqCut_mean, H3K27me3.zscore, LMNB1.zscore, m5C.zscore, H3K36me3.zscore) %>%
+  distinct(IPR, drug, freqCut_mean, H3K27me3.zscore, LMNB1.zscore, m5C.zscore, HDAC1.zscore, H3K36me3.zscore) %>%
   pivot_wider(names_from = drug, values_from = freqCut_mean) %>%
   mutate(Scriptaid_log2_FC_TIF = log2(Scriptaid/DMSO),
          Api_log2_FC_TIF = log2(Apicidin/DMSO),
@@ -646,7 +646,7 @@ pheatmap(all_compounds_epistasis_TIF[, TRIP_chrom_clust$labels],
          cellheight = 8,
          breaks = breaks,
          cluster_cols = TRIP_chrom_clust,
-         clustering_method = "ward.D2",
+         clustering_distance_rows = "correlation",
          annotation_row = target_ctrl,
          main = "Chromatin synergies - TIF all",
          color = colors,

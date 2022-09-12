@@ -119,15 +119,15 @@ in.dir = list.dirs(path = "/DATA/projects/DSBrepair/data/R") %>% .[grepl("episcr
 file = list.files(in.dir, pattern = "episcreen_ratios", full.names = T) %>% tail(n = 1)
 
 indel.data <- readRDS(file) %>% filter(viab_reproducibility) %>%
-  mutate(drug = gsub(" [(].*[)]", "", drug)) %>%
+  mutate(drug = gsub(" [(].*[)]", "", drug)) #%>%
   # We remove the HDAC1 and HDAC2 chromatin features as we do not have a sufficient dynamic range in
   # our clone to make strong conclusions. The max z-score we get are < 80% CI of the z-score in the
   # whole pool.
-  dplyr::select(-HDAC1, -HDAC2)
+  #dplyr::select(-HDAC1, -HDAC2)
 
-TRIP_chrom_tib <- readRDS('/DATA/projects/DSBrepair/data/R/cl20201026_ChIP_zscore_selection.RDS') %>% 
+TRIP_chrom_tib <- readRDS('/DATA/projects/DSBrepair/data/R/cl20201026_ChIP_zscore_selection.RDS') #%>% 
   # Same for the TRIP chromatin features
-  dplyr::select(-HDAC1, -HDAC2)
+  #dplyr::select(-HDAC1, -HDAC2)
 
 TRIP_chrom = TRIP_chrom_tib %>% dplyr::select(-binsize, -pool) %>% column_to_rownames("ID")
 # make clustering with some column rotation for better visualisation
