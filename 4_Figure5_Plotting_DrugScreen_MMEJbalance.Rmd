@@ -759,7 +759,7 @@ plt1 = pheatmap(balance.data.matrix[ , clone5_map_ipr$labels],
                 cellwidth = 8,
                 cellheight = 8,
                 breaks = myBreaks,
-                clustering_method = "ward.D",
+             clustering_distance_rows = "correlation",
                 cluster_rows = T,
                 na_col = "white",
                 main = 'MMEJ ratio FC (log2), all concentrations',
@@ -1556,6 +1556,7 @@ file = list.files(in.dir, pattern = "chrom_cluster_heatmap", full.names = T) %>%
 TRIP_chrom_clust <- readRDS(file)
 
 all_compounds_epistasis_TIF = CCD_tib %>%
+  #mutate(drug_conc = paste(drug, conc_char, sep = " ")) %>%
   dplyr::select(drug_conc, ratio_slope_plot, feature) %>%
   group_by(drug_conc) %>%
   mutate(onlyNA = sum(is.na(ratio_slope_plot))) %>% 
@@ -1603,7 +1604,7 @@ p = pheatmap(TIF_synergy_matrix[, TRIP_chrom_clust$labels],
              breaks = breaks,
              cluster_cols = TRIP_chrom_clust,
              annotation_row = target_set_drugs %>% dplyr::select(-drug),
-             clustering_method = "ward.D",
+             clustering_distance_rows = "correlation",
              main = paste("Chromatin synergies - All effective drugs cluster"),
              color = colors,
              annotation_colors = annotation_colors_scr_set, 

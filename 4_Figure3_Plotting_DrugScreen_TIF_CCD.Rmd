@@ -512,7 +512,7 @@ ordered_marks2 <- c("Negative Control", "MRN", "DNA-PK","Epigenetic Reader Domai
                     "Aurora Kinase", "PARP")
 
 #Epistatic interaction colors
-slope.colors <- tibble(color = c("grey60", "#f5f5f5","#84a98c"),label = c("negative","none","positive"), feature = "epistasis")
+slope.colors <- tibble(color = c("grey50", "#f5f5f5","#84a98c"),label = c("negative","none","positive"), feature = "epistasis")
 
 annotation_colors_scr$target <- annotation_colors_scr$target[ordered_marks2]
 
@@ -646,7 +646,7 @@ pheatmap(all_compounds_epistasis_TIF[, TRIP_chrom_clust$labels],
          cellheight = 8,
          breaks = breaks,
          cluster_cols = TRIP_chrom_clust,
-         clustering_distance_rows = "correlation",
+         clustering_distance_rows = "manhattan",
          annotation_row = target_ctrl,
          main = "Chromatin synergies - TIF all",
          color = colors,
