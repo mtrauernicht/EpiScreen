@@ -423,7 +423,7 @@ eff.data <- indel.data %>%
   #filter(target != "Aurora Kinase") %>%
   filter(sample == "Epigenetic Compound", indel_freq_filter, viab_reproducibility, !(freqCut_diff_mean < -0.1 & viab_mean < 0.5)) %>%
   # filter(abs(zscore_TIF_global_comb_rep) >= 2.58) %>%  # we can choose to display all drugs that have significant global hits
-  distinct(conc_char, drug, target, IPR, zscore_TIF_comb_rep, freqCut_diff_mean, replicate, tech, filter_zscore_TIF_comb_rep)
+  distinct(conc_char, drug, target, IPR, zscore_TIF_comb_rep, freqCut_diff_mean, replicate, tech, filter_zscore_TIF_comb_rep,filter_zscore_TIF_comb_tech, zscore_TIF)
 
 eff.data.heatmap <-  eff.data %>%
   group_by(drug, conc_char) %>%

@@ -87,6 +87,8 @@ dir.create(out.dir, showWarnings = FALSE)
 
 # initials (for file export)
 initials = "rs"
+
+pval_signif = 0.01
 ```
 
 
@@ -289,11 +291,11 @@ filtered_drug_pvals = indel.data %>%
 
 # Make a table with the orientation of effect, used later for filtering. 
 filtered_drug_conc = filtered_drug_pvals %>%
-  filter(adj_pval_TIF < 0.01 | adj_pval_bal < 0.01 | drug == "DMSO") %>%
+  filter(adj_pval_TIF < pval_signif | adj_pval_bal < pval_signif | drug == "DMSO") %>%
   mutate(drug_conc = paste(drug, conc_char,sep = " "),
          # List if they affect the variable.
-         effect_on_indelrate = ifelse(adj_pval_TIF < 0.01, TRUE, FALSE),
-         effect_on_ratio = ifelse(adj_pval_bal < 0.01, TRUE, FALSE)) %>%
+         effect_on_indelrate = ifelse(adj_pval_TIF < pval_signif, TRUE, FALSE),
+         effect_on_ratio = ifelse(adj_pval_bal < pval_signif, TRUE, FALSE)) %>%
   distinct(IPR, drug, conc_char, drug_conc, effect_on_indelrate, effect_on_ratio) %>%
   mutate(# Count add conting of IPR per compound that have an effect. We want at least 2 (avoid outlyers)
     counts = as.numeric(ave(drug_conc, drug, conc_char, FUN = function(x) length(x))),
@@ -316,8 +318,8 @@ filtered_drug_conc = filtered_drug_pvals %>%
 effect_of_compound_tib = filtered_drug_pvals %>%
 dplyr::group_by(drug, conc_char) %>% 
   # Change the non significant ones to 0, so we filter them out.
-  mutate(zscore_TIF_comb_rep_temp = ifelse(adj_pval_TIF >= 0.01, 0, zscore_TIF_comb_rep_temp),
-         zscore_bal_comb_rep_temp = ifelse(adj_pval_bal >= 0.01, 0, zscore_bal_comb_rep_temp)) %>%
+  mutate(zscore_TIF_comb_rep_temp = ifelse(adj_pval_TIF >= pval_signif, 0, zscore_TIF_comb_rep_temp),
+         zscore_bal_comb_rep_temp = ifelse(adj_pval_bal >= pval_signif, 0, zscore_bal_comb_rep_temp)) %>%
   dplyr::summarise(MMEJ_signif = sum(zscore_bal_comb_rep_temp < -1.96), #Summarise number of significant barcodes per compound for balance
                    NHEJ_signif = sum(zscore_bal_comb_rep_temp > 1.96),
                    TIF_down_signif = sum(zscore_TIF_comb_rep_temp < -1.96), #Summarise number of significant barcodes per compound for TIF
@@ -464,7 +466,7 @@ adj_p.value_KO_model <- drug_conc_CCDs_dt %>%
   mutate(p.adj = p.adjust(p.value, method = "BH")) %>% 
   dplyr::select(var, drug_conc,p.value,p.adj)
 
-signif_hits = adj_p.value_KO_model %>% filter(p.adj < 0.01) %>% 
+signif_hits = adj_p.value_KO_model %>% filter(p.adj < pval_signif) %>% 
   distinct(drug_conc, var) %>% 
   ungroup() %>% 
   mutate(val = TRUE,

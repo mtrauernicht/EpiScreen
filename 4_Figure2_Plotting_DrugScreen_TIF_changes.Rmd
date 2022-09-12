@@ -600,8 +600,8 @@ chromatin_targets = c("HDAC", "HAT", "Sirtuin", "HMT",  "DNMT", "Histone Demethy
 
 top_50_hits = eff.data.heatmap %>% 
   arrange(desc(abs(freqCut_diff_mean))) %>% 
-  distinct(drug, target, conc_char, min_score) %>%
-  slice(1:60) #%>%
+  distinct(drug, target, conc_char, min_score) # %>%
+  # slice(1:70) #%>%
   # filter(
   #   target %in% kinase_andco_targets,
   #   # target %in% chromatin_targets,
