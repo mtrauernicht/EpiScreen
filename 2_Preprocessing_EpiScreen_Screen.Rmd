@@ -93,7 +93,7 @@ library(ggbeeswarm)
 
 ```{r outdir screen}
 ## Select outdir
-out.dir = list.dirs(path = "/DATA/projects/DSBrepair/data/R") %>% .[grepl("episcreen_Bas_way", .)] %>% tail(n = 1)
+out.dir = list.dirs(path = "/DATA/projects/DSBrepair/data/R") %>% .[grepl("episcreen_Bas_way_all_bcs", .)] %>% tail(n = 1)
 in.dir = out.dir
 dir.create(out.dir, showWarnings = FALSE)
 ```
@@ -173,9 +173,8 @@ barcodes.clone5 <- c("AGGGCGTAAAATATTT", "TATGGCTGTCGGGTAG", "TGTCCCTTAGTACTTT",
                      "CCGGGGACGTATGCAC","TCTTTTGAGGAGCTGA","ATATCGTTGCTGGAGA",
                      "CATCCACCACACTTCA","ATACTATATTTAACGG",
                      "CATTTCTGATCAATAA","GAGCGCGTCACCGGGT",
-                     "GTACCTCTCGATAGTG","TGGCCAATATTTGTCT"
-                     #,
-                     #"ACCCCTAAAGGCGCTG"
+                     "GTACCTCTCGATAGTG","TGGCCAATATTTGTCT",
+                     "ACCCCTAAAGGCGCTG"
 )
 ```
 
@@ -607,7 +606,6 @@ indel.cols.only = c(
   "freq_mean",
   "freq_sd_rep",
   "freq_sd",
-  "sum_bc_reads_split",
   "ratio_indels_split",
   "type",
   "color")
@@ -1192,7 +1190,7 @@ clone5_z.score_chrom_tib <- readRDS('/DATA/projects/DSBrepair/data/R/cl20201026_
 
 
 clone5_chrom_tib <- readRDS("/DATA/projects/DSBrepair/data/R/rs20200519_clone5_newdoms_chromatin.RDS") %>%
-  filter(IPR != "IPR1") %>%
+  # filter(IPR != "IPR1") %>%
   left_join(clone5_z.score_chrom_tib)
 
 
@@ -1225,6 +1223,7 @@ ratio.cols = c("replicate",
                "drug",
                "conc_char",
                "target",
+               "sum_bc_reads_split",
                "viab_norm_split",
                "viab_mean",
                "indel_freq_filter",
