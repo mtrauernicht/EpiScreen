@@ -64,7 +64,7 @@ viab_limit_eff = 0.25
 viab_limit_bal = 0.40
 
 # Read count limit of +1 & -7 combined
-read_count_limit = 40
+read_count_limit = 30
 
 # minimal correlation for TIF between screens:
 TIF_cor = 0.75
@@ -318,7 +318,7 @@ length(unique(filtered.indelreads.dt$exp))
 E177_pre - E177_post
 # Number of wells with removed IPRs
 E1504_pre - E1504_post
-
+# Apply the filter
 mutations.dt = complete.mutations.dt %>% 
   filter(exp %in% filtered.indelreads.exp)
 
@@ -419,7 +419,7 @@ mutations.large.del.sum.dt =
   mutations.large.del.dt[, lapply(.SD, sum, na.rm=TRUE), 
                          by=c("exp", "barcode"),
                          .SDcols=c("count_split",  
-                                   "norm_split", "freq_split", "sum_bc_reads_split",
+                                   "norm_split", "freq_split",
                                    "ratio_indels_split")]
 # Add indel info
 mutations.large.del.sum.dt[, c("mutation", "mut_type") := list("<-14", "del")]
@@ -449,7 +449,7 @@ mutations.large.ins.dt = mutations.screen.dt[mutation %in% largeins & pathway_ba
 # Sum large ins
 mutations.large.ins.sum.dt = mutations.large.ins.dt[, lapply(.SD, sum, na.rm=TRUE),  by=c("exp", "barcode"),
                                                     .SDcols=c("count_split",  
-                                                              "norm_split", "freq_split", "sum_bc_reads_split",
+                                                              "norm_split", "freq_split",
                                                               "ratio_indels_split")]
 # Add indel info
 mutations.large.ins.sum.dt[, c("mutation", "mut_type") := list(">2", "ins")]
