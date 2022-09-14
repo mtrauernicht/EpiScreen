@@ -72,9 +72,9 @@ library(ggpubr)
 library(scales)
 
 ## Select outdir
-out.dir = paste0("./figures/", Date, "_master/")
+out.dir = paste0("./figures/", Date, "_Bas_way_all_bcs/")
 dir.create(out.dir)
-in.dir = list.dirs(path = "/DATA/projects/DSBrepair/data/R") %>% .[grepl("episcreen_master", .)] %>% tail(n = 1)
+in.dir = list.dirs(path = "/DATA/projects/DSBrepair/data/R") %>% .[grepl("episcreen", .)] %>% tail(n = 1)
 opts_chunk$set(dev=c('png', 'pdf'), fig.path = file.path(out.dir))
 pdf.options(useDingbats = FALSE)
 ```
@@ -372,10 +372,10 @@ clone5.matrix = indel.data %>%
 clone5_map_ipr = hclust(dist(clone5.matrix), method = "ward.D")
 
 # Feature clustering based on whole TRIP pool
-TRIP_chrom_tib <- readRDS('/DATA/projects/DSBrepair/data/R/cl20201026_ChIP_zscore_selection.RDS') %>% 
+TRIP_chrom_tib <- readRDS('/DATA/projects/DSBrepair/data/R/cl20201026_ChIP_zscore_selection.RDS') # %>% 
   # Remove HDAC1 and 2 as they do not reach higher than the 80th percentile of the HDAC 
   # districtubion in the TRIP pool for the reporters in Clone 5. 
-  dplyr::select(-HDAC1, -HDAC2)
+  # dplyr::select(-HDAC1, -HDAC2)
 
 TRIP_chrom = TRIP_chrom_tib %>% dplyr::select(-binsize, -pool) %>% column_to_rownames("ID")
 # make clustering with some column rotation for better visualisation
@@ -548,7 +548,7 @@ conc_colors = c("100 nM" = colors_drugs[7], "1 µM" = colors_drugs[4], "10 µM" 
 CTRL.data = indel.data %>%
   filter(sample == "DMSO (neg control)" & indel_freq_filter & IPR %in% IPR_set ) %>% 
   distinct(freqCut, IPR, drug, conc_char, tech, sample, replicate, 
-           barcode, MMEJratio, zscore_bal_comb_rep, zscore_bal_comb_tech, zscore_TIF_comb_rep,  plate, well) %>%
+           barcode, MMEJratio, zscore_bal_comb_rep, zscore_TIF_comb_rep,  plate, well) %>%
   mutate(sample_conc = "CTRL",
          freqCut = ave(freqCut, well, plate, conc_char, IPR, FUN = function(x) mean(x, na.rm = TRUE)),
          MMEJratio = ave(MMEJratio, well, plate, conc_char, IPR, FUN = function(x) mean(x, na.rm = TRUE))) %>% 
@@ -916,51 +916,54 @@ ggpairs(techn_repl %>% dplyr::select(contains("E1")),
 
 ## S1L-O: Correlation in MMEJ z-score between biological replicates
 How well does the MMEJ z-score correlate between the biologcial replicates before combining them?
-```{r S1LMNO MMEJ z-score correlation, warning = FALSE, fig.height=5, fig.width=5}
+```{r S1LMNO MMEJ global z-score correlation, warning = FALSE, fig.height=5, fig.width=5}
 # D: Correlation between biological replicates MMEJ score
 biol_repl_TIF <- indel.data %>%
   filter(sample == "Epigenetic Compound" & 
            viab_reproducibility == TRUE & 
            cor_TIF_filter & 
-           !is.na(zscore_TIF_global_comb_tech)) %>%
-  dplyr::distinct(zscore_TIF_global_comb_tech, 
+           !is.na(zscore_TIF_global_tech)) %>%
+  dplyr::distinct(zscore_TIF_global_tech, 
                   filter_zscore_TIF_global_comb_rep, 
                   drug, replicate, conc_char) %>%
   pivot_wider(names_from = replicate, 
-              values_from = zscore_TIF_global_comb_tech) %>%
+              values_from = zscore_TIF_global_tech) %>%
   na.omit()
 
 biol_repl_bal <- indel.data %>%
   filter(sample == "Epigenetic Compound" & 
            viab_reproducibility == TRUE & 
            cor_bal_filter & 
-           !is.na(zscore_bal_global_comb_tech)) %>%
-  dplyr::distinct(zscore_bal_global_comb_tech, 
+           !is.na(zscore_bal_global_tech)) %>%
+  dplyr::distinct(zscore_bal_global_tech, 
                   filter_zscore_bal_global_comb_rep, 
                   drug, replicate, conc_char) %>%
   pivot_wider(names_from = replicate, 
-              values_from = zscore_bal_global_comb_tech) %>%
+              values_from = zscore_bal_global_tech) %>%
   na.omit()
 
-p1 = ggplot_custom(biol_repl_TIF,
+p1 = ggplot(biol_repl_TIF,
        aes(x = E1504, y = E177)) +
   geom_point() +
   geom_abline(lty = "twodash") +
   geom_smooth(method = "lm", color = "red", lty = "dashed") +
   stat_cor(method = "pearson") +
   xlab("Screen 2 TIF ratio z-score") +
-  ylab("Screen 1 TIF ratio z-score")
+  ylab("Screen 1 TIF ratio z-score") +
+  theme_bw(base_size = 16)
 
-p2 = ggplot_custom(biol_repl_bal,
+p2 = ggplot(biol_repl_bal,
        aes(x = E1504, y = E177)) +
   geom_point() +
   geom_abline(lty = "twodash") +
   geom_smooth(method = "lm", color = "red", lty = "dashed") +
   stat_cor(method = "pearson") +
   xlab("Screen 2 MMEJ ratio z-score") +
-  ylab("Screen 1 MMEJ ratio z-score")
+  ylab("Screen 1 MMEJ ratio z-score")+
+  theme_bw(base_size = 16)
+
   
-p3 = ggplot_custom(
+p3 = ggplot(
   filter(biol_repl_TIF, filter_zscore_TIF_global_comb_rep),
        aes(x = E1504, y = E177)) +
   geom_point() +
@@ -968,9 +971,11 @@ p3 = ggplot_custom(
   geom_smooth(method = "lm", color = "red", lty = "dashed") +
   stat_cor(method = "pearson") +
   xlab("Screen 2 TIF ratio z-score filtered") +
-  ylab("Screen 1 TIF ratio z-score filtered")
+  ylab("Screen 1 TIF ratio z-score filtered")+
+  theme_bw(base_size = 16)
+
   
-p4 = ggplot_custom(
+p4 = ggplot(
   filter(biol_repl_bal, filter_zscore_bal_global_comb_rep),
        aes(x = E1504, y = E177)) +
   geom_point() +
@@ -978,13 +983,89 @@ p4 = ggplot_custom(
   geom_smooth(method = "lm", color = "red", lty = "dashed") +
   stat_cor(method = "pearson") +
   xlab("Screen 2 MMEJ ratio z-score filtered") +
-  ylab("Screen 1 MMEJ ratio z-score filtered")
+  ylab("Screen 1 MMEJ ratio z-score filtered")+
+  theme_bw(base_size = 16)
+
   
 
 plot_grid(p1, p2, p3, p4, ncol = 2, nrow = 2, labels = c("L", "M", "N", "O"))
 ```
 
+```{r S1LMNO MMEJ z-score correlation, warning = FALSE, fig.height=5, fig.width=5}
+# D: Correlation between biological replicates MMEJ score
+biol_repl_TIF <- indel.data %>%
+  filter(sample == "Epigenetic Compound" & 
+           viab_reproducibility == TRUE & 
+           cor_TIF_filter & 
+           !is.na(zscore_TIF_tech)) %>%
+  dplyr::distinct(barcode, zscore_TIF_tech, 
+                  filter_zscore_TIF_comb_rep, 
+                  drug, replicate, conc_char) %>%
+  pivot_wider(names_from = replicate, 
+              values_from = zscore_TIF_tech) %>%
+  na.omit()
 
+biol_repl_bal <- indel.data %>%
+  filter(sample == "Epigenetic Compound" & 
+           viab_reproducibility == TRUE & 
+           cor_bal_filter & 
+           !is.na(zscore_bal_tech)) %>%
+  dplyr::distinct(zscore_bal_tech, barcode,
+                  filter_zscore_bal_comb_rep, 
+                  drug, replicate, conc_char) %>%
+  pivot_wider(names_from = replicate, 
+              values_from = zscore_bal_tech) %>%
+  na.omit()
+
+p1 = ggplot(biol_repl_TIF,
+       aes(x = E1504, y = E177)) +
+  geom_point() +
+  geom_abline(lty = "twodash") +
+  geom_smooth(method = "lm", color = "red", lty = "dashed") +
+  stat_cor(method = "pearson") +
+  xlab("Screen 2 TIF ratio z-score") +
+  ylab("Screen 1 TIF ratio z-score") +
+  theme_bw(base_size = 16)
+
+
+p2 = ggplot(biol_repl_bal,
+       aes(x = E1504, y = E177)) +
+  geom_point() +
+  geom_abline(lty = "twodash") +
+  geom_smooth(method = "lm", color = "red", lty = "dashed") +
+  stat_cor(method = "pearson") +
+  xlab("Screen 2 MMEJ ratio z-score") +
+  ylab("Screen 1 MMEJ ratio z-score") +
+  theme_bw(base_size = 16)
+
+  
+p3 = ggplot(
+  filter(biol_repl_TIF, filter_zscore_TIF_comb_rep),
+       aes(x = E1504, y = E177)) +
+  geom_point() +
+  geom_abline(lty = "twodash") +
+  geom_smooth(method = "lm", color = "red", lty = "dashed") +
+  stat_cor(method = "pearson") +
+  xlab("Screen 2 TIF ratio z-score filtered") +
+  ylab("Screen 1 TIF ratio z-score filtered") +
+  theme_bw(base_size = 16)
+
+  
+p4 = ggplot(
+  filter(biol_repl_bal, filter_zscore_bal_comb_rep),
+       aes(x = E1504, y = E177)) +
+  geom_point() +
+  geom_abline(lty = "twodash") +
+  geom_smooth(method = "lm", color = "red", lty = "dashed") +
+  stat_cor(method = "pearson") +
+  xlab("Screen 2 MMEJ ratio z-score filtered") +
+  ylab("Screen 1 MMEJ ratio z-score filtered") +
+  theme_bw(base_size = 16)
+
+  
+
+plot_grid(p1, p2, p3, p4, ncol = 2, nrow = 2, labels = c("L", "M", "N", "O"))
+```
 
 *Figure S1D: Correlation of the MMEJ z-scores between the two biological replicates.*
 

@@ -29,9 +29,9 @@ I will export a bed file also containing the broad integrations for the generati
 render_processing = TRUE
 
 # Render Validation Processing
-render_validations = FALSE
+render_validations = TRUE
 
-# Render Synergies Processing
+# Render Synergies 
 render_synergies = TRUE
 ```
 
@@ -66,7 +66,7 @@ library(corrr)
 ## In directory
 in.dir = "/DATA/projects/DSBrepair/git/EpiScreen/files_scripts/"
 ## Select out directory
-out.dir = paste0("/DATA/projects/DSBrepair/data/R/rs", Date, "_episcreen_master")
+out.dir = paste0("/DATA/projects/DSBrepair/data/R/rs", Date, "_episcreen")
 dir.create(out.dir, showWarnings = FALSE)
 
 ## Initials (for file naming)

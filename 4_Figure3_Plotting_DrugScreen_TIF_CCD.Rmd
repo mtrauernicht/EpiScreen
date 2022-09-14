@@ -55,7 +55,6 @@ StartTime <-Sys.time()
 # 8-digit Date tag:
 Date <- substr(gsub("-","",Sys.time()),1,8) 
 # libraries:
-library(knitr)
 library(tidyverse)
 library(outliers)
 library(ggplot2)
@@ -63,16 +62,11 @@ library(ggbeeswarm)
 library(data.table)
 library(ggrepel)
 library(GGally)
-# library(DESeq2)
 library(gghighlight)
-# library(platetools)
 library(ggpubr)
-# library(Laurae)
 library(pheatmap)
 library(RColorBrewer)
-# # library(ggrastr)
 library(broom)
-# library(ggsignif)
 library(ggpmisc)
 library(cowplot)
 library(rstatix)
@@ -85,10 +79,11 @@ library(ggstatsplot)
 
 
 ## Select outdir
-out.dir = paste0("./figures/", Date, "_master/")
+out.dir = paste0("./figures/", Date, "/")
 dir.create(out.dir)
-in.dir = list.dirs(path = "/DATA/projects/DSBrepair/data/R") %>% .[grepl("episcreen_master", .)] %>% tail(n = 1)
-opts_chunk$set(dev=c('png', 'pdf'), fig.path = file.path(out.dir))
+in.dir = list.dirs(path = "/DATA/projects/DSBrepair/data/R") %>% .[grepl("episcreen", .)] %>% tail(n = 1)
+knitr::opts_chunk$set(dev=c('png', 'pdf'), fig.path = file.path(out.dir))
+
 pdf.options(useDingbats = FALSE)
 ```
 
@@ -423,7 +418,7 @@ eff.data <- indel.data %>%
   #filter(target != "Aurora Kinase") %>%
   filter(sample == "Epigenetic Compound", indel_freq_filter, viab_reproducibility, !(freqCut_diff_mean < -0.1 & viab_mean < 0.5)) %>%
   # filter(abs(zscore_TIF_global_comb_rep) >= 2.58) %>%  # we can choose to display all drugs that have significant global hits
-  distinct(conc_char, drug, target, IPR, zscore_TIF_comb_rep, freqCut_diff_mean, replicate, tech, filter_zscore_TIF_comb_rep)
+  distinct(conc_char, drug, target, IPR, zscore_TIF_comb_rep, freqCut_diff_mean, replicate, tech, filter_zscore_TIF_comb_rep,zscore_TIF)
 
 eff.data.heatmap <-  eff.data %>%
   group_by(drug, conc_char) %>%
@@ -512,8 +507,6 @@ ordered_marks2 <- c("Negative Control", "MRN", "DNA-PK","Epigenetic Reader Domai
                     "Aurora Kinase", "PARP")
 
 #Epistatic interaction colors
-slope.colors <- tibble(color = c("grey50", "#f5f5f5","#84a98c"),label = c("negative","none","positive"), feature = "epistasis")
-
 annotation_colors_scr$target <- annotation_colors_scr$target[ordered_marks2]
 
 clustering = data.frame(row.names=c('LMNB1', 'late_replicating', 'H3K9me2', 'H3K9me3', 'H3K27me3', 'EZH2', 
@@ -553,7 +546,7 @@ quant_breaks <- quantile(all_compounds_epistasis_TIF, c(.01,.99), na.rm = T)
 palette_length <- 100
 breaks <- c(seq(quant_breaks[1], 0, length.out=ceiling(palette_length/2) + 1), 
             seq(quant_breaks[2]/palette_length, quant_breaks[2], length.out=floor(palette_length/2)))
-colors = colorRampPalette(slope.colors %>% pull(color))(length(breaks))
+colors = diverge_hcl(length(breaks), palette = "Red-Green")
 colors[which(quant_breaks == 0)-1] = "gray90"
 ```
 
@@ -631,14 +624,14 @@ plot_grid(p1, p2, p3, nrow = 1, labels = c("A", "B", "C"))
 
 
 ## 3D All compound synergies with chromatin
-```{r 3D Synergies chromatin - TIF all, fig.width= 10, fig.height= 20}
+```{r 3D Synergies chromatin - TIF all, fig.width= 12, fig.height= 14}
 # change these numbers according to where you want to set the cutoff
 quant_breaks <- quantile(all_compounds_epistasis_TIF, c(.01,.99), na.rm = T)
 palette_length <- 100
 breaks <- c(seq(quant_breaks[1], 0, length.out=ceiling(palette_length/2) + 1), 
             seq(quant_breaks[2]/palette_length, quant_breaks[2], length.out=floor(palette_length/2)))
-colors = colorRampPalette(slope.colors %>% pull(color))(length(breaks))
-colors[which(quant_breaks == 0)-1] = "gray90"
+colors = diverge_hcl(length(breaks), palette = "Blue-Red")
+colors[which(breaks == 0)-1] = "gray90"
 
 pheatmap(all_compounds_epistasis_TIF[, TRIP_chrom_clust$labels],
          border_color = F,
@@ -646,7 +639,7 @@ pheatmap(all_compounds_epistasis_TIF[, TRIP_chrom_clust$labels],
          cellheight = 8,
          breaks = breaks,
          cluster_cols = TRIP_chrom_clust,
-         clustering_distance_rows = "manhattan",
+         clustering_distance_rows = "correlation",
          annotation_row = target_ctrl,
          main = "Chromatin synergies - TIF all",
          color = colors,

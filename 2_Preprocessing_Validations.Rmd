@@ -1,5 +1,5 @@
 ---
-title: "Indel data & viability preprocessing"
+title: "Validation experiments preprocessing"
 author: "Max Trauernicht & Ruben Schep"
 date: "`r format(Sys.time(), '%Y-%m-%d')`"
 output:
@@ -74,6 +74,7 @@ $(this).css({'text-indent': num_ul * 10, 'padding-left': 0});
 });
 </script>
 
+
 ## Path, Libraries, Parameters and Useful Functions
 
 ```{r setup validation, message=FALSE, warnings=FALSE}
@@ -92,8 +93,9 @@ library(parallel)
 library(gtools)
 
 ## Select outdir
-out.dir = paste0("/DATA/projects/DSBrepair/data/R/rs", Date, "_episcreen_master/")
-dir.create(out.dir)
+out.dir = list.dirs(path = "/DATA/projects/DSBrepair/data/R") %>% .[grepl("episcreen", .)] %>% tail(n = 1)
+in.dir = out.dir
+dir.create(out.dir, showWarnings = FALSE)
 
 # initials (for file export)
 initials = "rs"
