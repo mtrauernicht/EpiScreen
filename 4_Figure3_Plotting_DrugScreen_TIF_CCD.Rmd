@@ -79,10 +79,11 @@ library(ggstatsplot)
 
 
 ## Select outdir
-out.dir = paste0("./figures/", Date, "_Bas_way/")
+out.dir = paste0("./figures/", Date, "/")
 dir.create(out.dir)
-in.dir = list.dirs(path = "/DATA/projects/DSBrepair/data/R") %>% .[grepl("episcreen_Bas_way", .)] %>% tail(n = 1)
+in.dir = list.dirs(path = "/DATA/projects/DSBrepair/data/R") %>% .[grepl("episcreen", .)] %>% tail(n = 1)
 knitr::opts_chunk$set(dev=c('png', 'pdf'), fig.path = file.path(out.dir))
+
 pdf.options(useDingbats = FALSE)
 ```
 
@@ -559,9 +560,9 @@ CCD_example_tib = indel.data %>%
   mutate(drug = gsub(" [(].*[)]", "", drug),
          drug_conc = paste(drug, conc_char, sep = " ")) %>%
   filter(drug_conc %in% c("EPZ-6438 10 µM", "Decitabine 1 µM", "Scriptaid 1 µM", "Apicidin 100 nM", "DMSO control", "SNS-314 Mesylate 1 µM")) %>%
-  distinct(IPR, drug, freqCut, H3K27me3.zscore, LMNB1.zscore, m5C.zscore, tech, replicate, H3K36me3.zscore) %>%
+  distinct(IPR, drug, freqCut, H3K27me3.zscore, LMNB1.zscore, m5C.zscore, HDAC1.zscore, tech, replicate, H3K36me3.zscore) %>%
   mutate(freqCut_mean = ave(freqCut, IPR, drug, FUN = mean)) %>%
-  distinct(IPR, drug, freqCut_mean, H3K27me3.zscore, LMNB1.zscore, m5C.zscore, H3K36me3.zscore) %>%
+  distinct(IPR, drug, freqCut_mean, H3K27me3.zscore, LMNB1.zscore, m5C.zscore, HDAC1.zscore, H3K36me3.zscore) %>%
   pivot_wider(names_from = drug, values_from = freqCut_mean) %>%
   mutate(Scriptaid_log2_FC_TIF = log2(Scriptaid/DMSO),
          Api_log2_FC_TIF = log2(Apicidin/DMSO),

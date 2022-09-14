@@ -84,10 +84,11 @@ library(ggpmisc)
 
 
 ## Select outdir
-out.dir = paste0("./figures/", Date, "_Bas_way/")
+out.dir = paste0("./figures/", Date, "/")
 dir.create(out.dir)
-in.dir = list.dirs(path = "/DATA/projects/DSBrepair/data/R") %>% .[grepl("episcreen_Bas_way", .)] %>% tail(n = 1)
+in.dir = list.dirs(path = "/DATA/projects/DSBrepair/data/R") %>% .[grepl("episcreen", .)] %>% tail(n = 1)
 knitr::opts_chunk$set(dev=c('png', 'pdf'), fig.path = file.path(out.dir))
+
 pdf.options(useDingbats = FALSE)
 ```
 
@@ -455,7 +456,7 @@ ordered_marks2 <- c("Negative Control", "MRN", "DNA-PK","Epigenetic Reader Domai
                     "Aurora Kinase", "PARP")
 
 #Epistatic interaction colors
-slope.colors <- tibble(color = c("#8c510a", "#f5f5f5","#01665e"),label = c("negative","none","positive"), feature = "epistasis")
+slope.colors <- tibble(color = c("grey60", "#f5f5f5","#84a98c"),label = c("negative","none","positive"), feature = "epistasis")
 
 annotation_colors_scr$target <- annotation_colors_scr$target[ordered_marks2]
 
@@ -558,7 +559,7 @@ ggplot(hdac2_3,
 ```{r 4B H3K27me3 synergies, fig.width = 8, fig.height = 8}
 rank_dt = CCD_tib %>% 
   left_join(rownames_to_column(target, var = "drug_conc")) %>%
-  filter(feature == "H3K27me3", !is.na(indelrate_slope_plot)) %>%
+  filter(feature == "HDAC1", !is.na(indelrate_slope_plot)) %>%
   distinct() %>%
   arrange(desc(indelrate_slope_plot)) %>%
   mutate(rank = seq(1:n()))
