@@ -53,26 +53,19 @@ StartTime <-Sys.time()
 # 8-digit Date tag:
 Date <- substr(gsub("-","",Sys.time()),1,8) 
 # libraries:
-library(knitr)
 library(tidyverse)
 library(outliers)
 library(ggplot2)
 library(ggbeeswarm)
 library(data.table)
-# library(ggrepel)
 library(GGally)
 library(MASS)
-# library(DESeq2)
 library(gghighlight)
 library(ggrepel)
-# library(platetools)
 library(ggpubr)
-# library(Laurae)
 library(pheatmap)
 library(RColorBrewer)
-# # library(ggrastr)
 library(broom)
-# library(ggsignif)
 library(rstatix)
 library(colorspace)
 library(analogue)
@@ -80,10 +73,10 @@ library(cowplot)
 library(Hmisc)
 
 ## Select outdir
-out.dir = paste0("./figures/", Date, "_Bas_way/")
+out.dir = paste0("./figures/", Date, "_Bas_way_all_bcs/")
 dir.create(out.dir)
-in.dir = list.dirs(path = "/DATA/projects/DSBrepair/data/R") %>% .[grepl("episcreen_Bas_way", .)] %>% tail(n = 1)
-opts_chunk$set(dev=c('png', 'pdf'), fig.path = file.path(out.dir))
+in.dir = list.dirs(path = "/DATA/projects/DSBrepair/data/R") %>% .[grepl("episcreen_Bas_way_all_bcs", .)] %>% tail(n = 1)
+knitr::opts_chunk$set(dev=c('png', 'pdf'), fig.path = file.path(out.dir))
 pdf.options(useDingbats = FALSE)
 ```
 
@@ -544,7 +537,7 @@ RSTP2_IndelRatios_Chromatin_2kb <- readRDS("/DATA/usr/r.schep/DSBrepair/data/R/r
 dmso_freq <- indel.data %>%
   filter(drug == "DMSO") %>%
   distinct(IPR, MMEJratio) %>%
-  mutate(MMEJratio = ave(MMEJratio, IPR, FUN = function(x) mean(x, na.rm = TRUE))*100) %>%
+  mutate(MMEJratio = ave(MMEJratio, IPR, FUN = function(x) mean(x, na.rm = TRUE))) %>%
   dplyr::select('ctrl_MMEJratio' = MMEJratio, IPR) %>%
   distinct() %>%
   arrange(desc(ctrl_MMEJratio))
@@ -759,7 +752,7 @@ plt1 = pheatmap(balance.data.matrix[ , clone5_map_ipr$labels],
                 cellwidth = 8,
                 cellheight = 8,
                 breaks = myBreaks,
-                clustering_method = "ward.D",
+         clustering_distance_rows = "correlation",
                 cluster_rows = T,
                 na_col = "white",
                 main = 'MMEJ ratio FC (log2), all concentrations',
@@ -1480,7 +1473,7 @@ eff.data.heatmap.cluster1 <- cbind(eff.data.heatmap.cluster1, cluster_HDAC) %>%
   as_tibble()
 
 cluster_HDAC <- eff.data.heatmap.cluster1 %>%
-  distinct(drug_conc, cluster_HDAC)
+  distinct(drug_conc, cluster_HDAC, conc_char)
 
 target.cluster1 <- target_set_drugs %>%
   rownames_to_column("drug_conc") %>%

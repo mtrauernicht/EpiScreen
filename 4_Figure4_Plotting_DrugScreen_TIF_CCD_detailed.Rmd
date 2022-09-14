@@ -55,7 +55,6 @@ StartTime <-Sys.time()
 # 8-digit Date tag:
 Date <- substr(gsub("-","",Sys.time()),1,8) 
 # libraries:
-library(knitr)
 library(tidyverse)
 library(outliers)
 library(ggplot2)
@@ -88,7 +87,7 @@ library(ggpmisc)
 out.dir = paste0("./figures/", Date, "_Bas_way/")
 dir.create(out.dir)
 in.dir = list.dirs(path = "/DATA/projects/DSBrepair/data/R") %>% .[grepl("episcreen_Bas_way", .)] %>% tail(n = 1)
-opts_chunk$set(dev=c('png', 'pdf'), fig.path = file.path(out.dir))
+knitr::opts_chunk$set(dev=c('png', 'pdf'), fig.path = file.path(out.dir))
 pdf.options(useDingbats = FALSE)
 ```
 
@@ -497,7 +496,7 @@ quant_breaks <- quantile(all_compounds_epistasis_TIF, c(.01,.99), na.rm = T)
 palette_length <- 100
 breaks <- c(seq(quant_breaks[1], 0, length.out=ceiling(palette_length/2) + 1), 
             seq(quant_breaks[2]/palette_length, quant_breaks[2], length.out=floor(palette_length/2)))
-colors = colorRampPalette(slope.colors %>% pull(color))(length(breaks))
+colors = diverge_hcl(length(breaks), palette = "Blue-Red")
 colors[which(quant_breaks == 0)-1] = "gray90"
 ```
 
@@ -532,7 +531,7 @@ p = pheatmap(TIF_synergy_matrix[, TRIP_chrom_clust$labels],
              breaks = breaks,
              cluster_cols = TRIP_chrom_clust,
              annotation_row = target.HDAC,
-             clustering_method = "ward.D2",
+                clustering_distance_rows = "correlation",
              main = paste("Chromatin synergies - TIF HDAC cluster"),
              color = colors,
              annotation_colors = annotation_colors_scr, 
@@ -778,15 +777,17 @@ all_compounds_epistasis_TIF %>%
 DNMT_drugs = target_set_drugs %>% 
   rownames_to_column(var = "drug_conc") %>% 
   filter(target == "DNMT"
-         & conc_char == "1 µM"
          ) %>% pull(drug_conc)
 
-# Make matrix with drugs from selected target
-TIF_synergy_matrix_DNMT = all_compounds_epistasis_TIF %>% 
-  rownames_to_column(var = "drug_conc") %>%
-  filter(drug_conc %in% DNMT_drugs) %>%
+TIF_synergy_matrix_DNMT = CCD_tib %>%
+  dplyr::select(drug_conc, indelrate_slope_plot, feature) %>%
+  group_by(drug_conc) %>%
+  mutate(onlyNA = sum(is.na(indelrate_slope_plot))) %>% 
+  filter(onlyNA != 25 & drug_conc %in% DNMT_drugs) %>%
+  reshape2::dcast(drug_conc ~ feature, value.var = "indelrate_slope_plot", fill = 0) %>% 
   column_to_rownames(var = "drug_conc")
 
+# Make matrix with drugs from selected target
 cluster_rows = ifelse(nrow(TIF_synergy_matrix_DNMT) > 1, TRUE, FALSE)
 
 # # change these numbers according to where you want to set the cutoff
@@ -796,8 +797,8 @@ palette_length <- 100
 breaks <- c(seq(-max_quant, 0, length.out=ceiling(palette_length/2) + 1),
             seq(max_quant/palette_length, max_quant, length.out=floor(palette_length/2)))
 slope.colors.temp = slope.colors
-colors = colorRampPalette(slope.colors.temp %>% pull(color))(length(breaks))
-colors[which(quant_breaks == 0)-1] = "gray90"
+colors = diverge_hcl(length(breaks), palette = "Blue-Red")
+colors[which(breaks == 0)-1] = "gray40"
 
 p = pheatmap(TIF_synergy_matrix_DNMT[, TRIP_chrom_clust$labels],
              border_color = F,
@@ -817,7 +818,7 @@ p = pheatmap(TIF_synergy_matrix_DNMT[, TRIP_chrom_clust$labels],
 ```{r S4B HMT inhibitor synergy with 5mC,  fig.width = 6, fig.height = 4}
 ratios_tib_fc %>% 
   filter(drug_conc %in% DNMT_drugs)  %>% 
-  ggplot(.,aes(m5C, log2.fc.freqCut)) + geom_point() +
+  ggplot(.,aes(LMNB1, log2.fc.freqCut)) + geom_point() +
   geom_smooth(method = "lm", se = F) +
   stat_cor(method = "pearson") +
   stat_poly_eq(aes(label = paste(after_stat(eq.label),

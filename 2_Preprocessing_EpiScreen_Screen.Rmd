@@ -390,7 +390,7 @@ mutations.screen.dt <- mutations.stat.dt %>%
          pathway_bal_filter = ifelse(conc_char_drug %in% keep_drugs_bal, TRUE, FALSE),
          viab_norm_split_eff = ifelse(indel_freq_filter & viab_norm_split > viab_limit_eff, viab_norm_split, NA), 
          viab_norm_split_bal = ifelse(pathway_bal_filter & viab_norm_split > viab_limit_bal, viab_norm_split, NA)) %>%
-  # remove these colums
+  # remove these columns
   dplyr::select(-mut.counts) %>%
   # Calculate new mean
   mutate(viab_mean_if = ave(viab_norm_split_eff, drug, conc_char, replicate, FUN = function(x) mean(x, na.rm=T)),
@@ -1014,14 +1014,14 @@ bal.zscore = bal_zscore_calc %>%
   # Put the 0 MMEJratio to the minimal value of that sample
   group_by(drug, conc_char) %>%
   mutate(min_MMEJratio = min(MMEJratio[MMEJratio != 0 & !is.na(MMEJratio)], na.rm = TRUE),
-         MMEJratio = ifelse(MMEJratio == 0, min_MMEJratio, MMEJratio)) %>%
+         MMEJratio_min = ifelse(MMEJratio == 0, min_MMEJratio, MMEJratio)) %>%
   ungroup() %>%
   dplyr::select(-min_MMEJratio) %>%
   # Calculate FC
-  mutate(MMEJ_FC = MMEJratio / mean_DMSO,
+  mutate(MMEJ_FC = MMEJratio_min / mean_DMSO,
          MMEJ_log2_FC = log2(MMEJ_FC),
          # And calculate the z-scores
-         zscore_bal = (MMEJratio - mean_DMSO) / sd_DMSO,
+         zscore_bal = (MMEJratio_min - mean_DMSO) / sd_DMSO,
          zscore_bal_global = (MMEJratio_global - mean_DMSO_global) / sd_DMSO_global)
 
 # Combine the z-scores of both screens
@@ -1130,7 +1130,7 @@ bal.zscore.comb = bal.zscore.reps %>%
 
 
 bal.zscore %<>% left_join(mean.bal.zscore.comb) %>% left_join(bal.zscore.comb) %>% 
-  dplyr::select(barcode, replicate, plate, tech, well, drug, conc_char, 
+  dplyr::select(barcode, replicate, plate, tech, well, drug, conc_char, MMEJratio_min,
                 MMEJ_FC, MMEJ_log2_FC,
                 zscore_bal, score_bal_comb_tech, 
                 zscore_bal_tech, filter_zscore_bal,
@@ -1243,6 +1243,7 @@ ratio.cols = c("replicate",
                "freqMMEJ", 
                "freqNHEJ",
                "MMEJratio",
+               "MMEJratio_min",
                "MMEJratio_mean", 
                "MMEJratio_global",
                "MMEJratio_global_mean",
