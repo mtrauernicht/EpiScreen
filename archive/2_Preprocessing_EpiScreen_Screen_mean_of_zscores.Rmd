@@ -1,0 +1,1314 @@
+---
+title: "Indel data & viability preprocessing"
+author: "Max Trauernicht & Ruben Schep"
+date: "`r format(Sys.time(), '%Y-%m-%d')`"
+output:
+  html_document:
+    theme: journal #cerulean
+    highlight: monochrome
+    toc: true
+    toc_float: true
+    code_folding: show
+  editor_options:
+    chunk_output_type: console
+---
+knitr document van Steensel lab
+
+# Preprocessing of the indel data
+# Introduction
+
+In this script I want to prepocess the raw data from the epigenetic screening into one dataframe containing all information: +1/-7 ratio, efficiency, etc. This should all be integrated with the drug and the drug target group corresponding to the well. 
+This will be used for plotting indel patterns, calculating ratios later on and such.
+
+* Efficiency (All mutations / Total or (Total - WT sequences) / Total)  
+* +1 / -7  
+
+
+## Description of Data
+
+For this analysis we need the mapping and the indel data of the TRIP integrations. These 
+files are obtained with the crispr_trip.snake script that C. Leemans edited. This data 
+contains the genomic locations of the TRIP integrations (hg38) and the indel frequencies 
+at each integration.
+
+The mutations were called by counting the distance between two constant regions. These
+were separated by barcode. The barcodes were also filtered on the starcode, to pick out
+the most abundant, and considered real, ones.
+
+Mutations files : *genuine_mapped.table
+
+| barcode  | type | score | 
+| ------- | --------- | ----- | 
+| TTCTATTCGCACACAA | ins | 1 |
+| TTTCCCACATCAGGAG | wt | 0 |
+| CCATAGTAGTGATTAC | del | -4 |
+
+# Setup
+## Path, Libraries, Parameters and Useful Functions
+```{r setup, message=FALSE, warnings=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+StartTimeScreen <-Sys.time()
+
+# 6-digit Date tag:
+Date <- substr(gsub("-","",Sys.time()),1,8)
+```
+
+## Parameters
+```{r params screen}
+# initials (for file export)
+initials = "rs"
+
+# Viability (% of DMSO) for efficiency
+viab_limit_eff = 0.25
+# Viability threshold for repair pathway balance
+viab_limit_bal = 0.40
+
+# Read count limit of +1 & -7 combined
+read_count_limit = 30
+
+# minimal correlation for TIF between screens:
+TIF_cor = 0.75
+
+# minimal correlation for MMEJ score between screens:
+bal_cor = 0.75
+```
+
+
+```{r libraries screen processing}
+# libraries:
+library(data.table)
+library(ggplot2)
+library(parallel)
+library(ggpubr)
+library(magrittr)
+library(cowplot)
+library(report)
+library(corrr)
+library(PerformanceAnalytics)
+library(MASS)
+library(broom)
+library(tidyverse)
+library(ggbeeswarm)
+```
+
+```{r outdir screen}
+## Select outdir
+out.dir = list.dirs(path = "/DATA/projects/DSBrepair/data/R") %>% .[grepl("episcreen_Bas_way_all_bcs", .)] %>% tail(n = 1)
+in.dir = out.dir
+dir.create(out.dir, showWarnings = FALSE)
+```
+
+## Custom functions
+
+Functions used include all functions that have been used previously by Ruben (some of them might not be needed anymore, but are kept anyway). Functions 'CallTrueBarcodes' has been added by Max.
+
+```{r functions screen}
+serialNext = function(prefix, extension){
+  i=0
+  repeat {
+    f = paste0(prefix, "_", i , ".", extension)
+    if(!file.exists(f)){return(f)}
+    i=i+1
+  }
+}
+
+SetFileName <- function(filename, initials, extension) {
+  # Set filename with extension and initials to make filename with date integrated.
+  filename <- substitute(filename)
+  filename <- paste0(out.dir, "/", initials, substr(gsub("-","",Sys.time()),1,8), "_", filename)
+  filename <- serialNext(filename, extension)
+  filename
+}
+
+CallTrueBarcodes <- function(df) {
+  df %<>% filter(barcode %in% barcodes.clone5)
+  df
+}
+```
+
+
+# Data import
+
+Data import from mapping, files were generated on 21.01.2019.
+```{r import screen}
+# Import files in list and make individual tables
+# First list the files from the screen (E177 & 1504). The other will be processed in another script.
+file.list <- list.files("/DATA/projects/DSBrepair/data/rs20210628_EpiScreen/indelPCR_counts",
+                        pattern="E177_.*[.]count|E1504_.*[.]count", full.names=T)
+
+# import the data
+df.list <- mclapply(file.list, 
+                    read.table, 
+                    mc.cores = 20, 
+                    header = TRUE, 
+                    stringsAsFactors = FALSE, 
+                    col.names = c("barcode", "type", 
+                                  "mutation", "count"))
+# rename the lists
+names(df.list) <- gsub(".*?/(.*?)[.]cou.*", "\\1", file.list)
+# names(df.list) <- gsub("split", "-", names(df.list))
+
+
+# names(df.list) <- file.list
+# these are the samples
+head(names(df.list))
+# count the sample number
+n.samples <- length(df.list)
+
+# Load the indel statistics with the metadata generated in the parsing script.
+meta.viab.file = list.files(in.dir, full.names = T)  %>% .[grepl("Viab_Meta", .)] %>% sort(.) %>% tail(n = 1)
+indel.statistics.dt = as.data.table(readRDS(meta.viab.file))
+
+setnames(indel.statistics.dt, 
+         c("ID", "viability", "viab_norm", 
+           "r_written_pct", "reads"), 
+         c("exp", "viability_split", "viab_norm_split", 
+           "r_written_pct_split", "reads_split"))
+
+# Import RSTP2 clone 5 barcode list (in total 18 barcodes) - "ACCCCTAAAGGCGCTG" (19) + "CTCTTAATCGCTGCC" (20)
+# 19 is very lowly abundant in the sequencing replicate 1 (E177) and therefore omitted
+barcodes.clone5 <- c("AGGGCGTAAAATATTT", "TATGGCTGTCGGGTAG", "TGTCCCTTAGTACTTT", 
+                     "AGAAAATAATATGACG","CGGCCTGAAGGTCAGG","TTGAACGCGGGCTCGG",
+                     "GCTAACATCACGAATC", "GCGCACCCTTTAATTG","ACTGTCGAGTTGTCCG",
+                     "CCGGGGACGTATGCAC","TCTTTTGAGGAGCTGA","ATATCGTTGCTGGAGA",
+                     "CATCCACCACACTTCA","ATACTATATTTAACGG",
+                     "CATTTCTGATCAATAA","GAGCGCGTCACCGGGT",
+                     "GTACCTCTCGATAGTG","TGGCCAATATTTGTCT",
+                     "ACCCCTAAAGGCGCTG"
+)
+```
+
+## Reading the indel data tables
+
+```{r indel data table list}
+# Call true barcodes for clone 5 experiments
+df.list = mclapply(df.list, CallTrueBarcodes, mc.cores = 30)
+
+# add name of the processed file to each mutation table and change mutations to char
+mut.list = mclapply(names(df.list), function(exp){
+  dt = data.table(df.list[[exp]])
+  dt[, mutation := as.character(mutation)]
+  dt_exp = data.table(exp = exp,
+                      dt)
+  return(dt_exp)
+}, mc.cores = 10)
+```
+
+
+# Processing
+
+## Transform into data table and filtering
+Check how many reads are in general not clear or called as point mutations. 
+
+```{r indel dataframe screen}
+# Make a single data.table from the mutations list.
+mutations.prefilter.dt = do.call(rbind, c(mut.list, fill = T))
+dim(mutations.prefilter.dt) 
+
+# Remove NA counts
+mutations.prefilter.dt = mutations.prefilter.dt[!is.na(count)]
+dim(mutations.prefilter.dt)
+
+## Not clear reads:
+notclear = mutations.prefilter.dt %>% filter(type == "not_clear") %>% pull(count) %>% sum()
+all = mutations.prefilter.dt %>%  pull(count) %>% sum()
+notclear / all * 100
+
+# remove the inf from the datatable
+mutations.prefilter.dt = mutations.prefilter.dt[type != "not_clear"]
+dim(mutations.prefilter.dt)
+# Point mutations: 
+pointmut = mutations.prefilter.dt %>% filter(type == "wt_point_mut") %>% pull(count) %>% sum()
+pointmut / all * 100
+
+# remove the point mutations from the datatable
+mutations.prefilter.dt = mutations.prefilter.dt[type != "wt_point_mut"]
+dim(mutations.prefilter.dt)
+
+## For the time being, let's also remove the +1 and -1 WT. 
+# until I understand what Christ means with it
+mutations.prefilter.dt = mutations.prefilter.dt[!(type == "wt" & mutation != 0)]
+dim(mutations.prefilter.dt)
+# same for ssODN as we didn't use it here.
+mutations.prefilter.dt = mutations.prefilter.dt[type != "ssODN"]
+dim(mutations.prefilter.dt)
+
+setnames(mutations.prefilter.dt, "type", "mut_type")
+
+complete.mutations.dt = mutations.prefilter.dt %>% 
+  complete(mutation, nesting(exp, barcode), fill = list(count = 0)) %>% 
+  mutate(mut_type = ifelse(mutation < 0, "del", ifelse(mutation > 0, "ins", "wt"))) %>%
+  data.table()
+
+dim(complete.mutations.dt)
+dim(distinct(complete.mutations.dt))
+table(duplicated(complete.mutations.dt[1:200, ]))
+```
+
+0.27% of all the reads are not clear and 1.8% of all the reads are point mutations in the guide sequence.
+
+## Normalising counts, calculating frequencies and merging metadata.
+
+```{r merging technical replicates and calculating frequencies}
+# First measure the ratio before doing the sum of the technical replicates: 
+# We will call the data prior to the technical replicate combination "_split"
+setnames(complete.mutations.dt,"count", "count_split")
+
+# Normalise the counts of each sample so that there is no bias due to deeper sequencing depth.
+complete.mutations.dt[, norm_split := count_split/sum(count_split), by=exp,]
+
+# Calculate the frequency per technical replicate per barcode & experiment 
+# using the normalised counts from before, and the total reads for that barcode. 
+complete.mutations.dt[, c("freq_split", "sum_bc_reads_split") := 
+                        list(norm_split/sum(norm_split, na.rm = TRUE), sum(count_split)), 
+                      by = c("barcode","exp")]
+
+
+# Same as above but only conting the indels, ignoring the WT sequence.
+complete.mutations.dt[!mutation%in%c(0,NA), 
+                      ratio_indels_split := norm_split/sum(norm_split, na.rm = TRUE), 
+                      by=c("barcode","exp")]
+
+complete.mutations.dt[mutation%in%c(1, -7, 0), 
+                      mut.counts := sum(count_split, na.rm = TRUE), 
+                      by=c("barcode","exp")]
+
+# Filter the data for at least 100 reads per barcode
+length(unique(complete.mutations.dt$exp))
+length(unique(complete.mutations.dt[sum_bc_reads_split < 100]$exp))
+
+# Filter on minimal 40 reads per +1/-7 reads
+length(unique(complete.mutations.dt[mut.counts < read_count_limit]$exp))
+
+E177_pre = sum(grepl("E177", unique(complete.mutations.dt$exp)))
+E1504_pre = sum(grepl("E1504", unique(complete.mutations.dt$exp)))
+
+# # Filter with 100 min reads per barcode
+# filtered.sumreads.dt =
+#   unique(complete.mutations.dt[sum_bc_reads_split >= 100, c("exp", "barcode",  "sum_bc_reads_split")])
+# 
+# E177_post = sum(grepl("E177", unique(filtered.sumreads.dt$exp)))
+# E1504_post = sum(grepl("E1504", unique(filtered.sumreads.dt$exp)))
+# 
+# # Samples are removed from quite some wells.
+# length(unique(filtered.sumreads.dt$exp))
+# # Number of wells with removed IPRs
+# E177_pre - E177_post
+# # Number of wells with removed IPRs
+# E1504_pre - E1504_post
+
+# Filter with 40 min reads per barcode like Xabi did.
+filtered.indelreads.dt = 
+  unique(complete.mutations.dt[!is.na(complete.mutations.dt$mut.counts) & 
+                                 mut.counts >= read_count_limit, 
+                               c("exp", "barcode", "mut.counts")])
+
+# List all exp names in previous table
+exps = unique(filtered.indelreads.dt$exp)
+
+# List all the exps that still contain all the barcodes after count filtering 
+filtered.indelreads.exp = exps[table(filtered.indelreads.dt$exp) == length(barcodes.clone5)]
+
+E177_post = sum(grepl("E177", unique(filtered.indelreads.dt$exp)))
+E1504_post = sum(grepl("E1504", unique(filtered.indelreads.dt$exp)))
+
+# Samples are removed from quite some wells. 
+length(unique(filtered.indelreads.dt$exp))
+# Number of wells with removed IPRs
+E177_pre - E177_post
+# Number of wells with removed IPRs
+E1504_pre - E1504_post
+# Apply the filter
+mutations.dt = complete.mutations.dt %>% 
+  filter(exp %in% filtered.indelreads.exp)
+
+# check if lowest mut.count is 30
+mutations.dt %>% 
+  filter(!is.na(mut.counts)) %>% 
+  pull(mut.counts) %>% 
+  min()
+
+dim(complete.mutations.dt)
+dim(mutations.dt)
+
+# Add an ID column that removes the technical replicates information 
+mutations.dt[, ID := gsub("^(E1504|E177)_[0-9][0-9]_(1|10|100)_[123]_([12]_...$)", 
+                          "\\1_\\2_\\3", 
+                          exp, 
+                          perl = TRUE)]
+# Merge the indel statistics
+mutations.stat.dt = left_join(mutations.dt, indel.statistics.dt)
+
+# Filter the low viability reads
+# This filters out all drugs at a certain concentration were at least 2/3 technical replicates were below 0.5 in at least one biological replicate 
+keep_drugs_eff <- mutations.stat.dt %>%
+  distinct(plate, drug, conc_char, well, tech, replicate, viab_norm_split) %>%
+  # filter for samples with higher viab than the limit
+  filter(viab_norm_split > viab_limit_eff) %>% # filter
+  distinct(conc_char, drug, tech, replicate) %>% # list conditions that remain
+  mutate(conc_char_drug = paste(conc_char, drug, sep = " "), # conc + drug combination
+         tech_n = ave(conc_char_drug, conc_char_drug, replicate, FUN = length), # count technical replicates in which this combination is found in
+         conc_char_drug_rep = paste(conc_char, drug, replicate, sep = " ")) %>% # conc + drug + replicate combination
+  # These conditions need to be present in at least 2 (out of 3) technical replicates per bio replicate
+  filter(tech_n > 1) %>%  # filter
+  distinct(replicate, conc_char_drug, conc_char_drug_rep) %>% # list conditions that remain
+  mutate(rep_n = ave(conc_char_drug,conc_char_drug, FUN = length)) %>% # check if present in both replicates
+  # And in both bio replicates
+  filter(rep_n > 1) %>% # removes the ones in only 1 replicate
+  pull(conc_char_drug) %>% # pull the drug & concentration we keep
+  unique() # remove doublets
+
+######## This below is not needed anymore if the same cutoff is used for balance and efficiency.#######
+
+# This filters out all drugs at a certain concentration were at least 2/3 technical replicates were below 0.5 in at least one biological replicate 
+keep_drugs_bal <- mutations.stat.dt %>%
+  distinct(plate, drug, conc_char, well, tech, replicate, viab_norm_split) %>%
+  # filter for samples with higher viab than the limit
+  filter(viab_norm_split > viab_limit_bal) %>%
+  distinct(conc_char, drug, tech, replicate) %>%
+  mutate(conc_char_drug = paste(conc_char, drug, sep = " "),
+         tech_n = ave(conc_char_drug, conc_char_drug, replicate, FUN = length),
+         conc_char_drug_rep = paste(conc_char, drug, replicate, sep = " ")) %>%
+  # These conditions need to be present in at least 2 (out of 3) technical replicates per bio replicate
+  filter(tech_n > 1) %>% 
+  distinct(replicate, conc_char_drug, conc_char_drug_rep) %>%
+  mutate(rep_n = ave(conc_char_drug,conc_char_drug, FUN = length)) %>%
+  # And in both bio replicates
+  filter(rep_n > 1) %>% 
+  pull(conc_char_drug) %>%
+  unique()
+
+dim(mutations.stat.dt)
+
+# Filter for the viability
+mutations.screen.dt <- mutations.stat.dt %>%
+  # filter out technical replicates below the viability cutoff
+  # filter(viab_norm_split > viab_limit_eff) %>%
+  # make filter for the conditions for which we do not have at least 2 technical replicates
+  mutate(conc_char_drug = paste(conc_char, drug, sep = " "),
+         indel_freq_filter = ifelse(conc_char_drug %in% keep_drugs_eff, TRUE, FALSE),
+         pathway_bal_filter = ifelse(conc_char_drug %in% keep_drugs_bal, TRUE, FALSE),
+         viab_norm_split_eff = ifelse(indel_freq_filter & viab_norm_split > viab_limit_eff, viab_norm_split, NA), 
+         viab_norm_split_bal = ifelse(pathway_bal_filter & viab_norm_split > viab_limit_bal, viab_norm_split, NA)) %>%
+  # remove these columns
+  dplyr::select(-mut.counts) %>%
+  # Calculate new mean
+  mutate(viab_mean_if = ave(viab_norm_split_eff, drug, conc_char, replicate, FUN = function(x) mean(x, na.rm=T)),
+         viab_mean_pb = ave(viab_norm_split_bal, drug, conc_char, replicate, FUN = function(x) mean(x, na.rm=T)))
+
+dim(mutations.screen.dt)
+
+# Quick random check of the data for a specific barcode and drug: 
+mutations.screen.dt[barcode == "ACTGTCGAGTTGTCCG" & drug == "Zebularine" & mutation == -7, 
+                    -c("mut_type", "file", "seq_barcode", "seq_index", "well", 
+                       "barcode", "mutation", "index_length", "drug_no", "drug_well")]
+
+mutations.screen.dt[is.na(mutation), ]
+```
+
+## Pooling large indels for indel spectrum plotting
+
+```{r large indel pooling for indel plots screen}
+# Fix large deletions for every deletion above 25 (we do not sequence deletions larger than 130 bp)
+largedels <- as.character(seq(-130, -15))
+
+mutations.large.del.dt = mutations.screen.dt[mutation %in% largedels & pathway_bal_filter & viab_norm_split > viab_limit_bal, ]
+
+# Sum large dels
+mutations.large.del.sum.dt = 
+  mutations.large.del.dt[, lapply(.SD, sum, na.rm=TRUE), 
+                         by=c("exp", "barcode"),
+                         .SDcols=c("count_split",  
+                                   "norm_split", "freq_split",
+                                   "ratio_indels_split")]
+# Add indel info
+mutations.large.del.sum.dt[, c("mutation", "mut_type") := list("<-14", "del")]
+
+mutations.large.del.sum.dt[is.na(mutation), ]
+
+# Make base data table with columns except the 2 1st ones (exp & barcode)
+colslargedels = colnames(mutations.large.del.sum.dt)[3:ncol(mutations.large.del.sum.dt)]
+
+base.dt = mutations.screen.dt %>% 
+  dplyr::select(!all_of(colslargedels)) %>% distinct()
+
+# Merge the base DT with groupe larde dels
+mutations.large.del.sum.base.dt = base.dt %>% 
+  left_join(mutations.large.del.sum.dt, by = c("exp", "barcode")) %>% 
+  distinct()
+
+dim(mutations.large.del.sum.base.dt)
+
+mutations.large.del.sum.base.dt[is.na(mutation), ]
+
+
+# Fix large insertions for every insertions above 3
+largeins <- as.character(seq(3, 20))
+mutations.large.ins.dt = mutations.screen.dt[mutation %in% largeins & pathway_bal_filter & viab_norm_split > viab_limit_bal, ]
+
+# Sum large ins
+mutations.large.ins.sum.dt = mutations.large.ins.dt[, lapply(.SD, sum, na.rm=TRUE),  by=c("exp", "barcode"),
+                                                    .SDcols=c("count_split",  
+                                                              "norm_split", "freq_split",
+                                                              "ratio_indels_split")]
+# Add indel info
+mutations.large.ins.sum.dt[, c("mutation", "mut_type") := list(">2", "ins")]
+
+# Merge the base DT with groupe larde ins
+mutations.large.ins.sum.base.dt = base.dt %>% 
+  left_join(mutations.large.ins.sum.dt, by = c("exp", "barcode")) %>% 
+  distinct()
+
+mutations.large.ins.sum.base.dt[is.na(mutation), ]
+
+large.indels.dt = rbind(mutations.large.del.sum.base.dt, 
+                        mutations.large.ins.sum.base.dt) %>% 
+  distinct()
+
+muts <- unique(mutations.screen.dt$mutation)
+min_indel <- min(as.numeric(muts))
+max_indel <- max(as.numeric(muts))
+indels <- c("<-14", as.character(seq(min_indel, max_indel)), ">2")
+
+setcolorder(large.indels.dt,colnames(mutations.screen.dt))
+
+screen.indel.dt = rbind(mutations.screen.dt, large.indels.dt) %>% 
+  distinct()
+
+dim(screen.indel.dt)
+
+# screen.indel.dt[, c("sample", "type", "color") :=  list(
+#   # Add column with controls vs drug for plotting also
+#   ifelse(drug == "DMSO", "DMSO (neg control)", ifelse(
+#   drug == "DNA-PKi", "DNA-PKi (NHEJ control)", ifelse(
+#     drug == "Mirin", "Mirin (MMEJ control)", ifelse(
+#       drug == "PAO", "PAO (killing control)", "Epigenetic Compound")))),
+#   # Add column to identify core, grouped (large) indels or large indels (individual)
+#   ifelse(mutation %in% c(largedels, largeins), "large_indel", 
+#          ifelse(mutation %in% c("<-14", ">2"), "grouped_indel", "core")),
+#   # Add column with color for plotting ease
+#   ifelse(mutation == 0, "wt", 
+#          ifelse(mutation == 1, "NHEJ", 
+#                 ifelse(mutation == -7, "MMEJ", "other"))))]
+screen.indel.dt %>% setDT
+
+screen.indel.dt[, sample := 
+                  # Add column with controls vs drug for plotting also
+                  ifelse(drug == "DMSO", "DMSO (neg control)", ifelse(
+                    drug == "DNA-PKi", "DNA-PKi (NHEJ control)", ifelse(
+                      drug == "Mirin", "Mirin (MMEJ control)", ifelse(
+                        drug == "PAO", "PAO (killing control)", "Epigenetic Compound"))))]
+
+screen.indel.dt[, type := 
+                  # Add column to identify core, grouped (large) indels or large indels (individual)
+                  ifelse(mutation %in% c(largedels, largeins), "large_indel", 
+                         ifelse(mutation %in% c("<-14", ">2"), "grouped_indel", "core"))]
+
+screen.indel.dt[, color :=
+                  # Add column with color for plotting ease
+                  ifelse(mutation == 0, "wt", 
+                         ifelse(mutation == 1, "NHEJ", 
+                                ifelse(mutation == -7, "MMEJ", "other")))]
+
+# Make factor from mutations, so plotting is made easy
+screen.indel.dt[, mutation := factor(screen.indel.dt$mutation, levels=indels)]
+
+dim(screen.indel.dt)
+# Finally remove all the count = 0 now that the ratios have been calculated
+```
+
+## R cleanup
+```{r cleanup screen}
+rm(list = ls()[grep("^mutations", ls())])
+rm(list = ls()[grep("list$", ls())])
+rm(list = ls()[grep("large.indels.dt", ls())])
+rm(list = ls()[grep("mutations.dt", ls())])
+```
+
+## Add identifiers and compute indel ratios
+
+```{r calculate_ratios screen}
+# Calculate NHEJ/MMEJ ratios and efficiences
+ratios_tib <- screen.indel.dt %>%
+  filter(mutation %in% c("1", "-7") & pathway_bal_filter & viab_norm_split > viab_limit_bal) %>%
+  dplyr::distinct(exp, barcode, mutation, ratio_indels_split) %>% 
+  pivot_wider(names_from = mutation, 
+              values_from = ratio_indels_split, 
+              values_fill = 0) %>%
+  dplyr::rename(freqMMEJ = `-7`,
+                freqNHEJ = `1`) %>%
+  mutate(MMEJratio = freqMMEJ / freqNHEJ,
+         NHEJratio = freqNHEJ / freqMMEJ,
+         MMEJscore = freqMMEJ / (freqMMEJ + freqNHEJ),
+         NHEJscore = freqNHEJ / (freqNHEJ+ freqMMEJ),
+         MMEJratio_global = ave(MMEJratio, exp, FUN = function(x) mean(x, na.rm=T)))
+
+
+freqs_ratios_tib <- screen.indel.dt %>%
+  as_tibble() %>%
+  filter(mutation == "0" & indel_freq_filter & viab_norm_split > viab_limit_eff) %>%
+  dplyr::distinct(exp, barcode, freq_split) %>% 
+  mutate(freqCut = 1 - freq_split,
+         freqCut_global = ave(freqCut, exp, FUN = function(x) mean(x, na.rm=T)),
+         freqCut_max = ave(freqCut, exp, FUN = max)) %>%
+  distinct(exp, barcode, freqCut, freqCut_global, freqCut_max) %>% 
+  left_join(ratios_tib, by = c("exp", "barcode"))
+
+screen.indel.dt.backup = copy(screen.indel.dt)
+screen.indel.dt = left_join(screen.indel.dt, freqs_ratios_tib, by = c("exp", "barcode"))
+
+dim(screen.indel.dt)
+
+```
+
+## Calculate mean indel frequencies
+```{r split table for indels}
+indel.cols = c("replicate",
+               "barcode",
+               "tech",
+               "exp",
+               "mutation",
+               "mut_type",
+               "count_split",
+               "norm_split",
+               "freq_split",
+               "sum_bc_reads_split",
+               "ratio_indels_split",
+               "ID",
+               "concentration",
+               "drug_plate",
+               "drug",
+               "target",
+               "viab_norm_split",
+               "indel_freq_filter",
+               "pathway_bal_filter",
+               "viab_mean_if",
+               "viab_mean_pb",
+               "viab_reproducibility",
+               "conc_char",
+               "viab_mean",
+               "sample",
+               "type",
+               "color",
+               "freqCut",
+               "freqCut_global",
+               "freqCut_max")
+
+screen.indels.dt = screen.indel.dt %>% dplyr::select(all_of(indel.cols)) %>% distinct()
+
+indel.cols.only = c(
+  "mutation",
+  "mut_type",
+  "count_split",
+  "norm_split",
+  "freq_split",
+  "freq_mean_rep",
+  "freq_mean",
+  "freq_sd_rep",
+  "freq_sd",
+  "ratio_indels_split",
+  "type",
+  "color")
+
+screen.ratio.dt = screen.indel.dt %>% dplyr::select(-any_of(indel.cols.only)) %>% distinct()
+```
+
+```{r averaging indel frequencies}
+screen.indels.dt %<>% as.data.table()
+
+# Calculate all the means even with those not passing filters, why I don't know, we're constantly testing anyways...
+screen.indels.dt[, 
+                 c("freq_mean_rep_all", "freq_sd_rep_all") := 
+                   list(mean(freq_split, na.rm = TRUE), 
+                        sd(freq_split, na.rm = TRUE)), 
+                 by=c("barcode", "mutation", "replicate", "drug", "conc_char")] 
+
+screen.indels.dt[, 
+                 c("freq_mean_all", "freq_sd_all") := 
+                   list(mean(freq_split, na.rm = TRUE), 
+                        sd(freq_split, na.rm = TRUE)), 
+                 by=c("barcode", "mutation", "drug", "conc_char")] 
+
+# Calculate the means with the filters on.
+screen.indels.dt[pathway_bal_filter & viab_norm_split > viab_limit_bal, 
+                 c("freq_mean_rep", "freq_sd_rep") := 
+                   list(mean(freq_split, na.rm = TRUE), 
+                        sd(freq_split, na.rm = TRUE)), 
+                 by=c("barcode", "mutation", "replicate", "drug", "conc_char")] 
+
+
+screen.indels.dt[pathway_bal_filter & viab_norm_split > viab_limit_bal, 
+                 c("freq_mean", "freq_sd") := 
+                   list(mean(freq_split, na.rm = TRUE), 
+                        sd(freq_split, na.rm = TRUE)), 
+                 by=c("barcode", "mutation", "drug", "conc_char")]
+```
+
+# Calculating the z-scores
+
+## Data plotting
+
+### Checking DMSO data distribution
+
+Before calculating the z-scores we need to check the DMSO data distribution if it's normal or not.
+First the general distribution in a bee swarm plot per barcode.
+
+```{r plotting the balance and efficiency per barcode, eval = FALSE, echo = FALSE}
+for (i in barcodes.clone5) {
+  norm_pooled = screen.ratio.dt %>%
+    filter(drug == "DMSO", barcode == i) %>%
+    distinct(ID, barcode, freqCut, MMEJscore, replicate, tech)
+  plt1 = ggplot(norm_pooled, aes(replicate, freqCut, color = as.character(tech))) + 
+    geom_quasirandom() +
+    stat_summary(fun=mean, aes(shape="mean", color = "mean"), geom="point") +
+    stat_summary(fun=median, aes(shape="median", color = "median"), geom="point") +
+    scale_shape_manual(values=c("mean"= 15, "median" = 16)) +
+    scale_color_manual(values=c("1"= "gray80", "2"= "gray50", "3"= "gray20", "mean"= "red", "median" = "blue"))+
+    ylim(0.3, 1) +
+    theme_bw() +
+    ggtitle(paste0("freqCut Barcode: ", i))
+  plt2 = ggplot(norm_pooled, aes(replicate, MMEJscore, color = as.character(tech))) + 
+    geom_quasirandom() +
+    stat_summary(fun=mean, aes(shape="mean", color = "mean"), geom="point") +
+    stat_summary(fun=median, aes(shape="median", color = "median"), geom="point") +
+    scale_shape_manual(values=c("mean"= 15, "median" = 16)) +
+    scale_color_manual(values=c("1"= "gray80", "2"= "gray50", "3"= "gray20", "mean"= "red", "median" = "blue"))+
+    ylim(0, 0.6) +
+    theme_bw() +
+    ggtitle(paste0("MMEJscore Barcode: ", i))
+  print(plot_grid(plt1, plt2))
+}
+
+# same by concentration
+for (i in barcodes.clone5) {
+  norm_pooled = screen.ratio.dt %>%
+    filter(drug == "DMSO", barcode == i) %>%
+    distinct(ID, barcode, freqCut, MMEJscore, replicate, concentration)
+  plt1 = ggplot(norm_pooled, aes(replicate, freqCut, color = as.character(concentration))) + 
+    geom_quasirandom() +
+    stat_summary(fun=mean, aes(shape="mean", color = "mean"), geom="point") +
+    stat_summary(fun=median, aes(shape="median", color = "median"), geom="point") +
+    scale_shape_manual(values=c("mean"= 15, "median" = 16)) +
+    scale_color_manual(values=c("100"= "gray80", "1"= "gray50", "10"= "gray20", "mean"= "red", "median" = "blue"))+
+    ylim(0.3, 1) +
+    theme_bw() +
+    ggtitle(paste0("freqCut Barcode: ", i))
+  plt2 = ggplot(norm_pooled, aes(replicate, MMEJscore, color = as.character(concentration))) + 
+    geom_quasirandom() +
+    stat_summary(fun=mean, aes(shape="mean", color = "mean"), geom="point") +
+    stat_summary(fun=median, aes(shape="median", color = "median"), geom="point") +
+    scale_shape_manual(values=c("mean"= 15, "median" = 16)) +
+    scale_color_manual(values=c("100"= "gray80", "1"= "gray50", "10"= "gray20", "mean"= "red", "median" = "blue"))+
+    ylim(0, 0.6) +
+    theme_bw() +
+    ggtitle(paste0("MMEJscore Barcode: ", i))
+  print(plot_grid(plt1, plt2))
+}
+```
+We can observe some outliers but in general the data is quite reproducible. Some notes:
+- The efficiency for technical replicates, especially in E1504 seems to group together. This is important to note for the normalization of the drug effect on the efficiency. 
+- Barcode ACCCCTAAAGGCGCTG has a very large range in E177 for some reason.
+- Mean and median are very similar, it's good enough to use the mean in all the cases.
+
+
+### Checking for data normality
+Check if the DMSO data is normally distributed for MMEJscore and freqCut with qqplots. 
+
+```{r check for normal distribution, eval = FALSE, echo = FALSE}
+for (i in barcodes.clone5) {
+  norm_pooled = screen.ratio.dt %>%
+    filter(drug == "DMSO", barcode == i) %>%
+    distinct(ID, barcode, freqCut, MMEJscore, replicate)
+  plt1 = qplot(sample = freqCut, data = norm_pooled, color=replicate) +
+    theme_bw() +
+    ggtitle(paste0("pooled freqCut Barcode: ", i))
+  plt2 = qplot(sample = MMEJscore, data = norm_pooled, color=replicate) +
+    theme_bw() +
+    ggtitle(paste0("pooled MMEJscore Barcode: ", i))
+  print(plot_grid(plt1, plt2))
+}
+```
+
+Some samples have clear outlyers, others aren't prefectly normally distributed but in general it's rather good.
+
+## Calculating the z-scores and normalised efficiencies
+
+```{r efficiency normalisation to DMSO values}
+# Plate normalization for cutting/repair efficiency - 
+# calculate efficiency relative to mean DMSO efficiency per concentration, barcode and replicate
+# First a table with DMSO efficiency per barcode, per technical replicate. 
+
+dmso.TIF <- screen.ratio.dt %>%
+  filter(drug == "DMSO") %>%
+  distinct('DMSO' = freqCut, barcode, replicate,
+           tech, well, drug_plate) %>%
+  mutate(DMSO = ave(DMSO, barcode, replicate, tech, FUN = function(x) mean(x, na.rm=T))) %>% # mean per technical replicate
+  distinct(DMSO, barcode, replicate, tech)
+
+dmso.global <- screen.ratio.dt %>%
+  distinct('DMSO_global' = freqCut_global, replicate, tech) %>%
+  mutate(DMSO_global = ave(DMSO_global, replicate, tech, FUN = function(x) mean(x, na.rm=T))) %>%
+  distinct(DMSO_global, replicate, tech)
+
+screen.ratio.dt = left_join(screen.ratio.dt, dmso.TIF) %>% left_join(dmso.global)
+
+screen.ratio.dt <- screen.ratio.dt %>%
+  mutate(freqCut_norm = freqCut / DMSO,
+         freqCut_diff = freqCut - DMSO,
+         freqCut_norm_global = freqCut_global / DMSO_global,
+         freqCut_diff_global = freqCut_global - DMSO_global) %>%
+  # group by barcode, drug, concentration and replicate for mean 
+  # efficiency per well and barcode (remove technical replicates)
+  group_by(barcode, drug, conc_char, replicate) %>% 
+  mutate(freqCut_mean = mean(freqCut, na.rm = TRUE),
+         freqCut_global_mean = mean(freqCut_global, na.rm = TRUE),
+         freqCut_norm_mean = mean(freqCut_norm, na.rm = TRUE),
+         freqCut_norm_global_mean = mean(freqCut_norm_global, na.rm = TRUE),
+         freqCut_diff_mean = mean(freqCut_diff, na.rm = TRUE),
+         freqCut_diff_global_mean = mean(freqCut_diff_global, na.rm = TRUE),
+         MMEJratio_mean = mean(MMEJratio, na.rm = TRUE),
+         NHEJratio_mean = mean(NHEJratio, na.rm = TRUE),
+         MMEJscore_mean = mean(MMEJscore, na.rm = TRUE),
+         MMEJratio_global_mean = mean(MMEJratio_global, na.rm = TRUE)) %>%
+  ungroup()
+
+
+dim(screen.indel.dt)
+dim(screen.ratio.dt)
+```
+
+# Efficiency z-score calculation
+
+## DMSO null distribution
+### Per technical replicate
+```{r DMSO null distribution}
+#data frame to save data
+mean_sd_fits <- tibble(term = NA, estimate = NA, std.error = NA, barcode = NA, rep = NA)
+
+# First prepare a table with TIF in DMSO, well, barcode, replicate, tech and plate. Then group by tech and replicate.
+dmso.TIF.score <- screen.ratio.dt %>%
+  filter(drug == "DMSO") %>%
+  dplyr::select('DMSO' = freqCut, 'DMSO_global' = freqCut_global, well, barcode, replicate, tech, plate) %>%
+  mutate(rep = paste(replicate, tech, sep = " ")) %>%
+  distinct(barcode, replicate, tech, well, plate, DMSO, DMSO_global, rep)
+
+#Function to fit normal distribution through data
+for (i in unique(dmso.TIF.score$rep)) {
+  for (x in unique(dmso.TIF.score$barcode)) {
+    single_wt_ratio <- filter(dmso.TIF.score, rep == i & barcode == x) %>% pull(DMSO)
+    mean_sd_fits_row <- fitdistr(single_wt_ratio, "normal") %>% tidy()
+    mean_sd_fits <- mean_sd_fits %>% add_row(mean_sd_fits_row %>% mutate(barcode = x, rep = i))
+  }
+  # Same for the global scores
+  single_wt_ratio_global <- filter(dmso.TIF.score, rep == i) %>% distinct(DMSO_global) %>% pull(DMSO_global)
+  mean_sd_fits_row_global <- fitdistr(single_wt_ratio_global, "normal") %>% tidy()
+  mean_sd_fits <- mean_sd_fits %>% add_row(mean_sd_fits_row_global %>% mutate(barcode = "global", rep = i))
+}
+
+#Transform the fitted values 
+dmso.TIF.score <- mean_sd_fits %>% filter(!is.na(term)) %>%
+  dplyr::select(-std.error) %>%
+  separate(rep, into = c("replicate", "tech"), sep = " ") %>%
+  mutate(tech = as.integer(tech)) %>%
+  pivot_wider(names_from = term, values_from = estimate) %>% 
+  dplyr::select(barcode, replicate, tech, mean_DMSO = mean, sd_DMSO = sd)
+
+# Same for the global scores to merge.
+dmso.TIF.score.global = dmso.TIF.score %>% 
+  filter(barcode == "global") %>% 
+  dplyr::rename(mean_DMSO_global = mean_DMSO, sd_DMSO_global = sd_DMSO) %>% 
+  dplyr::select(-barcode)
+
+dmso.TIF.score %<>% left_join(dmso.TIF.score.global)
+```
+
+```{r combine DMSO TIF in table}
+TIF_zscore_calc = screen.ratio.dt %>% 
+  filter(!is.na(freqCut)) %>%
+  distinct(barcode, replicate, tech, drug, well, plate, freqCut, freqCut_global, drug_plate, conc_char) %>% 
+    mutate(drug = ifelse(drug == "DMSO" & plate %in% c(1:6), paste(drug, drug_plate, well, "1", sep = " "), 
+                       ifelse(drug == "DMSO" & plate %in% c(7:12), paste(drug, drug_plate, well, "2", sep = " "),
+                              ifelse(drug == "DMSO" & plate %in% c(13:18), paste(drug, drug_plate, well, "3", sep = " "),drug)))) %>%
+  left_join(dmso.TIF.score)
+```
+
+### Calculate the TIF z-scores per barcode
+```{r calculate tech efficiency z-scores}
+# Calculate IPR z-scores per technical replicate
+TIF.zscore = TIF_zscore_calc %>%
+  # And calculate the z-scores
+  mutate(zscore_TIF = (freqCut - mean_DMSO) / sd_DMSO,
+         zscore_TIF_global = (freqCut_global - mean_DMSO_global) / sd_DMSO_global)
+
+# Combine the z-scores of both screens
+mean.TIF.zscore.comb = TIF.zscore %>% 
+  distinct(drug, conc_char, barcode, replicate, zscore_TIF, zscore_TIF_global) %>%
+  filter(!is.na(zscore_TIF)) %>%
+  mutate(
+    # Local score
+    score_TIF_comb_tech = ave(zscore_TIF, drug, conc_char, barcode, replicate,
+                              FUN = mean),
+    # Global score: 
+    score_TIF_global_comb_tech = ave(zscore_TIF_global, drug, conc_char, barcode, replicate,
+                                     FUN = mean),
+    # First count the number of replicates per screen.
+    n_reps = ave(zscore_TIF, 
+                 drug, conc_char, replicate, barcode, 
+                 FUN = length),
+    # Count how many replicates have significant zscore
+    sum_tech  = ave(zscore_TIF, 
+                       drug, conc_char, replicate, barcode, 
+                       FUN = function(x) sum(abs(x) >= 1.96)),
+    filter_zscore_TIF = ifelse(n_reps-sum_tech < 2, TRUE, FALSE),
+    
+    # Create filter for the z-scores for at least 2 significant hits per screen. 
+    sum_tech_global = ave(zscore_TIF_global, 
+                       drug, conc_char, replicate, barcode, 
+                       FUN = function(x) sum(abs(x) >= 1.96)),
+    filter_zscore_TIF_global = ifelse(n_reps-sum_tech_global < 2, TRUE, FALSE))
+```
+
+### DMSO null ditribution after averaging the z-scores of the technical replicates
+```{r DMSO null distribution of mean replicates}
+#data frame to save data
+mean_sd_fits_score <- tibble(term = NA, estimate = NA, std.error = NA, barcode = NA, replicate = NA)
+
+# First prepare a table with TIF in DMSO, well, barcode, replicate, tech and plate. Then group by tech and replicate.
+dmso.TIF.score.comb <- mean.TIF.zscore.comb %>%
+  filter(grepl("DMSO", drug)) %>%
+  dplyr::select('DMSO' = score_TIF_comb_tech, 'DMSO_global' = score_TIF_global_comb_tech,  barcode, replicate) %>%
+  distinct(barcode, replicate, DMSO, DMSO_global)
+
+#Function to fit normal distribution through data
+for (i in unique(dmso.TIF.score.comb$replicate)) {
+  for (x in unique(dmso.TIF.score.comb$barcode)) {
+    single_wt_ratio <- filter(dmso.TIF.score.comb, replicate == i & barcode == x) %>% pull(DMSO)
+    mean_sd_fits_row <- fitdistr(single_wt_ratio, "normal") %>% tidy()
+    mean_sd_fits_score <- mean_sd_fits_score %>% add_row(mean_sd_fits_row %>% mutate(barcode = x, replicate = i))
+  }
+  # Same for the global scores
+  single_wt_ratio_global <- filter(dmso.TIF.score.comb, replicate == i) %>% distinct(DMSO_global) %>% pull(DMSO_global)
+  mean_sd_fits_row_global <- fitdistr(single_wt_ratio_global, "normal") %>% tidy()
+  mean_sd_fits_score <- mean_sd_fits_score %>% add_row(mean_sd_fits_row_global %>% mutate(barcode = "global", replicate = i))
+}
+
+#Transform the fitted values 
+dmso.TIF.score.rep <- mean_sd_fits_score %>% filter(!is.na(term)) %>%
+  dplyr::select(-std.error) %>%
+  pivot_wider(names_from = term, values_from = estimate) %>% 
+  dplyr::select(barcode, replicate, mean_DMSO = mean, sd_DMSO = sd)
+
+# Same for the global scores to merge.
+dmso.TIF.score.rep.global = dmso.TIF.score.rep %>% 
+  filter(barcode == "global") %>% 
+  dplyr::rename(mean_DMSO_global = mean_DMSO, sd_DMSO_global = sd_DMSO) %>% 
+  dplyr::select(-barcode)
+
+dmso.TIF.score.rep %<>% left_join(dmso.TIF.score.rep.global)
+```
+
+### Calculate the TIF z-scores per barcode combined reps
+```{r calculate final efficiency z-scores}
+# Calculate IPR z-scores per technical replicate
+TIF.zscore.reps = mean.TIF.zscore.comb %>%
+  left_join(dmso.TIF.score.rep) %>%
+  # And calculate the z-scores
+  mutate(zscore_TIF_tech = (score_TIF_comb_tech - mean_DMSO) / sd_DMSO,
+         zscore_TIF_global_tech = (score_TIF_global_comb_tech - mean_DMSO_global) / sd_DMSO_global)
+
+# Combine the z-scores of both screens
+TIF.zscore.comb = TIF.zscore.reps %>% 
+  distinct(drug, conc_char, barcode, replicate, 
+           zscore_TIF, zscore_TIF_global, zscore_TIF_tech, zscore_TIF_global_tech, 
+           filter_zscore_TIF, filter_zscore_TIF_global) %>%
+  filter(!is.na(zscore_TIF_tech)) %>%
+  mutate(
+    # Local z-score:
+    zscore_TIF_comb_rep = ave(zscore_TIF_tech, drug, conc_char, barcode,
+                              FUN = function(x) sum(x)/sqrt(length(x))),
+    # Global z-score: 
+    zscore_TIF_global_comb_rep = ave(zscore_TIF_global_tech, drug, conc_char, barcode,
+                                     FUN =  function(x) sum(x)/sqrt(length(x))),
+    ## Filters ##
+    # Filter for same effect. 
+    sum_sign = ave(zscore_TIF_tech, drug, conc_char, barcode,
+                   FUN = function(x) length(table(sign(x)))),
+    # Filter for same effect.     
+    sum_sign_global = ave(zscore_TIF_global_tech, drug, conc_char, barcode,
+                          FUN = function(x) length(table(sign(x))))) %>%
+  group_by(drug, conc_char, barcode) %>%
+  mutate(filter_zscore_TIF_comb_rep = ifelse(sum_sign == 1 & 
+                                          all(filter_zscore_TIF),
+                                        filter_zscore_TIF, FALSE),
+  filter_zscore_TIF_global_comb_rep = ifelse(sum_sign_global == 1 & 
+                                                 all(filter_zscore_TIF_global),
+                                               filter_zscore_TIF_global, FALSE))
+
+TIF.zscore %<>% left_join(mean.TIF.zscore.comb) %>% left_join(TIF.zscore.comb) %>% 
+  dplyr::select(barcode, replicate, plate, tech, well, drug, conc_char,
+                zscore_TIF, score_TIF_comb_tech, 
+                zscore_TIF_tech, filter_zscore_TIF,
+                zscore_TIF_comb_rep, filter_zscore_TIF_comb_rep,
+                zscore_TIF_global, score_TIF_global_comb_tech,
+                zscore_TIF_global_tech, filter_zscore_TIF_global,
+                zscore_TIF_global_comb_rep, filter_zscore_TIF_global_comb_rep)
+```
+
+# Pathway ratio z-score calculation
+## DMSO Null distribution 
+```{r DMSO null distribution balance}
+#data frame to save data
+mean_sd_fits <- tibble(term = NA, estimate = NA, std.error = NA, barcode = NA, rep = NA)
+
+# First prepare a table with bal in DMSO, well, barcode, replicate, tech and plate. Then group by tech and replicate.
+dmso.bal.score <- screen.ratio.dt %>%
+  filter(drug == "DMSO") %>%
+  dplyr::select('DMSO' = MMEJratio, 'DMSO_global' = MMEJratio_global, well, barcode, replicate, tech, plate) %>%
+  mutate(rep = paste(replicate, tech, sep = " ")) %>%
+  distinct(barcode, replicate, tech, well, plate, DMSO, DMSO_global, rep)
+
+#Function to fit normal distribution through data
+for (i in unique(dmso.bal.score$rep)) {
+  for (x in unique(dmso.bal.score$barcode)) {
+    single_wt_ratio <- filter(dmso.bal.score, rep == i & barcode == x) %>% pull(DMSO)
+    mean_sd_fits_row <- fitdistr(single_wt_ratio, "normal") %>% tidy()
+    mean_sd_fits <- mean_sd_fits %>% add_row(mean_sd_fits_row %>% mutate(barcode = x, rep = i))
+  }
+  # Same for the global scores
+  single_wt_ratio_global <- filter(dmso.bal.score, rep == i) %>% distinct(DMSO_global) %>% pull(DMSO_global)
+  mean_sd_fits_row_global <- fitdistr(single_wt_ratio_global, "normal") %>% tidy()
+  mean_sd_fits <- mean_sd_fits %>% add_row(mean_sd_fits_row_global %>% mutate(barcode = "global", rep = i))
+}
+
+#Transform the fitted values 
+dmso.bal.score <- mean_sd_fits %>% filter(!is.na(term)) %>%
+  dplyr::select(-std.error) %>%
+  separate(rep, into = c("replicate", "tech"), sep = " ") %>%
+  mutate(tech = as.integer(tech)) %>%
+  pivot_wider(names_from = term, values_from = estimate) %>% 
+  dplyr::select(barcode, replicate, tech, mean_DMSO = mean, sd_DMSO = sd)
+
+# Same for the global scores to merge.
+dmso.bal.score.global = dmso.bal.score %>% 
+  filter(barcode == "global") %>% 
+  dplyr::rename(mean_DMSO_global = mean_DMSO, sd_DMSO_global = sd_DMSO) %>% 
+  dplyr::select(-barcode)
+
+dmso.bal.score %<>% left_join(dmso.bal.score.global)
+```
+
+```{r combine DMSO bal in table}
+bal_zscore_calc = screen.ratio.dt %>% 
+  filter(!is.na(freqCut)) %>%
+  distinct(barcode, replicate, tech, drug, well, plate, MMEJratio, MMEJratio_global, drug_plate, conc_char) %>% 
+    mutate(drug = ifelse(drug == "DMSO" & plate %in% c(1:6), paste(drug, drug_plate, well, "1", sep = " "), 
+                       ifelse(drug == "DMSO" & plate %in% c(7:12), paste(drug, drug_plate, well, "2", sep = " "),
+                              ifelse(drug == "DMSO" & plate %in% c(13:18), paste(drug, drug_plate, well, "3", sep = " "),drug)))) %>%
+  left_join(dmso.bal.score)
+```
+
+## Calculate the balance z-scores per barcode
+```{r calculate tech balance z-scores, warning = FALSE}
+# Calculate IPR z-scores per technical replicate
+bal.zscore = bal_zscore_calc %>%
+  # Put the 0 MMEJratio to the minimal value of that sample
+  group_by(drug, conc_char) %>%
+  mutate(min_MMEJratio = min(MMEJratio[MMEJratio != 0 & !is.na(MMEJratio)], na.rm = TRUE),
+         MMEJratio_min = ifelse(MMEJratio == 0, min_MMEJratio, MMEJratio)) %>%
+  ungroup() %>%
+  dplyr::select(-min_MMEJratio) %>%
+  # Calculate FC
+  mutate(MMEJ_FC = MMEJratio_min / mean_DMSO,
+         MMEJ_log2_FC = log2(MMEJ_FC),
+         # And calculate the z-scores
+         zscore_bal = (MMEJratio_min - mean_DMSO) / sd_DMSO,
+         zscore_bal_global = (MMEJratio_global - mean_DMSO_global) / sd_DMSO_global)
+
+# Combine the z-scores of both screens
+mean.bal.zscore.comb = bal.zscore %>% 
+  distinct(drug, conc_char, barcode, replicate, zscore_bal, zscore_bal_global, MMEJ_FC, MMEJ_log2_FC) %>%
+  filter(!is.na(zscore_bal)) %>%
+  mutate(
+    # Local score
+    score_bal_comb_tech = ave(zscore_bal, drug, conc_char, barcode, replicate,
+                              FUN = mean),
+    # Global score: 
+    score_bal_global_comb_tech = ave(zscore_bal_global, drug, conc_char, barcode, replicate,
+                                     FUN = mean),
+    # First count the number of replicates per screen.
+    n_reps = ave(zscore_bal, 
+                 drug, conc_char, replicate, barcode, 
+                 FUN = length),
+    # Count how many replicates have significant zscore
+    sum_tech  = ave(zscore_bal, 
+                       drug, conc_char, replicate, barcode, 
+                       FUN = function(x) sum(abs(x) >= 1.96)),
+    filter_zscore_bal = ifelse(n_reps-sum_tech < 2, TRUE, FALSE),
+    
+    # Create filter for the z-scores for at least 2 significant hits per screen. 
+    sum_tech_global = ave(zscore_bal_global, 
+                       drug, conc_char, replicate, barcode, 
+                       FUN = function(x) sum(abs(x) >= 1.96)),
+    filter_zscore_bal_global = ifelse(n_reps-sum_tech_global < 2, TRUE, FALSE))
+```
+
+## DMSO null ditribution after averaging the z-scores of the technical replicates
+```{r DMSO null distribution of mean replicates for the balance}
+#data frame to save data
+mean_sd_fits_score <- tibble(term = NA, estimate = NA, std.error = NA, barcode = NA, replicate = NA)
+
+# First prepare a table with bal in DMSO, well, barcode, replicate, tech and plate. Then group by tech and replicate.
+dmso.bal.score.comb <- mean.bal.zscore.comb %>%
+  filter(grepl("DMSO", drug)) %>%
+  dplyr::select('DMSO' = score_bal_comb_tech, 'DMSO_global' = score_bal_global_comb_tech,  barcode, replicate) %>%
+  distinct(barcode, replicate, DMSO, DMSO_global)
+
+#Function to fit normal distribution through data
+for (i in unique(dmso.bal.score.comb$replicate)) {
+  for (x in unique(dmso.bal.score.comb$barcode)) {
+    single_wt_ratio <- filter(dmso.bal.score.comb, replicate == i & barcode == x) %>% pull(DMSO)
+    mean_sd_fits_row <- fitdistr(single_wt_ratio, "normal") %>% tidy()
+    mean_sd_fits_score <- mean_sd_fits_score %>% add_row(mean_sd_fits_row %>% mutate(barcode = x, replicate = i))
+  }
+  # Same for the global scores
+  single_wt_ratio_global <- filter(dmso.bal.score.comb, replicate == i) %>% distinct(DMSO_global) %>% pull(DMSO_global)
+  mean_sd_fits_row_global <- fitdistr(single_wt_ratio_global, "normal") %>% tidy()
+  mean_sd_fits_score <- mean_sd_fits_score %>% add_row(mean_sd_fits_row_global %>% mutate(barcode = "global", replicate = i))
+}
+
+#Transform the fitted values 
+dmso.bal.score.rep <- mean_sd_fits_score %>% filter(!is.na(term)) %>%
+  dplyr::select(-std.error) %>%
+  pivot_wider(names_from = term, values_from = estimate) %>% 
+  dplyr::select(barcode, replicate, mean_DMSO = mean, sd_DMSO = sd)
+
+# Same for the global scores to merge.
+dmso.bal.score.rep.global = dmso.bal.score.rep %>% 
+  filter(barcode == "global") %>% 
+  dplyr::rename(mean_DMSO_global = mean_DMSO, sd_DMSO_global = sd_DMSO) %>% 
+  dplyr::select(-barcode)
+
+dmso.bal.score.rep %<>% left_join(dmso.bal.score.rep.global)
+```
+
+## Calculate the bal z-scores per barcode combined reps
+```{r calculate final balance z-scores}
+# Calculate IPR z-scores per technical replicate
+bal.zscore.reps = mean.bal.zscore.comb %>%
+  left_join(dmso.bal.score.rep) %>%
+  # And calculate the z-scores
+  mutate(zscore_bal_tech = (score_bal_comb_tech - mean_DMSO) / sd_DMSO,
+         zscore_bal_global_tech = (score_bal_global_comb_tech - mean_DMSO_global) / sd_DMSO_global)
+
+# Combine the z-scores of both screens
+bal.zscore.comb = bal.zscore.reps %>% 
+  distinct(drug, conc_char, barcode, replicate, 
+           zscore_bal, zscore_bal_global, zscore_bal_tech, zscore_bal_global_tech, 
+           filter_zscore_bal, filter_zscore_bal_global) %>%
+  filter(!is.na(zscore_bal_tech)) %>%
+  mutate(
+    # Local z-score:
+    zscore_bal_comb_rep = ave(zscore_bal_tech, drug, conc_char, barcode,
+                              FUN = function(x) sum(x)/sqrt(length(x))),
+    # Global z-score: 
+    zscore_bal_global_comb_rep = ave(zscore_bal_global_tech, drug, conc_char, barcode,
+                                     FUN =  function(x) sum(x)/sqrt(length(x))),
+    ## Filters ##
+    # Filter for same effect. 
+    sum_sign = ave(zscore_bal_tech, drug, conc_char, barcode,
+                   FUN = function(x) length(table(sign(x)))),
+    # Filter for same effect.     
+    sum_sign_global = ave(zscore_bal_global_tech, drug, conc_char, barcode,
+                          FUN = function(x) length(table(sign(x))))) %>%
+  group_by(drug, conc_char, barcode) %>%
+  mutate(filter_zscore_bal_comb_rep = ifelse(sum_sign == 1 & 
+                                          all(filter_zscore_bal),
+                                        filter_zscore_bal, FALSE),
+  filter_zscore_bal_global_comb_rep = ifelse(sum_sign_global == 1 & 
+                                                 all(filter_zscore_bal_global),
+                                               filter_zscore_bal_global, FALSE))
+
+
+bal.zscore %<>% left_join(mean.bal.zscore.comb) %>% left_join(bal.zscore.comb) %>% 
+  dplyr::select(barcode, replicate, plate, tech, well, drug, conc_char, MMEJratio_min,
+                MMEJ_FC, MMEJ_log2_FC,
+                zscore_bal, score_bal_comb_tech, 
+                zscore_bal_tech, filter_zscore_bal,
+                zscore_bal_comb_rep, filter_zscore_bal_comb_rep,
+                zscore_bal_global, score_bal_global_comb_tech,
+                zscore_bal_global_tech, filter_zscore_bal_global,
+                zscore_bal_global_comb_rep, filter_zscore_bal_global_comb_rep)
+```
+
+# Merge z-scores with table
+```{r combine all the z-scores with the table}
+# Merge with main table
+screen.ratio.dt <- screen.ratio.dt %>% 
+  left_join(TIF.zscore) %>%
+  left_join(bal.zscore)
+```
+
+# Data reproducibility
+## Make filter for feqCut and MMEJratio reproducibility between screens
+```{r check for data reproducibility}
+cor_filter = screen.ratio.dt %>% dplyr::select(barcode, replicate, tech, drug, conc_char, freqCut, MMEJscore, well, plate) %>%
+  group_by(drug, conc_char) %>%
+  pivot_wider(names_from = replicate, values_from = c(freqCut, MMEJscore)) %>%
+  summarise(cor_TIF = cor(freqCut_E1504, freqCut_E177, use = "pairwise.complete.obs"),
+            cor_bal = cor(MMEJscore_E1504, MMEJscore_E177, use = "pairwise.complete.obs")) %>%
+  mutate(cor_TIF_filter = ifelse(cor_TIF >= TIF_cor, TRUE, 
+                                        FALSE),
+         cor_bal_filter = ifelse(cor_bal >= bal_cor, TRUE, 
+                                        FALSE))
+
+screen.ratio.dt = screen.ratio.dt %>% left_join(cor_filter)
+```
+
+
+
+## Fix filters
+Some filters have NA, these need to be changed to FALSE. 
+```{r fix some filters}
+screen.ratio.dt = screen.ratio.dt %>% 
+  mutate(across(.cols = contains("filter"), 
+                ~ replace(., is.na(.), FALSE)))
+```
+
+
+# Data export
+
+## Add chromatin data
+
+We'll use the table from Schep et al. 2021 to bind directly all the relevant chromatin data. 
+
+```{r add chromatin data}
+clone5_z.score_chrom_tib <- readRDS('/DATA/projects/DSBrepair/data/R/cl20201026_ChIP_zscore_selection.RDS') %>%
+  filter(pool == "clone_set") %>% 
+  setNames(paste0(names(.), ".zscore")) %>% 
+  plyr::rename(., c('ID.zscore' = 'barcode')) %>% 
+  dplyr::select(-pool.zscore, -binsize.zscore)
+
+
+clone5_chrom_tib <- readRDS("/DATA/projects/DSBrepair/data/R/rs20200519_clone5_newdoms_chromatin.RDS") %>%
+  # filter(IPR != "IPR1") %>%
+  left_join(clone5_z.score_chrom_tib)
+
+
+
+chrom_colnames = names(clone5_chrom_tib)
+
+screen.ratios.chrom.dt <- screen.ratio.dt %>% left_join(clone5_chrom_tib)
+screen.indels.chrom.dt <- screen.indels.dt %>% left_join(clone5_chrom_tib) 
+
+# rm(screen.ratio.dt)
+# rm(screen.indels.dt)
+```
+## Exporting the data tables
+
+We'll make three tables.
+- Table with all (large and will use less - also has all metadata)
+- Table with individual mutation data (for indel plotting)
+- Table with only ratios (smaller for most plotting)
+
+```{r split the tables for different scripts}
+ratio.cols = c("replicate",
+               "barcode",
+               "tech",
+               "exp",
+               "well",
+               "plate",
+               "drug_plate",
+               "ID",
+               "concentration",
+               "drug",
+               "conc_char",
+               "target",
+               "sum_bc_reads_split",
+               "viab_norm_split",
+               "viab_mean",
+               "indel_freq_filter",
+               "pathway_bal_filter",
+               "viab_mean_if",
+               "viab_mean_pb",
+               "viab_reproducibility",
+               "cor_TIF",
+               "cor_bal",
+               "cor_TIF_filter",
+               "cor_bal_filter",
+               "sample",
+               "freqCut",
+               "freqCut_mean",
+               "freqCut_global",
+               "freqCut_max",
+               "freqMMEJ", 
+               "freqNHEJ",
+               "MMEJratio",
+               "MMEJratio_min",
+               "MMEJratio_mean", 
+               "MMEJratio_global",
+               "MMEJratio_global_mean",
+               "MMEJ_FC",
+               "MMEJ_log2_FC",
+               "NHEJratio",
+               "MMEJscore",
+               "MMEJscore_mean", 
+               "NHEJscore",
+               "freqCut_norm",
+               "freqCut_norm_global",
+               "freqCut_norm_mean",
+               "freqCut_norm_global_mean",
+               "freqCut_diff",
+               "freqCut_diff_global",
+               "freqCut_diff_mean",
+               "freqCut_diff_global_mean",
+               "zscore_TIF", 
+               "score_TIF_comb_tech", "filter_zscore_TIF","zscore_TIF_tech",
+               "zscore_TIF_comb_rep", "filter_zscore_TIF_comb_rep",
+               "zscore_TIF_global", 
+               "score_TIF_global_comb_tech", "filter_zscore_TIF_global","zscore_TIF_global_tech",
+               "zscore_TIF_global_comb_rep", "filter_zscore_TIF_global_comb_rep",
+               "zscore_bal", 
+               "score_bal_comb_tech", "filter_zscore_bal","zscore_bal_tech",
+               "zscore_bal_comb_rep", "filter_zscore_bal_comb_rep",
+               "zscore_bal_global", 
+               "score_bal_global_comb_tech", "filter_zscore_bal_global","zscore_bal_global_tech",
+               "zscore_bal_global_comb_rep" , "filter_zscore_bal_global_comb_rep")
+
+screen_ratios_tib =  screen.ratios.chrom.dt %>% 
+  dplyr::select(all_of(c(ratio.cols, chrom_colnames))) %>%
+  dplyr::distinct()
+
+#rm(screen.indel.chrom.dt)
+```
+
+
+## Processed data export The files will be saved in the processed data folder.
+```{r export screen}
+# The mutations list that can be loaded for the indel spectra plots.
+filename <- SetFileName("episcreen_mutations", initials = initials, extension = "RDS")
+saveRDS(screen.indels.chrom.dt, file = filename)
+
+# The ratios list of the split technical replicates
+filename <- SetFileName("episcreen_ratios", initials = initials, extension = "RDS")
+saveRDS(screen_ratios_tib, file = filename)
+```
+
+
+# Conclusions 
+Looks all fine! Now, we can generate indel plots and look in detail at the ratios.
+
+# Bibliography
+```{r citations screen}
+cite_packages()
+```
+
+# Session Info
+```{r session_info screen}
+sessionInfo()
+getwd()
+date()
+paste("Run time: ",format(Sys.time()-StartTimeScreen))
+# rm(list = ls(all.names = TRUE)) #will clear all objects includes hidden objects.
+# gc() #free up memrory and report the memory usage.
+```
+
