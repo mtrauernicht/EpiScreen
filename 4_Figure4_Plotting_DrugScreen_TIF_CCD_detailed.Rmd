@@ -204,7 +204,6 @@ ggplot_custom <- function(...) ggplot2::ggplot(...) +
 #### Import
 ```{r data import, echo = FALSE, warning = FALSE}
 # Import data from preprocessing script
-in.dir = list.dirs(path = "/DATA/projects/DSBrepair/data/R") %>% .[grepl("episcreen", .)] %>% tail(n = 1)
 file = list.files(in.dir, pattern = "episcreen_ratios", full.names = T) %>% tail(n = 1)
 indel.data <- readRDS(file) # %>% filter(pathway_bal_filter == TRUE & viab_reproducibility == TRUE)
 ```
@@ -497,7 +496,7 @@ quant_breaks <- quantile(all_compounds_epistasis_TIF, c(.01,.99), na.rm = T)
 palette_length <- 100
 breaks <- c(seq(quant_breaks[1], 0, length.out=ceiling(palette_length/2) + 1), 
             seq(quant_breaks[2]/palette_length, quant_breaks[2], length.out=floor(palette_length/2)))
-colors = diverge_hcl(length(breaks), palette = "Blue-Red")
+colors = diverge_hcl(length(breaks), palette = "Cork")
 colors[which(quant_breaks == 0)-1] = "gray90"
 ```
 
@@ -559,7 +558,7 @@ ggplot(hdac2_3,
 ```{r 4B H3K27me3 synergies, fig.width = 8, fig.height = 8}
 rank_dt = CCD_tib %>% 
   left_join(rownames_to_column(target, var = "drug_conc")) %>%
-  filter(feature == "HDAC1", !is.na(indelrate_slope_plot)) %>%
+  filter(feature == "H3K27me3", !is.na(indelrate_slope_plot)) %>%
   distinct() %>%
   arrange(desc(indelrate_slope_plot)) %>%
   mutate(rank = seq(1:n()))
@@ -774,7 +773,7 @@ all_compounds_epistasis_TIF %>%
 ```
 # Supplementary Figures
 ## S4A HMT CCD Heatmap
-```{r S4A HMT CCD, fig.width= 6, fig.height= 6}
+```{r S4A HMT CCD, fig.width= 8, fig.height= 6}
 DNMT_drugs = target_set_drugs %>% 
   rownames_to_column(var = "drug_conc") %>% 
   filter(target == "DNMT"
@@ -792,14 +791,14 @@ TIF_synergy_matrix_DNMT = CCD_tib %>%
 cluster_rows = ifelse(nrow(TIF_synergy_matrix_DNMT) > 1, TRUE, FALSE)
 
 # # change these numbers according to where you want to set the cutoff
-quant_breaks <- quantile(TIF_synergy_matrix_DNMT, c(.01,.99), na.rm = T)
+quant_breaks <- quantile(TIF_synergy_matrix_DNMT, c(.05,.95), na.rm = T)
 max_quant = max(abs(quant_breaks))
 palette_length <- 100
 breaks <- c(seq(-max_quant, 0, length.out=ceiling(palette_length/2) + 1),
             seq(max_quant/palette_length, max_quant, length.out=floor(palette_length/2)))
 slope.colors.temp = slope.colors
-colors = diverge_hcl(length(breaks), palette = "Blue-Red")
-colors[which(breaks == 0)-1] = "gray40"
+colors = diverge_hcl(length(breaks), palette = "Cork")
+colors[which(breaks == 0)-1] = "white"
 
 p = pheatmap(TIF_synergy_matrix_DNMT[, TRIP_chrom_clust$labels],
              border_color = F,
@@ -808,7 +807,7 @@ p = pheatmap(TIF_synergy_matrix_DNMT[, TRIP_chrom_clust$labels],
              cluster_rows = cluster_rows,
              breaks = breaks,
              cluster_cols = TRIP_chrom_clust,
-             clustering_method = "ward.D2",
+             clustering_distance_rows = "correlation",
              main = paste("Chromatin synergies - TIF DNMT cluster"),
              color = colors,
              annotation_colors = annotation_colors_scr, 
@@ -816,7 +815,7 @@ p = pheatmap(TIF_synergy_matrix_DNMT[, TRIP_chrom_clust$labels],
 ```
 
 ## S4B Scatter plot HMT inhibotors 5mC
-```{r S4B HMT inhibitor synergy with 5mC,  fig.width = 6, fig.height = 4}
+```{r S4B HMT inhibitor synergy with 5mC,  fig.width = 10, fig.height = 6}
 ratios_tib_fc %>% 
   filter(drug_conc %in% DNMT_drugs)  %>% 
   ggplot(.,aes(LMNB1, log2.fc.freqCut)) + geom_point() +
@@ -826,6 +825,21 @@ ratios_tib_fc %>%
                                  after_stat(rr.label), sep = "*\", \"*")),
                label.x = "left", label.y = "bottom") +
   facet_wrap(. ~ drug_conc) +
+    geom_vline(xintercept = 0, linetype = 2) + 
+  geom_hline(yintercept = 0, linetype = 2) + 
+  theme_classic(base_size = 16) 
+
+ratios_tib_fc %>% 
+  filter(drug_conc %in% DNMT_drugs)  %>% 
+  ggplot(.,aes(m5C, log2.fc.freqCut)) + geom_point() +
+  geom_smooth(method = "lm", se = F) +
+  stat_cor(method = "pearson") +
+  stat_poly_eq(aes(label = paste(after_stat(eq.label),
+                                 after_stat(rr.label), sep = "*\", \"*")),
+               label.x = "left", label.y = "bottom") +
+  facet_wrap(. ~ drug_conc) +
+    geom_vline(xintercept = 0, linetype = 2) + 
+  geom_hline(yintercept = 0, linetype = 2) + 
   theme_classic(base_size = 16) 
 ```
 

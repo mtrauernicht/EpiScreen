@@ -72,7 +72,7 @@ library(pls)
 
 ```{r outdir}
 ## Select outdir
-out.dir = list.dirs(path = "/DATA/projects/DSBrepair/data/R") %>% .[grepl("episcreen_Bas_way_all_bcs", .)] %>% tail(n = 1)
+out.dir = list.dirs(path = "/DATA/projects/DSBrepair/data/R") %>% .[grepl("episcreen", .)] %>% tail(n = 1)
 in.dir = out.dir
 dir.create(out.dir, showWarnings = FALSE)
 
@@ -108,7 +108,6 @@ SetFileName <- function(filename, initials, extension) {
 ```{r}
 #Chromatin data (it needs a IPR column)
 # Import data from preprocessing script
-in.dir = list.dirs(path = "/DATA/projects/DSBrepair/data/R") %>% .[grepl("episcreen", .)] %>% tail(n = 1)
 file = list.files(in.dir, pattern = "episcreen_ratios", full.names = T) %>% tail(n = 1)
 
 indel.data <- readRDS(file) %>% filter(viab_reproducibility) %>%
@@ -270,6 +269,10 @@ ordered_marks2 <- c("Negative Control", "MRN", "DNA-PK","Epigenetic Reader Domai
 ```{r, warning=FALSE}
 # List significance
 filtered_drug_pvals = indel.data %>%
+   mutate(drug = case_when(drug == "DMSO" & plate %in% c(1:6) ~ paste(drug, drug_plate, well, "1", sep = " "), 
+                          drug == "DMSO" & plate %in% c(7:12) ~ paste(drug, drug_plate, well, "2", sep = " "),
+                          drug == "DMSO" & plate %in% c(13:18) ~ paste(drug, drug_plate, well, "3", sep = " "),
+                          T ~ drug)) %>%
   distinct(drug, conc_char, IPR, zscore_TIF_comb_rep, zscore_bal_comb_rep, filter_zscore_TIF_comb_rep, filter_zscore_bal_comb_rep) %>%
   filter(!is.na(zscore_bal_comb_rep), !is.na(zscore_TIF_comb_rep)) %>%
   mutate(zscore_TIF_comb_rep_temp = ifelse(filter_zscore_TIF_comb_rep, zscore_TIF_comb_rep, 0),
@@ -282,7 +285,7 @@ filtered_drug_pvals = indel.data %>%
 
 # Make a table with the orientation of effect, used later for filtering. 
 filtered_drug_conc = filtered_drug_pvals %>%
-  filter(adj_pval_TIF < pval_signif | adj_pval_bal < pval_signif | drug == "DMSO") %>%
+  filter(adj_pval_TIF < pval_signif | adj_pval_bal < pval_signif | grepl("DMSO", drug)) %>%
   mutate(drug_conc = paste(drug, conc_char,sep = " "),
          # List if they affect the variable.
          effect_on_indelrate = ifelse(adj_pval_TIF < pval_signif, TRUE, FALSE),
@@ -292,7 +295,7 @@ filtered_drug_conc = filtered_drug_pvals %>%
     count_TIF = as.numeric(ave(effect_on_indelrate, drug_conc, FUN = sum)),
     count_bal = as.numeric(ave(effect_on_ratio, drug_conc, FUN = sum)),
     # Keep here to at least 2 sites are significant in either TIF or bal
-    keep = ifelse(count_TIF > 1 | count_bal > 1, 
+    keep = ifelse(count_TIF > 1 | count_bal > 1| grepl("DMSO", drug), 
                   TRUE, FALSE)) %>%
   filter(keep) %>%
   # Change the effect if less than 2. 
@@ -316,40 +319,40 @@ dplyr::group_by(drug, conc_char) %>%
   # Change the non significant ones to 0, so we filter them out.
   mutate(zscore_TIF_comb_rep_temp = ifelse(adj_pval_TIF >= pval_signif, 0, zscore_TIF_comb_rep_temp),
          zscore_bal_comb_rep_temp = ifelse(adj_pval_bal >= pval_signif, 0, zscore_bal_comb_rep_temp)) %>%
-  dplyr::summarise(MMEJ_signif = sum(zscore_bal_comb_rep_temp < -1.96), #Summarise number of significant barcodes per compound for balance
-                   NHEJ_signif = sum(zscore_bal_comb_rep_temp > 1.96),
+  dplyr::summarise(NHEJ_signif = sum(zscore_bal_comb_rep_temp < -1.96), #Summarise number of significant barcodes per compound for balance
+                   MMEJ_signif = sum(zscore_bal_comb_rep_temp > 1.96), 
                    TIF_down_signif = sum(zscore_TIF_comb_rep_temp < -1.96), #Summarise number of significant barcodes per compound for TIF
                    TIF_up_signif = sum(zscore_TIF_comb_rep_temp > 1.96)) %>% 
-  mutate(bal_signif = case_when(MMEJ_signif <= 1 & NHEJ_signif > 1 ~ "NHEJ", #Annotate if a protein favors NHEJ, MMEJ or both
+  mutate(bal_signif = case_when(MMEJ_signif <= 1 & NHEJ_signif > 1 ~ "NHEJ", #Annotate which pathway the compound boosts
                                     NHEJ_signif <= 1 & MMEJ_signif > 1 ~ "MMEJ", 
                                     T ~ "both"),
-         TIF_signif = case_when(TIF_up_signif <= 1 & TIF_down_signif > 1 ~ "TIF_down", #Annotate if a protein favors NHEJ, MMEJ or both
+         TIF_signif = case_when(TIF_up_signif <= 1 & TIF_down_signif > 1 ~ "TIF_down", #Annotate how the compounds affects TIF
                                     TIF_down_signif <= 1 & TIF_up_signif > 1 ~ "TIF_up", 
                                     T ~ "TIF_both")) %>%
   mutate(drug_conc = paste(drug, conc_char, sep = " ")) %>%
   semi_join(filtered_drug_conc) # Semi-join the filtered druc conc to keep only the significant ones after p adjustment.
 
 ratios_tib <- indel.data %>%
-  mutate(drug_conc = paste(drug, conc_char, sep = " ")) %>%
+  mutate(drug = case_when(drug == "DMSO" & plate %in% c(1:6) ~ paste(drug, drug_plate, well, "1", sep = " "), 
+                          drug == "DMSO" & plate %in% c(7:12) ~ paste(drug, drug_plate, well, "2", sep = " "),
+                          drug == "DMSO" & plate %in% c(13:18) ~ paste(drug, drug_plate, well, "3", sep = " "),
+                          T ~ drug),
+         drug_conc = paste(drug, conc_char, sep = " ")) %>%
   semi_join(filtered_drug_conc) %>%
   # I take the ratio without mean here because I adjusted for 0 value at that level in the preprocessing script line 1009
   # We don't have that issue with the freqCut. 
-  distinct(MMEJratio, freqCut_mean, drug, conc_char, drug_conc, target, IPR, replicate) %>% 
-  mutate(MMEJratio_mean = ave(MMEJratio, drug, conc_char, IPR, replicate, FUN = function(x) mean(x, na.rm = TRUE)),
-         MMEJratio.log2 = log2(MMEJratio_mean),
-         MMEJratio.log2 = ave(MMEJratio.log2, drug, conc_char, IPR, FUN = function(x) mean(x, na.rm = TRUE)),
-         freqCut.log2 = log2(freqCut_mean),
-         freqCut.log2 = (ave(freqCut.log2, drug, conc_char, IPR, FUN = function(x) mean(x, na.rm = TRUE)))) %>%
-  dplyr::select(-MMEJratio_mean, -MMEJratio, -freqCut_mean, -replicate) %>%
+  distinct(MMEJratio, MMEJratio_min, freqCut, drug, conc_char, drug_conc, target, IPR, replicate, tech) %>% 
+  mutate(MMEJratio = ifelse(MMEJratio == 0, MMEJratio_min, MMEJratio),
+         MMEJratio.log2 = log2(MMEJratio),
+         freqCut.log2 = log2(freqCut)) %>%
+  dplyr::select(-MMEJratio, -MMEJratio_min, -freqCut) %>%
   distinct()
 
 dmso_ratios_tib <- indel.data %>%
   filter(drug == "DMSO") %>%
-  distinct(MMEJratio_mean, freqCut_mean, IPR) %>%
+  distinct(MMEJratio_mean, freqCut_mean, IPR, tech, replicate) %>%
   mutate(DMSO.ratio.log2 = log2(MMEJratio_mean),
-         DMSO.ratio.log2 = ave(DMSO.ratio.log2, IPR, FUN = function(x) mean(x, na.rm = TRUE)),
-         DMSO.freqCut.log2 = log2(freqCut_mean),
-         DMSO.freqCut.log2 = (ave(DMSO.freqCut.log2, IPR, FUN = function(x) mean(x, na.rm = TRUE)))) %>%
+         DMSO.freqCut.log2 = log2(freqCut_mean)) %>%
   dplyr::select(-MMEJratio_mean, -freqCut_mean) %>%
   distinct()
 
@@ -362,10 +365,12 @@ The log2 distance ratio in our case is positive if it promotes NHEJ and negative
 ```{r}
 # Each replicate has a different value (compute differences by replicate)
 ratios_tib_fc <- ratios_tib %>% 
-  dplyr::group_by(IPR, drug, conc_char) %>% 
   mutate(log2.fc.ratio = MMEJratio.log2 - DMSO.ratio.log2, 
-         log2.fc.freqCut = freqCut.log2 - DMSO.freqCut.log2) %>%
-  left_join(chrom_data)
+         log2.fc.ratio = ave(log2.fc.ratio, IPR, drug_conc, FUN = function(x) mean(x, na.rm = TRUE)), 
+         log2.fc.freqCut = freqCut.log2 - DMSO.freqCut.log2,
+         log2.fc.freqCut = ave(log2.fc.freqCut, IPR, drug_conc, FUN = function(x) mean(x, na.rm = TRUE))) %>%
+  distinct(IPR, drug, conc_char, target, log2.fc.freqCut, log2.fc.ratio) %>%
+  left_join(chrom_data) 
 ```
 
 # Calculating the Chromatin Context Dependency (CCD)
@@ -492,10 +497,10 @@ epistasis_tib %<>%
            effect_on_indelrate, effect_on_ratio # If the effect is significant in at least 2 IPRs (from above)
            ) %>% 
   mutate(ratio_slope_plot = case_when(
-      effect_on_ratio & signif.ratio & bal_signif == "MMEJ" & ratio_slope < 0 ~ ratio_slope, 
-      bal_signif == "MMEJ" & ratio_slope > 0 ~ as.double(NA), 
-      effect_on_ratio & signif.ratio & bal_signif == "NHEJ" & ratio_slope > 0 ~ ratio_slope, 
-      bal_signif == "NHEJ" & ratio_slope < 0 ~ as.double(NA), 
+      effect_on_ratio & signif.ratio & bal_signif == "MMEJ" & ratio_slope > 0 ~ ratio_slope, 
+      bal_signif == "MMEJ" & ratio_slope < 0 ~ as.double(NA), 
+      effect_on_ratio & signif.ratio & bal_signif == "NHEJ" & ratio_slope < 0 ~ ratio_slope, 
+      bal_signif == "NHEJ" & ratio_slope > 0 ~ as.double(NA), 
       effect_on_ratio & signif.ratio & bal_signif == "bal_both" ~ indelrate_slope,
       T ~ as.double(NA)),
     indelrate_slope_plot = case_when(

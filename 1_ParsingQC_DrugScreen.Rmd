@@ -32,7 +32,19 @@ render_processing = TRUE
 render_validations = TRUE
 
 # Render Synergies 
-render_synergies = TRUE
+render_synergies = FALSE
+```
+
+```{r}
+# Render all figure scripts
+render_all_figures = TRUE
+
+# Individual figures
+fig1 = TRUE
+fig2 = TRUE
+fig3 = TRUE
+fig4 = TRUE
+fig5 = TRUE
 ```
 
 
@@ -47,7 +59,6 @@ StartTime <-Sys.time()
 Date <- substr(gsub("-","",Sys.time()),1,8) 
 
 # libraries:
-library(knitr)
 library(tidyverse)
 library(GenomicRanges)
 library(RColorBrewer)

@@ -72,7 +72,7 @@ library(ggpubr)
 library(scales)
 
 ## Select outdir
-out.dir = paste0("./figures/", Date, "_Bas_way_all_bcs/")
+out.dir = paste0("./figures/", Date, "/")
 dir.create(out.dir)
 in.dir = list.dirs(path = "/DATA/projects/DSBrepair/data/R") %>% .[grepl("episcreen", .)] %>% tail(n = 1)
 opts_chunk$set(dev=c('png', 'pdf'), fig.path = file.path(out.dir))
@@ -750,7 +750,7 @@ ggplot_custom(viab_mmej_cor,
               aes(x = viab_norm_split, y = log2(MMEJratio), color = sample)) +
   geom_point_rast(raster.dpi = 300) +
   geom_vline(xintercept = 0.40, color = "red") +
-  annotate("rect",xmin=0,xmax=0.50,ymin=-Inf,ymax=Inf, alpha=0.1, fill="red") +
+  annotate("rect",xmin=0,xmax=0.40,ymin=-Inf,ymax=Inf, alpha=0.1, fill="red") +
   scale_x_continuous(breaks = seq(0, 1, by = 0.25), limits = c(0.1, 1.2)) +
   xlab("Normalised viability") +
   ylab("log2(MMEJ ratio)") + 

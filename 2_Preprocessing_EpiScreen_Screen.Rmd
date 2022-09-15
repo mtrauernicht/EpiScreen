@@ -843,7 +843,7 @@ TIF.zscore = TIF_zscore_calc %>%
 
 # Combine the z-scores of both screens
 mean.TIF.zscore.comb = TIF.zscore %>% 
-  distinct(drug, conc_char, barcode, replicate, zscore_TIF, zscore_TIF_global) %>%
+  distinct(drug, conc_char, barcode, replicate, freqCut, freqCut_global, zscore_TIF, zscore_TIF_global) %>%
   filter(!is.na(zscore_TIF)) %>%
   mutate(
     # Local score
@@ -889,13 +889,15 @@ mean.TIF.zscore.comb = TIF.zscore %>%
 ### Merge the data
 ```{r calculate final efficiency z-scores}
 TIF.zscore %<>% left_join(mean.TIF.zscore.comb) %>% 
-  dplyr::select(barcode, replicate, plate, tech, well, drug, conc_char,
+  dplyr::select(barcode, replicate, plate, tech, well, drug, conc_char, freqCut, freqCut_global,
                 zscore_TIF,  
                 zscore_TIF_tech, filter_zscore_TIF,
                 zscore_TIF_comb_rep, filter_zscore_TIF_comb_rep,
                 zscore_TIF_global, 
                 zscore_TIF_global_tech, filter_zscore_TIF_global,
-                zscore_TIF_global_comb_rep, filter_zscore_TIF_global_comb_rep)
+                zscore_TIF_global_comb_rep, filter_zscore_TIF_global_comb_rep) %>%
+  mutate(drug = case_when(grepl("DMSO", drug) ~ "DMSO", 
+                          T ~ drug))
 ```
 
 # Pathway ratio z-score calculation
@@ -1023,7 +1025,9 @@ bal.zscore %<>% left_join(mean.bal.zscore.comb) %>%
                 zscore_bal_comb_rep, filter_zscore_bal_comb_rep,
                 zscore_bal_global, 
                 zscore_bal_global_tech, filter_zscore_bal_global,
-                zscore_bal_global_comb_rep, filter_zscore_bal_global_comb_rep)
+                zscore_bal_global_comb_rep, filter_zscore_bal_global_comb_rep) %>%
+  mutate(drug = case_when(grepl("DMSO", drug) ~ "DMSO",
+                          T ~ drug))
 ```
 
 # Merge z-scores with table
@@ -1148,16 +1152,16 @@ ratio.cols = c("replicate",
                "freqCut_diff_mean",
                "freqCut_diff_global_mean",
                "zscore_TIF", 
-               "score_TIF_comb_tech", "filter_zscore_TIF","zscore_TIF_tech",
+               "filter_zscore_TIF","zscore_TIF_tech",
                "zscore_TIF_comb_rep", "filter_zscore_TIF_comb_rep",
                "zscore_TIF_global", 
-               "score_TIF_global_comb_tech", "filter_zscore_TIF_global","zscore_TIF_global_tech",
+               "filter_zscore_TIF_global","zscore_TIF_global_tech",
                "zscore_TIF_global_comb_rep", "filter_zscore_TIF_global_comb_rep",
                "zscore_bal", 
-               "score_bal_comb_tech", "filter_zscore_bal","zscore_bal_tech",
+               "filter_zscore_bal","zscore_bal_tech",
                "zscore_bal_comb_rep", "filter_zscore_bal_comb_rep",
                "zscore_bal_global", 
-               "score_bal_global_comb_tech", "filter_zscore_bal_global","zscore_bal_global_tech",
+               "filter_zscore_bal_global","zscore_bal_global_tech",
                "zscore_bal_global_comb_rep" , "filter_zscore_bal_global_comb_rep")
 
 screen_ratios_tib =  screen.ratios.chrom.dt %>% 
