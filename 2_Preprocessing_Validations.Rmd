@@ -91,6 +91,11 @@ library(ggplot2)
 library(report)
 library(parallel)
 library(gtools)
+library(rstatix)
+library(pls)
+library(broom)
+library(ggpubr)
+library(ggpmisc)
 
 ## Select outdir
 out.dir = list.dirs(path = "/DATA/projects/DSBrepair/data/R") %>% .[grepl("episcreen", .)] %>% tail(n = 1)
@@ -708,6 +713,232 @@ validation_ratios_tib = validation_indels_tib %>%
   unique()
 ```
 
+
+# Processing the epistasis on the validation data: 
+### Process Vorinostat & GSK126 validations
+```{r prepping tables for CCD validations}
+# List chromatin name columns from this table
+chromatin_cols = colnames(validation_ratios_tib)[42:75]
+
+RSTP2_IndelRatios_Chromatin_2kb <- readRDS("/DATA/usr/r.schep/DSBrepair/data/R/rs20210311/RSTP2_IndelRatios_Chromatin_2kb.RDS") %>% 
+  filter(replicate == "mean" & drug %in% c("DMSO_GSK", "GSK126") & plasmid == "LBR2") %>%
+  dplyr::select(barcode, drug, MMEJ, NHEJ, efficiency, all_of(chromatin_cols)) %>%
+  distinct() %>%
+  mutate(MMEJ_NHEJ = MMEJ/NHEJ) %>%
+  dplyr::select(-NHEJ, -MMEJ)
+
+vorinostat_validation = validation_ratios_tib %>% 
+  filter(replicate == "mean" & plasmid == "LBR2", drug %in% c("DMSO", "Vorinostat"), sum_bc_reads > 1000)%>% 
+  dplyr::select(barcode, drug, MMEJ_NHEJ, efficiency, all_of(chromatin_cols)) %>%
+  distinct() 
+
+barcde_all_reps_vorino = vorinostat_validation %>% 
+  distinct(barcode, drug) %>% 
+  group_by(barcode) %>%
+  summarise(bccount = n()) %>% 
+  filter(bccount == 2) %>%
+  pull(barcode)
+
+vorinostat_ratios = vorinostat_validation  %>% 
+  filter(barcode %in% barcde_all_reps_vorino) %>%
+  pivot_wider(names_from = drug, values_from = c(efficiency, MMEJ_NHEJ)) %>%
+  mutate(diff_TIF = efficiency_Vorinostat - efficiency_DMSO,
+         ratio_TIF = efficiency_Vorinostat/efficiency_DMSO,
+         log2_FC_TIF = log2(ratio_TIF),
+         diff_MMEJ_NHEJ = MMEJ_NHEJ_Vorinostat - MMEJ_NHEJ_DMSO,
+         ratio_MMEJ_NHEJ = MMEJ_NHEJ_Vorinostat/MMEJ_NHEJ_DMSO,
+         log2_FC_MMEJ_NHEJ = log2(ratio_MMEJ_NHEJ),
+         drug = "Vorinostat") 
+
+barcde_all_reps_gsk = RSTP2_IndelRatios_Chromatin_2kb %>% 
+  distinct(barcode, drug) %>% 
+  group_by(barcode) %>%
+  summarise(bccount = n()) %>% 
+  filter(bccount == 2) %>%
+  pull(barcode)
+
+GSK_ratios = RSTP2_IndelRatios_Chromatin_2kb %>% 
+  filter(barcode %in% barcde_all_reps_gsk) %>%
+  # distinct(barcode, drug, MMEJ_NHEJ , efficiency) %>% 
+  pivot_wider(names_from = drug, values_from = c(efficiency, MMEJ_NHEJ)) %>%
+  mutate(diff_TIF = efficiency_GSK126 - efficiency_DMSO_GSK,
+         ratio_TIF = efficiency_GSK126/efficiency_DMSO_GSK,
+         log2_FC_TIF = log2(ratio_TIF),
+         diff_MMEJ_NHEJ = MMEJ_NHEJ_GSK126 - MMEJ_NHEJ_DMSO_GSK,
+         ratio_MMEJ_NHEJ = MMEJ_NHEJ_GSK126/MMEJ_NHEJ_DMSO_GSK,
+         log2_FC_MMEJ_NHEJ = log2(ratio_MMEJ_NHEJ),
+         drug = "GSK-126")
+
+pool_validation_ratios = bind_rows(vorinostat_ratios, GSK_ratios) %>% 
+  dplyr::select(-efficiency_Vorinostat, -efficiency_DMSO, -MMEJ_NHEJ_DMSO, 
+                -MMEJ_NHEJ_Vorinostat, -MMEJ_NHEJ_DMSO_GSK, -efficiency_DMSO_GSK, 
+                -MMEJ_NHEJ_DMSO_GSK, -MMEJ_NHEJ_GSK126, -efficiency_GSK126)
+```
+
+# Calculating the Chromatin Context Dependency (CCD)
+## Extract slopes for all features
+```{r LM validations}
+chromatin.features.short = chromatin_cols[1:24]
+
+slope.protein.features <- tibble(drug = NA, feature = NA,  term = NA, 
+                                 indelrate = NA, p.value.indelrate = NA, 
+                                 ratio = NA, p.value.ratio = NA)
+
+for (i in unique(pool_validation_ratios$drug)) {
+  for (j in chromatin.features.short) {
+    model_tib <- pool_validation_ratios %>% filter(drug == i) 
+    
+    # Indel rates
+    model.indelrate.log2 <- lm(formula = log2_FC_TIF ~ unlist(model_tib[j]), 
+                               data = model_tib) %>% 
+      tidy()
+    
+    # Pathway balance
+    model.ratio.log2 <- lm(formula = log2_FC_MMEJ_NHEJ ~ unlist(model_tib[j]), 
+                           data = model_tib) %>% 
+      tidy()
+    
+    slope.protein.features <- slope.protein.features %>% 
+      add_row(drug = i, 
+              feature = j, 
+              term = model.indelrate.log2 %>%
+                pull(term),
+              indelrate = model.indelrate.log2 %>% 
+                pull(estimate), 
+              p.value.indelrate = model.indelrate.log2 %>% 
+                pull(p.value),
+              ratio = model.ratio.log2 %>% 
+                pull(estimate), 
+              p.value.ratio = model.ratio.log2 %>% 
+                pull(p.value))
+  }
+}
+
+# Remove the 1st NA column
+slope.protein.features %<>% 
+  filter(!is.na(feature)) %>%
+  mutate(term = ifelse(term == "(Intercept)", "intercept", "slope"))
+```
+
+
+### Calculating the Principle Component Regression (PCR)
+```{r PCR validations}
+CCD_tib = pool_validation_ratios %>% dplyr::select(barcode, drug, log2_FC_TIF, log2_FC_MMEJ_NHEJ, all_of(chromatin.features.short)) %>% ungroup()
+
+#Create an empty dt with CCDs of DDR proteins
+pool_CCDs_dt <- tibble(var = NA, drug = NA, num_comp = NA, r.squared = NA, adj.r.squared = NA,p.value = NA)
+# chrom_formula = as.formula(paste("y ~ ", paste(chromatin.features, collapse= "+")))
+
+for (i in unique(CCD_tib$drug)){
+  for (j in c("log2_FC_TIF", "log2_FC_MMEJ_NHEJ")) {
+    pool_dt <- filter(CCD_tib, drug == i)
+    # Run a model per drug
+    set.seed(1)
+    chrom_formula = reformulate(chromatin.features.short, response = j)
+    PCR_model_DDR_test <- pcr(chrom_formula,
+                              data=pool_dt , 
+                              validation="CV")
+    
+    pcr_pred <- predict(PCR_model_DDR_test, 
+                        pool_dt, ncomp = 3)
+    
+    combined.dt <- tibble(measured = pool_dt %>% pull(j), 
+                          predicted = as.numeric(pcr_pred))
+    
+    pred_vs_estim <- lm(formula = measured ~ predicted, 
+                        data = combined.dt) %>% 
+      glance()
+    
+    pool_CCDs_dt <- pool_CCDs_dt %>% 
+      add_row(var = j,
+              drug = i, 
+              r.squared = pred_vs_estim %>% 
+                pull(r.squared), 
+              adj.r.squared = pred_vs_estim %>% 
+                pull(adj.r.squared), 
+              p.value = pred_vs_estim %>% 
+                pull(p.value))
+  }
+}
+
+#Correct model to adjust for multiple testing correction
+adj_p.value_KO_model <- pool_CCDs_dt %>% 
+  dplyr::select(var, num_comp, p.value, drug) %>% 
+  group_by(var) %>%
+  mutate(p.adj = p.adjust(p.value, method = "BH")) %>% 
+  dplyr::select(var, drug,p.value,p.adj)
+
+signif_hits = adj_p.value_KO_model %>% filter(p.adj < 0.01) %>% 
+  distinct(drug, var) %>% 
+  ungroup() %>% 
+  mutate(val = TRUE,
+         var = gsub("log2.fc", "signif", var)) %>%
+  pivot_wider(names_from = var, 
+              values_from = val, 
+              values_fill = FALSE) 
+
+```
+### Plotting of the predicted vs measured
+```{r plot predicted vs measured}
+FC_tib = pool_validation_ratios %>% dplyr::select(barcode, drug, log2_FC_TIF, log2_FC_MMEJ_NHEJ, all_of(chromatin.features.short)) %>%  ungroup()
+
+for (i in c("Vorinostat", "GSK-126")){
+  drug_conc_dt <- filter(FC_tib, drug == i)
+  # Run a model per drug_conc
+  set.seed(1)
+  chrom_formula = reformulate(chromatin.features.short, response = "log2_FC_MMEJ_NHEJ")
+  PCR_model_DDR_test <- pcr(chrom_formula,
+                            data=drug_conc_dt , 
+                            validation="CV")
+  
+  pcr_pred <- predict(PCR_model_DDR_test, 
+                      drug_conc_dt, ncomp = 3)
+  
+  combined.dt <- tibble(measured = drug_conc_dt %>% pull("log2_FC_MMEJ_NHEJ"), 
+                        predicted = as.numeric(pcr_pred))
+  
+  pred_vs_estim <- lm(formula = measured ~ predicted, 
+                      data = combined.dt) %>% 
+    glance()
+  
+  p =  ggplot(combined.dt, aes(measured, predicted)) +
+    geom_point() +
+    geom_smooth(method = "lm", se = F) +
+    stat_cor(method = "spearman") +
+    stat_poly_eq(aes(label = paste(after_stat(eq.label),
+                                   after_stat(rr.label), sep = "*\", \"*")),
+                 label.x = "left", label.y = "bottom") +
+    ggtitle(i) +
+    theme_classic2(base_size = 16) 
+  
+  print(p)
+}
+
+```
+
+
+### Filtering the epistasis
+```{r epistasis filtering validations}
+# Calculate postition where the linear model crosses y = 0, we do this by -intercept / slope
+epistasis_tib = slope.protein.features %>% 
+  # Here we will filter for significant linear model, as a first step.
+  mutate(indelrate = ifelse(p.value.indelrate < 0.05, indelrate, 0),
+         ratio = ifelse(p.value.ratio < 0.05, ratio, 0)) %>%
+  distinct(drug, term, feature, indelrate, ratio) %>% 
+  pivot_wider(., names_from = term, values_from = c(indelrate, ratio)) %>%
+  mutate(feature = gsub(".zscore", "", feature),
+         x_intercept_indelrate = -indelrate_intercept / indelrate_slope,
+         x_intercept_ratio = -ratio_intercept / ratio_slope)
+
+epistasis_tib %<>% 
+  left_join(signif_hits) %>%
+  mutate(
+    indelrate_slope_plot = ifelse(x_intercept_indelrate < 1 & log2_FC_TIF, indelrate_slope, NA),
+    ratio_slope_plot = ifelse(x_intercept_ratio < 1 & log2_FC_MMEJ_NHEJ, ratio_slope, NA)) %>%
+  distinct(drug, feature, indelrate_slope_plot, ratio_slope_plot, indelrate_slope, ratio_slope) 
+```
+
+
 ## Processed data export
 The files will be saved in the processed data folder.
 ```{r export validation}
@@ -718,6 +949,10 @@ saveRDS(validation_indels_tib, file = filename)
 # The ratios list of the split technical replicates
 filename <- SetFileName("validation_ratios", initials = initials, extension = "RDS")
 saveRDS(validation_ratios_tib, file = filename)
+
+# The mutations list that can be loaded for the indel spectra plots.
+filename <- SetFileName("CCD_validation_table", initials = initials, extension = "RDS")
+saveRDS(epistasis_tib, file = filename)
 ```
 # Conclusions
 I"m happy with the output I"ve generated. I should still work on checking what the best amount of reads is that I need for correct correlations etc.

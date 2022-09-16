@@ -269,19 +269,20 @@ ordered_marks2 <- c("Negative Control", "MRN", "DNA-PK","Epigenetic Reader Domai
 ```{r, warning=FALSE}
 # List significance
 filtered_drug_pvals = indel.data %>%
-   mutate(drug = case_when(drug == "DMSO" & plate %in% c(1:6) ~ paste(drug, drug_plate, well, "1", sep = " "), 
+  mutate(drug = case_when(drug == "DMSO" & plate %in% c(1:6) ~ paste(drug, drug_plate, well, "1", sep = " "), 
                           drug == "DMSO" & plate %in% c(7:12) ~ paste(drug, drug_plate, well, "2", sep = " "),
                           drug == "DMSO" & plate %in% c(13:18) ~ paste(drug, drug_plate, well, "3", sep = " "),
                           T ~ drug)) %>%
   distinct(drug, conc_char, IPR, zscore_TIF_comb_rep, zscore_bal_comb_rep, filter_zscore_TIF_comb_rep, filter_zscore_bal_comb_rep) %>%
   filter(!is.na(zscore_bal_comb_rep), !is.na(zscore_TIF_comb_rep)) %>%
-  mutate(zscore_TIF_comb_rep_temp = ifelse(filter_zscore_TIF_comb_rep, zscore_TIF_comb_rep, 0),
-         zscore_bal_comb_rep_temp = ifelse(filter_zscore_bal_comb_rep, zscore_bal_comb_rep, 0),
-         p_val_TIF = 2*pnorm(q = abs(zscore_TIF_comb_rep_temp), lower.tail = F),
-         p_val_bal = 2*pnorm(q = abs(zscore_bal_comb_rep_temp), lower.tail = F),
-         # Adjust p value for false discovery rate
-         adj_pval_TIF = p.adjust(p_val_TIF, method = 'holm'),
-         adj_pval_bal = p.adjust(p_val_bal, method = 'holm'))
+  mutate(
+    zscore_TIF_comb_rep_temp = ifelse(filter_zscore_TIF_comb_rep, zscore_TIF_comb_rep, 0),
+    zscore_bal_comb_rep_temp = ifelse(filter_zscore_bal_comb_rep, zscore_bal_comb_rep, 0),
+    p_val_TIF = 2*pnorm(q = abs(zscore_TIF_comb_rep_temp), lower.tail = F),
+    p_val_bal = 2*pnorm(q = abs(zscore_bal_comb_rep_temp), lower.tail = F),
+    # Adjust p value for false discovery rate
+    adj_pval_TIF = p.adjust(p_val_TIF, method = 'holm'),
+    adj_pval_bal = p.adjust(p_val_bal, method = 'holm'))
 
 # Make a table with the orientation of effect, used later for filtering. 
 filtered_drug_conc = filtered_drug_pvals %>%
@@ -315,7 +316,7 @@ filtered_drug_conc = filtered_drug_pvals %>%
 
 ## From Xabi Vergara to filter on effect and not on intercept.
 effect_of_compound_tib = filtered_drug_pvals %>%
-dplyr::group_by(drug, conc_char) %>% 
+  dplyr::group_by(drug, conc_char) %>% 
   # Change the non significant ones to 0, so we filter them out.
   mutate(zscore_TIF_comb_rep_temp = ifelse(adj_pval_TIF >= pval_signif, 0, zscore_TIF_comb_rep_temp),
          zscore_bal_comb_rep_temp = ifelse(adj_pval_bal >= pval_signif, 0, zscore_bal_comb_rep_temp)) %>%
@@ -324,13 +325,13 @@ dplyr::group_by(drug, conc_char) %>%
                    TIF_down_signif = sum(zscore_TIF_comb_rep_temp < -1.96), #Summarise number of significant barcodes per compound for TIF
                    TIF_up_signif = sum(zscore_TIF_comb_rep_temp > 1.96)) %>% 
   mutate(bal_signif = case_when(MMEJ_signif <= 1 & NHEJ_signif > 1 ~ "NHEJ", #Annotate which pathway the compound boosts
-                                    NHEJ_signif <= 1 & MMEJ_signif > 1 ~ "MMEJ", 
-                                    T ~ "both"),
+                                NHEJ_signif <= 1 & MMEJ_signif > 1 ~ "MMEJ", 
+                                T ~ "both"),
          TIF_signif = case_when(TIF_up_signif <= 1 & TIF_down_signif > 1 ~ "TIF_down", #Annotate how the compounds affects TIF
-                                    TIF_down_signif <= 1 & TIF_up_signif > 1 ~ "TIF_up", 
-                                    T ~ "TIF_both")) %>%
+                                TIF_down_signif <= 1 & TIF_up_signif > 1 ~ "TIF_up", 
+                                T ~ "TIF_both")) %>%
   mutate(drug_conc = paste(drug, conc_char, sep = " ")) %>%
-  semi_join(filtered_drug_conc) # Semi-join the filtered druc conc to keep only the significant ones after p adjustment.
+  semi_join(filtered_drug_conc) # Semi-join the filtered drug conc to keep only the significant ones after p adjustment.
 
 ratios_tib <- indel.data %>%
   mutate(drug = case_when(drug == "DMSO" & plate %in% c(1:6) ~ paste(drug, drug_plate, well, "1", sep = " "), 
@@ -468,11 +469,11 @@ adj_p.value_KO_model <- drug_conc_CCDs_dt %>%
   mutate(p.adj = p.adjust(p.value, method = "BH")) %>% 
   dplyr::select(var, drug_conc,p.value,p.adj)
 
-signif_hits = adj_p.value_KO_model %>% filter(p.adj < pval_signif) %>% 
+signif_pcr_hits = adj_p.value_KO_model %>% filter(p.adj < pval_signif) %>% 
   distinct(drug_conc, var) %>% 
   ungroup() %>% 
   mutate(val = TRUE,
-         var = gsub("log2.fc", "signif", var)) %>%
+         var = gsub("log2.fc", "signif.pcr", var)) %>%
   pivot_wider(names_from = var, 
               values_from = val, 
               values_fill = FALSE) 
@@ -487,31 +488,31 @@ epistasis_tib = slope.protein.features %>%
   mutate(feature = gsub(".zscore", "", feature))
 
 epistasis_tib %<>% 
-  left_join(signif_hits) %>%
+  left_join(signif_pcr_hits) %>%# These are p values for a significant CCD by PCR
   left_join(effect_of_compound_tib) %>% 
   left_join(filtered_drug_conc) %>%
-  distinct(signif.ratio, signif.freqCut, # These are p values for a significant CCD
+  distinct(signif.pcr.ratio, signif.pcr.freqCut, # These are p values for a significant CCD by PCR
            drug_conc, feature, 
            indelrate_slope, ratio_slope, # The slopes
            bal_signif, TIF_signif, # What effect the compounds have
-           effect_on_indelrate, effect_on_ratio # If the effect is significant in at least 2 IPRs (from above)
-           ) %>% 
+           effect_on_indelrate, effect_on_ratio) %>% # If the effect is significant in at least 2 IPRs (from above)) %>% 
   mutate(ratio_slope_plot = case_when(
-      effect_on_ratio & signif.ratio & bal_signif == "MMEJ" & ratio_slope > 0 ~ ratio_slope, 
+      effect_on_ratio & signif.pcr.ratio & bal_signif == "MMEJ" & ratio_slope > 0 ~ ratio_slope, 
       bal_signif == "MMEJ" & ratio_slope < 0 ~ as.double(NA), 
-      effect_on_ratio & signif.ratio & bal_signif == "NHEJ" & ratio_slope < 0 ~ ratio_slope, 
+      effect_on_ratio & signif.pcr.ratio & bal_signif == "NHEJ" & ratio_slope < 0 ~ ratio_slope, 
       bal_signif == "NHEJ" & ratio_slope > 0 ~ as.double(NA), 
-      effect_on_ratio & signif.ratio & bal_signif == "bal_both" ~ indelrate_slope,
+      effect_on_ratio & signif.pcr.ratio & bal_signif == "bal_both" ~ ratio_slope,
       T ~ as.double(NA)),
     indelrate_slope_plot = case_when(
-      effect_on_indelrate & signif.freqCut & TIF_signif == "TIF_down" & indelrate_slope < 0 ~ indelrate_slope, 
+      effect_on_indelrate & signif.pcr.freqCut & TIF_signif == "TIF_down" & indelrate_slope < 0 ~ indelrate_slope, 
       TIF_signif == "TIF_down" & indelrate_slope > 0 ~ as.double(NA), 
-      effect_on_indelrate & signif.freqCut & TIF_signif == "TIF_up" & indelrate_slope > 0 ~ indelrate_slope, 
+      effect_on_indelrate & signif.pcr.freqCut & TIF_signif == "TIF_up" & indelrate_slope > 0 ~ indelrate_slope, 
       TIF_signif == "TIF_up" & indelrate_slope < 0 ~ as.double(NA), 
-      effect_on_indelrate & signif.freqCut & TIF_signif == "TIF_both" ~ indelrate_slope,
+      effect_on_indelrate & signif.pcr.freqCut & TIF_signif == "TIF_both" ~ indelrate_slope,
       T ~ as.double(NA))) %>%
   distinct(drug_conc, feature, indelrate_slope, indelrate_slope_plot, ratio_slope, ratio_slope_plot)
 ```
+
 
 ## Heatmap annoation
 

@@ -35,7 +35,7 @@ render_validations = TRUE
 render_synergies = FALSE
 ```
 
-```{r}
+```{r render figures, eval=F}
 # Render all figure scripts
 render_all_figures = TRUE
 
