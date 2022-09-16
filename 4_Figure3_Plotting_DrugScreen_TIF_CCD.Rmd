@@ -257,7 +257,7 @@ group_colors = c("Euchromatin" = "#f7941d",
 colors_targets <-  c(HDAC="#60988D", HAT="#C6D0A8", Sirtuin="#8FCAAC",
                      HMT="#FDCDAC", DNMT="#D69C81", `Histone Demethylase`="#FFF2AE",
                      HIF="#E3DCD5", JAK="#C8D7E2", PIM="#9AB8C4", `Aurora Kinase`="#F4CAE4",
-                     PARP="#CB546F", `Epigenetic Reader Domain`= "#476D61", `DNA-PK`="#E07A43")
+                     PARP="#CB546F", `Epigenetic Reader Domain`= "#476D61", `DNA-PK`="#779ed7")
 
 conc_control_colors = c("CTRL" = colors_drugs[2], "100 nM" = colors_drugs[7], "1 µM" = colors_drugs[4], "10 µM" = "#000000")
 conc_colors = c("100 nM" = colors_drugs[7], "1 µM" = colors_drugs[4], "10 µM" = "#000000")
@@ -277,7 +277,6 @@ ggplot_custom <- function(...) ggplot2::ggplot(...) +
 #### Import
 ```{r data import, echo = FALSE, warning = FALSE}
 # Import data from preprocessing script
-in.dir = list.dirs(path = "/DATA/projects/DSBrepair/data/R") %>% .[grepl("episcreen", .)] %>% tail(n = 1)
 file = list.files(in.dir, pattern = "episcreen_ratios", full.names = T) %>% tail(n = 1)
 indel.data <- readRDS(file) # %>% filter(pathway_bal_filter == TRUE & viab_reproducibility == TRUE)
 ```
@@ -384,7 +383,7 @@ annotation_colors_scr = list(
   target = c(HDAC="#60988D", HAT="#C6D0A8", Sirtuin="#8FCAAC",
              HMT="#FDCDAC", DNMT="#D69C81", `Histone Demethylase`="#FFF2AE",
              HIF="#E3DCD5", JAK="#C8D7E2", PIM="#9AB8C4", `Aurora Kinase`="#F4CAE4",
-             PARP="#CB546F", `Epigenetic Reader Domain`= "#476D61", `DNA-PK`="#E07A43"),
+             PARP="#CB546F", `Epigenetic Reader Domain`= "#476D61", `DNA-PK`="#779ed7"),
   conc_char = conc_colors,
   clusters_drugs = sequential_hcl(7, "Plasma"),
   # viab_rep1 = c('#ffeee9', '#ffdcd4', '#ffcbbe', '#ffb8a8', '#fda693', '#f9947e', '#f4826a', '#ef6f56', '#e95b43', '#e24530'),
@@ -462,7 +461,6 @@ file = list.files(in.dir, pattern = "chrom_cluster_heatmap", full.names = T) %>%
 TRIP_chrom_clust <- readRDS(file)
 file = list.files(in.dir, pattern = "FC_ratios", full.names = T) %>% tail(n = 1)
 ratios_tib_fc <- readRDS(file)
-
 ```
 
 ### Annotation
@@ -486,7 +484,7 @@ annotation_colors_scr = list(
   target = c(HDAC="#60988D", HAT="#C6D0A8", Sirtuin="#8FCAAC",
              HMT="#FDCDAC", DNMT="#D69C81", `Histone Demethylase`="#FFF2AE",
              HIF="#E3DCD5", JAK="#C8D7E2", PIM="#9AB8C4", `Aurora Kinase`="#F4CAE4",
-             PARP="#CB546F", `Epigenetic Reader Domain`= "#476D61", `DNA-PK`="#E07A43", 
+             PARP="#CB546F", `Epigenetic Reader Domain`= "#476D61", `DNA-PK`="#779ed7", 
              `Negative Control` = "#65BFA4", `MRN` = "#5D79AC"),
   conc_char = conc_colors,
   conc_char_ctrl = conc_control_colors,
@@ -583,7 +581,7 @@ p1 = ggplot(mock.slopes, aes(z_score,value,color = variable)) + theme_bw() +
   xlab("Feature signal (z-score)") + 
   theme(legend.position = "none") + 
   coord_cartesian(ylim= c(-1.5,1.5)) + 
-  scale_color_manual(values = c("black","#01665e","#8c510a"))+
+  scale_color_manual(values = c("black","#2E6B9F","#317625"))+
   theme_classic2(base_size = 16)
 
 # p2 = ggplot(CCD_example_tib,
@@ -600,7 +598,7 @@ p1 = ggplot(mock.slopes, aes(z_score,value,color = variable)) + theme_bw() +
 p2 = ggplot(CCD_example_tib,
             aes(x = LMNB1.zscore, y = PCI_log2_FC_TIF)) +
   geom_point() +
-  geom_smooth(method = "lm", color = "#01665e",se = FALSE) +
+  geom_smooth(method = "lm", color = "#2E6B9F",se = FALSE) +
   stat_cor(method = "pearson") +
   geom_vline(xintercept = 0, linetype = 2) + 
   geom_hline(yintercept = 0, linetype = 2) + 
@@ -624,7 +622,7 @@ p3 = ggplot(CCD_example_tib,
   coord_cartesian()+
   theme_classic2(base_size = 16)
 
-plot_grid(p1, p2, p3, nrow = 1, labels = c("A", "B", "C"))
+plot_grid(p1, p2, p3, ncol = 1, labels = c("A", "B", "C"))
 ```
 
 
@@ -635,7 +633,7 @@ quant_breaks <- quantile(all_compounds_epistasis_TIF, c(.01,.99), na.rm = T)
 palette_length <- 100
 breaks <- c(seq(quant_breaks[1], 0, length.out=ceiling(palette_length/2) + 1), 
             seq(quant_breaks[2]/palette_length, quant_breaks[2], length.out=floor(palette_length/2)))
-colors = diverge_hcl(length(breaks), palette = "Cork")
+colors = rev(diverge_hcl(length(breaks), palette = "Cork"))
 colors[which(breaks == 0)-1] = "white"
 
 pheatmap(all_compounds_epistasis_TIF[, TRIP_chrom_clust$labels],
@@ -727,14 +725,14 @@ p1 = ggplot(mock.slopes, aes(z_score, value, color = variable)) +
   ylab("log2(fold change TIF)") + 
   xlab("Feature signal (z-score)") + 
   coord_cartesian(ylim= c(-1.5,1.5)) + 
-  scale_color_manual(values = c("#01665e","#8c510a"))+
+  scale_color_manual(values = c("#2E6B9F","#317625"))+
   theme_classic2(base_size = 16) + 
   theme(legend.position = "none")
 
 p2 = ggplot(CCD_example_tib,
             aes(x = H3K36me3.zscore, y = EPZ6438_log2_FC_TIF)) +
   geom_point() +
-  geom_smooth(method = "lm", color = "#8c510a",se = FALSE) +
+  geom_smooth(method = "lm", color = "#317625",se = FALSE) +
   stat_cor(method = "pearson") +
   geom_vline(xintercept = 0, linetype = 2) + 
   geom_hline(yintercept = 0, linetype = 2) + 

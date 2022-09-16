@@ -642,9 +642,9 @@ all_compounds_epistasis_TIF %>%
 for(i in unique(CCD_tib$feature)) {
   rank_dt = CCD_tib %>% 
     left_join(rownames_to_column(target, var = "drug_conc"), by = "drug_conc") %>%
-    filter(feature == i, !is.na(indelrate_slope_plot)) %>%
+    filter(feature == i, !is.na(indelrate_slope)) %>%
     distinct() %>%
-    arrange(desc(indelrate_slope_plot))
+    arrange(desc(indelrate_slope))
   
   if(nrow(rank_dt) > 1) {
     rank_dt %<>%
@@ -666,14 +666,14 @@ for(i in unique(CCD_tib$feature)) {
             axis.text.x=element_blank(),
             axis.ticks.x=element_blank())+
       # add horizontal line for 0.01 slope cutoff which is highlighted in the heatmap
-      geom_vline(xintercept = rank_dt[rank_dt$indelrate_slope_plot  < -0.01, ]$rank[1] - 0.5)  +
-      geom_vline(xintercept = max(rank_dt[rank_dt$indelrate_slope_plot  > 0.01, ]$rank) + 0.5)
+      geom_vline(xintercept = rank_dt[rank_dt$indelrate_slope  < -0.01, ]$rank[1] - 0.5)  +
+      geom_vline(xintercept = max(rank_dt[rank_dt$indelrate_slope  > 0.01, ]$rank) + 0.5)
     
     
     p2 = rank_dt %>% 
-      filter(!between(rank, 11, maxrank-10)) %>%
+      filter(!between(rank, 16, maxrank-15)) %>%
       mutate(rank = seq(1:n())) %>% 
-      ggplot(., aes(x = rank, y = indelrate_slope_plot, fill = target)) +
+      ggplot(., aes(x = rank, y = indelrate_slope, fill = target)) +
       geom_bar(stat = "identity") + 
       scale_x_reverse() +
       coord_flip() +
@@ -780,18 +780,18 @@ DNMT_drugs = target_set_drugs %>%
          ) %>% pull(drug_conc)
 
 TIF_synergy_matrix_DNMT = CCD_tib %>%
-  dplyr::select(drug_conc, indelrate_slope_plot, feature) %>%
+  dplyr::select(drug_conc, indelrate_slope, feature) %>%
   group_by(drug_conc) %>%
-  mutate(onlyNA = sum(is.na(indelrate_slope_plot))) %>% 
+  mutate(onlyNA = sum(is.na(indelrate_slope))) %>% 
   filter(onlyNA != 25 & drug_conc %in% DNMT_drugs) %>%
-  reshape2::dcast(drug_conc ~ feature, value.var = "indelrate_slope_plot", fill = 0) %>% 
+  reshape2::dcast(drug_conc ~ feature, value.var = "indelrate_slope", fill = 0) %>% 
   column_to_rownames(var = "drug_conc")
 
 # Make matrix with drugs from selected target
 cluster_rows = ifelse(nrow(TIF_synergy_matrix_DNMT) > 1, TRUE, FALSE)
 
 # # change these numbers according to where you want to set the cutoff
-quant_breaks <- quantile(TIF_synergy_matrix_DNMT, c(.05,.95), na.rm = T)
+quant_breaks <- quantile(TIF_synergy_matrix_DNMT, c(.20,.80), na.rm = T)
 max_quant = max(abs(quant_breaks))
 palette_length <- 100
 breaks <- c(seq(-max_quant, 0, length.out=ceiling(palette_length/2) + 1),

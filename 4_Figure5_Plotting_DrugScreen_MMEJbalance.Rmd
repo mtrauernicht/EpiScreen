@@ -186,7 +186,7 @@ CorrelationPlotMean <- function(data, feature_name, targets, title = "with treat
   }
   p <-  ggplot(cor.df, aes(x = rowname, y = corr, fill = p.adj.signif)) +
     geom_bar(stat = "identity", position = "dodge") +
-    ylab(paste("Spearman correlation ",title)) +
+    ylab(paste("Spearman correlation",title)) +
     xlab("Chromatin Feature") +
     # ggtitle(paste("Repair pathways correlation with chromatin features in", condition_name, "exps"))  +
     theme_classic2(base_size = 16) +
@@ -486,7 +486,7 @@ colors_drugs <- c("#FA8D62", "#65BFA4", "#8CA0C4", "#808184", "#F6D289", "#E5E5E
 colors_targets <-  c(HDAC="#60988D", HAT="#C6D0A8", Sirtuin="#8FCAAC",
                      HMT="#FDCDAC", DNMT="#D69C81", `Histone Demethylase`="#FFF2AE",
                      HIF="#E3DCD5", JAK="#C8D7E2", PIM="#9AB8C4", `Aurora Kinase`="#F4CAE4",
-                     PARP="#CB546F", `Epigenetic Reader Domain`= "#476D61", `DNA-PK`="#E07A43")
+                     PARP="#CB546F", `Epigenetic Reader Domain`= "#476D61", `DNA-PK`="#779ed7")
 colors_pathways = c("wt" = "#808184", "other" = "black", "NHEJ" = "#e1251b", "MMEJ" = "#26419a", "SSTR" = "#007A4C")
 slope.colors <- tibble(color = c("#8c510a", "#f5f5f5","#01665e"),label = c("negative","none","positive"), feature = "epistasis")
 
@@ -528,6 +528,7 @@ chrom_data = indel.data %>% dplyr::select(barcode, all_of(chromatin.features)) %
   rename_with(., ~gsub(".zscore", "", .x))
 
 chromatin.features.short = gsub(".zscore", "", chromatin.features)
+chromatin.features.short.val = chromatin.features.short[!grepl("H3K9me3", chromatin.features.short)]
 
 # List chromatin name columns from this table
 chromatin_cols = colnames(indel.data.validation)[42:75]
@@ -620,7 +621,7 @@ annotation_colors_scr = list(
   target = c(HDAC="#60988D", HAT="#C6D0A8", Sirtuin="#8FCAAC",
              HMT="#FDCDAC", DNMT="#D69C81", `Histone Demethylase`="#FFF2AE",
              HIF="#E3DCD5", JAK="#C8D7E2", PIM="#9AB8C4", `Aurora Kinase`="#F4CAE4",
-             PARP="#CB546F", `Epigenetic Reader Domain`= "#476D61", `DNA-PK`="#E07A43"),
+             PARP="#CB546F", `Epigenetic Reader Domain`= "#476D61", `DNA-PK`="#779ed7"),
   conc_char = conc_colors,
   clusters_drugs = sequential_hcl(4, "YlGn"),
   # viab_rep1 = c('#ffeee9', '#ffdcd4', '#ffcbbe', '#ffb8a8', '#fda693', '#f9947e', '#f4826a', '#ef6f56', '#e95b43', '#e24530'),
@@ -795,7 +796,7 @@ target_all <- target_set_all %>%
   dplyr::select(target, viab)
 ```
 
-```{r S2A TIF heatmaps, warning = FALSE, fig.width = 8, fig.height = 12}
+```{r 5A MMEJ FC heatmap, warning = FALSE, fig.width = 8, fig.height = 12}
 # pdf(paste0(figure_out, "rs20220623_indelfrequency_heatmap_allconc.pdf"), width=20, height=8)
 balance.data.matrix = balance.data.heatmap2.clusters %>%
   arrange(target_all) %>%
@@ -808,97 +809,18 @@ plt1 = pheatmap(balance.data.matrix[ , clone5_map_ipr$labels],
                 cellwidth = 8,
                 cellheight = 8,
                 breaks = myBreaks,
-                clustering_distance_rows = "correlation",
+                clustering_distance_rows = "manhattan",
                 cluster_rows = T,
                 na_col = "white",
                 main = 'MMEJ ratio FC (log2), all concentrations',
                 annotation_row = target_all,
                 annotation_col = chromatin,
-                # color = colorRampPalette(c("#e07a5f", "#e5e5e5", "#3d405b"))(palette_length),
-                color = diverge_hcl(palette_length, "Blue-Red"),
+                color = colorRampPalette(c("#c0332b", "#E2E2E2", "#2d4284"))(palette_length),
+                # color = diverge_hcl(palette_length, "Blue-Red"),
                 annotation_colors = annotation_colors_scr_set, 
                 annotation_legend = T)
 ```
 *Conclusion Figure 5A: HDAC-rich cluster seems to show H3K27me3-specific MMEJ ratio decrease. No strong MMEJ ratio increases.*
-
-
-
-<!-- ```{r} -->
-<!-- #data frame to save data -->
-<!-- mean_sd_fits <- tibble(term = NA, estimate = NA, std.error = NA, barcode = NA, rep = NA) -->
-
-
-<!-- # First calculate means and sd of the DMSO efficiency per replicate and barcode -->
-<!-- dmso.eff.score <- indel.data %>% -->
-<!--   filter(drug == "DMSO") %>% -->
-<!--   dplyr::select('DMSO' = MMEJratio, well, barcode, replicate, tech, plate) %>% -->
-<!--   mutate(DMSO = ave(DMSO, well, replicate, tech, plate, FUN = function(x) mean(x, na.rm=T))) %>% -->
-<!--   distinct(replicate, tech, well, plate, DMSO) %>%  -->
-<!--   pull(DMSO) %>% -->
-<!--   fitdistr(., "normal") %>% tidy() -->
-<!-- ``` -->
-
-<!-- ```{r Compounds that affect the balance at all the sites} -->
-<!-- ## Which compounds change the balance at all the sites in both screens? -->
-<!-- all_balance = indel.data %>%  -->
-<!--   distinct(drug, conc_char, replicate, zscore_bal_comb_rep, target,  -->
-<!--            barcode, viab_reproducibility, pathway_bal_filter) %>%  -->
-<!--   filter(!is.na(zscore_bal_comb_rep) &  -->
-<!--            !between(zscore_bal_comb_rep, -1.96, 1.96) &  -->
-<!--            viab_reproducibility == T &  -->
-<!--            pathway_bal_filter == T) %>%  -->
-<!--   group_by(drug, conc_char, target) %>%  -->
-<!--   count() %>%  -->
-<!--   filter(n == 36) # 2 x 18 -->
-
-<!-- kable(all_balance) -->
-<!-- all_balance %>% ungroup() %>% distinct(drug, target) -->
-
-<!-- ## Now with 16/18 (~ 90%) of the sites with an effect. Near global -->
-<!-- near_all_balance = indel.data %>%  -->
-<!--   distinct(drug, conc_char, replicate, zscore_bal_comb_rep, target,  -->
-<!--            barcode, viab_reproducibility, pathway_bal_filter) %>%  -->
-<!--   filter(!is.na(zscore_bal_comb_rep) &  -->
-<!--            !between(zscore_bal_comb_rep, -1.96, 1.96) &  -->
-<!--            viab_reproducibility == T &  -->
-<!--            pathway_bal_filter == T) %>%  -->
-<!--   group_by(drug, conc_char, target) %>%  -->
-<!--   count() %>%  -->
-<!--   filter(n >= 32) # 2 x 16 -->
-
-
-<!-- kable(near_all_balance) -->
-<!-- near_all_balance %>% ungroup() %>% distinct(drug, target) -->
-<!-- ``` -->
-
-<!-- ```{r warning = FALSE} -->
-<!-- # Plot raw MMEJ ratio -->
-<!-- dmso_bal <- indel.data %>% -->
-<!--   filter(drug == "DMSO") %>% -->
-<!--   dplyr::select('dmso_bal' = MMEJratio, IPR, replicate, tech, well, plate) %>% -->
-<!--   group_by(replicate, tech, well, plate) %>% -->
-<!--   summarise(dmso_bal = mean(dmso_bal)) %>% -->
-<!--   ungroup() %>% -->
-<!--   mutate(dmso_mean = mean(dmso_bal), -->
-<!--          dsmo_sd = sd(dmso_bal)) %>% -->
-<!--   distinct(dmso_mean, dsmo_sd) -->
-
-
-<!-- indel.data %>% -->
-<!--   filter(sample == "Epigenetic Compound" & pathway_bal_filter == TRUE & viab_reproducibility == TRUE) %>% -->
-<!--   distinct(MMEJratio, drug, conc_char, zscore_bal_global_comb_rep) %>% -->
-<!--   mutate(GlobalMMEJratio = ave(MMEJratio, drug, conc_char, FUN = mean)) %>% -->
-<!--   distinct() %>% -->
-<!--   mutate(zscore_bal_global_comb_rep = 2*pnorm(q = abs(zscore_bal_global_comb_rep), lower.tail = F)) %>% -->
-<!--   mutate(MMEJ_pval_adj_global_comb = log10(p.adjust(zscore_bal_global_comb_rep, method = 'fdr')), -->
-<!--          col_bal = ifelse(MMEJ_pval_adj_global_comb < 0.01 &  -->
-<!--                             GlobalMMEJratio > (dmso_bal$dmso_mean + dmso_bal$dsmo_sd), "green",  -->
-<!--                           ifelse(MMEJ_pval_adj_global_comb < 0.01 &  -->
-<!--                                    GlobalMMEJratio < (dmso_bal$dmso_mean - dmso_bal$dsmo_sd), "yellow","blue"))) %>%   -->
-<!--   filter(col_bal != "blue") %>% -->
-<!--   distinct(drug, conc_char) -->
-<!-- ``` -->
-
 
 ---
 
@@ -1143,8 +1065,8 @@ ggplot(decitabine_nu7441_df %>%
   geom_bar(stat = "identity", position = position_dodge(0.75), aes(alpha = 0.7), width = .6) +
   geom_errorbar(aes(ymin=percentage_mean-percentage_sd, ymax=percentage_mean+percentage_sd), width=.2,
                  position=position_dodge(.75))  +
-  scale_fill_manual("legend", values = c(Decitabine_ssODN = "#D69C81", NU7441_ssODN = "#8CA0C4", Decitabine_NU7441_ssODN = "black", DMSO_ssODN = "grey70")) + 
-  scale_color_manual("legend", values = c(Decitabine_ssODN = "#D69C81", NU7441_ssODN = "#8CA0C4", Decitabine_NU7441_ssODN = "black", DMSO_ssODN = "grey70")) + 
+  scale_fill_manual("legend", values = c(Decitabine_ssODN = "#D69C81", NU7441_ssODN = "#779ed7", Decitabine_NU7441_ssODN = "black", DMSO_ssODN = "grey70")) + 
+  scale_color_manual("legend", values = c(Decitabine_ssODN = "#D69C81", NU7441_ssODN = "#779ed7", Decitabine_NU7441_ssODN = "black", DMSO_ssODN = "grey70")) + 
   #scale_y_continuous(name="frequency", labels = percent) +
   scale_x_discrete(name="indel size", breaks = c(-7, 0, 1, 2)) + 
   #facet_wrap( ~ chromatin, ncol = 2) +
@@ -1366,6 +1288,127 @@ p1 = plot_comb_grid_beeswarm(vorino.dt, opt_df,
 p1
 ```
 
+## Vorinostat & GSK
+
+```{r 5F Validations vs screen in HDACi and EZH2i, fig.width=8, fig.height=8}
+vorinostat_validation = indel.data.validation %>% 
+  filter(replicate == "mean" & plasmid == "LBR2", drug %in% c("DMSO", "Vorinostat"), sum_bc_reads > 1000)%>% 
+  dplyr::select(barcode, drug, MMEJ_NHEJ, efficiency, all_of(chromatin_cols)) %>%
+  distinct() 
+
+barcde_all_reps_vorino = vorinostat_validation %>% 
+  distinct(barcode, drug) %>% 
+  group_by(barcode) %>%
+  summarise(bccount = n()) %>% 
+  filter(bccount == 2) %>%
+  pull(barcode)
+
+vorinostat_ratios = vorinostat_validation  %>% 
+  filter(barcode %in% barcde_all_reps_vorino) %>%
+  pivot_wider(names_from = drug, values_from = c(efficiency, MMEJ_NHEJ)) %>%
+  mutate(diff_TIF = efficiency_Vorinostat - efficiency_DMSO,
+         ratio_TIF = efficiency_Vorinostat/efficiency_DMSO,
+         log2_FC_TIF = log2(ratio_TIF),
+         diff_MMEJ_NHEJ = MMEJ_NHEJ_Vorinostat - MMEJ_NHEJ_DMSO,
+         ratio_MMEJ_NHEJ = MMEJ_NHEJ_Vorinostat/MMEJ_NHEJ_DMSO,
+         log2_FC_MMEJ_NHEJ = log2(ratio_MMEJ_NHEJ),
+         drug = "Vorinostat") 
+
+barcde_all_reps_gsk = RSTP2_IndelRatios_Chromatin_2kb %>% 
+  distinct(barcode, drug) %>% 
+  group_by(barcode) %>%
+  summarise(bccount = n()) %>% 
+  filter(bccount == 2) %>%
+  pull(barcode)
+
+GSK_ratios = RSTP2_IndelRatios_Chromatin_2kb %>% 
+  filter(barcode %in% barcde_all_reps_gsk) %>%
+  # distinct(barcode, drug, MMEJ_NHEJ , efficiency) %>% 
+  pivot_wider(names_from = drug, values_from = c(efficiency, MMEJ_NHEJ)) %>%
+  mutate(diff_TIF = efficiency_GSK126 - efficiency_DMSO_GSK,
+         ratio_TIF = efficiency_GSK126/efficiency_DMSO_GSK,
+         log2_FC_TIF = log2(ratio_TIF),
+         diff_MMEJ_NHEJ = MMEJ_NHEJ_GSK126 - MMEJ_NHEJ_DMSO_GSK,
+         ratio_MMEJ_NHEJ = MMEJ_NHEJ_GSK126/MMEJ_NHEJ_DMSO_GSK,
+         log2_FC_MMEJ_NHEJ = log2(ratio_MMEJ_NHEJ),
+         drug = "GSK-126")
+
+pool_validation_ratios = bind_rows(
+  vorinostat_ratios, # %>% filter(efficiency_DMSO < 0.85),  
+  GSK_ratios #%>% filter(efficiency_DMSO_GSK < 0.85)
+  ) %>% 
+  dplyr::select(-efficiency_Vorinostat, -efficiency_DMSO, -MMEJ_NHEJ_DMSO, 
+                -MMEJ_NHEJ_Vorinostat, -MMEJ_NHEJ_DMSO_GSK, -efficiency_DMSO_GSK, 
+                -MMEJ_NHEJ_DMSO_GSK, -MMEJ_NHEJ_GSK126, -efficiency_GSK126)
+
+valid_ratios_long = pool_validation_ratios %>% 
+  dplyr::select(barcode, drug, all_of(chromatin.features.short.val), log2_FC_TIF, log2_FC_MMEJ_NHEJ) %>% 
+  distinct() %>%
+  pivot_longer(cols = chromatin.features.short.val, names_to = "feature", values_to = "zscore")
+
+vorino_screen_K27 = indel.data %>% 
+  filter((grepl("Vorinostat", drug) & conc_char == "1 µM") | 
+           (grepl("3-Deazane", drug) & conc_char == "1 µM")) %>% 
+  distinct(drug, barcode, replicate, tech, freqCut_norm_mean, 
+           H3K27me3,POL2, MMEJ_FC) %>%
+  group_by(barcode, drug) %>% 
+  summarise(log2_FC_TIF = log2(mean(freqCut_norm_mean)),
+            log2_FC_MMEJ_NHEJ = log2(mean(MMEJ_FC, na.rm = TRUE)),
+            H3K27me3 = mean(H3K27me3),
+            POL2 = mean(POL2),
+            source = "screen") %>%
+  pivot_longer(cols = c("POL2", "H3K27me3"), names_to = "feature", values_to = "zscore") %>%
+  mutate(drug = ifelse(grepl("Vorinostat", drug), "HDACi", "EZH2i"))
+
+vorino_pool_K27 = valid_ratios_long%>% 
+  filter(feature %in% c("H3K27me3" , "POL2"), 
+         # barcode %in% barcode_set_match_clone
+         # barcode %in% c(vorino_bc_85, gsk_bc_85)
+         ) %>%
+  mutate(source = "pool",
+         drug = ifelse(grepl("Vorinostat", drug), "HDACi", "EZH2i"))
+
+vorino_pool_K27_cloneset = valid_ratios_long %>% 
+  filter(feature %in% c("H3K27me3" , "POL2"), barcode %in% paste0(unique(indel.data$barcode), ".B")) %>%
+  mutate(source = "pool_clone",
+         drug = ifelse(grepl("Vorinostat", drug), "HDACi", "EZH2i"))
+
+
+vorino_k27 = bind_rows(vorino_screen_K27, vorino_pool_K27, vorino_pool_K27_cloneset)
+
+# ggplot(vorino_k27, aes(zscore, log2_FC_MMEJ_NHEJ, color = source)) + 
+#   geom_point() +
+#   geom_smooth(method = "lm", se = F) +
+#   stat_cor(method = "pearson") +
+#   ggtitle("log2 FC Balance") +
+#   stat_poly_eq(aes(label = paste(after_stat(eq.label),
+#                                  after_stat(rr.label), sep = "*\", \"*")),
+#                label.x = "left", label.y = "bottom") +
+#   facet_grid(drug ~ feature) +
+#   theme_bw(base_size = 16)
+
+vorino_k27.plot <- vorino_k27 %>%
+  mutate(source_2 = ifelse(source %in% c("pool_clone", "pool"), "1_pool", "0_screen")) %>%
+  mutate(source = ifelse(source %in% c("pool_clone", "screen"), "screen", "pool"))
+
+ggplot(vorino_k27.plot %>%
+         filter(feature == "H3K27me3"), 
+       aes(zscore, log2_FC_MMEJ_NHEJ, color = drug)) + 
+  geom_point(aes(alpha = source))+
+  geom_smooth(method = "lm", se = F) +
+  stat_cor(method = "pearson") +
+  ggtitle("log2 FC Balance") +
+  stat_poly_eq(aes(label = paste(after_stat(eq.label),
+                                 after_stat(rr.label), sep = "*\", \"*")),
+               label.x = "left", label.y = "bottom") +
+  facet_grid(drug~source_2) +
+  scale_alpha_discrete(range = c(0.2,1)) +
+  scale_color_manual(values = c("HDACi" = "#60988D", "EZH2i" = "#FDCDAC"))
+```
+
+
+
+
 # Supplementary Figure 5
 
 
@@ -1449,6 +1492,8 @@ ggplot(all.samples.plot %>%
 ```{r Synergies chromatin prep, fig.width= 10, fig.height= 20}
 file = list.files(in.dir, pattern = "CCD_table", full.names = T) %>% tail(n = 1)
 CCD_tib <- readRDS(file)
+file = list.files(in.dir, pattern = "CCD_vali", full.names = T) %>% tail(n = 1)
+CCD_val_tib <- readRDS(file)
 file = list.files(in.dir, pattern = "IPR_annotation_heatmap", full.names = T) %>% tail(n = 1)
 chromatin_TIF <- readRDS(file)
 file = list.files(in.dir, pattern = "compound_annotation_heatmap", full.names = T) %>% tail(n = 1)
@@ -1595,8 +1640,8 @@ all_compounds_epistasis_TIF %>%
   rownames()
 ```
 
-## S5C: HDACi only heatmap
-```{r , fig.width = 10, fig.height = 10}
+## S5x: HDACi only heatmap
+```{r HDACi only, fig.width = 10, fig.height = 10, eval = F}
 HDAC_tib = read.table("rs20220708_HDAC_targets.txt", sep = "\t", fill = NA, header = T) %>%
   dplyr::select(-target_main, -target_second) %>%
   as_tibble()
@@ -1608,7 +1653,8 @@ HDAC_tib = read.table("rs20220708_HDAC_targets.txt", sep = "\t", fill = NA, head
 #   mutate(drug_conc = paste(drug, conc_char, sep = " "))
 
 balance.data.heatmap.HDAC = balance.data.heatmap %>% 
-  mutate(drug_conc = paste(drug, conc_char, sep = " ")) %>% 
+  mutate(drug = gsub(" [(].*[)]", "", drug),
+         drug_conc = paste(drug, conc_char, sep = " ")) %>% 
   filter(target == "HDAC")  %>% 
   dplyr::select(-min_score) %>%
   spread(IPR, MMEJ_log2_FC_mean)
@@ -1619,44 +1665,29 @@ eff.data.heatmap.cluster1 = balance.data.heatmap.HDAC %>%
   # filter(drug_conc %in% cluster1) %>%
   # filter(drug_conc %in% top_50_hits_hdacs$drug_conc) 
 
-cluster_HDAC <- eff.data.heatmap.cluster1 %>%
-  distinct(drug_conc, cluster_HDAC, conc_char)
-
 target.cluster1 <- target_set_drugs %>%
+  filter(target == "HDAC") %>%
   rownames_to_column("drug_conc") %>%
   left_join(HDAC_tib) %>%
-  left_join(cluster_HDAC) %>%
-  filter(!is.na(cluster_HDAC)) %>%
-  replace(is.na(.), 0)
-
-rownames(target.cluster1) <- target.cluster1$drug_conc
-target.cluster1 <- target.cluster1 %>%
-  dplyr::select(cluster_HDAC, conc_char, pan_HDAC, HDAC1,HDAC2, HDAC3,
-                HDAC4, HDAC6, HDAC8, HDAC10, viab)
+  select_if(~sum(!is.na(.)) > 0) %>%
+  replace(is.na(.), 0) %>% 
+  dplyr::select(-drug, -target) %>%
+  column_to_rownames("drug_conc")
 
 target.cluster1
-
-# target_set_all <- target_set_drugs %>%
-#   rownames_to_column("drug_conc") %>%
-#   left_join(clusters_drugs) %>%
-#   na.omit()
-# rownames(target_set_all) <- target_set_all$drug_conc
-# target_all <- target_set_all %>%
-#   dplyr::select(target, 
-#                 clusters_drugs,
-#                 conc_char, viab)
-
-
 
 HDAC_matrix = eff.data.heatmap.cluster1 %>%
   t()
 
-breaks <- quantile(unlist(balance.data.heatmap2 %>% 
-                            dplyr::select(contains('IPR'))), c(.01,.91), na.rm = T) # change these numbers according to where you want to set the cutoff
+breaks <- quantile(unlist(balance.data.heatmap.HDAC %>% 
+                            dplyr::select(contains('IPR'))), c(.01,.99), na.rm = T) # change these numbers according to where you want to set the cutoff
+
+max_break = max(abs(breaks))
+
 palette_length <- 100
 
-myBreaks <- c(seq(breaks[1], 0, length.out=ceiling(palette_length/2) + 1), 
-              seq(0.5/palette_length, 0.5, length.out=floor(palette_length/2)))
+myBreaks <- c(seq(-max_break, 0, length.out=ceiling(palette_length/2) + 1), 
+              seq(max_break/palette_length, max_break, length.out=floor(palette_length/2)))
 
 
 # pdf(paste0(figure_out, "rs20220623_indelfrequency_heatmap_HDAC.pdf"), width=16, height=8)
@@ -1673,7 +1704,7 @@ plt3 = pheatmap(HDAC_matrix[clone5_map_ipr$labels,],
                 main = 'MMEJ ratio FC (log2), all concentrations',
                 annotation_col = target.cluster1,
                 annotation_row = chromatin,
-                color = diverge_hcl(palette_length, "Blue-Red"),
+                color = colorRampPalette(c("#c0332b", "#E2E2E2", "#2d4284"))(palette_length),
                 annotation_colors = annotation_colors_scr,
                 annotation_legend = T)
 ```
@@ -1757,19 +1788,27 @@ CorrelationPlotMean(vorinostat_ratios, "log2_FC_MMEJ_NHEJ", targets = vorinostat
 ```
 
 ## 5x CCD Pool
-```{r}
+```{r S5x CCD pool filtered, fig.height= 6, fig.width= 8}
 # Load pool data
-validation_epistasis_bal <- read.csv2("/DATA/usr/m.trauernicht/projects/EpiScreen/data/validation_epistasis_bal.csv") %>%
-  mutate(X = gsub("(.*)", "\\1_pool", X))
+validation_epistasis_bal <- CCD_val_tib %>%
+  dplyr::select(drug, ratio_slope_plot, feature) %>%
+  group_by(drug) %>%
+  mutate(onlyNA = sum(is.na(ratio_slope_plot))) %>% 
+  filter(onlyNA != 25) %>%
+  reshape2::dcast(drug ~ feature, value.var = "ratio_slope_plot", fill = 0) %>% 
+  column_to_rownames(var = "drug")
 
-# Include screen data
-all_compounds_epistasis_TIF_selection <- all_compounds_epistasis_TIF %>%
-  rownames_to_column("X") %>%
-  filter(X %in% c("Vorinostat 1 µM", "EPZ-6438 10 µM", "3-Deazaneplanocin A 1 µM")) %>%
-  dplyr::select(-H3K9me3)
+all_compounds_epistasis_TIF_HDM = CCD_tib %>%
+  #mutate(drug_conc = paste(drug, conc_char, sep = " ")) %>%
+  dplyr::select(drug_conc, ratio_slope_plot, feature) %>%
+  filter(grepl("Vorinostat|EPZ-6438|3-Deazaneplanocin", drug_conc)) %>%
+  group_by(drug_conc) %>%
+  mutate(onlyNA = sum(is.na(ratio_slope_plot))) %>% 
+  filter(onlyNA != 25 & feature != "H3K9me3") %>%
+  reshape2::dcast(drug_conc ~ feature, value.var = "ratio_slope_plot", fill = 0) %>% 
+  column_to_rownames(var = "drug_conc")
 
-validation_epistasis_bal <- rbind(validation_epistasis_bal, all_compounds_epistasis_TIF_selection) %>%
-  column_to_rownames("X")
+validation_epistasis_bal <- rbind(validation_epistasis_bal, all_compounds_epistasis_TIF_HDM)
 
 quant_breaks <- quantile(validation_epistasis_bal, c(.01,.99), na.rm = T)
 palette_length <- 100
@@ -1787,6 +1826,7 @@ pheatmap(validation_epistasis_bal[ , order_chrom],
              cellwidth = 8,
              cellheight = 8,
              breaks = breaks.validation,
+             clustering_distance_rows = "correlation",
              main = paste("Chromatin synergies - Balance"),
              color = colors.validations,
              annotation_legend = T)

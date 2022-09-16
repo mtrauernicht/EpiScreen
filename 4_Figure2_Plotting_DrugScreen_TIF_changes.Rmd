@@ -230,7 +230,7 @@ colors_drugs <- c("#FA8D62", "#65BFA4", "#8CA0C4", "#808184", "#F6D289", "#E5E5E
 colors_targets <-  c(HDAC="#60988D", HAT="#C6D0A8", Sirtuin="#8FCAAC",
                      HMT="#FDCDAC", DNMT="#D69C81", `Histone Demethylase`="#FFF2AE",
                      HIF="#E3DCD5", JAK="#C8D7E2", PIM="#9AB8C4", `Aurora Kinase`="#F4CAE4",
-                     PARP="#CB546F", `Epigenetic Reader Domain`= "#476D61", `DNA-PK`="#E07A43")
+                     PARP="#CB546F", `Epigenetic Reader Domain`= "#476D61", `DNA-PK`="#779ed7")
 
 conc_colors = c("100 nM" = colors_drugs[7], "1 µM" = colors_drugs[4], "10 µM" = "#000000")
 
@@ -463,7 +463,150 @@ paste("Compounds that significantly (p holm adj < 0.01) changed the TIF in all 1
 
 ---
 
-## 2A: Heatmap of TIF differences {.tabset}
+---
+
+## 2A Ranking 
+```{r 2A Top TIF boosting, fig.width = 4, fig.height = 4}
+rank_dt = indel.data %>% 
+  filter(!drug %in% c("DMSO", "Mirin", "DNA-PKi") & indel_freq_filter & viab_reproducibility  & !is.na(zscore_TIF_global_comb_rep)  & cor_TIF_filter) %>%
+  distinct(drug, conc_char, zscore_TIF_global_comb_rep , target, viab_mean, viab_reproducibility, filter_zscore_TIF_global_comb_rep) %>% 
+  mutate(viab_mean = ave(viab_mean, drug, conc_char, FUN = mean),
+         mean_eff_pval_comb = 2*pnorm(q = abs(zscore_TIF_global_comb_rep), lower.tail = FALSE),
+         mean_eff_pval_adj_comb = p.adjust(mean_eff_pval_comb, method = 'holm')) %>%
+  distinct() %>%
+  filter(!(viab_mean < .60 & zscore_TIF_global_comb_rep < -2.54)) %>% 
+  arrange(desc(zscore_TIF_global_comb_rep )) %>%
+  mutate(rank = seq(1:n()),
+         drug = gsub(" [(].*[)]", "", drug),
+         drug_conc = paste(drug, conc_char, sep = " "))
+
+colors_targets_black = c(colors_targets, black="gray30")
+maxrank = nrow(rank_dt)
+
+rank_dt %>% 
+  # left_join(near_all_TIF) %>%
+  mutate(# n = ifelse(is.na(n), 1, 2),
+    col = ifelse(filter_zscore_TIF_global_comb_rep & 
+                   !(viab_mean < .60 & zscore_TIF_global_comb_rep < -2.54) & 
+                   mean_eff_pval_adj_comb < 0.01,
+                 "black", "gray20")
+  ) %>%
+  # filter(rank < 100 ) %>%
+  ggplot(., aes(rank, zscore_TIF_global_comb_rep, 
+                # size = n, 
+                color = col
+                )) +
+  geom_point()  +
+  scale_color_manual(values = colors_targets_black) +
+  geom_hline(linetype = "dashed", yintercept = 2.58) +
+  geom_hline(linetype = "dashed", yintercept = -2.58) +
+  # geom_label_repel(aes(label = ifelse(col != "black", drug_conc,'')),
+  #                  box.padding   = 1,
+  #                  point.padding = 0.5,
+  #                  max.overlaps = Inf,
+  #                  segment.color = 'gray50') +
+  # gghighlight(!between(rank, 10, maxrank-10) & filter_zscore_TIF_global_comb_rep, 
+  #             label_key = drug_conc, 
+  #             max_highlight = Inf) +
+  # scale_x_reverse(limits = c(100, 0)) +
+  scale_x_reverse() +
+  ylim(-40,40) +
+  ylab("Global combined TIF z-score") +
+  theme_classic2()+ 
+  theme(legend.position = "none") 
+
+
+bottom_hits = rank_dt  %>%
+filter(rank > (maxrank-20) & 
+  filter_zscore_TIF_global_comb_rep & 
+  !(viab_mean < .60 & zscore_TIF_global_comb_rep < -2.54) &
+    mean_eff_pval_adj_comb < 0.01) %>%
+distinct(drug, conc_char, zscore_TIF_global_comb_rep , target, viab_mean) %>%
+arrange(zscore_TIF_global_comb_rep) %>%
+slice_head(n = 10) %>%
+distinct(drug, conc_char, target, zscore_TIF_global_comb_rep, viab_mean) %>%
+mutate(rank = seq(1:n()),
+drug = gsub(" [(].*[)]", "", drug),
+drug_conc = paste(drug, conc_char, sep = " "))
+
+```
+
+## 2B-C Zoom on rank
+```{r 2BC Zoom on rank, fig.width = 8, fig.height = 4}
+# Boosting effect
+p1 = rank_dt %>% 
+  filter(rank <= 75) %>%
+  # left_join(near_all_TIF) %>%
+  mutate(# n = ifelse(is.na(n), 1, 2),
+    col = case_when(rank < 18 & 
+                   filter_zscore_TIF_global_comb_rep & 
+                   !(viab_mean < .60 & zscore_TIF_global_comb_rep < -2.54) & 
+                   mean_eff_pval_adj_comb < 0.01 ~ target,
+                   filter_zscore_TIF_global_comb_rep ~ "black",
+                   T ~ "gray20")
+  ) %>%
+  # filter(rank < 100 ) %>%
+  ggplot(., aes(rank, zscore_TIF_global_comb_rep, 
+                # size = n, 
+                color = col)) +
+  geom_point()  +
+  scale_color_manual(values = colors_targets_black) +
+  geom_hline(linetype = "dashed", yintercept = 2.58) +
+  geom_label_repel(aes(label = ifelse(!col %in% c("gray20","black"), drug_conc,'')),
+                   box.padding   = 1,
+                   point.padding = 0.5,
+                   max.overlaps = Inf,
+                   segment.color = 'gray50') +
+  # gghighlight(!between(rank, 10, maxrank-10) & filter_zscore_TIF_global_comb_rep, 
+  #             label_key = drug_conc, 
+  #             max_highlight = Inf) +
+  # scale_x_reverse(limits = c(100, 0)) +
+  scale_x_reverse() +
+  ylab("Global combined TIF z-score") +
+  theme_classic2() +
+  theme(legend.position = "none")
+
+
+# Inhibiting effect
+p2 = rank_dt %>% 
+  filter(rank >= (maxrank-75)) %>%
+  # left_join(near_all_TIF) %>%
+  mutate(# n = ifelse(is.na(n), 1, 2),
+    col = case_when(rank > (maxrank-11) & 
+                   filter_zscore_TIF_global_comb_rep & 
+                   !(viab_mean < .60 & zscore_TIF_global_comb_rep < -2.54) & 
+                   mean_eff_pval_adj_comb < 0.01 ~ target,
+                   filter_zscore_TIF_global_comb_rep ~ "black",
+                   T ~ "gray20")
+  ) %>%
+  # filter(rank < 100 ) %>%
+  ggplot(., aes(rank, zscore_TIF_global_comb_rep, 
+                # size = n, 
+                color = col)) +
+  geom_point()  +
+  scale_color_manual(values = colors_targets_black) +
+  geom_hline(linetype = "dashed", yintercept = -2.58) +
+  geom_label_repel(aes(label = ifelse(!col %in% c("gray20","black"), drug_conc,'')),
+                   box.padding   = 1,
+                   point.padding = 0.5,
+                   max.overlaps = Inf,
+                   segment.color = 'gray50') +
+  # gghighlight(!between(rank, 10, maxrank-10) & filter_zscore_TIF_global_comb_rep, 
+  #             label_key = drug_conc, 
+  #             max_highlight = Inf) +
+  # scale_x_reverse(limits = c(100, 0)) +
+  scale_x_reverse() +
+  ylab("Global combined TIF z-score") +
+  theme_classic2() +
+  theme(legend.position = "none")
+
+plot_grid(p1, p2, nrow = 1, labels = c("B", "C"))
+```
+
+---
+
+
+## 2D: Heatmap of TIF differences {.tabset}
 
 ### Prepare the annotations
 This is reused later in the script.
@@ -546,7 +689,7 @@ annotation_colors_scr = list(
   target = c(HDAC="#60988D", HAT="#C6D0A8", Sirtuin="#8FCAAC",
              HMT="#FDCDAC", DNMT="#D69C81", `Histone Demethylase`="#FFF2AE",
              HIF="#E3DCD5", JAK="#C8D7E2", PIM="#9AB8C4", `Aurora Kinase`="#F4CAE4",
-             PARP="#CB546F", `Epigenetic Reader Domain`= "#476D61", `DNA-PK`="#E07A43"),
+             PARP="#CB546F", `Epigenetic Reader Domain`= "#476D61", `DNA-PK`="#779ed7"),
   conc_char = conc_colors,
   clusters_drugs = sequential_hcl(4, "Greens"),
   # viab_rep1 = c('#ffeee9', '#ffdcd4', '#ffcbbe', '#ffb8a8', '#fda693', '#f9947e', '#f4826a', '#ef6f56', '#e95b43', '#e24530'),
@@ -641,7 +784,7 @@ dplyr::select(eff.data.heatmap2, contains('IPR')) %>% summary()
 ```
 
 ### Plot the heatmap
-```{r 2A TIF heatmap, warning = FALSE, fig.width = 10, fig.height = 25}
+```{r 2D TIF heatmap, warning = FALSE, fig.width = 10, fig.height = 25}
 # pdf(paste0(figure_out, "rs20220623_indelfrequency_heatmap_allconc.pdf"), width=20, height=8)
 eff.data.matrix = eff.data.heatmap2 %>%
   column_to_rownames('drug_conc') %>%
@@ -653,156 +796,17 @@ plt1 = pheatmap(eff.data.matrix[ , clone5_map_ipr$labels] %>% as.matrix(),
                 cellwidth = 8,
                 cellheight = 8,
                 breaks = myBreaks,
-                clustering_distance_rows = "correlation",
+                clustering_distance_rows = "manhattan",
                 cluster_rows = T,
                 na_col = "white",
                 main = 'efficiency change, all concentrations',
                 annotation_row = target_all,
                 annotation_col = chromatin,
                 # color = colorRampPalette(c("#e07a5f", "#e5e5e5", "#3d405b"))(palette_length),
-                color = diverge_hcl(palette_length, "Blue-Red"),
+                color = rev(diverge_hcl(palette_length, "Broc")),
                 annotation_colors = annotation_colors_scr_set,
                 annotation_legend = T)
 
-```
-
----
-
-## 2B Ranking 
-```{r 2B Top TIF boosting, fig.width = 4, fig.height = 4}
-rank_dt = indel.data %>% 
-  filter(!drug %in% c("DMSO", "Mirin", "DNA-PKi") & indel_freq_filter & viab_reproducibility  & !is.na(zscore_TIF_global_comb_rep)  & cor_TIF_filter) %>%
-  distinct(drug, conc_char, zscore_TIF_global_comb_rep , target, viab_mean, viab_reproducibility, filter_zscore_TIF_global_comb_rep) %>% 
-  mutate(viab_mean = ave(viab_mean, drug, conc_char, FUN = mean),
-         mean_eff_pval_comb = 2*pnorm(q = abs(zscore_TIF_global_comb_rep), lower.tail = FALSE),
-         mean_eff_pval_adj_comb = p.adjust(mean_eff_pval_comb, method = 'holm')) %>%
-  distinct() %>%
-  filter(!(viab_mean < .60 & zscore_TIF_global_comb_rep < -2.54)) %>% 
-  arrange(desc(zscore_TIF_global_comb_rep )) %>%
-  mutate(rank = seq(1:n()),
-         drug = gsub(" [(].*[)]", "", drug),
-         drug_conc = paste(drug, conc_char, sep = " "))
-
-colors_targets_black = c(colors_targets, black="gray30")
-maxrank = nrow(rank_dt)
-
-rank_dt %>% 
-  # left_join(near_all_TIF) %>%
-  mutate(# n = ifelse(is.na(n), 1, 2),
-    col = ifelse(!between(rank, 15, maxrank-8) & 
-                   filter_zscore_TIF_global_comb_rep & 
-                   !(viab_mean < .60 & zscore_TIF_global_comb_rep < -2.54) & 
-                   mean_eff_pval_adj_comb < 0.01,
-                 target, "black")
-  ) %>%
-  # filter(rank < 100 ) %>%
-  ggplot(., aes(rank, zscore_TIF_global_comb_rep, 
-                # size = n, 
-                # color = col
-                )) +
-  geom_point()  +
-  scale_color_manual(values = colors_targets_black) +
-  geom_hline(linetype = "dashed", yintercept = 2.58) +
-  geom_hline(linetype = "dashed", yintercept = -2.58) +
-  # geom_label_repel(aes(label = ifelse(col != "black", drug_conc,'')),
-  #                  box.padding   = 1,
-  #                  point.padding = 0.5,
-  #                  max.overlaps = Inf,
-  #                  segment.color = 'gray50') +
-  # gghighlight(!between(rank, 10, maxrank-10) & filter_zscore_TIF_global_comb_rep, 
-  #             label_key = drug_conc, 
-  #             max_highlight = Inf) +
-  # scale_x_reverse(limits = c(100, 0)) +
-  scale_x_reverse() +
-  ylim(-40,40) +
-  ylab("Global combined TIF z-score") +
-  theme_classic2()+ 
-  theme(legend.position = "none") 
-
-
-bottom_hits = rank_dt  %>%
-filter(rank > (maxrank-20) & 
-  filter_zscore_TIF_global_comb_rep & 
-  !(viab_mean < .60 & zscore_TIF_global_comb_rep < -2.54) &
-    mean_eff_pval_adj_comb < 0.01) %>%
-distinct(drug, conc_char, zscore_TIF_global_comb_rep , target, viab_mean) %>%
-arrange(zscore_TIF_global_comb_rep) %>%
-slice_head(n = 10) %>%
-distinct(drug, conc_char, target, zscore_TIF_global_comb_rep, viab_mean) %>%
-mutate(rank = seq(1:n()),
-drug = gsub(" [(].*[)]", "", drug),
-drug_conc = paste(drug, conc_char, sep = " "))
-
-```
-
-## 2C-D Zoom on rank
-```{r 2CD Zoom on rank, fig.width = 8, fig.height = 4}
-# Boosting effect
-p1 = rank_dt %>% 
-  filter(rank <= 75) %>%
-  # left_join(near_all_TIF) %>%
-  mutate(# n = ifelse(is.na(n), 1, 2),
-    col = ifelse(rank < 18 & 
-                   filter_zscore_TIF_global_comb_rep & 
-                   !(viab_mean < .60 & zscore_TIF_global_comb_rep < -2.54) & 
-                   mean_eff_pval_adj_comb < 0.01,
-                 target, "black")
-  ) %>%
-  # filter(rank < 100 ) %>%
-  ggplot(., aes(rank, zscore_TIF_global_comb_rep, 
-                # size = n, 
-                color = col)) +
-  geom_point()  +
-  scale_color_manual(values = colors_targets_black) +
-  geom_hline(linetype = "dashed", yintercept = 2.58) +
-  geom_label_repel(aes(label = ifelse(col != "black", drug_conc,'')),
-                   box.padding   = 1,
-                   point.padding = 0.5,
-                   max.overlaps = Inf,
-                   segment.color = 'gray50') +
-  # gghighlight(!between(rank, 10, maxrank-10) & filter_zscore_TIF_global_comb_rep, 
-  #             label_key = drug_conc, 
-  #             max_highlight = Inf) +
-  # scale_x_reverse(limits = c(100, 0)) +
-  scale_x_reverse() +
-  ylab("Global combined TIF z-score") +
-  theme_classic2() +
-  theme(legend.position = "none")
-
-
-# Inhibiting effect
-p2 = rank_dt %>% 
-  filter(rank >= (maxrank-75)) %>%
-  # left_join(near_all_TIF) %>%
-  mutate(# n = ifelse(is.na(n), 1, 2),
-    col = ifelse(rank > (maxrank-11) & 
-                   filter_zscore_TIF_global_comb_rep & 
-                   !(viab_mean < .60 & zscore_TIF_global_comb_rep < -2.54) & 
-                   mean_eff_pval_adj_comb < 0.01,
-                 target, "black")
-  ) %>%
-  # filter(rank < 100 ) %>%
-  ggplot(., aes(rank, zscore_TIF_global_comb_rep, 
-                # size = n, 
-                color = col)) +
-  geom_point()  +
-  scale_color_manual(values = colors_targets_black) +
-  geom_hline(linetype = "dashed", yintercept = -2.58) +
-  geom_label_repel(aes(label = ifelse(col != "black", drug_conc,'')),
-                   box.padding   = 1,
-                   point.padding = 0.5,
-                   max.overlaps = Inf,
-                   segment.color = 'gray50') +
-  # gghighlight(!between(rank, 10, maxrank-10) & filter_zscore_TIF_global_comb_rep, 
-  #             label_key = drug_conc, 
-  #             max_highlight = Inf) +
-  # scale_x_reverse(limits = c(100, 0)) +
-  scale_x_reverse() +
-  ylab("Global combined TIF z-score") +
-  theme_classic2() +
-  theme(legend.position = "none")
-
-plot_grid(p1, p2, nrow = 1, labels = c("B", "C"))
 ```
 
 ---

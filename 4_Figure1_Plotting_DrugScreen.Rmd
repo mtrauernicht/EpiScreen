@@ -276,7 +276,7 @@ colors_pathways = c("wt" = "#808184", "other" = "black", "NHEJ" = "#e1251b", "MM
 target_color = c(HDAC="#60988D", HAT="#C6D0A8", Sirtuin="#8FCAAC",
              HMT="#FDCDAC", DNMT="#D69C81", `Histone Demethylase`="#FFF2AE",
              HIF="#E3DCD5", JAK="#C8D7E2", PIM="#9AB8C4", `Aurora Kinase`="#F4CAE4",
-             PARP="#CB546F", `Epigenetic Reader Domain`= "#476D61", `DNA-PK`="#E07A43")
+             PARP="#CB546F", `Epigenetic Reader Domain`= "#476D61", `DNA-PK`="#779ed7")
 
 ggplot_custom <- function(...) ggplot2::ggplot(...) + 
   scale_color_manual(values = colors_diverse) + 
