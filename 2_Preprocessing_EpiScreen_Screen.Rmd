@@ -437,19 +437,6 @@ screen.indel.dt = rbind(mutations.screen.dt, large.indels.dt) %>%
 
 dim(screen.indel.dt)
 
-# screen.indel.dt[, c("sample", "type", "color") :=  list(
-#   # Add column with controls vs drug for plotting also
-#   ifelse(drug == "DMSO", "DMSO (neg control)", ifelse(
-#   drug == "DNA-PKi", "DNA-PKi (NHEJ control)", ifelse(
-#     drug == "Mirin", "Mirin (MMEJ control)", ifelse(
-#       drug == "PAO", "PAO (killing control)", "Epigenetic Compound")))),
-#   # Add column to identify core, grouped (large) indels or large indels (individual)
-#   ifelse(mutation %in% c(largedels, largeins), "large_indel", 
-#          ifelse(mutation %in% c("<-14", ">2"), "grouped_indel", "core")),
-#   # Add column with color for plotting ease
-#   ifelse(mutation == 0, "wt", 
-#          ifelse(mutation == 1, "NHEJ", 
-#                 ifelse(mutation == -7, "MMEJ", "other"))))]
 screen.indel.dt %>% setDT
 
 screen.indel.dt[, sample := 
@@ -485,8 +472,40 @@ rm(list = ls()[grep("large.indels.dt", ls())])
 rm(list = ls()[grep("mutations.dt", ls())])
 ```
 
-## Add identifiers and compute indel ratios
+## Average the control samples to have these also in a combined set (on top of the 24 samples per condition)
+```{r}
+average_control_samples = screen.indel.dt %>% filter(sample != "Epigenetic Compound" & drug != "PAO") %>% 
+  group_by(mutation, mut_type, barcode, drug, tech, replicate, target, type, color, sample) %>%
+  dplyr::summarise(count_split = mean(count_split), 
+                   norm_split = mean(norm_split),
+                   freq_split = mean(freq_split),
+                   sum_bc_reads_split = mean(sum_bc_reads_split),
+                   ratio_indels_split = mean(ratio_indels_split),
+                   reads_split = mean(reads_split),
+                   concentration = 1, 
+                   viability_split = mean(viability_split), 
+                   viab_norm_split = mean(viab_norm_split), 
+                   conc_char = "1 µM",
+                   viab_diff = mean(viab_diff), 
+                   viab_mean = mean(viab_mean), 
+                   viab_var = mean(viab_var), 
+                   viab_reproducibility = TRUE, 
+                   indel_freq_filter = TRUE, 
+                   pathway_bal_filter = TRUE, 
+                   viab_norm_split_eff = mean(viab_norm_split_eff), 
+                   viab_norm_split_bal = mean(viab_norm_split_bal), 
+                   viab_mean_if = mean(viab_mean_if), 
+                   viab_mean_pb = mean(viab_mean_pb)) %>%
+  mutate(exp_name = case_when(drug == "DMSO" ~ "comb_DMSO",
+                         drug == "Mirin" ~ "comb_Mirin",
+                         T ~ "comb_DNA-PKi"),
+         exp = paste(replicate, tech, exp_name, sep = "_")) %>%
+  dplyr::select(-exp_name)
 
+screen.indel.dt %<>% bind_rows(average_control_samples)
+```
+
+## Add identifiers and compute indel ratios
 ```{r calculate_ratios screen}
 # Calculate NHEJ/MMEJ ratios and efficiences
 ratios_tib <- screen.indel.dt %>%
@@ -572,6 +591,7 @@ indel.cols.only = c(
 
 screen.ratio.dt = screen.indel.dt %>% dplyr::select(-any_of(indel.cols.only)) %>% distinct()
 ```
+
 
 ```{r averaging indel frequencies}
 screen.indels.dt %<>% as.data.table()

@@ -829,10 +829,13 @@ plt1 = pheatmap(balance.data.matrix[ , clone5_map_ipr$labels],
 Aim: Show which drugs and which target groups are responsible for the biggest global MMEJ ratio decrease.
 ```{r 5B Top TIF boosting, fig.width = 8, fig.height = 8}
 rank_dt = indel.data %>% 
-  filter(drug != "DMSO" & pathway_bal_filter) %>%
+  filter(conc_char != "control" & pathway_bal_filter & 
+           viab_reproducibility  & 
+           !is.na(zscore_bal_global_comb_rep)  & 
+           cor_bal_filter) %>%
   #filter(!target %in% c("Aurora Kinase", "JAK", "PARP", "PIM", "HIF")) %>%
-  distinct(drug, conc_char, zscore_bal_global_comb_rep , target, cor_bal, viab_mean) %>% 
-  arrange(zscore_bal_global_comb_rep) %>%
+  distinct(drug, conc_char, zscore_bal_global_comb_rep , target, cor_bal, viab_mean, filter_zscore_bal_global_comb_rep) %>% 
+  arrange(desc(zscore_bal_global_comb_rep)) %>%
   mutate(viab_mean = ave(viab_mean, drug, conc_char, FUN = mean),
          p_val_bal = 2*pnorm(q = abs(zscore_bal_global_comb_rep), lower.tail = F),
          adj_pval_bal = p.adjust(p_val_bal, method = 'holm')) %>%
@@ -847,41 +850,85 @@ maxrank = nrow(rank_dt)
 
 pos_zscore_signif = rank_dt %>% 
   filter(adj_pval_bal < 0.01 & zscore_bal_global_comb_rep > 0) %>% 
-  head(n = 1L) %>% 
+  tail(n = 1L) %>% 
   pull(zscore_bal_global_comb_rep) %>% 
   abs()
 neg_zscore_signif = rank_dt %>% 
   filter(adj_pval_bal < 0.01 & zscore_bal_global_comb_rep < 0) %>% 
-  tail(n = 1L) %>% 
+  head(n = 1L) %>% 
   pull(zscore_bal_global_comb_rep) %>%
   abs()
 zscore_signif = min(pos_zscore_signif, neg_zscore_signif)
 
-ggplot(rank_dt, aes(rank, zscore_bal_global_comb_rep)) +
-  geom_point(color = "black")  +
-  geom_hline(linetype = "dashed", yintercept = zscore_signif) +
-  geom_hline(linetype = "dashed", yintercept = -zscore_signif) +
-  scale_x_reverse() +
-  ylim(-75,25) +
-  ylab("Global combined balance z-score") +
-  theme_classic2() + 
-  theme(legend.position = "none") 
-
 rank_dt %>% 
   # left_join(near_all_TIF) %>%
-  mutate(# n = ifelse(is.na(n), 1, 2),
-    col = ifelse(!between(rank, 11, maxrank-5) & 
-                   !(viab_mean < .40 & zscore_bal_global_comb_rep < -2.54),
-                 target, "black")
-  ) %>%
-  filter(rank < 85) %>%
+  mutate(col = case_when(rank < 18 & 
+                           filter_zscore_bal_global_comb_rep & 
+                           adj_pval_bal < 0.01 ~ target,
+                         filter_zscore_bal_global_comb_rep ~ "black",
+                         T ~ "gray20")) %>%
   ggplot(., aes(rank, zscore_bal_global_comb_rep, 
                 color = col)) +
   geom_point()  +
   scale_color_manual(values = colors_targets_black) +
   #geom_hline(linetype = "dashed", yintercept = 2.58) +
   #geom_hline(linetype = "dashed", yintercept = -2.58) +
-  geom_label_repel(aes(label = ifelse(col != "black", drug_conc,'')),
+  geom_label_repel(aes(label = ifelse(!col %in% c("gray20","black"), drug_conc,'')),
+                   box.padding   = 1,
+                   point.padding = 0.5,
+                   max.overlaps = Inf,
+                   segment.color = 'gray50') +
+  scale_x_reverse() +
+  #ylim(-75,15) +
+  ylab("Global combined balance z-score") +
+  geom_hline(linetype = "dashed", yintercept = zscore_signif) +
+  geom_hline(linetype = "dashed", yintercept = -zscore_signif) +
+  theme_classic2() + 
+  theme(legend.position = "none") 
+
+rank_dt %>% 
+  filter(drug != "DNA-PKi") %>%
+  # left_join(near_all_TIF) %>%
+  mutate(col = case_when(rank < 18 & 
+                           filter_zscore_bal_global_comb_rep & 
+                           adj_pval_bal < 0.01 ~ target,
+                         filter_zscore_bal_global_comb_rep ~ "black",
+                         T ~ "gray20")) %>%
+  ggplot(., aes(rank, zscore_bal_global_comb_rep, 
+                color = col)) +
+  geom_point()  +
+  scale_color_manual(values = colors_targets_black) +
+  #geom_hline(linetype = "dashed", yintercept = 2.58) +
+  #geom_hline(linetype = "dashed", yintercept = -2.58) +
+  geom_label_repel(aes(label = ifelse(!col %in% c("gray20","black"), drug_conc,'')),
+                   box.padding   = 1,
+                   point.padding = 0.5,
+                   max.overlaps = Inf,
+                   segment.color = 'gray50') +
+  scale_x_reverse() +
+  geom_hline(linetype = "dashed", yintercept = zscore_signif) +
+  geom_hline(linetype = "dashed", yintercept = -zscore_signif) +
+  #ylim(-75,15) +
+  ylab("Global combined balance z-score") +
+  theme_classic2() + 
+  theme(legend.position = "none") 
+
+
+rank_dt %>% 
+    filter(rank >= (maxrank-100)) %>%
+  # left_join(near_all_TIF) %>%
+  mutate(col = case_when(rank > (maxrank-10) & 
+                   filter_zscore_bal_global_comb_rep & 
+                   adj_pval_bal < 0.01 ~ target,
+                   filter_zscore_bal_global_comb_rep ~ "black",
+                   T ~ "gray20")) %>%
+  ggplot(., aes(rank, zscore_bal_global_comb_rep, 
+                color = col)) +
+  geom_point()  +
+  scale_color_manual(values = colors_targets_black) +
+  #geom_hline(linetype = "dashed", yintercept = 2.58) +
+  #geom_hline(linetype = "dashed", yintercept = -2.58) +
+  geom_label_repel(aes(label = ifelse(!col %in% c("gray20","black"), drug_conc,'')),
                    box.padding   = 1,
                    point.padding = 0.5,
                    max.overlaps = Inf,

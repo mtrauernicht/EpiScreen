@@ -468,20 +468,36 @@ paste("Compounds that significantly (p holm adj < 0.01) changed the TIF in all 1
 ## 2A Ranking 
 ```{r 2A Top TIF boosting, fig.width = 4, fig.height = 4}
 rank_dt = indel.data %>% 
-  filter(!drug %in% c("DMSO", "Mirin", "DNA-PKi") & indel_freq_filter & viab_reproducibility  & !is.na(zscore_TIF_global_comb_rep)  & cor_TIF_filter) %>%
+  filter(conc_char != "control" & 
+           indel_freq_filter & 
+           viab_reproducibility  & 
+           !is.na(zscore_TIF_global_comb_rep)  & 
+           cor_TIF_filter) %>%
   distinct(drug, conc_char, zscore_TIF_global_comb_rep , target, viab_mean, viab_reproducibility, filter_zscore_TIF_global_comb_rep) %>% 
   mutate(viab_mean = ave(viab_mean, drug, conc_char, FUN = mean),
          mean_eff_pval_comb = 2*pnorm(q = abs(zscore_TIF_global_comb_rep), lower.tail = FALSE),
          mean_eff_pval_adj_comb = p.adjust(mean_eff_pval_comb, method = 'holm')) %>%
   distinct() %>%
   filter(!(viab_mean < .60 & zscore_TIF_global_comb_rep < -2.54)) %>% 
-  arrange(desc(zscore_TIF_global_comb_rep )) %>%
+  arrange(desc(zscore_TIF_global_comb_rep)) %>%
   mutate(rank = seq(1:n()),
          drug = gsub(" [(].*[)]", "", drug),
          drug_conc = paste(drug, conc_char, sep = " "))
 
 colors_targets_black = c(colors_targets, black="gray30")
 maxrank = nrow(rank_dt)
+
+pos_zscore_signif = rank_dt %>% 
+  filter(mean_eff_pval_adj_comb < 0.01 & zscore_TIF_global_comb_rep > 0) %>% 
+  tail(n = 1L) %>% 
+  pull(zscore_TIF_global_comb_rep) %>% 
+  abs()
+neg_zscore_signif = rank_dt %>% 
+  filter(mean_eff_pval_adj_comb < 0.01 & zscore_TIF_global_comb_rep < 0) %>% 
+  head(n = 1L) %>% 
+  pull(zscore_TIF_global_comb_rep) %>%
+  abs()
+zscore_signif = min(pos_zscore_signif, neg_zscore_signif)
 
 rank_dt %>% 
   # left_join(near_all_TIF) %>%
@@ -498,8 +514,8 @@ rank_dt %>%
                 )) +
   geom_point()  +
   scale_color_manual(values = colors_targets_black) +
-  geom_hline(linetype = "dashed", yintercept = 2.58) +
-  geom_hline(linetype = "dashed", yintercept = -2.58) +
+  geom_hline(linetype = "dashed", yintercept = zscore_signif) +
+  geom_hline(linetype = "dashed", yintercept = -zscore_signif) +
   # geom_label_repel(aes(label = ifelse(col != "black", drug_conc,'')),
   #                  box.padding   = 1,
   #                  point.padding = 0.5,
@@ -536,22 +552,20 @@ drug_conc = paste(drug, conc_char, sep = " "))
 # Boosting effect
 p1 = rank_dt %>% 
   filter(rank <= 75) %>%
-  # left_join(near_all_TIF) %>%
   mutate(# n = ifelse(is.na(n), 1, 2),
     col = case_when(rank < 18 & 
                    filter_zscore_TIF_global_comb_rep & 
                    !(viab_mean < .60 & zscore_TIF_global_comb_rep < -2.54) & 
-                   mean_eff_pval_adj_comb < 0.01 ~ target,
+                   mean_eff_pval_adj_comb < 0.01  & mean_eff_pval_adj_comb < 0.01 ~ target,
                    filter_zscore_TIF_global_comb_rep ~ "black",
                    T ~ "gray20")
   ) %>%
-  # filter(rank < 100 ) %>%
   ggplot(., aes(rank, zscore_TIF_global_comb_rep, 
                 # size = n, 
                 color = col)) +
   geom_point()  +
   scale_color_manual(values = colors_targets_black) +
-  geom_hline(linetype = "dashed", yintercept = 2.58) +
+  geom_hline(linetype = "dashed", yintercept = zscore_signif) +
   geom_label_repel(aes(label = ifelse(!col %in% c("gray20","black"), drug_conc,'')),
                    box.padding   = 1,
                    point.padding = 0.5,
@@ -576,7 +590,7 @@ p2 = rank_dt %>%
                    filter_zscore_TIF_global_comb_rep & 
                    !(viab_mean < .60 & zscore_TIF_global_comb_rep < -2.54) & 
                    mean_eff_pval_adj_comb < 0.01 ~ target,
-                   filter_zscore_TIF_global_comb_rep ~ "black",
+                   filter_zscore_TIF_global_comb_rep & mean_eff_pval_adj_comb < 0.01 ~ "black",
                    T ~ "gray20")
   ) %>%
   # filter(rank < 100 ) %>%
@@ -585,7 +599,7 @@ p2 = rank_dt %>%
                 color = col)) +
   geom_point()  +
   scale_color_manual(values = colors_targets_black) +
-  geom_hline(linetype = "dashed", yintercept = -2.58) +
+  geom_hline(linetype = "dashed", yintercept = -zscore_signif) +
   geom_label_repel(aes(label = ifelse(!col %in% c("gray20","black"), drug_conc,'')),
                    box.padding   = 1,
                    point.padding = 0.5,
