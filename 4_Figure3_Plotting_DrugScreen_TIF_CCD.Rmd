@@ -553,17 +553,16 @@ colors[which(quant_breaks == 0)-1] = "gray90"
 # Main figures
 
 ## 3ABC CCD Examples
-```{r 3A CCD examples, fig.width= 12, fig.height= 4}
+```{r 3ABC CCD examples, fig.width= 4, fig.height= 12}
 CCD_example_tib = indel.data %>% 
   mutate(drug = gsub(" [(].*[)]", "", drug),
          drug_conc = paste(drug, conc_char, sep = " ")) %>%
-  filter(drug_conc %in% c("EPZ-6438 10 µM", "Decitabine 1 µM", "Scriptaid 1 µM", "Vorinostat 1 µM", "PCI-24781 100 nM", "DMSO control", "SNS-314 Mesylate 1 µM")) %>%
-  distinct(IPR, drug, freqCut, H3K27me3.zscore, LMNB1.zscore, m5C.zscore, HDAC1.zscore, tech, replicate, H3K36me3.zscore) %>%
+  filter(drug_conc %in% c("EPZ-6438 10 µM", "Decitabine 1 µM", "Vorinostat 1 µM", "PCI-24781 100 nM", "DMSO control", "SNS-314 Mesylate 1 µM")) %>%
+  distinct(IPR, drug, freqCut, H3K27me3.zscore, LMNB1.zscore, m5C.zscore, H3K4me1.zscore, tech, replicate, H3K36me3.zscore) %>%
   mutate(freqCut_mean = ave(freqCut, IPR, drug, FUN = function(x) mean(x, na.rm = TRUE))) %>%
-  distinct(IPR, drug, freqCut_mean, H3K27me3.zscore, LMNB1.zscore, m5C.zscore, HDAC1.zscore, H3K36me3.zscore) %>%
+  distinct(IPR, drug, freqCut_mean, H3K27me3.zscore, LMNB1.zscore, m5C.zscore, H3K4me1.zscore, H3K36me3.zscore) %>%
   pivot_wider(names_from = drug, values_from = freqCut_mean) %>%
   mutate(Vorinostat_log2_FC_TIF = log2(Vorinostat/DMSO),
-    Scriptaid_log2_FC_TIF = log2(Scriptaid/DMSO),
          PCI_log2_FC_TIF = log2(`PCI-24781`/DMSO),
          EPZ6438_log2_FC_TIF = log2(`EPZ-6438`/DMSO),
          SNSMesyl_log2_FC_TIF = log2(`SNS-314 Mesylate`/DMSO),
@@ -582,7 +581,8 @@ p1 = ggplot(mock.slopes, aes(z_score,value,color = variable)) + theme_bw() +
   theme(legend.position = "none") + 
   coord_cartesian(ylim= c(-1.5,1.5)) + 
   scale_color_manual(values = c("black","#2E6B9F","#317625"))+
-  theme_classic2(base_size = 16)
+  theme_classic2(base_size = 16)  +
+  theme(legend.position="none")
 
 # p2 = ggplot(CCD_example_tib,
 #        aes(x = m5C.zscore, y = Decitabine_log2_FC_TIF)) +
@@ -596,18 +596,19 @@ p1 = ggplot(mock.slopes, aes(z_score,value,color = variable)) + theme_bw() +
 # CCD_tib %>% filter(drug_conc == "Decitabine 1 µM" & feature == "m5C")
 
 p2 = ggplot(CCD_example_tib,
-            aes(x = LMNB1.zscore, y = PCI_log2_FC_TIF)) +
+            aes(x = H3K4me1.zscore, y = Decitabine_log2_FC_TIF)) +
   geom_point() +
   geom_smooth(method = "lm", color = "#2E6B9F",se = FALSE) +
   stat_cor(method = "pearson") +
   geom_vline(xintercept = 0, linetype = 2) + 
   geom_hline(yintercept = 0, linetype = 2) + 
-  xlab("LMNB1 z-score") +
+  xlab("H3K4me1 z-score") +
   ylab("delta log2(TIF)") + 
   coord_cartesian()+
+  ggtitle("Decitabine 1 µM") +
   theme_classic2(base_size = 16)
 
-CCD_tib %>% filter(drug_conc == "EPZ-6438 10 µM" & feature == "H3K27me3")
+CCD_tib %>% filter(drug_conc == "Decitabine 1 µM" & feature == "HDAC1")
 
 
 p3 = ggplot(CCD_example_tib, 
@@ -616,13 +617,18 @@ p3 = ggplot(CCD_example_tib,
   geom_smooth(method = "lm", color = "black",se = FALSE) +
   stat_cor(method = "pearson") +
   xlab("H3K36me3 z-score") +
+  ggtitle("SNS-314 Mesylate 1 µM") +
   ylab("delta log2(TIF)") + 
   geom_vline(xintercept = 0, linetype = 2) + 
   geom_hline(yintercept = 0, linetype = 2) + 
   coord_cartesian()+
   theme_classic2(base_size = 16)
 
+CCD_tib %>% filter(drug_conc == "SNS-314 Mesylate 1 µM" & feature == "HDAC1")
+
 plot_grid(p1, p2, p3, ncol = 1, labels = c("A", "B", "C"))
+
+
 ```
 
 
@@ -710,7 +716,7 @@ for(i in unique(CCD_tib$feature)) {
 
 # Supplementary Figures
 ## S3AB Example mock filtered out CCD
-```{r S3AB example of filtered out CCDs,  fig.width = 8, fig.height = 3}
+```{r S3AB example of filtered out CCDs,  fig.width = 8, fig.height = 4}
 #Create mock examples
 mock.slopes <- tibble(z_score = seq(-3,3,0.25), 
                       A = z_score*0.1 -0.6, 
@@ -736,7 +742,7 @@ p2 = ggplot(CCD_example_tib,
   stat_cor(method = "pearson") +
   geom_vline(xintercept = 0, linetype = 2) + 
   geom_hline(yintercept = 0, linetype = 2) + 
-  xlab("H3K27me3 z-score") +
+  xlab("H3K36me3 z-score") +
   ylab("delta log2(TIF)") + 
   coord_cartesian() +
   theme_classic2(base_size = 16)
@@ -797,7 +803,7 @@ ggplot(projection_melt, aes(x=feature, y=value, fill=group)) +
 ```
 
 ## S3C Example PCR plots
-```{r S3C Example PCR prediction, fig.width = 6, fig.height = 6}
+```{r S3C Example PCR prediction, fig.width = 4, fig.height = 4}
 FC_tib = ratios_tib_fc %>% dplyr::select(IPR, drug_conc, log2.fc.freqCut, log2.fc.ratio, all_of(chromatin.features.short)) %>% ungroup()
 
 for (i in c("BMN 673 10 µM", "Apicidin 100 nM")){
@@ -833,14 +839,16 @@ for (i in c("BMN 673 10 µM", "Apicidin 100 nM")){
 }
 
 # adjusted pvals from the Synergies preprocessing scripts: 
-# adj_p.value_KO_model %>% filter(drug_conc %in% c("BMN 673 10 µM", "Apicidin 100 nM"), var == "log2.fc.freqCut")
-# BMN 673 10 µM : 0.1697062666
-# Apicidin 100 nM : 0.0001259269
+# adj_p.value_KO_model %>% filter(drug_conc %in% c("BMN 673 10 µM", "Apicidin 100 nM"), var == "log2.fc.freqCut") %>% knitr::kable()
+# |var             |drug_conc       |   p.value|     p.adj|
+# |:---------------|:---------------|---------:|---------:|
+# |log2.fc.freqCut |BMN 673 10 µM   | 0.0846856| 0.1072685|
+# |log2.fc.freqCut |Apicidin 100 nM | 0.0000799| 0.0006183|
 ```
 
 
 ## S3EF Example CCDs
-```{r S3C Example strong synergy hits with LMNB1,  fig.width = 6, fig.height = 4}
+```{r S3C Example strong synergy hits with LMNB1,  fig.width = 8, fig.height = 4}
 top_hit_drugs = CCD_tib %>% filter(!is.na(ratio_slope_plot) & abs(ratio_slope_plot) > 0.2)  %>% distinct(drug_conc) %>% pull(drug_conc)
 
 # Highligh top 4 strongest hits + and - TIF. In the end we kept only LMNB1, but let's keep this code for flexibility.

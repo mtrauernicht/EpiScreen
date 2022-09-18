@@ -465,8 +465,8 @@ paste("Compounds that significantly (p holm adj < 0.01) changed the TIF in all 1
 
 ---
 
-## 2A Ranking 
-```{r 2A Top TIF boosting, fig.width = 4, fig.height = 4}
+## 2ABC Ranking 
+```{r ranking, fig.width = 4, fig.height = 4}
 rank_dt = indel.data %>% 
   filter(conc_char != "control" & 
            indel_freq_filter & 
@@ -499,7 +499,24 @@ neg_zscore_signif = rank_dt %>%
   abs()
 zscore_signif = min(pos_zscore_signif, neg_zscore_signif)
 
-rank_dt %>% 
+bottom_hits = rank_dt  %>%
+filter(rank > (maxrank-20) & 
+  filter_zscore_TIF_global_comb_rep & 
+  !(viab_mean < .60 & zscore_TIF_global_comb_rep < -2.54) &
+    mean_eff_pval_adj_comb < 0.01) %>%
+distinct(drug, conc_char, zscore_TIF_global_comb_rep , target, viab_mean) %>%
+arrange(zscore_TIF_global_comb_rep) %>%
+slice_head(n = 10) %>%
+distinct(drug, conc_char, target, zscore_TIF_global_comb_rep, viab_mean) %>%
+mutate(rank = seq(1:n()),
+drug = gsub(" [(].*[)]", "", drug),
+drug_conc = paste(drug, conc_char, sep = " "))
+
+```
+
+```{r 2ABC Global TIF rank, fig.width = 4, fig.height = 12}
+# Boosting effect
+p1 = rank_dt %>% 
   # left_join(near_all_TIF) %>%
   mutate(# n = ifelse(is.na(n), 1, 2),
     col = ifelse(filter_zscore_TIF_global_comb_rep & 
@@ -531,26 +548,7 @@ rank_dt %>%
   theme_classic2()+ 
   theme(legend.position = "none") 
 
-
-bottom_hits = rank_dt  %>%
-filter(rank > (maxrank-20) & 
-  filter_zscore_TIF_global_comb_rep & 
-  !(viab_mean < .60 & zscore_TIF_global_comb_rep < -2.54) &
-    mean_eff_pval_adj_comb < 0.01) %>%
-distinct(drug, conc_char, zscore_TIF_global_comb_rep , target, viab_mean) %>%
-arrange(zscore_TIF_global_comb_rep) %>%
-slice_head(n = 10) %>%
-distinct(drug, conc_char, target, zscore_TIF_global_comb_rep, viab_mean) %>%
-mutate(rank = seq(1:n()),
-drug = gsub(" [(].*[)]", "", drug),
-drug_conc = paste(drug, conc_char, sep = " "))
-
-```
-
-## 2B-C Zoom on rank
-```{r 2BC Zoom on rank, fig.width = 8, fig.height = 4}
-# Boosting effect
-p1 = rank_dt %>% 
+p2 = rank_dt %>% 
   filter(rank <= 75) %>%
   mutate(# n = ifelse(is.na(n), 1, 2),
     col = case_when(rank < 18 & 
@@ -582,7 +580,7 @@ p1 = rank_dt %>%
 
 
 # Inhibiting effect
-p2 = rank_dt %>% 
+p3 = rank_dt %>% 
   filter(rank >= (maxrank-75)) %>%
   # left_join(near_all_TIF) %>%
   mutate(# n = ifelse(is.na(n), 1, 2),
@@ -614,7 +612,7 @@ p2 = rank_dt %>%
   theme_classic2() +
   theme(legend.position = "none")
 
-plot_grid(p1, p2, nrow = 1, labels = c("B", "C"))
+plot_grid(p1, p2, p3, ncol = 1)
 ```
 
 ---
