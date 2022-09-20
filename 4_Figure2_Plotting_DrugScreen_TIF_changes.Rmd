@@ -366,13 +366,14 @@ eff.data %>%
 global_effects = indel.data %>%
   filter(sample == "Epigenetic Compound") %>%
   distinct(zscore_TIF_global_comb_rep, filter_zscore_TIF_global_comb_rep, 
-           drug, target, conc_char, freqCut_diff_global_mean) %>%
+           drug, target, conc_char, freqCut_diff_global_mean, viab_reproducibility, indel_freq_filter) %>%
   mutate(mean_TIF_global_pval_comb = 2*pnorm(q = abs(zscore_TIF_global_comb_rep), lower.tail = FALSE),
          mean_TIF_global_pval_adj_comb = p.adjust(mean_TIF_global_pval_comb, method = 'holm'))  %>% 
   mutate(drug = gsub(" [(].*[)]", "", drug),
          drug_conc = paste(drug, conc_char, sep = " ")) %>%
   left_join(mean_viab_table) %>%
-  filter(mean_TIF_global_pval_adj_comb < 0.01 & !(freqCut_diff_global_mean < -0.05 & mean_viab < 60)) %>%
+  filter(mean_TIF_global_pval_adj_comb < 0.01 & !(freqCut_diff_global_mean < -0.05 & mean_viab < 60) & viab_reproducibility == T & 
+           indel_freq_filter == T, filter_zscore_TIF_global_comb_rep) %>%
   distinct(drug, drug_conc, conc_char, target, mean_TIF_global_pval_adj_comb, mean_viab) 
 
 global_effects %>%

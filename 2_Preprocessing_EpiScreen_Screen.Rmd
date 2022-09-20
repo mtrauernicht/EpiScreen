@@ -67,10 +67,10 @@ viab_limit_bal = 0.40
 read_count_limit = 30
 
 # minimal correlation for TIF between screens:
-TIF_cor = 0.75
+TIF_cor = 0.65
 
 # minimal correlation for MMEJ score between screens:
-bal_cor = 0.75
+bal_cor = 0.65
 ```
 
 
@@ -275,7 +275,7 @@ count_filter = complete.mutations.dt %>%
   filter(mutation %in% c(1, -7)) %>%
   group_by(barcode, exp) %>%
   summarise(sum = sum(count_split)) %>%
-  mutate(sum = case_when(sum < 30 ~ FALSE,
+  mutate(sum = case_when(sum < read_count_limit ~ FALSE,
                          T ~ TRUE))
 
 # How many are TRUE and FALSE
@@ -1042,11 +1042,11 @@ screen.ratio.dt <- screen.ratio.dt %>%
 # Data reproducibility
 ## Make filter for feqCut and MMEJratio reproducibility between screens
 ```{r check for data reproducibility}
-cor_filter = screen.ratio.dt %>% dplyr::select(barcode, replicate, tech, drug, conc_char, freqCut, MMEJscore, well, plate) %>%
+cor_filter = screen.ratio.dt %>% dplyr::select(barcode, replicate, tech, drug, conc_char, freqCut_mean, MMEJscore_mean, well, plate) %>%
   group_by(drug, conc_char) %>%
-  pivot_wider(names_from = replicate, values_from = c(freqCut, MMEJscore)) %>%
-  summarise(cor_TIF = cor(freqCut_E1504, freqCut_E177, use = "pairwise.complete.obs"),
-            cor_bal = cor(MMEJscore_E1504, MMEJscore_E177, use = "pairwise.complete.obs")) %>%
+  pivot_wider(names_from = replicate, values_from = c(freqCut_mean, MMEJscore_mean)) %>%
+  summarise(cor_TIF = cor(freqCut_mean_E1504, freqCut_mean_E177, use = "pairwise.complete.obs"),
+            cor_bal = cor(MMEJscore_mean_E1504, MMEJscore_mean_E177, use = "pairwise.complete.obs")) %>%
   mutate(cor_TIF_filter = ifelse(cor_TIF >= TIF_cor, TRUE, 
                                  FALSE),
          cor_bal_filter = ifelse(cor_bal >= bal_cor, TRUE, 

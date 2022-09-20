@@ -57,7 +57,6 @@ StartTime <-Sys.time()
 Date <- substr(gsub("-","",Sys.time()),1,8) 
 
 
-library(knitr)
 library(tidyverse)
 library(ggplot2)
 library(ggbeeswarm)
@@ -75,7 +74,7 @@ library(scales)
 out.dir = paste0("./figures/", Date, "/")
 dir.create(out.dir)
 in.dir = list.dirs(path = "/DATA/projects/DSBrepair/data/R") %>% .[grepl("episcreen", .)] %>% tail(n = 1)
-opts_chunk$set(dev=c('png', 'pdf'), fig.path = file.path(out.dir))
+knitr::opts_chunk$set(dev=c('png', 'pdf'), fig.path = file.path(out.dir))
 pdf.options(useDingbats = FALSE)
 ```
 
@@ -700,6 +699,18 @@ indel.data %>%
   scale_color_manual(values = hcl.colors(4, palette = "Lajolla", rev = F)[2:4]) +
   facet_grid(. ~ conc_char)
 
+
+indel.data  %>% 
+  filter(!indel_freq_filter | !viab_reproducibility) %>% # freqCut is NA if sample didn't pass filter for viability.
+  distinct(drug, conc_char) %>% # unique compound and concentration combination
+  pull(conc_char) %>% 
+  table() # count compounds per concentration that are removed
+
+indel.data  %>% 
+  filter(!indel_freq_filter) %>% # freqCut is NA if sample didn't pass filter for viability.
+  distinct(drug, conc_char) %>% # unique compound and concentration combination
+  pull(conc_char) %>% 
+  table() 
 ```
 
 *Figure S1A: Correlation of the cell viability between the two biological replicates. Marked in yellow are the compounds that were removed from the analysis.*
@@ -728,12 +739,6 @@ ggplot_custom(viab_eff_cor,
   annotate("rect",xmin=0,xmax=0.25,ymin=-Inf,ymax=Inf, alpha=0.1, fill="red") +
   ylim(0, 1) +
   xlim(0, 1.2)
-
-indel.data  %>% 
-  filter(is.na(freqCut)) %>% # freqCut is NA if sample didn't pass filter for viability.
-  distinct(drug, conc_char) %>% # unique compound and concentration combination
-  pull(conc_char) %>% 
-  table() # count compounds per concentration that are removed
 ```
 
 ## S1D: Correlation between viability and MMEJ ratio
