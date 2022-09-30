@@ -540,6 +540,32 @@ dim(screen.indel.dt)
 
 ```
 
+## Table with individual MMEJ ratios, TIF and viability per well and barcode
+```{r}
+ratios_tib_all = screen.indel.dt %>%
+  filter(mutation %in% c("1", "-7")) %>%
+  dplyr::distinct(exp, barcode, mutation, ratio_indels_split) %>% 
+  pivot_wider(names_from = mutation, 
+              values_from = ratio_indels_split, 
+              values_fill = 0) %>%
+  dplyr::rename(freqMMEJ = `-7`,
+                freqNHEJ = `1`) %>%
+  mutate(MMEJratio = freqMMEJ / freqNHEJ,
+         MMEJscore = freqMMEJ / (freqMMEJ + freqNHEJ),
+         MMEJratio_global = ave(MMEJratio, exp, FUN = function(x) mean(x, na.rm=T)),
+         MMEJscore_global = ave(MMEJscore, exp, FUN = function(x) mean(x, na.rm=T)))
+
+TIF_ratios_all_tib <- screen.indel.dt %>%
+  as_tibble() %>%
+  filter(mutation == "0") %>%
+  dplyr::distinct(exp, barcode, freq_split, viab_norm_split, sample) %>% 
+  mutate(freqCut = 1 - freq_split,
+         freqCut_global = ave(freqCut, exp, FUN = function(x) mean(x, na.rm=T))) %>%
+  distinct(exp, barcode, freqCut, freqCut_global, viab_norm_split, sample) %>% 
+  left_join(ratios_tib_all, by = c("exp", "barcode"))
+```
+
+
 ## Calculate mean indel frequencies
 ```{r split table for indels}
 indel.cols = c("replicate",
@@ -1182,6 +1208,11 @@ saveRDS(screen.indels.chrom.dt, file = filename)
 # The ratios list of the split technical replicates
 filename <- SetFileName("episcreen_ratios", initials = initials, extension = "RDS")
 saveRDS(screen_ratios_tib, file = filename)
+
+# The raw counts for MMEJ:NHEJ ratio and TIF for all the wells and barodes without filtering
+filename <- SetFileName("episcreen_raw_ratios", initials = initials, extension = "RDS")
+saveRDS(TIF_ratios_all_tib, file = filename)
+
 ```
 
 

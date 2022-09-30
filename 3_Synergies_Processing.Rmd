@@ -281,8 +281,8 @@ filtered_drug_pvals = indel.data %>%
     p_val_TIF = 2*pnorm(q = abs(zscore_TIF_comb_rep_temp), lower.tail = F),
     p_val_bal = 2*pnorm(q = abs(zscore_bal_comb_rep_temp), lower.tail = F),
     # Adjust p value for false discovery rate
-    adj_pval_TIF = p.adjust(p_val_TIF, method = 'holm'),
-    adj_pval_bal = p.adjust(p_val_bal, method = 'holm'))
+    adj_pval_TIF = p.adjust(p_val_TIF, method = 'BH'),
+    adj_pval_bal = p.adjust(p_val_bal, method = 'BH'))
 
 # Make a table with the orientation of effect, used later for filtering. 
 filtered_drug_conc = filtered_drug_pvals %>%

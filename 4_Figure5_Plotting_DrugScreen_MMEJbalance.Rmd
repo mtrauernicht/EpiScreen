@@ -102,7 +102,7 @@ CorrelationDFMean <- function(data, feature_name, targets, p.value=0.001){
 
 p.adjust <- function(p, method = p.adjust.methods, n = length(p))
 {
-  ## Methods 'Hommel', 'BH', 'BY' and speed improvements
+  ## Methods 'Hommel', 'holm', 'BY' and speed improvements
   ## contributed by Gordon Smyth
   method <- match.arg(method)
   if(method == "fdr") method <- "BH"	# back compatibility
@@ -304,7 +304,7 @@ plot_comb_grid_beeswarm <- function(dt, opt_df, domains, y_name, min_count=0,
   } else {
     wilcox_dt = indel_selection[,test_wilcox(.SD, group_by, y_name),
                                 by='group']
-    wilcox_dt[,p_adj:=p.adjust(p_value, method = "holm")]
+    wilcox_dt[,p_adj:=p.adjust(p_value, method = "BH")]
     wilcox_dt[,p_signif:=symnum(p_adj, cutpoints=symnum$cutpoints,
                                 symbols=symnum$symbols)]
     
@@ -590,7 +590,7 @@ clone5.matrix = indel.data %>%
   column_to_rownames(var="IPR")
 
 clone5_map_ipr = hclust(dist(clone5.matrix), method = "ward.D") %>% 
-  # Rotate the middle node to math better the TIF in CTRL conditions
+  # Rotate the middle node to math better the bal in CTRL conditions
   dendextend::rotate(c(1:6, 10:7, 11:18))
 
 # Chromatin annotation
@@ -669,7 +669,7 @@ balance.data.heatmap <- indel.data %>%
          zscore_bal_comb_rep_temp = ifelse(filter_zscore_bal_comb_rep, zscore_bal_comb_rep, 0),
          p_value = 2*pnorm(q = abs(zscore_bal_comb_rep_temp), lower.tail = F),
          # Adjust p value for false discovery rate
-         adj_pvalue = p.adjust(p_value, method = 'holm'),
+         adj_pvalue = p.adjust(p_value, method = 'BH'),
          # Pick the smallest per compound & concentration
          min_score = min(adj_pvalue, na.rm = T)) %>%
   # filter for adjusted p.val < 0.01 so we keep compounds with at least one signif effect.
@@ -763,7 +763,7 @@ plt1 = pheatmap(balance.data.matrix[ , clone5_map_ipr$labels],
 
 ## 5B: Highlighting the strongest MMEJ ratio reducers. 
 Aim: Show which drugs and which target groups are responsible for the biggest global MMEJ ratio decrease.
-```{r 5B Top TIF boosting, fig.width = 4, fig.height = 4}
+```{r 5B Top bal boosting, fig.width = 4, fig.height = 4}
 rank_dt = indel.data %>% 
   filter(conc_char != "control" & pathway_bal_filter & 
            viab_reproducibility  & 
@@ -774,7 +774,7 @@ rank_dt = indel.data %>%
   arrange(desc(zscore_bal_global_comb_rep)) %>%
   mutate(viab_mean = ave(viab_mean, drug, conc_char, FUN = mean),
          p_val_bal = 2*pnorm(q = abs(zscore_bal_global_comb_rep), lower.tail = F),
-         adj_pval_bal = p.adjust(p_val_bal, method = 'holm')) %>%
+         adj_pval_bal = p.adjust(p_val_bal, method = 'BH')) %>%
   distinct() %>%
   na.omit() %>%
   mutate(rank = seq(1:n()),
@@ -797,7 +797,7 @@ neg_zscore_signif = rank_dt %>%
 zscore_signif = min(pos_zscore_signif, neg_zscore_signif)
 
 rank_dt %>% 
-  # left_join(near_all_TIF) %>%
+  # left_join(near_all_bal) %>%
   mutate(col = case_when(rank < 18 & 
                            filter_zscore_bal_global_comb_rep & 
                            adj_pval_bal < 0.01 ~ target,
@@ -824,7 +824,7 @@ rank_dt %>%
 
 rank_dt %>% 
   filter(drug != "DNA-PKi") %>%
-  # left_join(near_all_TIF) %>%
+  # left_join(near_all_bal) %>%
   mutate(col = case_when(rank < 18 & 
                            filter_zscore_bal_global_comb_rep & 
                            adj_pval_bal < 0.01 ~ target,
@@ -852,7 +852,7 @@ rank_dt %>%
 
 rank_dt %>% 
     filter(rank >= (maxrank-100)) %>%
-  # left_join(near_all_TIF) %>%
+  # left_join(near_all_bal) %>%
   mutate(col = case_when(rank > (maxrank-10) & 
                    filter_zscore_bal_global_comb_rep & 
                    adj_pval_bal < 0.01 ~ target,
@@ -1210,7 +1210,7 @@ GSK.dt = GSK.dt %>% mutate(state = ifelse(late_replicating == 1 &
 
 library(rstatix)
 GSK.dt %>% wilcox_test(., log2_FC_MMEJ_NHEJ ~ state)%>%
-  adjust_pvalue(method = "holm") %>%
+  adjust_pvalue(method = "BH") %>%
   add_significance("p.adj")
 ```
 *Conclusion Figure 5D: MMEJ ratio FC is the strongest in H3K27me3 domains*
@@ -1531,12 +1531,11 @@ TRIP_chrom_clust <- readRDS(file)
 file = list.files(in.dir, pattern = "FC_ratios", full.names = T) %>% tail(n = 1)
 ratios_tib_fc <- readRDS(file)
 
-all_compounds_epistasis_TIF = CCD_tib %>%
+all_compounds_epistasis_bal = CCD_tib %>%
   #mutate(drug_conc = paste(drug, conc_char, sep = " ")) %>%
   dplyr::select(drug_conc, ratio_slope_plot, feature) %>%
   group_by(drug_conc) %>%
-  mutate(onlyNA = sum(is.na(ratio_slope_plot)),
-         drug_conc = gsub("control", "1 µM", drug_conc, perl = TRUE)) %>% 
+  mutate(onlyNA = sum(is.na(ratio_slope_plot))) %>% 
   filter(onlyNA != 25) %>%
   reshape2::dcast(drug_conc ~ feature, value.var = "ratio_slope_plot", fill = 0) %>% 
   column_to_rownames(var = "drug_conc")
@@ -1554,15 +1553,15 @@ target_ctrl = target %>%
 #   
 
 # Make matrix with drugs from selected target
-TIF_synergy_matrix = all_compounds_epistasis_TIF #%>% 
+bal_synergy_matrix = all_compounds_epistasis_bal #%>% 
   # rownames_to_column(var = "drug_conc") %>%
   # filter(drug_conc %in% target_set_all$drug_conc) %>%
   # column_to_rownames(var = "drug_conc")
 
-cluster_rows = ifelse(nrow(TIF_synergy_matrix) > 1, TRUE, FALSE)
+cluster_rows = ifelse(nrow(bal_synergy_matrix) > 1, TRUE, FALSE)
 
 # change these numbers according to where you want to set the cutoff
-quant_breaks <- quantile(TIF_synergy_matrix, c(.01,.99), na.rm = T) 
+quant_breaks <- quantile(bal_synergy_matrix, c(.01,.99), na.rm = T) 
 max_quant = max(abs(quant_breaks))
 palette_length <- 100
 breaks <- c(seq(-max_quant, 0, length.out=ceiling(palette_length/2) + 1), 
@@ -1571,7 +1570,7 @@ slope.colors.temp = slope.colors
 colors = colorRampPalette(slope.colors.temp %>% pull(color))(length(breaks))
 #colors[which(quant_breaks == 0)-1] = "gray90"
 
-p = pheatmap(TIF_synergy_matrix[, TRIP_chrom_clust$labels],
+p = pheatmap(bal_synergy_matrix[, TRIP_chrom_clust$labels],
              border_color = F,
              cellwidth = 8,
              cellheight = 8,
@@ -1585,7 +1584,7 @@ p = pheatmap(TIF_synergy_matrix[, TRIP_chrom_clust$labels],
              annotation_colors = annotation_colors_scr, 
              annotation_legend = T)
 
-# TIF_synergy_cluster <- TIF_synergy_matrix %>%
+# bal_synergy_cluster <- bal_synergy_matrix %>%
 #   rownames_to_column("drug_conc") %>%
 #   left_join(cluster_HDAC) %>%
 #   mutate(cluster_HDAC = as.character(cluster_HDAC))
@@ -1594,7 +1593,7 @@ p = pheatmap(TIF_synergy_matrix[, TRIP_chrom_clust$labels],
 ```
 
 ```{r, fig.width= 12, fig.height= 6, eval=F}
-# Highligh top 4 strongest hits + and - TIF. In the end we kept only LMNB1, but let's keep this code for flexibility.
+# Highligh top 4 strongest hits + and - bal. In the end we kept only LMNB1, but let's keep this code for flexibility.
 ratios_tib_fc %>% 
   filter(drug_conc == "Belinostat 100 nM" |
            drug_conc == "PCI-24781 100 nM"
@@ -1664,7 +1663,7 @@ theme_classic2(base_size = 16) +
 plot_grid(p1, p2, labels = c("E", "F"), rel_widths = c(1, 5))
 
 # Samples to highlight in the heatmap S3C
-all_compounds_epistasis_TIF %>% 
+all_compounds_epistasis_bal %>% 
   filter(!between(H3K27me3, -0.01, .01)) %>%
   rownames()
 ```
@@ -1804,7 +1803,7 @@ for(i in unique(CCD_tib$feature)) {
 
 ## S5E Vorinostat MMEJ FC correlation with chromatin features
 Aim: Show that H3K27me3 is the strongest correlating factor. 
-```{r S5E Vorino TIF FC Correlations, fig.width = 6, fig.height = 8}
+```{r S5E Vorino bal FC Correlations, fig.width = 6, fig.height = 8}
 ## Vorinostat
 chrom.mods.cols <- seq(grep("CTCF", names(vorinostat_ratios)), grep("H3K27me3_domain", names(vorinostat_ratios))-1)
 
@@ -1813,7 +1812,7 @@ vorinostat.hist.corr <- CorrelationDFMean(vorinostat_ratios, "log2_FC_MMEJ_NHEJ"
 
 lims = 1
 
-CorrelationPlotMean(vorinostat_ratios, "log2_FC_MMEJ_NHEJ", targets = vorinostat.hist.corr, title = "with log2 FC TIF after Vorinostat treatment")
+CorrelationPlotMean(vorinostat_ratios, "log2_FC_MMEJ_NHEJ", targets = vorinostat.hist.corr, title = "with log2 FC bal after Vorinostat treatment")
 ```
 
 ## 5x CCD Pool
@@ -1827,7 +1826,7 @@ validation_epistasis_bal <- CCD_val_tib %>%
   reshape2::dcast(drug ~ feature, value.var = "ratio_slope_plot", fill = 0) %>% 
   column_to_rownames(var = "drug")
 
-all_compounds_epistasis_TIF_HDM = CCD_tib %>%
+all_compounds_epistasis_bal_HDM = CCD_tib %>%
   #mutate(drug_conc = paste(drug, conc_char, sep = " ")) %>%
   dplyr::select(drug_conc, ratio_slope_plot, feature) %>%
   filter(grepl("Vorinostat|EPZ-6438|3-Deazaneplanocin", drug_conc)) %>%
@@ -1837,7 +1836,7 @@ all_compounds_epistasis_TIF_HDM = CCD_tib %>%
   reshape2::dcast(drug_conc ~ feature, value.var = "ratio_slope_plot", fill = 0) %>% 
   column_to_rownames(var = "drug_conc")
 
-validation_epistasis_bal <- rbind(validation_epistasis_bal, all_compounds_epistasis_TIF_HDM)
+validation_epistasis_bal <- rbind(validation_epistasis_bal, all_compounds_epistasis_bal_HDM)
 
 quant_breaks <- quantile(validation_epistasis_bal, c(.01,.99), na.rm = T)
 palette_length <- 100

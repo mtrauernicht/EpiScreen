@@ -95,7 +95,7 @@ p.adjust <- function(p, method = p.adjust.methods, n = length(p))
   ## Methods 'Hommel', 'holm', 'BY' and speed improvements
   ## contributed by Gordon Smyth
   method <- match.arg(method)
-  if(method == "fdr") method <- "holm"	# back compatibility
+  if(method == "fdr") method <- "BH"	# back compatibility
   nm <- names(p)
   p <- as.numeric(p)
   p0 <- setNames(p, nm)

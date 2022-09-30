@@ -277,10 +277,6 @@ target_color = c(HDAC="#60988D", HAT="#C6D0A8", Sirtuin="#8FCAAC",
              HIF="#E3DCD5", JAK="#C8D7E2", PIM="#9AB8C4", `Aurora Kinase`="#F4CAE4",
              PARP="#CB546F", `Epigenetic Reader Domain`= "#476D61", `DNA-PK`="#779ed7")
 
-ggplot_custom <- function(...) ggplot2::ggplot(...) + 
-  scale_color_manual(values = colors_diverse) + 
-  scale_fill_manual(values = colors_diverse)
-
 changeLevels <- function(object, column = "chr_r", levels = c(paste0("chr", 1:22), "chrX")) {
   object[, column] <- as.character(object[, column])
   object[, column] <- factor(object[, column], levels)
@@ -296,6 +292,10 @@ changeLevels <- function(object, column = "chr_r", levels = c(paste0("chr", 1:22
 in.dir = list.dirs(path = "/DATA/projects/DSBrepair/data/R") %>% .[grepl("episcreen", .)] %>% tail(n = 1)
 file = list.files(in.dir, pattern = "episcreen_ratios", full.names = T) %>% tail(n = 1)
 indel.data <- readRDS(file)
+
+# Import raw ratios file
+file = list.files(in.dir, pattern = "episcreen_raw_ratios", full.names = T) %>% tail(n = 1)
+TIF_ratios_all_tib <- readRDS(file)
 
 # Import data from preprocessing script
 file.muts = list.files(in.dir, pattern = "episcreen_mutations", full.names = T) %>% tail(n = 1)
@@ -411,7 +411,7 @@ clustering = data.frame(row.names=c('LMNB1', 'late_replicating',
                                  'methylation', 'euchromatin',
                                  'HDAC', 'insulator', 'repressive')))
 feature_fill = c(insulator="#a6b5a3", repressive="#304441", euchromatin="#cda4cc",
-                 transcribing="#FBB040", HDAC="#aac9e0", accessibility='#cebc85',
+                 transcribing="#d68d7d", HDAC="#aac9e0", accessibility='#cebc85',
                  methylation='#7dc98f')
 
 order_vec=rownames(clustering)[nrow(clustering):1]
@@ -656,41 +656,22 @@ plot_grid(plt1, plt2, labels = c("F", "H"), ncol = 2)
 
 # Supplemental figures
 
-## S1A: Viability filtering
-How many drugs are filtered out because they are too toxic?
-```{r S1A Viability filter, warning = FALSE, fig.height = 4, fig.width = 4}
-# C: Viability filtering
-indel.data %>% 
-  filter(sample == "Epigenetic Compound") %>%
-  mutate(viab = ave(viab_mean, conc_char, drug, FUN = function(x) mean(x, na.rm = TRUE)),
-         filter_viab = ifelse(pathway_bal_filter, "Balance filter", 
-                              ifelse(indel_freq_filter,"TIF filter" , "Discarded")),
-         filter_viab = factor(filter_viab, levels = c("Discarded", "TIF filter" , "Balance filter"))) %>% # average the two replicates for plotting
-  distinct(conc_char, drug, viab, filter_viab) %>%
-  ggplot_custom(.,
-                aes(x = conc_char, y = viab)) +
-  geom_quasirandom(aes(fill = filter_viab), color = "black", shape = 21, size = 2) +
-  theme_pubr(border = T) +
-  xlab("Concentration") +
-  ylab("Relative viability to control (DMSO)")+ 
-  scale_fill_manual(values = hcl.colors(4, palette = "Lajolla", rev = F)[2:4])
-```
-
-
-## S1B: Correlate viability data from the 2 replicates
+## S1A: Correlate viability data from the 2 replicates
 How well does the viability data correlate between the two biological replicates? Did the drugs become less potent after 3 years in the freezer?
-```{r S1B viability correlation, warning = FALSE, fig.height=4, fig.width=8}
+```{r S1A viability correlation, warning = FALSE, fig.height=4, fig.width=8}
 # A: Correlate viability data from the 2 replicates
 indel.data %>%
   filter(sample == "Epigenetic Compound") %>%
-  mutate(filter_viab = ifelse(pathway_bal_filter, "Balance filter", 
-                              ifelse(indel_freq_filter,"TIF filter" , "Discarded")),
-         filter_viab = factor(filter_viab, levels = c("Discarded", "TIF filter" , "Balance filter"))) %>%
-  distinct(viab_mean, sample, replicate, conc_char, drug, viab_reproducibility,
-           filter_viab, indel_freq_filter, pathway_bal_filter) %>%
+    distinct(viab_mean, sample, replicate, conc_char, drug, viab_reproducibility,
+           indel_freq_filter, pathway_bal_filter) %>%
+  mutate(filter_viab = case_when(pathway_bal_filter & viab_reproducibility ~ "Balance filter", 
+                             indel_freq_filter & viab_reproducibility ~ "TIF filter" , 
+                             T ~ "Discarded"),
+         filter_viab = factor(filter_viab, levels = c("Discarded", "TIF filter" , "Balance filter")),
+         conc_char = factor(conc_char, levels = c("100 nM", "1 µM", "10 µM"))) %>%
   pivot_wider(names_from = replicate, values_from = viab_mean) %>%
   ggplot(., aes(x = E177, y = E1504, color = filter_viab,  shape = viab_reproducibility)) +
-  geom_point(size = 3) +
+  geom_point(size = 4) +
   scale_shape_manual(values=c(18, 16))+
   geom_smooth(aes(group = 1), method = "lm", color = colors_diverse[1]) +
   # geom_segment(x = 0.5, xend = 0.5, y = 0.5, yend = 1.2, linetype = "dashed") +
@@ -718,57 +699,47 @@ indel.data  %>%
 **Conclusion: Most drugs that were toxic in rep 1 were also toxic in rep 2, so the trends are similar. However, some drugs were especially more toxic in rep 2. These drugs were removed from the analysis.**
 
 
-## S1C: Correlation between viability and TIF
+## S1B: Correlation between viability and TIF
 Is lower viability causing a decrease in TIF? Can we justify our 0.50 viability cutoff based on the correlation between viability and TIF?
 
-```{r S1C TIF correlation with viability, warning=F, fig.height=5, fig.width=5}
+```{r S1B TIF correlation with viability, warning=F, fig.height=5, fig.width=5}
 # F: Correlation between viability and MMEJ ratio
 # load indel data that has no filter on it.
-indel.data.nofilter <- readRDS("/DATA/usr/m.trauernicht/projects/EpiScreen/files_scripts/mt20220126_episcreen.RDS")
 
-viab_eff_cor <- indel.data.nofilter %>%
-  # filter(sample == "Epigenetic Compound") %>%
-  dplyr::distinct(viab_norm_split, freqCut, drug, replicate, conc_char, tech, sample) %>%
-  mutate(freqCut = ave(freqCut, drug, replicate, conc_char, tech, FUN = mean)) %>%
-  distinct()
-
-ggplot_custom(viab_eff_cor,
-              aes(x = viab_norm_split, y = freqCut, color = sample)) +
+TIF_ratios_all_tib %>% distinct(exp, viab_norm_split, freqCut_global, sample) %>% 
+ggplot(., aes(x = viab_norm_split, y = freqCut_global, color = sample)) +
   geom_point_rast(raster.dpi = 300) +
   geom_vline(xintercept = 0.25, color = "red") +
   annotate("rect",xmin=0,xmax=0.25,ymin=-Inf,ymax=Inf, alpha=0.1, fill="red") +
+  xlab("viable cell count relative to control") +
+  ylab("Global TIF") + 
+  scale_color_manual(values = colors_diverse) +
   ylim(0, 1) +
   xlim(0, 1.2)
 ```
 
-## S1D: Correlation between viability and MMEJ ratio
+## S1C: Correlation between viability and MMEJ ratio
 Is lower viability causing a decrease in MMEJ? Can we justify our 0.50 viability cutoff based on the correlation between viability and MMEJ ratio?
 
-```{r S1D MMEJ ratio correlation with viability, warning=F, fig.height=5, fig.width=5}
-viab_mmej_cor <- indel.data.nofilter %>%
-  # filter(sample == "Epigenetic Compound") %>%
-  dplyr::distinct(viab_norm_split, MMEJratio, drug, replicate, conc_char, tech, sample) %>%
-  mutate(MMEJratio = ave(MMEJratio, drug, replicate, conc_char, tech, FUN = mean)) %>%
-  distinct()
-
-ggplot_custom(viab_mmej_cor,
-              aes(x = viab_norm_split, y = log2(MMEJratio), color = sample)) +
+```{r S1C MMEJ ratio correlation with viability, warning=F, fig.height=5, fig.width=5}
+TIF_ratios_all_tib %>% distinct(exp, viab_norm_split, MMEJratio_global, sample) %>% 
+ggplot(., aes(x = viab_norm_split, y = log2(MMEJratio_global), color = sample)) +
   geom_point_rast(raster.dpi = 300) +
   geom_vline(xintercept = 0.40, color = "red") +
   annotate("rect",xmin=0,xmax=0.40,ymin=-Inf,ymax=Inf, alpha=0.1, fill="red") +
   scale_x_continuous(breaks = seq(0, 1, by = 0.25), limits = c(0.1, 1.2)) +
-  xlab("Normalised viability") +
-  ylab("log2(MMEJ ratio)") + 
+  scale_color_manual(values = colors_diverse) +
+  xlab("viable cell count relative to control") +
+  ylab("log2(global MMEJ:NHEJ)") + 
   xlim(0, 1.2)
-
 ```
 
 
-## S1E: Comparison between technical replicates of efficiency in DMSO
+## S1D: Comparison between technical replicates of efficiency in DMSO
 
-```{r S1E comparison for mean indel rate across replicates, warning = FALSE, fig.height=5, fig.width=3}
+```{r S1D comparison for mean indel rate across replicates, warning = FALSE, fig.height=5, fig.width=3}
 indel.data %>%
-  filter(drug == "DMSO") %>%
+  filter(drug == "DMSO", conc_char == "control") %>%
   mutate(drug = case_when(drug == "DMSO" & plate %in% c(1:6) ~ paste(drug, drug_plate, well, "1", sep = " "), 
                           drug == "DMSO" & plate %in% c(7:12) ~ paste(drug, drug_plate, well, "2", sep = " "),
                           drug == "DMSO" & plate %in% c(13:18) ~ paste(drug, drug_plate, well, "3", sep = " ")))  %>%
@@ -784,39 +755,38 @@ indel.data %>%
   ylim(0,1)
 ```
 
-## S1F: Comparison between replicates of efficiency in DMSO
+## S1E: Comparison between replicates of efficiency in DMSO
 
-```{r S1F control distribution of indel rates across wells and replicates, warning = FALSE, fig.height=3, fig.width=5}
-
+```{r S1E control distribution of indel rates across wells and replicates, warning = FALSE, fig.height=3, fig.width=5}
 indel.data %>%
-  filter(drug == "DMSO") %>%
+  filter(drug == "DMSO", conc_char == "control") %>%
   mutate(IPR = factor(IPR, levels = clone5_map_ipr$labels[clone5_map_ipr$order])) %>%
   dplyr::distinct(freqCut, IPR, exp, replicate) %>%
   ggplot(.,
          aes(x = IPR, y = freqCut)) +
-  geom_quasirandom_rast(aes(color = replicate), dodge.width = 0.75, raster.dpi = 600) +
+  geom_quasirandom(aes(color = replicate),dodge.width = 0.75) +
   scale_color_manual(values = c(colors_drugs[8], colors_drugs[7])) +
   theme_classic_lines_90() +
   ylim(0,1)
 ```
 
 
-## S1G: Comparison between replicates MMEJ ratio in DMSO
+## S1F: Comparison between replicates MMEJ ratio in DMSO
 
-```{r S1G control distribution of MMEJ ratio across wells and replicates, warning = FALSE, fig.height=3, fig.width=5}
+```{r S1F control distribution of MMEJ ratio across wells and replicates, warning = FALSE, fig.height=3, fig.width=5}
 indel.data %>%
-  filter(drug == "DMSO") %>%
+  filter(drug == "DMSO", conc_char == "control") %>%
   dplyr::distinct(MMEJratio, IPR, exp, replicate) %>%
   mutate(IPR = factor(IPR, levels = clone5_map_ipr$labels[clone5_map_ipr$order])) %>%
   ggplot(.,
          aes(x = IPR, y = MMEJratio)) +
-  geom_quasirandom_rast(aes(color = replicate), dodge.width = 0.75, raster.dpi = 600) +
+  geom_quasirandom(aes(color = replicate), dodge.width = 0.75) +
   scale_color_manual(values = c(colors_drugs[8], colors_drugs[7])) +
   theme_classic_lines_90()
 ```
-## S1H: Combined TIF z-scores per IPR per concentration
 
-```{r S1H TIF zscores per IPR, warning = FALSE, fig.height=3, fig.width=8}
+## S1G: Combined TIF z-scores per IPR per concentration
+```{r S1G TIF zscores per IPR, fig.height=3, fig.width=8}
 zscore_dt = indel.data %>%
   filter(sample %in% c("Epigenetic Compound") & indel_freq_filter) %>%
   distinct(freqCut, IPR, drug, conc_char, tech, sample, replicate, 
@@ -834,9 +804,8 @@ ggplot(zscore_dt,
   ylab("TIF z-score")
 ```
 
-## S1I: Combined balance z-scores per IPR per concentration
-
-```{r S1I bal zscore per IPR, warning = FALSE, fig.height=3, fig.width=8}
+## S1H: Combined balance z-scores per IPR per concentration
+```{r S1H bal zscore per IPR, fig.height=3, fig.width=8}
   ggplot(zscore_dt,
          aes(x = IPR, y = zscore_bal_comb_rep, color = sample_conc)) +
   geom_quasirandom_rast(aes(color = sample_conc), dodge.width = 0.75, raster.dpi = 300, size = 1) +
@@ -847,15 +816,14 @@ ggplot(zscore_dt,
   ylab("MMEJ:NHEJ z-score")
 ```
 
-## S1J: Correlation between technical replicates MMEJ score
-
+## S1I: Correlation between technical replicates MMEJ score
 How well does the MMEJ score correlate between the six technical replicates?
-```{r S1J normalized MMEJ ratio correlation, warning = FALSE, fig.height=5, fig.width=5}
+```{r S1I normalized MMEJ ratio correlation, warning = FALSE, fig.height=5, fig.width=5}
 # B: Correlation between technical replicates MMEJ score
 techn_repl <- indel.data %>%
   filter(sample == "Epigenetic Compound" & pathway_bal_filter == T & viab_reproducibility == T) %>%
   dplyr::distinct(MMEJ_log2_FC, drug, tech, replicate, conc_char, sample) %>%
-  mutate(MMEJ_log2_FC = ave(MMEJ_log2_FC, drug, tech, replicate, conc_char, FUN = mean)) %>%
+  mutate(MMEJ_log2_FC = ave(MMEJ_log2_FC, drug, tech, replicate, conc_char, FUN = function(x) mean(x, na.rm = TRUE))) %>%
   unique() %>%
   mutate(rep = paste(replicate, tech, sep = "_")) %>%
   dplyr::select(-replicate, -tech) %>%
@@ -883,16 +851,16 @@ ggpairs(techn_repl %>% dplyr::select(contains("E1")),
 
 
 
-## S1K: Correlation between technical replicates efficiency
+## S1J: Correlation between technical replicates efficiency
 How well does the cutting efficiency correlate between the six technical replicates
-```{r S1K normalized TIF correlation, warning = FALSE, fig.height=5, fig.width=5}
+```{r S1J normalized TIF correlation, warning = FALSE, fig.height=5, fig.width=5}
 # C: Correlation between technical replicates efficiency
 techn_repl <- indel.data %>%
   filter(sample == "Epigenetic Compound" & 
            indel_freq_filter == T & 
            viab_reproducibility == T) %>%
   dplyr::distinct(freqCut_norm, drug, conc_char, replicate, tech) %>%
-  mutate(freqCut_norm = log2(ave(freqCut_norm, drug, conc_char, replicate, tech, FUN = mean))) %>%
+  mutate(freqCut_norm = log2(ave(freqCut_norm, drug, conc_char, replicate, tech, FUN = function(x) mean(x, na.rm = TRUE)))) %>%
   distinct() %>%
   mutate(rep = paste(replicate, tech, sep = "_")) %>%
   dplyr::select(-replicate, -tech) %>%
@@ -919,9 +887,9 @@ ggpairs(techn_repl %>% dplyr::select(contains("E1")),
 
 
 
-## S1L-O: Correlation in MMEJ z-score between biological replicates
+## S1K-N: Correlation in MMEJ z-score between biological replicates
 How well does the MMEJ z-score correlate between the biologcial replicates before combining them?
-```{r S1LMNO MMEJ global z-score correlation, warning = FALSE, fig.height=5, fig.width=5}
+```{r S1KLMN MMEJ global z-score correlation, warning = FALSE, fig.height=5, fig.width=5}
 # D: Correlation between biological replicates MMEJ score
 biol_repl_TIF <- indel.data %>%
   filter(sample == "Epigenetic Compound" & 
@@ -951,11 +919,17 @@ p1 = ggplot(biol_repl_TIF,
        aes(x = E1504, y = E177)) +
   geom_point() +
   geom_abline(lty = "twodash") +
-  geom_smooth(method = "lm", color = "red", lty = "dashed") +
+  geom_smooth(method = "lm", color = "red", lty = "dashed") + 
   stat_cor(method = "pearson") +
   xlab("Screen 2 TIF ratio z-score") +
   ylab("Screen 1 TIF ratio z-score") +
-  theme_bw(base_size = 16)
+  theme_classic(base_size = 16) + 
+  geom_hline(yintercept = 1.96, linetype = "dashed") +
+  geom_hline(yintercept = -1.96, linetype = "dashed") +
+  geom_vline(xintercept = 1.96, linetype = "dashed") +
+  geom_vline(xintercept = -1.96, linetype = "dashed")  +
+  xlim(-65, 25) +
+  ylim(-65, 25)
 
 p2 = ggplot(biol_repl_bal,
        aes(x = E1504, y = E177)) +
@@ -964,8 +938,14 @@ p2 = ggplot(biol_repl_bal,
   geom_smooth(method = "lm", color = "red", lty = "dashed") +
   stat_cor(method = "pearson") +
   xlab("Screen 2 MMEJ ratio z-score") +
-  ylab("Screen 1 MMEJ ratio z-score")+
-  theme_bw(base_size = 16)
+  ylab("Screen 1 MMEJ ratio z-score") +
+  theme_classic(base_size = 16) + 
+  geom_hline(yintercept = 1.96, linetype = "dashed") +
+  geom_hline(yintercept = -1.96, linetype = "dashed") +
+  geom_vline(xintercept = 1.96, linetype = "dashed") +
+  geom_vline(xintercept = -1.96, linetype = "dashed") +
+  xlim(-61, 33) +
+  ylim(-61, 33)
 
   
 p3 = ggplot(
@@ -976,9 +956,14 @@ p3 = ggplot(
   geom_smooth(method = "lm", color = "red", lty = "dashed") +
   stat_cor(method = "pearson") +
   xlab("Screen 2 TIF ratio z-score filtered") +
-  ylab("Screen 1 TIF ratio z-score filtered")+
-  theme_bw(base_size = 16)
-
+  ylab("Screen 1 TIF ratio z-score filtered") +
+  theme_classic(base_size = 16) +
+  geom_hline(yintercept = 1.96, linetype = "dashed") +
+  geom_hline(yintercept = -1.96, linetype = "dashed") +
+  geom_vline(xintercept = 1.96, linetype = "dashed") +
+  geom_vline(xintercept = -1.96, linetype = "dashed")  +
+  xlim(-65, 25) +
+  ylim(-65, 25)
   
 p4 = ggplot(
   filter(biol_repl_bal, filter_zscore_bal_global_comb_rep),
@@ -988,12 +973,17 @@ p4 = ggplot(
   geom_smooth(method = "lm", color = "red", lty = "dashed") +
   stat_cor(method = "pearson") +
   xlab("Screen 2 MMEJ ratio z-score filtered") +
-  ylab("Screen 1 MMEJ ratio z-score filtered")+
-  theme_bw(base_size = 16)
-
+  ylab("Screen 1 MMEJ ratio z-score filtered") +
+  theme_classic(base_size = 16) + 
+  geom_hline(yintercept = 1.96, linetype = "dashed") +
+  geom_hline(yintercept = -1.96, linetype = "dashed") +
+  geom_vline(xintercept = 1.96, linetype = "dashed") +
+  geom_vline(xintercept = -1.96, linetype = "dashed") +
+  xlim(-61, 33) +
+  ylim(-61, 33)
   
 
-plot_grid(p1, p2, p3, p4, ncol = 2, nrow = 2, labels = c("L", "M", "N", "O"))
+plot_grid(p1, p2, p3, p4, ncol = 2, nrow = 2, labels = c("K", "L", "M", "N"))
 ```
 
 ```{r S1LMNO MMEJ z-score correlation, warning = FALSE, fig.height=5, fig.width=5}
@@ -1029,8 +1019,12 @@ p1 = ggplot(biol_repl_TIF,
   geom_smooth(method = "lm", color = "red", lty = "dashed") +
   stat_cor(method = "pearson") +
   xlab("Screen 2 TIF ratio z-score") +
-  ylab("Screen 1 TIF ratio z-score") +
-  theme_bw(base_size = 16)
+  ylab("Screen 1 TIF ratio z-score")  +
+  theme_classic(base_size = 16) + 
+  geom_hline(yintercept = 1.96, linetype = "dashed") +
+  geom_hline(yintercept = -1.96, linetype = "dashed") +
+  geom_vline(xintercept = 1.96, linetype = "dashed") +
+  geom_vline(xintercept = -1.96, linetype = "dashed")
 
 
 p2 = ggplot(biol_repl_bal,
@@ -1040,8 +1034,12 @@ p2 = ggplot(biol_repl_bal,
   geom_smooth(method = "lm", color = "red", lty = "dashed") +
   stat_cor(method = "pearson") +
   xlab("Screen 2 MMEJ ratio z-score") +
-  ylab("Screen 1 MMEJ ratio z-score") +
-  theme_bw(base_size = 16)
+  ylab("Screen 1 MMEJ ratio z-score")  +
+  theme_classic(base_size = 16) + 
+  geom_hline(yintercept = 1.96, linetype = "dashed") +
+  geom_hline(yintercept = -1.96, linetype = "dashed") +
+  geom_vline(xintercept = 1.96, linetype = "dashed") +
+  geom_vline(xintercept = -1.96, linetype = "dashed")
 
   
 p3 = ggplot(
@@ -1052,8 +1050,12 @@ p3 = ggplot(
   geom_smooth(method = "lm", color = "red", lty = "dashed") +
   stat_cor(method = "pearson") +
   xlab("Screen 2 TIF ratio z-score filtered") +
-  ylab("Screen 1 TIF ratio z-score filtered") +
-  theme_bw(base_size = 16)
+  ylab("Screen 1 TIF ratio z-score filtered")  +
+  theme_classic(base_size = 16) + 
+  geom_hline(yintercept = 1.96, linetype = "dashed") +
+  geom_hline(yintercept = -1.96, linetype = "dashed") +
+  geom_vline(xintercept = 1.96, linetype = "dashed") +
+  geom_vline(xintercept = -1.96, linetype = "dashed")
 
   
 p4 = ggplot(
@@ -1065,9 +1067,11 @@ p4 = ggplot(
   stat_cor(method = "pearson") +
   xlab("Screen 2 MMEJ ratio z-score filtered") +
   ylab("Screen 1 MMEJ ratio z-score filtered") +
-  theme_bw(base_size = 16)
-
-  
+  theme_classic(base_size = 16) + 
+  geom_hline(yintercept = 1.96, linetype = "dashed") +
+  geom_hline(yintercept = -1.96, linetype = "dashed") +
+  geom_vline(xintercept = 1.96, linetype = "dashed") +
+  geom_vline(xintercept = -1.96, linetype = "dashed")
 
 plot_grid(p1, p2, p3, p4, ncol = 2, nrow = 2, labels = c("L", "M", "N", "O"))
 ```
