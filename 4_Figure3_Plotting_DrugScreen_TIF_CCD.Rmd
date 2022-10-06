@@ -619,8 +619,35 @@ How many CCDs do we have in total?
 ```{r}
 drug_conc_table = target_set_drugs %>% rownames_to_column(var = "drug_conc") %>% distinct(drug_conc, drug)
 
-CCD_tib %>% filter(!is.na(indelrate_slope_plot)) %>% left_join(drug_conc_table) %>% distinct(drug_conc) %>% nrow()
-CCD_tib %>% filter(!is.na(indelrate_slope_plot)) %>% left_join(drug_conc_table) %>% distinct(drug_conc) %>% nrow()
+# CCDs for the TIF
+CCD_tib %>% 
+  filter(!grepl("DNA-PK", drug_conc)) %>%
+  filter(!is.na(indelrate_slope_plot)) %>% 
+  left_join(drug_conc_table) %>% 
+  distinct(drug_conc) %>% 
+  nrow()
+
+CCD_tib %>% 
+  filter(!grepl("DNA-PK", drug_conc)) %>%
+  filter(!is.na(indelrate_slope_plot)) %>% 
+  left_join(drug_conc_table) %>% 
+  distinct(drug) %>% 
+  nrow()
+
+# CCDs for the balance and/or TIF
+CCD_tib %>% 
+  filter(!grepl("DNA-PK", drug_conc)) %>%
+  filter(!is.na(ratio_slope_plot) | !is.na(indelrate_slope_plot)) %>% 
+  left_join(drug_conc_table) %>% 
+  distinct(drug_conc) %>% 
+  nrow()
+
+CCD_tib %>% 
+  filter(!grepl("DNA-PK", drug_conc)) %>%
+  filter(!is.na(ratio_slope_plot) | !is.na(indelrate_slope_plot)) %>% 
+  left_join(drug_conc_table) %>% 
+  distinct(drug) %>% 
+  nrow()
 ```
 
 ## 3D All compound synergies with chromatin
@@ -645,6 +672,53 @@ pheatmap(all_compounds_epistasis_TIF[, TRIP_chrom_clust$labels],
          color = colors,
          annotation_colors = annotation_colors_scr, 
          annotation_legend = T)
+```
+
+
+```{r Fisher test TIF CCD}
+drug_conc_tib = indel.data %>% 
+  distinct(drug, conc_char, target) %>% 
+  mutate(drug = gsub(" [(].*[)]", "", drug),
+         drug_conc = paste(drug, conc_char,sep = " "))
+
+TIF_hits = CCD_tib %>% filter(!is.na(indelrate_slope_plot) & 
+                                !grepl("DNA-PK", drug_conc) # remove DNA-PK from this count
+                              ) %>% 
+  left_join(drug_conc_tib) %>%
+  distinct(drug_conc, target) %>% 
+  group_by(target) %>%
+  count() %>%
+  rename(effect = n) %>%
+  rbind(tibble(target = "other", effect = 0)) %>%
+  arrange(target) %>%
+  column_to_rownames(var = "target")
+
+all_drugs = indel.data %>% filter(sample == "Epigenetic Compound") %>% 
+  mutate(drug = gsub(" [(].*[)]", "", drug),
+        drug_conc = paste(drug, conc_char, sep = " "),
+        target = case_when(target %in% rownames(TIF_hits) ~ target,
+         T ~ "other")) %>%
+  distinct(drug_conc, target) %>%
+  group_by(target) %>%
+  count() %>%
+  rename(no_effect = n) %>%
+  arrange(target) %>%
+  column_to_rownames(var = "target")
+
+all_drugs = all_drugs-TIF_hits
+
+cont_table = cbind(TIF_hits,all_drugs) %>% as.matrix()
+rownames(cont_table) = c("AurK", "DNMT", "ERD", "HDAC","HDM", "HMT", "JAK", "other", "PARP", "Sirtuin")
+
+xtab_effect = as.table(cont_table)
+
+dimnames(xtab_effect) <- list(
+  Groups = rownames(xtab_effect),
+  Effect = c("Yes", "No")
+)
+
+# Compare the proportion of males and females in each category
+row_wise_fisher_test(xtab_effect, p.adjust.method = "BH")
 ```
 
 ```{r top CCDs for all chromatin features, fig.width= 6, fig.height= 6, eval = FALSE}

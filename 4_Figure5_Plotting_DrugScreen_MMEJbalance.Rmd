@@ -677,6 +677,43 @@ balance.data.heatmap <- indel.data %>%
   ungroup() %>%
   distinct(drug, target, conc_char, MMEJ_log2_FC_mean, IPR, min_score, drug_conc) 
 
+# Number of individual drugs (Same piece of code as above)
+number_drugs = indel.data %>%
+  #filter(!target %in% c("Aurora Kinase", "JAK", "PARP", "PIM", "HIF")) %>%
+  mutate(drug_conc = paste(drug, conc_char, sep = " ")) %>%
+  filter(sample == "Epigenetic Compound") %>%
+  filter(pathway_bal_filter == TRUE) %>%
+  distinct(conc_char, drug, drug_conc, target, IPR, zscore_bal_comb_rep, 
+           MMEJ_log2_FC, replicate, tech, filter_zscore_bal_comb_rep) %>%
+  group_by(drug_conc) %>%
+  mutate(MMEJ_log2_FC_mean = ave(MMEJ_log2_FC, IPR, FUN = function(x) mean(x, na.rm = TRUE)),
+         ## Select drugs that have a large effect size in at least one location 
+         ## (some drugs might have a small global effect size, but large local)
+         zscore_bal_comb_rep_temp = ifelse(filter_zscore_bal_comb_rep, zscore_bal_comb_rep, 0),
+         p_value = 2*pnorm(q = abs(zscore_bal_comb_rep_temp), lower.tail = F),
+         # Adjust p value for false discovery rate
+         adj_pvalue = p.adjust(p_value, method = 'BH'))
+
+MMEJboost = number_drugs %>% 
+  # Add filtering for significant increases
+  filter(adj_pvalue < 0.01 & zscore_bal_comb_rep_temp > 1) %>% 
+  # unique the drugs
+  distinct(drug) %>% 
+  # count the rows
+  nrow()
+
+NHEJboost = number_drugs %>% 
+  # Add filtering for significant increases
+  filter(adj_pvalue < 0.01 & zscore_bal_comb_rep_temp < -1) %>% 
+  # unique the drugs
+  distinct(drug) %>% 
+  # count the rows
+  nrow()
+
+# Statement
+paste("Of the 160 epigenetic compounds significantly altering the MMEJ:NHEJ ratio in at least one IPR,", MMEJboost, "boosted the ratio and ", NHEJboost, " decreased the ratio.")
+
+
 dmso_bal <- indel.data %>%
   filter(drug == "DMSO") %>%
   dplyr::select('dmso_bal' = MMEJ_log2_FC , IPR) %>%
@@ -882,6 +919,43 @@ top_hits = indel.data  %>%
   mutate(rank = seq(1:n()),
          drug = gsub(" [(].*[)]", "", drug),
          drug_conc = paste(drug, conc_char, sep = " "))
+
+
+# Number of individual drugs (Same piece of code as above)
+number_drugs = indel.data %>%
+  #filter(!target %in% c("Aurora Kinase", "JAK", "PARP", "PIM", "HIF")) %>%
+  mutate(drug_conc = paste(drug, conc_char, sep = " ")) %>%
+  filter(sample == "Epigenetic Compound") %>%
+  filter(pathway_bal_filter == TRUE) %>%
+  distinct(conc_char, drug, drug_conc, target, zscore_bal_global_comb_rep, 
+           replicate, tech, filter_zscore_TIF_global_comb_rep) %>%
+  group_by(drug_conc) %>%
+  mutate(## Select drugs that have a large effect size in at least one location 
+         ## (some drugs might have a small global effect size, but large local)
+         zscore_bal_global_comb_rep_temp = ifelse(filter_zscore_TIF_global_comb_rep, zscore_bal_global_comb_rep, 0),
+         p_value = 2*pnorm(q = abs(zscore_bal_global_comb_rep_temp), lower.tail = F),
+         # Adjust p value for false discovery rate
+         adj_pvalue = p.adjust(p_value, method = 'BH'))
+
+MMEJboost = number_drugs %>% 
+  # Add filtering for significant increases
+  filter(adj_pvalue < 0.01 & zscore_bal_global_comb_rep_temp > 1) %>% 
+  # unique the drugs
+  distinct(drug) %>% 
+  # count the rows
+  nrow()
+
+NHEJboost = number_drugs %>% 
+  # Add filtering for significant increases
+  filter(adj_pvalue < 0.01 & zscore_bal_global_comb_rep_temp < -1) %>% 
+  # unique the drugs
+  distinct(drug) %>% 
+  # count the rows
+  nrow()
+
+# Statement
+paste("Of the 160 epigenetic compounds significantly altering the MMEJ:NHEJ ratio globally,", 
+      MMEJboost, "boosted the ratio and", NHEJboost, "decreased the ratio.")
 ```
 *Conclusion Figure 4C: Many AURKi are the most stron MMEJ ratio reducers. Also Decitabine and a HDAC inhibitor are amongst the strongest.*
 

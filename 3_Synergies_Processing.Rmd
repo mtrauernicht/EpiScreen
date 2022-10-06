@@ -269,9 +269,9 @@ ordered_marks2 <- c("Negative Control", "MRN", "DNA-PK","Epigenetic Reader Domai
 ```{r, warning=FALSE}
 # List significance
 filtered_drug_pvals = indel.data %>%
-  mutate(drug = case_when(drug == "DMSO" & plate %in% c(1:6) ~ paste(drug, drug_plate, well, "1", sep = " "), 
-                          drug == "DMSO" & plate %in% c(7:12) ~ paste(drug, drug_plate, well, "2", sep = " "),
-                          drug == "DMSO" & plate %in% c(13:18) ~ paste(drug, drug_plate, well, "3", sep = " "),
+  mutate(drug = case_when(conc_char == "control" & plate %in% c(1:6) ~ paste(drug, drug_plate, well, "1", sep = " "), 
+                          conc_char == "control" & plate %in% c(7:12) ~ paste(drug, drug_plate, well, "2", sep = " "),
+                          conc_char == "control" & plate %in% c(13:18) ~ paste(drug, drug_plate, well, "3", sep = " "),
                           T ~ drug)) %>%
   distinct(drug, conc_char, IPR, zscore_TIF_comb_rep, zscore_bal_comb_rep, filter_zscore_TIF_comb_rep, filter_zscore_bal_comb_rep) %>%
   filter(!is.na(zscore_bal_comb_rep), !is.na(zscore_TIF_comb_rep)) %>%
@@ -334,9 +334,9 @@ effect_of_compound_tib = filtered_drug_pvals %>%
   semi_join(filtered_drug_conc) # Semi-join the filtered drug conc to keep only the significant ones after p adjustment.
 
 ratios_tib <- indel.data %>%
-  mutate(drug = case_when(drug == "DMSO" & plate %in% c(1:6) ~ paste(drug, drug_plate, well, "1", sep = " "), 
-                          drug == "DMSO" & plate %in% c(7:12) ~ paste(drug, drug_plate, well, "2", sep = " "),
-                          drug == "DMSO" & plate %in% c(13:18) ~ paste(drug, drug_plate, well, "3", sep = " "),
+  mutate(drug = case_when(conc_char == "control" & plate %in% c(1:6) ~ paste(drug, drug_plate, well, "1", sep = " "), 
+                          conc_char == "control" & plate %in% c(7:12) ~ paste(drug, drug_plate, well, "2", sep = " "),
+                          conc_char == "control" & plate %in% c(13:18) ~ paste(drug, drug_plate, well, "3", sep = " "),
                           T ~ drug),
          drug_conc = paste(drug, conc_char, sep = " ")) %>%
   semi_join(filtered_drug_conc) %>%
@@ -477,6 +477,23 @@ signif_pcr_hits = adj_p.value_KO_model %>% filter(p.adj < pval_signif) %>%
   pivot_wider(names_from = var, 
               values_from = val, 
               values_fill = FALSE) 
+
+TIF_CCDs = adj_p.value_KO_model %>% 
+  filter(var == "log2.fc.freqCut" & 
+           p.adj < pval_signif &
+           !grepl("DNA-PK|DMSO|Mirin", drug_conc)) %>%
+nrow()
+
+bal_CCDs = adj_p.value_KO_model %>% filter(var == "log2.fc.ratio"& 
+           p.adj < pval_signif &
+           !grepl("DNA-PK|DMSO|Mirin", drug_conc)) %>%
+  nrow()
+
+paste("Of the 160 drugs,", TIF_CCDs,"had a significant TIF for the balance and", bal_CCDs,"had a significant CCD for the balance")
+
+adj_p.value_KO_model %>% 
+  filter(p.adj < pval_signif &
+           grepl("DMSO", drug_conc))
 ```
 
 ### Filtering the epistasis
@@ -511,6 +528,48 @@ epistasis_tib %<>%
       effect_on_indelrate & signif.pcr.freqCut & TIF_signif == "TIF_both" ~ indelrate_slope,
       T ~ as.double(NA))) %>%
   distinct(drug_conc, feature, indelrate_slope, indelrate_slope_plot, ratio_slope, ratio_slope_plot)
+
+TIF_CCDs = epistasis_tib %>% 
+    filter(!grepl("DNA-PK", drug_conc)) %>% 
+  filter(!is.na(indelrate_slope_plot)) %>%
+  distinct(drug_conc) %>%
+nrow()
+
+bal_CCDs = epistasis_tib %>% 
+    filter(!grepl("DNA-PK", drug_conc)) %>% 
+  filter(!is.na(ratio_slope_plot)) %>%
+  distinct(drug_conc) %>%
+  nrow()
+
+paste("Of the 480 drug:concentration combinations,", TIF_CCDs,"had a significant CCD for the TIF and", bal_CCDs,"had a significant CCD for the balance")
+
+drug_conc_tib = filtered_drug_pvals %>% distinct(drug, conc_char) %>% 
+  filter(!grepl("DNA-PK", drug)) %>% 
+  mutate(drug_conc = paste(drug, conc_char,sep = " "))
+  
+TIF_CCDs = drug_conc_tib %>% left_join(epistasis_tib)%>% 
+  filter(!is.na(indelrate_slope_plot)) %>%
+  distinct(drug) %>%
+  nrow()
+
+bal_CCDs = drug_conc_tib %>% left_join(epistasis_tib)%>% 
+  filter(!is.na(ratio_slope_plot)) %>%
+  distinct(drug) %>%
+  nrow()
+
+paste("Of the 160 drugs,", TIF_CCDs,"had a significant CCD for the TIF and", bal_CCDs,"had a significant CCD for the balance")
+
+drug_CCDs = drug_conc_tib %>% left_join(epistasis_tib)%>% 
+  filter(!is.na(ratio_slope_plot) | !is.na(indelrate_slope_plot)) %>%
+  distinct(drug) %>%
+  nrow()
+
+drug_conc_CCDs = drug_conc_tib %>% left_join(epistasis_tib)%>% 
+  filter(!is.na(ratio_slope_plot) | !is.na(indelrate_slope_plot)) %>%
+  distinct(drug_conc) %>%
+  nrow()
+
+paste("Of the 160 drugs,", drug_CCDs,"had a significant CCD for the TIF and/or balance and", drug_conc_CCDs," of the 480 drug-concentrations")
 ```
 
 
