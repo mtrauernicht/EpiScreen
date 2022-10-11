@@ -1,8 +1,8 @@
 ---
-title: "DSB epigenetic drug screen - Figure 3"
+title: "DSB epigenetic drug screen - Figure 4"
 author:
   - name: "Max Trauernicht & Ruben Schep"
-    email: "m.trauernicht@nki.nl"
+    email: "m.trauernicht@nki.nl; r.schep@nki.nl"
     affiliation: "Netherlands Cancer Institute"
 date: '`r format(Sys.time(), "%d/%m/%Y")`'
 output:
@@ -476,7 +476,7 @@ palette_length <- 100
 breaks <- c(seq(quant_breaks[1], 0, length.out=ceiling(palette_length/2) + 1), 
             seq(quant_breaks[2]/palette_length, quant_breaks[2], length.out=floor(palette_length/2)))
 colors = rev(diverge_hcl(length(breaks), palette = "Cork"))
-colors[which(quant_breaks == 0)-1] = "white"
+colors[which(breaks == 0)-1] = "white"
 ```
 
 ---

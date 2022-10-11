@@ -2,7 +2,7 @@
 title: "DSB epigenetic drug screen - Figure 3"
 author:
   - name: "Max Trauernicht & Ruben Schep"
-    email: "m.trauernicht@nki.nl"
+    email: "m.trauernicht@nki.nl; r.schep@nki.nl"
     affiliation: "Netherlands Cancer Institute"
 date: '`r format(Sys.time(), "%d/%m/%Y")`'
 output:
@@ -521,7 +521,7 @@ all_compounds_epistasis_TIF = CCD_tib %>%
   reshape2::dcast(drug_conc ~ feature, value.var = "indelrate_slope_plot", fill = 0) %>% 
   column_to_rownames(var = "drug_conc")
 
-target_ctrl = dplyr::select(target, -conc_char)
+target_ctrl = dplyr::select(target, -conc_char, -bal_signif, -TIF_signif)
 
 quant_breaks <- quantile(all_compounds_epistasis_TIF, c(.01,.99), na.rm = T)
 palette_length <- 100
@@ -645,6 +645,14 @@ CCD_tib %>%
 CCD_tib %>% 
   filter(!grepl("DNA-PK", drug_conc)) %>%
   filter(!is.na(ratio_slope_plot) | !is.na(indelrate_slope_plot)) %>% 
+  left_join(drug_conc_table) %>% 
+  distinct(drug) %>% 
+  nrow()
+
+# CCDs for the balance and TIF
+CCD_tib %>% 
+  filter(!grepl("DNA-PK", drug_conc)) %>%
+  filter(!is.na(ratio_slope_plot) & !is.na(indelrate_slope_plot)) %>% 
   left_join(drug_conc_table) %>% 
   distinct(drug) %>% 
   nrow()

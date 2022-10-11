@@ -2,7 +2,7 @@
 title: "DSB epigenetic drug screen - Figure 1"
 author: 
   - name: "Max Trauernicht & Ruben Schep"
-    email: "m.trauernicht@nki.nl"
+    email: "m.trauernicht@nki.nl; r.schep@nki.nl"
     affiliation: "Netherlands Cancer Institute"
 date: '`r format(Sys.time(), "%d/%m/%Y")`'
 output: 
@@ -554,7 +554,7 @@ CTRL.data = indel.data %>%
   left_join(chromatin_tib) %>% 
   dplyr::select(-well, -tech)
 
-indel.data2 <- indel.data %>%
+indel.data.iprset <- indel.data %>%
   filter(sample %in% c("Epigenetic Compound") & indel_freq_filter & IPR %in% IPR_set ) %>%
   distinct(freqCut, IPR, drug, conc_char, tech, sample, replicate, 
            barcode, MMEJratio, zscore_bal_comb_rep, zscore_TIF_comb_rep) %>%
@@ -566,12 +566,12 @@ indel.data2 <- indel.data %>%
   distinct()
 
 sample_order <- c("CTRL", "100 nM", "1 µM", "10 µM")
-# indel.data2 <- indel.data2 %>%
+# indel.data.iprset <- indel.data.iprset %>%
 #   mutate(IPR = gsub("IPR", "", IPR))
 #ipr_order <- c("1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19")
 
 
-plt1 = indel.data2 %>%
+plt1 = indel.data.iprset %>%
   mutate(freqCut = ave(freqCut, drug, conc_char, IPR, FUN = function(x) mean(x, na.rm = TRUE))) %>%
   bind_rows(CTRL.data) %>%
   mutate(sample_conc = factor(sample_conc, levels = sample_order)) %>%
@@ -585,7 +585,7 @@ plt1 = indel.data2 %>%
   theme_classic_nolines_90() + 
   ylab("Total indel frequency [TIF]")
 
-plt2 =  indel.data2 %>%
+plt2 =  indel.data.iprset %>%
   distinct(zscore_TIF_comb_rep, drug, conc_char, IPR, chromatin, sample_conc) %>%
   mutate(sample_conc = factor(sample_conc, levels = sample_order),
          IPR = factor(IPR, levels = )) %>%
@@ -622,7 +622,7 @@ How do the drugs impact MMEJ score in general? Does the genomic location & conce
 ```{r 1FH MMEJ ratio, warning = FALSE, fig.height=5, fig.width=8}
 # E: MMEJ score per IPR
 plt1 = 
-  indel.data2 %>%
+  indel.data.iprset %>%
   mutate(MMEJratio = ave(MMEJratio, drug, conc_char, IPR, FUN = function(x) mean(x, na.rm = TRUE))) %>%
   bind_rows(CTRL.data)   %>%
   mutate(sample_conc = factor(sample_conc, levels = sample_order)) %>%
@@ -635,7 +635,7 @@ plt1 =
   #geom_hline(linetype = "dashed", yintercept = -2.58)   +
   theme_classic_nolines_90()
 
-plt2 = indel.data2 %>%
+plt2 = indel.data.iprset %>%
   distinct(zscore_bal_comb_rep, drug, conc_char, IPR, chromatin, sample_conc) %>%
     mutate(sample_conc = factor(sample_conc, levels = sample_order)) %>%
   ggplot(.,

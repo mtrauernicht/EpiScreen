@@ -1,8 +1,8 @@
 ---
-title: "DSB Episcreen data analysis & plotting"
+title: "DSB epigenetic drug screen - Figure 5"
 author: 
-  - name: "Max Trauernicht"
-    email: "m.trauernicht@nki.nl"
+  - name: "Max Trauernicht & Ruben Schep"
+    email: "m.trauernicht@nki.nl; r.schep@nki.nl"
     affiliation: "Netherlands Cancer Institute"
 date: '`r format(Sys.time(), "%d/%m/%Y")`'
 output: 
@@ -73,7 +73,8 @@ library(cowplot)
 library(Hmisc)
 library(ggstatsplot)
 library(ggpmisc)
-
+library(onewaytests)
+library(magrittr)
 
 
 ## Select outdir
@@ -555,6 +556,10 @@ dmso_freq <- indel.data %>%
 iprs <- dmso_freq$IPR
 iprs <- as.character(iprs)
 
+drug_conc_table = indel.data %>%
+  distinct(drug, conc_char, target) %>%
+  mutate(drug = gsub(" [(].*[)]", "", drug),
+         drug_conc = paste(drug, conc_char, sep = " "))
 
 # Set annotation for heatmap
 # viability
@@ -564,6 +569,7 @@ viab_drug = indel.data %>% filter(drug != "PAO") %>%
   distinct(viab_mean, drug_conc, replicate) %>% 
   group_by(drug_conc) %>%
   summarise(viab = mean(viab_mean))
+
 # Row annotation: annotate drugs with the target group
 target_set_drugs <- indel.data %>% 
   filter(conc_char != "control") %>%
@@ -622,7 +628,7 @@ annotation_colors_scr = list(
              HMT="#FDCDAC", DNMT="#D69C81", `Histone Demethylase`="#FFF2AE",
              HIF="#E3DCD5", JAK="#C8D7E2", PIM="#9AB8C4", `Aurora Kinase`="#F4CAE4",
              PARP="#CB546F", `Epigenetic Reader Domain`= "#476D61", `DNA-PK`="#779ed7"),
-  conc_char = conc_colors,
+  p.adj.Welch = c(n.s. = "#F9F9F9", `p < 0.01` = "#0066A5"),
   clusters_drugs = sequential_hcl(4, "YlGn"),
   # viab_rep1 = c('#ffeee9', '#ffdcd4', '#ffcbbe', '#ffb8a8', '#fda693', '#f9947e', '#f4826a', '#ef6f56', '#e95b43', '#e24530'),
   # viab_rep2 = c('#ffeee9', '#ffdcd4', '#ffcbbe', '#ffb8a8', '#fda693', '#f9947e', '#f4826a', '#ef6f56', '#e95b43', '#e24530'),
@@ -656,10 +662,9 @@ Aim: Give an overview of the most important MMEJ ratio fold-changes.
 ```{r prepare data for heatmaps}
 # Generate heatmap: select top drugs (highest change at any IPR) per concentration
 balance.data.heatmap <- indel.data %>%
-  #filter(!target %in% c("Aurora Kinase", "JAK", "PARP", "PIM", "HIF")) %>%
-  mutate(drug_conc = paste(drug, conc_char, sep = " ")) %>%
-  filter(sample == "Epigenetic Compound") %>%
-  filter(pathway_bal_filter == TRUE) %>%
+  mutate(drug = gsub(" [(].*[)]", "", drug),
+         drug_conc = paste(drug, conc_char, sep = " ")) %>%
+  filter(sample == "Epigenetic Compound" & pathway_bal_filter) %>%
   distinct(conc_char, drug, drug_conc, target, IPR, zscore_bal_comb_rep, 
            MMEJ_log2_FC, replicate, tech, filter_zscore_bal_comb_rep) %>%
   group_by(drug_conc) %>%
@@ -667,8 +672,9 @@ balance.data.heatmap <- indel.data %>%
          ## Select drugs that have a large effect size in at least one location 
          ## (some drugs might have a small global effect size, but large local)
          zscore_bal_comb_rep_temp = ifelse(filter_zscore_bal_comb_rep, zscore_bal_comb_rep, 0),
-         p_value = 2*pnorm(q = abs(zscore_bal_comb_rep_temp), lower.tail = F),
-         # Adjust p value for false discovery rate
+         p_value = 2*pnorm(q = abs(zscore_bal_comb_rep_temp), lower.tail = F)) %>%
+  distinct(drug, target, conc_char, MMEJ_log2_FC_mean, IPR, zscore_bal_comb_rep_temp, p_value, drug_conc) %>%
+  mutate(# Adjust p value for false discovery rate
          adj_pvalue = p.adjust(p_value, method = 'BH'),
          # Pick the smallest per compound & concentration
          min_score = min(adj_pvalue, na.rm = T)) %>%
@@ -677,9 +683,32 @@ balance.data.heatmap <- indel.data %>%
   ungroup() %>%
   distinct(drug, target, conc_char, MMEJ_log2_FC_mean, IPR, min_score, drug_conc) 
 
+# Store heatmap for clustering below
+balance.clustering <- copy(balance.data.heatmap)
+
+
+# List samples with significant effect in IPR to gray them out in the plot.
+pvals_drug_conc = indel.data %>%
+  mutate(drug = gsub(" [(].*[)]", "", drug),
+         drug_conc = paste(drug, conc_char, sep = " ")) %>%
+  distinct(drug_conc, IPR, zscore_bal_comb_rep, filter_zscore_bal_comb_rep) %>%
+   group_by(drug_conc) %>%
+  mutate(zscore_bal_comb_rep_temp = ifelse(filter_zscore_bal_comb_rep, zscore_bal_comb_rep, 0),
+         p_value = 2*pnorm(q = abs(zscore_bal_comb_rep_temp), lower.tail = F)) %>%
+  filter(!is.na(zscore_bal_comb_rep)) %>%
+  mutate(adj_pvalue = p.adjust(p_value, method = 'BH'),
+         p_filter = ifelse(adj_pvalue < 0.01 & filter_zscore_bal_comb_rep, TRUE, FALSE)) %>%
+  filter(filter_zscore_bal_comb_rep) %>%
+  distinct(drug_conc, IPR, p_filter)
+
+balance.data.heatmap %<>% left_join(pvals_drug_conc) %>%
+  mutate(p_filter = replace_na(p_filter, FALSE),
+         # This changes the samples that are not significant to 0.
+         # MMEJ_log2_FC_mean = ifelse(p_filter, MMEJ_log2_FC_mean, 0)
+         ) 
+
 # Number of individual drugs (Same piece of code as above)
 number_drugs = indel.data %>%
-  #filter(!target %in% c("Aurora Kinase", "JAK", "PARP", "PIM", "HIF")) %>%
   mutate(drug_conc = paste(drug, conc_char, sep = " ")) %>%
   filter(sample == "Epigenetic Compound") %>%
   filter(pathway_bal_filter == TRUE) %>%
@@ -728,20 +757,30 @@ top_50_hits = balance.data.heatmap %>%
 
 balance.data.heatmap2 <- balance.data.heatmap %>% 
   filter(drug_conc %in% top_50_hits$drug_conc) %>%
-  dplyr::select(-min_score) %>%
+  dplyr::select(-min_score, -p_filter) %>%
+  spread(IPR, MMEJ_log2_FC_mean)
+
+
+# Make clustering of samples with all the data: 
+balance.clustering %<>% 
+  filter(drug_conc %in% top_50_hits$drug_conc) %>%
+  dplyr::select(-min_score, -drug, -conc_char, -target) %>%
   spread(IPR, MMEJ_log2_FC_mean) %>%
-  filter(!is.nan(IPR3))
+  column_to_rownames(var = "drug_conc")
+
+balance.clustering =  dist(balance.clustering, method = "minkowski")
+
 
 balance.data.heatmap2 <- balance.data.heatmap2[,c("drug", "target", "conc_char", iprs)]
 balance.data.heatmap2$drug <- gsub(" [(].*[)]", "", balance.data.heatmap2$drug) #shorten name of drug
 
-
+# change these numbers according to where you want to set the cutoff
 breaks <- quantile(unlist(balance.data.heatmap2 %>% 
-                            dplyr::select(contains('IPR'))), c(.05,.95), na.rm = T) # change these numbers according to where you want to set the cutoff
+                            dplyr::select(contains('IPR'))), c(.01,.99), na.rm = T) 
+
 palette_length <- 100
 
-myBreaks <- c(seq(breaks[1], 0, length.out=ceiling(palette_length/2) + 1),
-              seq(-breaks[1]/palette_length, -breaks[1], length.out=floor(palette_length/2)))
+myBreaks <- c(seq(breaks[1], 0, length.out=ceiling(palette_length) + 1))
 
 ordered_marks2 <- balance.data.heatmap2 %>% 
   dplyr::select(target) %>%
@@ -757,16 +796,112 @@ annotation_colors_scr_set$target <- annotation_colors_scr$target[ordered_marks2]
 balance.data.heatmap2.clusters <- balance.data.heatmap2 %>% 
   as_tibble() %>%
   mutate(drug_conc = paste(drug, conc_char, sep = " "))
+```
+
+## Welch's test for chromatin senstive drugs and fisher's test for the balance
+```{r}
+drug_concs = unique(balance.data.heatmap$drug_conc)
+
+MMEJratio_tib = indel.data %>% 
+  mutate(drug = gsub(" [(].*[)]", "", drug),
+         drug_conc = paste(drug, conc_char, sep = " ")) %>% 
+  filter(drug_conc %in% drug_concs) %>%
+  distinct(drug_conc, IPR, MMEJ_log2_FC, tech, replicate)
+
+welch_tib = map_dfr(drug_concs, function(x) {
+  tibble("drug_conc" = x,
+         "welsh.p" = welch.test(MMEJ_log2_FC ~ IPR, data = filter(MMEJratio_tib, drug_conc == x), alpha = 0.001, verbose = F)$p.value)
+         }
+  )
+
+welch_tib %<>%
+  left_join(drug_conc_table) %>%
+  mutate(p.adj = p.adjust(welsh.p, method = "BH"),
+         p.adj.Welch = ifelse(p.adj < 0.01, "p < 0.01", "n.s."))
+
+table(welch_tib$p.adj.Welch)
+
+paste(nrow(welch_tib %>% filter(p.adj < 0.01)), 
+      "out of", nrow(welch_tib), 
+      "drug-concentration samples are significantly different between IPRs")
+paste(welch_tib %>% filter(p.adj < 0.01) %>% distinct(drug) %>% nrow(), 
+      "out of", 
+      welch_tib %>% distinct(drug) %>% nrow(),
+      "drugs are significantly different between IPRs")
+
+# Add this information to the heatmap
+target_all <- target_set_drugs %>% 
+  rownames_to_column(var = "drug_conc") %>%
+  left_join(welch_tib) %>%
+  filter(drug_conc %in% balance.data.heatmap2.clusters$drug_conc) %>%
+  column_to_rownames(var = "drug_conc") %>%
+  dplyr::select(target, viab, p.adj.Welch)
 
 
-target_set_all <- target_set_drugs %>%
-  rownames_to_column("drug_conc") %>%
-  na.omit() %>%
-  filter(drug_conc %in% balance.data.heatmap2.clusters$drug_conc)
+# Check the control samples:
+MMEJratio_ctrl_tib = indel.data %>% 
+  mutate(drug = gsub(" [(].*[)]", "", drug),
+         drug_conc = paste(drug, conc_char, sep = " ")) %>% 
+  filter(sample != "Epigenetic Compound" & !grepl("1 µM", drug_conc)) %>%
+  distinct(drug_conc, IPR, MMEJ_log2_FC, tech, replicate)
 
-rownames(target_set_all) <- target_set_all$drug_conc
-target_all <- target_set_all %>%
-  dplyr::select(target, viab)
+ctrl_dc = unique(MMEJratio_ctrl_tib$drug_conc)
+
+welch_ctrl_tib = map_dfr(ctrl_dc, function(x) {
+  tibble("drug_conc" = x,
+         "welsh.p" = welch.test(MMEJ_log2_FC ~ IPR, data = filter(MMEJratio_ctrl_tib, drug_conc == x), alpha = 0.001, verbose = F)$p.value)
+         }
+  )
+
+welch_ctrl_tib %<>%
+  mutate(p.adj = p.adjust(welsh.p, method = "BH")) %>%
+  add_significance("p.adj") 
+
+welch_ctrl_tib
+
+MMEJratio_ctrl_tib %>% 
+  ggplot(., aes(IPR, MMEJ_log2_FC)) +
+  geom_quasirandom() +
+  facet_grid(~ drug_conc)
+
+
+MMEJratio_tib %>% filter(drug_conc == "M344 100 nM") %>%
+  ggplot(., aes(IPR, MMEJ_log2_FC)) +
+  geom_quasirandom()
+```
+
+```{r Fisher test welch results balance}
+chrom_hits = welch_tib %>%
+  filter(p.adj < 0.01) %>%
+  group_by(target) %>%
+  count() %>%
+  rename(effect = n) %>%
+  column_to_rownames(var = "target") %>%
+  rbind("other" = c(0))
+
+all_drugs = welch_tib %>% 
+  mutate(target = case_when(target %in% rownames(chrom_hits) ~ target,
+         T ~ "other")) %>%
+  distinct(drug_conc, target) %>%
+  group_by(target) %>%
+  count() %>%
+  rename(no_effect = n) %>%
+  column_to_rownames(var = "target")
+
+all_drugs = all_drugs-chrom_hits
+
+cont_table = cbind(chrom_hits,all_drugs) %>% as.matrix()
+rownames(cont_table) = c("AurK", "DNMT", "ERD", "HDAC", "HDM", "HMT", "JAK", "PARP", "other")
+
+xtab_effect = as.table(cont_table)
+
+dimnames(xtab_effect) <- list(
+  Groups = rownames(xtab_effect),
+  Effect = c("Yes", "No")
+)
+
+# Compare the proportion of males and females in each category
+row_wise_fisher_test(xtab_effect, p.adjust.method = "BH")
 ```
 
 ```{r 5A MMEJ FC heatmap, warning = FALSE, fig.width = 10, fig.height = 12}
@@ -776,24 +911,22 @@ balance.data.matrix = balance.data.heatmap2.clusters %>%
   column_to_rownames('drug_conc') %>%
   dplyr::select(contains('IPR'))
 
-plt1 = pheatmap(balance.data.matrix[ , clone5_map_ipr$labels],
+plt1 = pheatmap(balance.data.matrix[hclust(balance.clustering, method = "ward.D2")$labels,
+                                    clone5_map_ipr$labels],
                 cluster_cols = clone5_map_ipr,
                 border_color = F,
                 cellwidth = 8,
                 cellheight = 8,
                 breaks = myBreaks,
-                clustering_distance_rows = "manhattan",
-                cluster_rows = T,
-                na_col = "white",
-                main = 'MMEJ ratio FC (log2), all concentrations',
+                main = 'MMEJ ratio FC (log2), top 60',
                 annotation_row = target_all,
                 annotation_col = chromatin,
-                color = colorRampPalette(c("#c0332b", "#E2E2E2", "#2d4284"))(palette_length),
-                # color = diverge_hcl(palette_length, "Blue-Red"),
+                color = colorRampPalette(c("#c0332b", "#f7f7f7"))(palette_length),
                 annotation_colors = annotation_colors_scr_set, 
                 annotation_legend = T)
 ```
 *Conclusion Figure 5A: HDAC-rich cluster seems to show H3K27me3-specific MMEJ ratio decrease. No strong MMEJ ratio increases.*
+
 
 ---
 
@@ -925,14 +1058,13 @@ top_hits = indel.data  %>%
 number_drugs = indel.data %>%
   #filter(!target %in% c("Aurora Kinase", "JAK", "PARP", "PIM", "HIF")) %>%
   mutate(drug_conc = paste(drug, conc_char, sep = " ")) %>%
-  filter(sample == "Epigenetic Compound") %>%
-  filter(pathway_bal_filter == TRUE) %>%
+  filter(pathway_bal_filter == TRUE & conc_char != "control") %>%
   distinct(conc_char, drug, drug_conc, target, zscore_bal_global_comb_rep, 
-           replicate, tech, filter_zscore_TIF_global_comb_rep) %>%
+           filter_zscore_bal_global_comb_rep) %>%
   group_by(drug_conc) %>%
   mutate(## Select drugs that have a large effect size in at least one location 
          ## (some drugs might have a small global effect size, but large local)
-         zscore_bal_global_comb_rep_temp = ifelse(filter_zscore_TIF_global_comb_rep, zscore_bal_global_comb_rep, 0),
+         zscore_bal_global_comb_rep_temp = ifelse(filter_zscore_bal_global_comb_rep, zscore_bal_global_comb_rep, 0),
          p_value = 2*pnorm(q = abs(zscore_bal_global_comb_rep_temp), lower.tail = F),
          # Adjust p value for false discovery rate
          adj_pvalue = p.adjust(p_value, method = 'BH'))
@@ -941,7 +1073,7 @@ MMEJboost = number_drugs %>%
   # Add filtering for significant increases
   filter(adj_pvalue < 0.01 & zscore_bal_global_comb_rep_temp > 1) %>% 
   # unique the drugs
-  distinct(drug) %>% 
+  distinct(drug, adj_pvalue, zscore_bal_global_comb_rep_temp) %>% 
   # count the rows
   nrow()
 
@@ -949,7 +1081,7 @@ NHEJboost = number_drugs %>%
   # Add filtering for significant increases
   filter(adj_pvalue < 0.01 & zscore_bal_global_comb_rep_temp < -1) %>% 
   # unique the drugs
-  distinct(drug) %>% 
+  distinct(drug, adj_pvalue, zscore_bal_global_comb_rep_temp) %>% 
   # count the rows
   nrow()
 
@@ -1444,7 +1576,7 @@ top_10_MMEJ_hits = balance.data.heatmap %>%
 #eff.data.heatmap2$freqCut_norm_mean[eff.data.heatmap2$mean_eff_zscore_comb > 0.05] <- NA
 balance.data.heatmap2 <- balance.data.heatmap %>% 
   filter(drug_conc %in% top_10_MMEJ_hits$drug_conc) %>%
-  dplyr::select(-min_score) %>%
+  dplyr::select(-min_score, -p_filter) %>%
   spread(IPR, MMEJ_log2_FC_mean) %>%
   filter(!is.nan(IPR3))
 
@@ -1454,9 +1586,9 @@ balance.data.heatmap2$drug <- gsub(" [(].*[)]", "", balance.data.heatmap2$drug) 
 
 breaks <- summary(unlist(balance.data.heatmap2 %>% 
                             dplyr::select(contains('IPR'))), c(.001,.999), na.rm = T) # change these numbers according to where you want to set the cutoff
-palette_length <- 100
+palette_length <- 50
 
-breaks[1] = 0.5
+breaks[1] = -0.5
 
 myBreaks <- c(seq(breaks[1], 0, length.out=ceiling(palette_length/2) + 1),
               seq(-breaks[1]/palette_length, -breaks[1], length.out=floor(palette_length/2)))
@@ -1493,7 +1625,7 @@ target_all <- target_set_all %>%
   dplyr::select(target, viab)
 ```
 
-```{r S5A MMEJ boosting FC heatmap, warning = FALSE, fig.width = 10, fig.height = 10}
+```{r S5A MMEJ boosting FC heatmap, warning = FALSE, fig.width = 6, fig.height = 6}
 # pdf(paste0(figure_out, "rs20220623_indelfrequency_heatmap_allconc.pdf"), width=20, height=8)
 balance.data.matrix = balance.data.heatmap2.clusters %>%
   arrange(target_all) %>%
@@ -1525,6 +1657,35 @@ Aim: Show which drugs are affected by G2 arrest.
 # rmarkdown::render("3_Processing_FACS.Rmd")
 all.samples = read_csv2("/DATA/usr/m.trauernicht/projects/EpiScreen/FACS/Data/mt20220802_facs_all_drugs.csv")
 
+drugs_tworeps = all.samples %>% filter(exp == "effective_drugs" & variable == "G2" & !is.na(value)) %>%
+  mutate(drug_conc = paste(drug, conc, sep = " ")) %>% 
+  group_by(drug_conc) %>% 
+  count() %>% 
+  filter(n > 1) %>% 
+  pull(drug_conc)
+
+  
+exps.facs.G2 = all.samples %>% 
+  mutate(drug_conc = paste(drug, conc, sep = " ")) %>% 
+  filter(variable == "G2" & drug_conc %in% drugs_tworeps) %>% 
+  distinct(drug_conc, value, rep)
+
+exps.facs.G2 %>% t_test(., value ~ drug_conc, ref.group = "DMSO 10um", p.adjust.method = "BH") %>% filter(p.adj < 0.05)
+
+exps.facs.G1 = all.samples %>%
+mutate(drug_conc = paste(drug, conc, sep = " ")) %>% 
+  filter(variable == "G1" & drug_conc %in% drugs_tworeps) %>% 
+  distinct(drug_conc, value, rep)
+
+exps.facs.G1 %>% t_test(., value ~ drug_conc, ref.group = "DMSO 10um", p.adjust.method = "BH") %>% filter(p.adj < 0.05)
+
+exps.facs.S = all.samples %>%
+mutate(drug_conc = paste(drug, conc, sep = " ")) %>% 
+  filter(variable == "S" & drug_conc %in% drugs_tworeps) %>% 
+  distinct(drug_conc, value, rep)
+
+exps.facs.S %>% t_test(., value ~ drug_conc, ref.group = "DMSO 10um", p.adjust.method = "BH") %>% filter(p.adj < 0.05)
+
 all.samples <- all.samples %>%
   mutate(drug_conc = paste(drug, conc, sep = " ")) %>%
   mutate(drug_conc_exp = paste(drug, conc, exp, sep = "_")) %>%
@@ -1533,6 +1694,7 @@ all.samples <- all.samples %>%
   #filter(exp == "five_drugs") %>%
   distinct(drug, conc, drug_conc_exp, variable, mean_value, SD, value, exp, drug_conc) %>%
   mutate(pval = "")
+
 
 all.samples <- all.samples %>%
   dplyr::select(-value) %>%
@@ -1608,14 +1770,34 @@ ratios_tib_fc <- readRDS(file)
 all_compounds_epistasis_bal = CCD_tib %>%
   #mutate(drug_conc = paste(drug, conc_char, sep = " ")) %>%
   dplyr::select(drug_conc, ratio_slope_plot, feature) %>%
+  filter(!grepl("control", drug_conc)) %>% # remove the control sample of DNA-PK
   group_by(drug_conc) %>%
   mutate(onlyNA = sum(is.na(ratio_slope_plot))) %>% 
   filter(onlyNA != 25) %>%
   reshape2::dcast(drug_conc ~ feature, value.var = "ratio_slope_plot", fill = 0) %>% 
   column_to_rownames(var = "drug_conc")
 
-target_ctrl = target %>%
-  setnames('conc_char', 'conc_char_ctrl')
+target_ctrl = target %>% 
+  dplyr::select(-conc_char, -bal_signif, -TIF_signif)
+```
+How many CCDs do we have in total?
+```{r}
+drug_conc_table = target_set_drugs %>% rownames_to_column(var = "drug_conc") %>% distinct(drug_conc, drug)
+
+# CCDs for the TIF
+CCD_tib %>% 
+  filter(!grepl("DNA-PK", drug_conc)) %>%
+  filter(!is.na(ratio_slope_plot)) %>% 
+  left_join(drug_conc_table) %>% 
+  distinct(drug_conc) %>% 
+  nrow()
+
+CCD_tib %>% 
+  filter(!grepl("DNA-PK", drug_conc)) %>%
+  filter(!is.na(ratio_slope_plot)) %>% 
+  left_join(drug_conc_table) %>% 
+  distinct(drug) %>% 
+  nrow()
 ```
 
 ### Heatmaps
@@ -1664,6 +1846,50 @@ p = pheatmap(bal_synergy_matrix[, TRIP_chrom_clust$labels],
 #   mutate(cluster_HDAC = as.character(cluster_HDAC))
 
 
+```
+
+```{r Fisher test CCD}
+drug_conc_tib = indel.data %>% distinct(drug, conc_char, target) %>% mutate(drug = gsub(" [(].*[)]", "", drug),
+                                                                            drug_conc = paste(drug, conc_char,sep = " "))
+
+bal_hits = CCD_tib %>% filter(!is.na(ratio_slope_plot) & 
+                                !grepl("DNA-PK", drug_conc) # remove DNA-PK from this count
+                              ) %>% 
+  left_join(drug_conc_tib) %>%
+  distinct(drug_conc, target) %>% 
+  group_by(target) %>%
+  count() %>%
+  rename(effect = n) %>%
+  rbind(tibble(target = "other", effect = 0)) %>%
+  arrange(target) %>%
+  column_to_rownames(var = "target")
+
+all_drugs = indel.data %>% filter(sample == "Epigenetic Compound") %>% 
+  mutate(drug = gsub(" [(].*[)]", "", drug),
+        drug_conc = paste(drug, conc_char, sep = " "),
+        target = case_when(target %in% rownames(bal_hits) ~ target,
+         T ~ "other")) %>%
+  distinct(drug_conc, target) %>%
+  group_by(target) %>%
+  count() %>%
+  rename(no_effect = n) %>%
+  arrange(target) %>%
+  column_to_rownames(var = "target")
+
+all_drugs = all_drugs-bal_hits
+
+cont_table = cbind(bal_hits,all_drugs) %>% as.matrix()
+rownames(cont_table) = c("AurK", "DNMT", "ERD", "HDAC","HDM", "HMT", "JAK", "other", "PARP", "PIM", "Sirtuin")
+
+xtab_effect = as.table(cont_table)
+
+dimnames(xtab_effect) <- list(
+  Groups = rownames(xtab_effect),
+  Effect = c("Yes", "No")
+)
+
+# Compare the proportion of males and females in each category
+row_wise_fisher_test(xtab_effect, p.adjust.method = "BH")
 ```
 
 ```{r, fig.width= 12, fig.height= 6, eval=F}
