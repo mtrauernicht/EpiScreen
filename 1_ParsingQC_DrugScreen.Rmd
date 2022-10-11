@@ -184,7 +184,10 @@ cell.viab.data %<>% mutate(ID = gsub("nm|um|plate|rep", "", ID)) %>%
 
 # calculate the % of the DMSO control (here we take the mean of DMSO per replicate)
 indel.statistics.tib %<>% left_join(cell.viab.data) %>%
-  group_by(replicate) %>%
+  group_by(replicate, tech) %>%
+  # The PAO control didn't work as well in the second screen
+  # By lowereing the viability with the minimal value per replicate, we can 
+  # compare the killing control and viable cells in the same way.
   mutate(viability = viability - min(viability)) %>%
   mutate(ctrl_mean = mean(viability[drug == "DMSO"]),
          viab_norm = viability / ctrl_mean,

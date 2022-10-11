@@ -597,13 +597,19 @@ viab_drug = indel.data %>% filter(drug != "PAO") %>%
   distinct(viab_mean, drug_conc, replicate) %>% group_by(drug_conc) %>%
   summarise(viab = mean(viab_mean))
 
+# Add effect on TIF and balance
+effect_tib = effect_of_compound_tib %>% 
+  ungroup() %>%
+  distinct(drug_conc, TIF_signif, bal_signif)
+
 # Row annotation: annotate drugs with the target group
 target <- indel.data %>% 
   # filter(!target %in% c("Negative Control", "MRN", "DNA-PK")) %>%
   mutate(drug = gsub(" [(].*[)]", "", drug),
          drug_conc = paste(drug, conc_char, sep = " ")) %>%
   left_join(viab_drug) %>%
-  distinct(drug_conc, conc_char, target, viab) %>% 
+  left_join(effect_tib) %>%
+  distinct(drug_conc, conc_char, target, viab, TIF_signif, bal_signif) %>% 
   column_to_rownames(var="drug_conc")
 ```
 ### IPR annotation

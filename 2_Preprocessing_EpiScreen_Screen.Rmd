@@ -293,7 +293,7 @@ count_filter %>% ungroup() %>% filter(sum) %>% distinct(exp) %>% nrow()
 mutations.dt = left_join(complete.mutations.dt, count_filter) %>%
   filter(sum) %>% dplyr::select(-sum)
 
-# Add an ID column that removes the technical replicates information 
+# Add an ID column that removes the replicates information 
 mutations.dt[, ID := gsub("^(E1504|E177)_[0-9][0-9]_(1|10|100)_[123]_([12]_...$)", 
                           "\\1_\\2_\\3", 
                           exp, 
@@ -302,59 +302,48 @@ mutations.dt[, ID := gsub("^(E1504|E177)_[0-9][0-9]_(1|10|100)_[123]_([12]_...$)
 mutations.stat.dt = left_join(mutations.dt, indel.statistics.dt)
 
 # Filter the low viability reads
-# This filters out all drugs at a certain concentration were at least 2/3 technical replicates were below 0.5 in at least one biological replicate 
-keep_drugs_eff <- mutations.stat.dt %>%
+# This filters out all drugs at the concentration set in the setup
+# The drug concentration needs to be in 1/2 or 2/3 samples per screen
+# AND in both screens.
+keep_drugs <- mutations.stat.dt %>%
   distinct(plate, drug, conc_char, well, tech, replicate, viab_norm_split) %>%
-  # filter for samples with higher viab than the limit
-  filter(viab_norm_split > viab_limit_eff) %>% # filter
-  distinct(conc_char, drug, tech, replicate) %>% # list conditions that remain
-  mutate(conc_char_drug = paste(conc_char, drug, sep = " "), # conc + drug combination
-         tech_n = ave(conc_char_drug, conc_char_drug, replicate, FUN = length), # count technical replicates in which this combination is found in
-         conc_char_drug_rep = paste(conc_char, drug, replicate, sep = " ")) %>% # conc + drug + replicate combination
-  # These conditions need to be present in at least 2 (out of 3) technical replicates per bio replicate
-  filter(tech_n > 1) %>%  # filter
-  distinct(replicate, conc_char_drug, conc_char_drug_rep) %>% # list conditions that remain
-  mutate(rep_n = ave(conc_char_drug,conc_char_drug, FUN = length)) %>% # check if present in both replicates
-  # And in both bio replicates
-  filter(rep_n > 1) %>% # removes the ones in only 1 replicate
-  pull(conc_char_drug) %>% # pull the drug & concentration we keep
-  unique() # remove doublets
-
-######## This below is not needed anymore if the same cutoff is used for balance and efficiency.#######
-
-# This filters out all drugs at a certain concentration were at least 2/3 technical replicates were below 0.5 in at least one biological replicate 
-keep_drugs_bal <- mutations.stat.dt %>%
-  distinct(plate, drug, conc_char, well, tech, replicate, viab_norm_split) %>%
-  # filter for samples with higher viab than the limit
-  filter(viab_norm_split > viab_limit_bal) %>%
-  distinct(conc_char, drug, tech, replicate) %>%
   mutate(conc_char_drug = paste(conc_char, drug, sep = " "),
-         tech_n = ave(conc_char_drug, conc_char_drug, replicate, FUN = length),
-         conc_char_drug_rep = paste(conc_char, drug, replicate, sep = " ")) %>%
-  # These conditions need to be present in at least 2 (out of 3) technical replicates per bio replicate
-  filter(tech_n > 1) %>% 
-  distinct(replicate, conc_char_drug, conc_char_drug_rep) %>%
-  mutate(rep_n = ave(conc_char_drug,conc_char_drug, FUN = length)) %>%
+         conc_char_drug_rep = paste(conc_char, drug, replicate, sep = " "),
+         # count replicates in which this combination is found in
+         tech_n = as.numeric(ave(conc_char_drug_rep, conc_char_drug_rep, FUN = length)),
+         viab_sum_eff = ave(viab_norm_split > viab_limit_eff, conc_char_drug_rep, FUN = sum),
+         viab_eff = ifelse(tech_n - viab_sum_eff < 2, TRUE, FALSE),
+         viab_sum_bal = ave(viab_norm_split > viab_limit_bal, conc_char_drug_rep, FUN = sum),
+         viab_bal = ifelse(tech_n - viab_sum_bal < 2, TRUE, FALSE)) %>% 
+  # These conditions need to be present in at least 1 out of 2 or 2 out of 3 replicates 
+  # per screen
+  distinct(conc_char_drug, conc_char, drug, replicate, viab_eff, viab_bal) %>% 
+  mutate(rep_bal = ave(viab_bal, conc_char_drug, FUN = sum),
+         pathway_bal_filter = ifelse(rep_bal > 1, TRUE, FALSE),
+         rep_eff = ave(viab_eff, conc_char_drug, FUN = sum),
+         indel_freq_filter = ifelse(rep_eff > 1, TRUE, FALSE)) %>% 
+  # check if present in both replicates
   # And in both bio replicates
-  filter(rep_n > 1) %>% 
-  pull(conc_char_drug) %>%
-  unique()
+  distinct(conc_char, drug, pathway_bal_filter, indel_freq_filter)
+
+keep_drugs %>% dplyr::select(pathway_bal_filter, indel_freq_filter) %>% colSums()
 
 dim(mutations.stat.dt)
 
 # Filter for the viability
 mutations.screen.dt <- mutations.stat.dt %>%
   # filter out technical replicates below the viability cutoff
-  # filter(viab_norm_split > viab_limit_eff) %>%
+  left_join(keep_drugs) %>%
   # make filter for the conditions for which we do not have at least 2 technical replicates
-  mutate(conc_char_drug = paste(conc_char, drug, sep = " "),
-         indel_freq_filter = ifelse(conc_char_drug %in% keep_drugs_eff, TRUE, FALSE),
-         pathway_bal_filter = ifelse(conc_char_drug %in% keep_drugs_bal, TRUE, FALSE),
-         viab_norm_split_eff = ifelse(indel_freq_filter & viab_norm_split > viab_limit_eff, viab_norm_split, NA), 
-         viab_norm_split_bal = ifelse(pathway_bal_filter & viab_norm_split > viab_limit_bal, viab_norm_split, NA)) %>%
+  mutate(viab_norm_split_eff = ifelse(indel_freq_filter & viab_norm_split > viab_limit_eff,
+                                      viab_norm_split, NA), 
+         viab_norm_split_bal = ifelse(pathway_bal_filter & viab_norm_split > viab_limit_bal,
+                                      viab_norm_split, NA)) %>%
   # Calculate new mean
-  mutate(viab_mean_if = ave(viab_norm_split_eff, drug, conc_char, replicate, FUN = function(x) mean(x, na.rm=T)),
-         viab_mean_pb = ave(viab_norm_split_bal, drug, conc_char, replicate, FUN = function(x) mean(x, na.rm=T)))
+  mutate(viab_mean_if = ave(viab_norm_split_eff, drug, conc_char, replicate, 
+                            FUN = function(x) mean(x, na.rm=T)),
+         viab_mean_pb = ave(viab_norm_split_bal, drug, conc_char, replicate, 
+                            FUN = function(x) mean(x, na.rm=T)))
 
 dim(mutations.screen.dt)
 
