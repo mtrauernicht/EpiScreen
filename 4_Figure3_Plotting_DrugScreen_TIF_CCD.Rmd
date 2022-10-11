@@ -665,7 +665,12 @@ quant_breaks <- quantile(all_compounds_epistasis_TIF, c(.01,.99), na.rm = T)
 palette_length <- 100
 breaks <- c(seq(quant_breaks[1], 0, length.out=ceiling(palette_length/2) + 1), 
             seq(quant_breaks[2]/palette_length, quant_breaks[2], length.out=floor(palette_length/2)))
+<<<<<<< HEAD
+colors = diverge_hcl(length(breaks), palette = "Cork")
+colors = colorRampPalette(c("#d5bdaf", "#e5e5e5", "#84a98c"))(palette_length)
+=======
 colors = rev(diverge_hcl(length(breaks), palette = "Cork"))
+>>>>>>> fe383244ce63b04da97cd58918bd14cca9811c38
 colors[which(breaks == 0)-1] = "white"
 
 pheatmap(all_compounds_epistasis_TIF[, TRIP_chrom_clust$labels],
