@@ -62,16 +62,11 @@ library(ggbeeswarm)
 library(data.table)
 library(ggrepel)
 library(GGally)
-# library(DESeq2)
 library(gghighlight)
-# library(platetools)
 library(ggpubr)
-# library(Laurae)
 library(pheatmap)
 library(RColorBrewer)
-# # library(ggrastr)
 library(broom)
-# library(ggsignif)
 library(cowplot)
 library(rstatix)
 library(colorspace)
@@ -100,7 +95,7 @@ p.adjust <- function(p, method = p.adjust.methods, n = length(p))
   ## Methods 'Hommel', 'holm', 'BY' and speed improvements
   ## contributed by Gordon Smyth
   method <- match.arg(method)
-  if(method == "fdr") method <- "holm"	# back compatibility
+  if(method == "fdr") method <- "BH"	# back compatibility
   nm <- names(p)
   p <- as.numeric(p)
   p0 <- setNames(p, nm)
@@ -234,29 +229,13 @@ viab_drug = indel.data %>% filter(drug != "PAO") %>%
   summarise(viab = mean(viab_mean))
 # Row annotation: annotate drugs with the target group
 target_set_drugs <- indel.data %>% 
-  filter(!target %in% c("Negative Control", "MRN", "DNA-PK")) %>%
+  filter(drug != "PAO") %>%
   mutate(drug = gsub(" [(].*[)]", "", drug),
          drug_conc = paste(drug, conc_char, sep = " ")) %>%
   left_join(viab_drug) %>%
-  distinct(drug, drug_conc, conc_char, target, viab) %>% 
+  distinct(drug_conc, drug, conc_char, target, viab) %>% 
   column_to_rownames(var="drug_conc")
 
-# Set annotation for heatmap
-# viability
-viab_drug = indel.data %>% filter(drug != "PAO") %>% 
-  mutate(drug = gsub(" [(].*[)]", "", drug),
-         drug_conc = paste(drug, conc_char, sep = " ")) %>% 
-  distinct(viab_mean, drug_conc, replicate) %>% 
-  group_by(drug_conc) %>%
-  summarise(viab = mean(viab_mean))
-# Row annotation: annotate drugs with the target group
-target_set_drugs <- indel.data %>% 
-  filter(!target %in% c("Negative Control", "MRN", "DNA-PK")) %>%
-  mutate(drug = gsub(" [(].*[)]", "", drug),
-         drug_conc = paste(drug, conc_char, sep = " ")) %>%
-  left_join(viab_drug) %>%
-  distinct(drug, drug_conc, conc_char, target, viab) %>% 
-  column_to_rownames(var="drug_conc")
 
 ctrl.vals <- indel.data %>%
   filter(drug == "DMSO") %>%
@@ -379,7 +358,7 @@ eff.data.heatmap2$drug <- gsub(" [(].*[)]", "", eff.data.heatmap2$drug) #shorten
 ```{r HDAC heatmap processing}
 HDACs = indel.data %>% 
   distinct(drug, conc_char, target) %>%
-    mutate(drug = gsub(" [(].*[)]", "", drug),
+  mutate(drug = gsub(" [(].*[)]", "", drug),
          drug_conc = paste(drug, conc_char, sep = " ")) %>% 
   filter(target == "HDAC" & drug != "Nullscript") %>% 
   pull(drug_conc)
@@ -496,8 +475,8 @@ quant_breaks <- quantile(all_compounds_epistasis_TIF, c(.01,.99), na.rm = T)
 palette_length <- 100
 breaks <- c(seq(quant_breaks[1], 0, length.out=ceiling(palette_length/2) + 1), 
             seq(quant_breaks[2]/palette_length, quant_breaks[2], length.out=floor(palette_length/2)))
-colors = diverge_hcl(length(breaks), palette = "Cork")
-colors[which(quant_breaks == 0)-1] = "gray90"
+colors = rev(diverge_hcl(length(breaks), palette = "Cork"))
+colors[which(quant_breaks == 0)-1] = "white"
 ```
 
 ---
@@ -531,7 +510,7 @@ p = pheatmap(TIF_synergy_matrix[, TRIP_chrom_clust$labels],
              breaks = breaks,
              cluster_cols = TRIP_chrom_clust,
              annotation_row = target.HDAC,
-                clustering_distance_rows = "correlation",
+             clustering_distance_rows = "correlation",
              main = paste("Chromatin synergies - TIF HDAC cluster"),
              color = colors,
              annotation_colors = annotation_colors_scr, 
@@ -540,18 +519,6 @@ p = pheatmap(TIF_synergy_matrix[, TRIP_chrom_clust$labels],
 TIF_synergy_cluster <- TIF_synergy_matrix %>%
   rownames_to_column("drug_conc")
 ```
-## HDAC2/3 CCD
-```{r, eval = F}
-hdac2_3 <- TIF_synergy_cluster %>%
-  distinct(drug_conc, H3K27me3, H3K4me1, EZH2) %>%
-  left_join(target.HDAC %>% rownames_to_column("drug_conc")) %>%
-  mutate(hdac3_pan = ifelse(HDAC3 == 1 | pan_HDAC == 1, 1, 0))
-
-ggplot(hdac2_3,
-       aes(x = HDAC3, y = EZH2)) +
-  geom_quasirandom()
-```
-
 
 
 ## 4B K27me3 top CCDs
@@ -573,24 +540,6 @@ colors = colorRampPalette(slope.colors %>% pull(color))(length(breaks))
 colors[which(quant_breaks == 0)-1] = "gray90"
 
 max_slope = max(abs(rank_dt$indelrate_slope_plot))
-# 
-# p1 = rank_dt %>% 
-#   ggplot(., aes(x = rank, y = 1)) +
-#   geom_bar(stat = "identity", aes(fill = indelrate_slope_plot)) + 
-#   scale_x_reverse() +
-#   coord_flip() +
-#   xlab("Rank") +
-#   theme_classic2(base_size = 16) +
-#   scale_fill_distiller(palette = "BrBG", 
-#                        breaks = c(seq(-0.04, 0.04, 0.01)), direction = 1,
-#                        limits = c(-max_slope, max_slope)) +
-#   # geom_label(aes(label = ifelse(width == 2, drug_conc,''))) +
-#   theme(axis.title.x=element_blank(),
-#         axis.text.x=element_blank(),
-#         axis.ticks.x=element_blank())+
-#   # add horizontal line for 0.01 slope cutoff which is highlighted in the heatmap
-#   geom_vline(xintercept = rank_dt[rank_dt$indelrate_slope_plot  < -0.01, ]$rank[1] - 0.5)  +
-#   geom_vline(xintercept = max(rank_dt[rank_dt$indelrate_slope_plot  > 0.01, ]$rank) + 0.5)
 
 p2 = rank_dt %>% 
   ggplot(., aes(x = rank, fill = target)) +
@@ -598,7 +547,7 @@ p2 = rank_dt %>%
   scale_x_reverse() +
   coord_flip() +
   xlab("Rank") +
-theme_classic2(base_size = 16) +
+  theme_classic2(base_size = 16) +
   scale_fill_manual(values = colors_targets) +
   # geom_label(aes(label = ifelse(width == 2, drug_conc,''))) +
   theme(legend.position = "none",
@@ -618,7 +567,7 @@ p3 = rank_dt %>%
   scale_x_reverse() +
   coord_flip() +
   ylab("Synergy score") +
-theme_classic2(base_size = 16) +
+  theme_classic2(base_size = 16) +
   scale_fill_manual(values = colors_targets) +
   # geom_label(aes(label = ifelse(width == 2, drug_conc,''))) +
   geom_text(aes(label=drug_conc)) +
@@ -629,7 +578,7 @@ theme_classic2(base_size = 16) +
 
 
 plot_grid(# p1, #comment out the slope per rank
-          p2, p3, labels = c("E", "F"), rel_widths = c(1, 7), nrow = 1)
+  p2, p3, labels = c("E", "F"), rel_widths = c(1, 7), nrow = 1)
 
 # Samples to highlight in the heatmap S3C
 all_compounds_epistasis_TIF %>% 
@@ -638,6 +587,251 @@ all_compounds_epistasis_TIF %>%
 ```
 
 
+
+
+## 4C m5C top CCDs
+```{r 4C m5C synergies, fig.width = 8, fig.height = 4}
+rank_dt = CCD_tib %>% 
+  left_join(rownames_to_column(target, var = "drug_conc")) %>%
+  filter(feature == "m5C", !is.na(indelrate_slope_plot)) %>%
+  distinct() %>%
+  arrange(desc(indelrate_slope_plot)) %>%
+  mutate(rank = seq(1:n()))
+
+maxrank = nrow(rank_dt)
+
+max_slope = max(abs(rank_dt$indelrate_slope_plot))
+
+p2 = rank_dt %>% 
+  ggplot(., aes(x = rank, fill = target)) +
+  geom_bar() + 
+  scale_x_reverse() +
+  coord_flip() +
+  xlab("Rank") +
+  theme_classic2(base_size = 16) +
+  scale_fill_manual(values = colors_targets) +
+  # geom_label(aes(label = ifelse(width == 2, drug_conc,''))) +
+  theme(legend.position = "none",
+        axis.title.x=element_blank(),
+        axis.text.x=element_blank(),
+        axis.ticks.x=element_blank()) +
+  # add horizontal line for 0.01 slope cutoff which is highlighted in the heatmap
+  geom_vline(xintercept = rank_dt[rank_dt$indelrate_slope_plot  < -0.01, ]$rank[1] - 0.5)  +
+  geom_vline(xintercept = max(rank_dt[rank_dt$indelrate_slope_plot  > 0.01, ]$rank) + 0.5)
+
+p3 = rank_dt %>% 
+  filter(!between(rank, 6, maxrank-3)) %>%
+  mutate(rank = seq(1:n())) %>% 
+  ggplot(., aes(x = rank, y = indelrate_slope_plot, fill = target)) +
+  geom_bar(stat = "identity") + 
+  scale_x_reverse() +
+  coord_flip() +
+  ylab("Synergy score") +
+  theme_classic2(base_size = 16) +
+  scale_fill_manual(values = colors_targets) +
+  # geom_label(aes(label = ifelse(width == 2, drug_conc,''))) +
+  geom_text(aes(label=drug_conc)) +
+  theme(legend.position = "none",
+        axis.title.y=element_blank(),
+        axis.text.y=element_blank(),
+        axis.ticks.y=element_blank())
+
+
+plot_grid(# p1, # comment out the TIF slope 
+  p2, p3, labels = c("E", "F"), rel_widths = c(1, 6), nrow = 1)
+
+# Samples to highlight in the heatmap S3C
+all_compounds_epistasis_TIF %>% 
+  filter(!between(m5C, -0.01, .01)) %>%
+  rownames()
+```
+# Supplementary Figures
+## S4A HMT CCD Heatmap
+```{r S4A HMT CCD, fig.width= 8, fig.height= 6}
+DNMT_drugs = target_set_drugs %>% 
+  rownames_to_column(var = "drug_conc") %>% 
+  filter(target == "DNMT" &
+           conc_char == "100 nM"
+  ) %>% pull(drug_conc)
+
+TIF_synergy_matrix_DNMT = CCD_tib %>%
+  dplyr::select(drug_conc, indelrate_slope, feature) %>%
+  group_by(drug_conc) %>%
+  mutate(onlyNA = sum(is.na(indelrate_slope))) %>% 
+  filter(onlyNA != 25 & drug_conc %in% DNMT_drugs) %>%
+  reshape2::dcast(drug_conc ~ feature, value.var = "indelrate_slope", fill = 0) %>% 
+  column_to_rownames(var = "drug_conc")
+
+# Make matrix with drugs from selected target
+cluster_rows = ifelse(nrow(TIF_synergy_matrix_DNMT) > 1, TRUE, FALSE)
+
+# # change these numbers according to where you want to set the cutoff
+quant_breaks <- quantile(TIF_synergy_matrix_DNMT, c(.01,.99), na.rm = T)
+max_quant = max(abs(quant_breaks))
+palette_length <- 100
+breaks <- c(seq(-max_quant, 0, length.out=ceiling(palette_length/2) + 1),
+            seq(max_quant/palette_length, max_quant, length.out=floor(palette_length/2)))
+slope.colors.temp = slope.colors
+colors =  rev(diverge_hcl(length(breaks), palette = "Cork"))
+colors[which(breaks == 0)-1] = "white"
+
+p = pheatmap(TIF_synergy_matrix_DNMT[, TRIP_chrom_clust$labels],
+             border_color = F,
+             cellwidth = 8,
+             cellheight = 8,
+             cluster_rows = cluster_rows,
+             breaks = breaks,
+             cluster_cols = TRIP_chrom_clust,
+             clustering_distance_rows = "correlation",
+             main = paste("Chromatin synergies - TIF DNMT 1 µM"),
+             color = colors,
+             annotation_colors = annotation_colors_scr, 
+             annotation_legend = T)
+
+DNMT_drugs = target_set_drugs %>% 
+  rownames_to_column(var = "drug_conc") %>% 
+  filter(target == "DNMT" &
+           conc_char == "1 µM"
+  ) %>% pull(drug_conc)
+
+TIF_synergy_matrix_DNMT = CCD_tib %>%
+  dplyr::select(drug_conc, indelrate_slope, feature) %>%
+  group_by(drug_conc) %>%
+  mutate(onlyNA = sum(is.na(indelrate_slope))) %>% 
+  filter(onlyNA != 25 & drug_conc %in% DNMT_drugs) %>%
+  reshape2::dcast(drug_conc ~ feature, value.var = "indelrate_slope", fill = 0) %>% 
+  column_to_rownames(var = "drug_conc")
+
+# Make matrix with drugs from selected target
+cluster_rows = ifelse(nrow(TIF_synergy_matrix_DNMT) > 1, TRUE, FALSE)
+
+# # change these numbers according to where you want to set the cutoff
+quant_breaks <- quantile(TIF_synergy_matrix_DNMT, c(.01,.99), na.rm = T)
+max_quant = max(abs(quant_breaks))
+palette_length <- 100
+breaks <- c(seq(-max_quant, 0, length.out=ceiling(palette_length/2) + 1),
+            seq(max_quant/palette_length, max_quant, length.out=floor(palette_length/2)))
+slope.colors.temp = slope.colors
+colors =  rev(diverge_hcl(length(breaks), palette = "Cork"))
+colors[which(breaks == 0)-1] = "white"
+
+p = pheatmap(TIF_synergy_matrix_DNMT[, TRIP_chrom_clust$labels],
+             border_color = F,
+             cellwidth = 8,
+             cellheight = 8,
+             cluster_rows = cluster_rows,
+             breaks = breaks,
+             cluster_cols = TRIP_chrom_clust,
+             clustering_distance_rows = "correlation",
+             main = paste("Chromatin synergies - TIF DNMT 1 µM"),
+             color = colors,
+             annotation_colors = annotation_colors_scr, 
+             annotation_legend = T)
+
+DNMT_drugs = target_set_drugs %>% 
+  rownames_to_column(var = "drug_conc") %>% 
+  filter(target == "DNMT" &
+           conc_char == "10 µM") %>% pull(drug_conc)
+
+TIF_synergy_matrix_DNMT = CCD_tib %>%
+  dplyr::select(drug_conc, indelrate_slope, feature) %>%
+  group_by(drug_conc) %>%
+  mutate(onlyNA = sum(is.na(indelrate_slope))) %>% 
+  filter(onlyNA != 25 & drug_conc %in% DNMT_drugs) %>%
+  reshape2::dcast(drug_conc ~ feature, value.var = "indelrate_slope", fill = 0) %>% 
+  column_to_rownames(var = "drug_conc")
+
+# Make matrix with drugs from selected target
+cluster_rows = ifelse(nrow(TIF_synergy_matrix_DNMT) > 1, TRUE, FALSE)
+
+# # change these numbers according to where you want to set the cutoff
+quant_breaks <- quantile(TIF_synergy_matrix_DNMT, c(.01,.99), na.rm = T)
+max_quant = max(abs(quant_breaks))
+palette_length <- 100
+breaks <- c(seq(-max_quant, 0, length.out=ceiling(palette_length/2) + 1),
+            seq(max_quant/palette_length, max_quant, length.out=floor(palette_length/2)))
+slope.colors.temp = slope.colors
+colors = rev(diverge_hcl(length(breaks), palette = "Cork"))
+colors[which(breaks == 0)-1] = "white"
+
+p = pheatmap(TIF_synergy_matrix_DNMT[, TRIP_chrom_clust$labels],
+             border_color = F,
+             cellwidth = 8,
+             cellheight = 8,
+             cluster_rows = cluster_rows,
+             breaks = breaks,
+             cluster_cols = TRIP_chrom_clust,
+             clustering_distance_rows = "correlation",
+             main = paste("Chromatin synergies - TIF DNMT 10 µM"),
+             color = colors,
+             annotation_colors = annotation_colors_scr, 
+             annotation_legend = T)
+```
+
+## S4B Scatter plot HMT inhibotors 5mC
+```{r S4B HMT inhibitor synergy with 5mC,  fig.width = 10, fig.height = 6}
+DNMT_drugs = target_set_drugs %>% 
+  rownames_to_column(var = "drug_conc") %>% 
+  filter(target == "DNMT") %>% pull(drug_conc)
+
+ratios_tib_fc %>% 
+  filter(drug_conc %in% DNMT_drugs)  %>% 
+  ggplot(.,aes(LMNB1, log2.fc.freqCut)) + geom_point() +
+  geom_smooth(method = "lm", se = F) +
+  stat_cor(method = "pearson") +
+  stat_poly_eq(aes(label = paste(after_stat(eq.label),
+                                 after_stat(rr.label), sep = "*\", \"*")),
+               label.x = "left", label.y = "bottom") +
+  facet_grid(drug ~ conc_char) +
+  geom_vline(xintercept = 0, linetype = 2) + 
+  geom_hline(yintercept = 0, linetype = 2) + 
+  theme_classic(base_size = 16) 
+
+ratios_tib_fc %>% 
+  filter(drug_conc %in% DNMT_drugs)  %>% 
+  ggplot(.,aes(m5C, log2.fc.freqCut)) + geom_point() +
+  geom_smooth(method = "lm", se = F) +
+  stat_cor(method = "pearson") +
+  stat_poly_eq(aes(label = paste(after_stat(eq.label),
+                                 after_stat(rr.label), sep = "*\", \"*")),
+               label.x = "left", label.y = "bottom") +
+  facet_grid(drug ~ conc_char) +
+  geom_vline(xintercept = 0, linetype = 2) + 
+  geom_hline(yintercept = 0, linetype = 2) + 
+  theme_classic(base_size = 16) 
+```
+
+
+## S4B Scatter plot EPZ & Vorniostat in K27me3
+```{r S4C Bossing in H3K27me3 specifically,  fig.width = 6, fig.height = 4}
+ratios_tib_fc %>% 
+  filter(drug_conc %in% c("Vorinostat 1 µM", "EPZ-6438 10 µM"))  %>% 
+  ggplot(.,aes(H3K27me3, log2.fc.freqCut)) + geom_point() +
+  geom_smooth(method = "lm", se = F) +
+  stat_cor(method = "pearson") +
+  stat_poly_eq(aes(label = paste(after_stat(eq.label),
+                                 after_stat(rr.label), sep = "*\", \"*")),
+               label.x = "left", label.y = "bottom") +
+  geom_vline(xintercept = 0, linetype = 2) + 
+  geom_hline(yintercept = 0, linetype = 2) + 
+  facet_wrap(. ~ drug_conc) +
+  theme_classic(base_size = 16) 
+```
+
+
+```{r eval=FALSE}
+indel.data %>% filter(!between(zscore_TIF_comb_rep, -3.2905, 3.2905) & conc_char != "control" & viab_reproducibility & cor_TIF_filter & filter_zscore_TIF_comb_rep) %>% 
+  # distinct(IPR, drug, replicate, target, tech, conc_char, zscore_TIF, zscore_TIF_comb_tech, zscore_TIF_comb_rep) %>% 
+  distinct(IPR, drug, conc_char, target, zscore_TIF_comb_rep) %>% 
+  ggplot(., aes(IPR, zscore_TIF_comb_rep, color = target)) + 
+  geom_quasirandom() + 
+  facet_grid(. ~ conc_char) + 
+  scale_color_manual(values = colors_targets) +
+  theme_classic2(base_size = 16)
+```
+
+
+# Top hits and heatmaps for all features and targets
 ```{r top CCDs for all chromatin features, fig.width= 6, fig.height= 6, eval = FALSE}
 for(i in unique(CCD_tib$feature)) {
   rank_dt = CCD_tib %>% 
@@ -671,7 +865,7 @@ for(i in unique(CCD_tib$feature)) {
     
     
     p2 = rank_dt %>% 
-      filter(!between(rank, 11, maxrank-10)) %>%
+      filter(!between(rank, 16, maxrank-15)) %>%
       mutate(rank = seq(1:n())) %>% 
       ggplot(., aes(x = rank, y = indelrate_slope_plot, fill = target)) +
       geom_bar(stat = "identity") + 
@@ -695,179 +889,54 @@ for(i in unique(CCD_tib$feature)) {
 }
 ```
 
+```{r heatmaps per compound target, eval = FALSE}
+target_set_target = dplyr::rename(target_set_drugs, conc_char_ctrl = conc_char) %>% dplyr::select(-drug)
 
-## 4C m5C top CCDs
-```{r 4C m5C synergies, fig.width = 8, fig.height = 6}
-rank_dt = CCD_tib %>% 
-  left_join(rownames_to_column(target, var = "drug_conc")) %>%
-  filter(feature == "m5C", !is.na(indelrate_slope_plot)) %>%
-  distinct() %>%
-  arrange(desc(indelrate_slope_plot)) %>%
-  mutate(rank = seq(1:n()))
-
-maxrank = nrow(rank_dt)
-
-max_slope = max(abs(rank_dt$indelrate_slope_plot))
-
-# p1 = rank_dt %>% 
-#   ggplot(., aes(x = rank, y = 1)) +
-#   geom_bar(stat = "identity", aes(fill = indelrate_slope_plot)) + 
-#   scale_x_reverse() +
-#   coord_flip() +
-#   xlab("Rank") +
-#   theme_classic2(base_size = 16) +
-#   scale_fill_distiller(palette = "BrBG", 
-#                        breaks = c(seq(-0.04, 0.04, 0.01)), direction = 1,
-#                        limits = c(-max_slope, max_slope)) +
-#   # geom_label(aes(label = ifelse(width == 2, drug_conc,''))) +
-#   theme(legend.position = "none",
-#         axis.title.x=element_blank(),
-#         axis.text.x=element_blank(),
-#         axis.ticks.x=element_blank())+
-#   # add horizontal line for 0.01 slope cutoff which is highlighted in the heatmap
-#   geom_vline(xintercept = rank_dt[rank_dt$indelrate_slope_plot  < -0.01, ]$rank[1] - 0.5)  +
-#   geom_vline(xintercept = max(rank_dt[rank_dt$indelrate_slope_plot  > 0.01, ]$rank) + 0.5)
-
-p2 = rank_dt %>% 
-  ggplot(., aes(x = rank, fill = target)) +
-  geom_bar() + 
-  scale_x_reverse() +
-  coord_flip() +
-  xlab("Rank") +
-theme_classic2(base_size = 16) +
-  scale_fill_manual(values = colors_targets) +
-  # geom_label(aes(label = ifelse(width == 2, drug_conc,''))) +
-  theme(legend.position = "none",
-        axis.title.x=element_blank(),
-        axis.text.x=element_blank(),
-        axis.ticks.x=element_blank())+
-  # add horizontal line for 0.01 slope cutoff which is highlighted in the heatmap
-  geom_vline(xintercept = rank_dt[rank_dt$indelrate_slope_plot  < -0.01, ]$rank[1] - 0.5)  +
-  geom_vline(xintercept = max(rank_dt[rank_dt$indelrate_slope_plot  > 0.01, ]$rank) + 0.5)
-
-p3 = rank_dt %>% 
-  filter(!between(rank, 6, maxrank-5)) %>%
-  mutate(rank = seq(1:n())) %>% 
-  ggplot(., aes(x = rank, y = indelrate_slope_plot, fill = target)) +
-  geom_bar(stat = "identity") + 
-  scale_x_reverse() +
-  coord_flip() +
-  ylab("Synergy score") +
-  theme_classic2(base_size = 16) +
-  scale_fill_manual(values = colors_targets) +
-  # geom_label(aes(label = ifelse(width == 2, drug_conc,''))) +
-  geom_text(aes(label=drug_conc)) +
-  theme(legend.position = "none",
-        axis.title.y=element_blank(),
-        axis.text.y=element_blank(),
-        axis.ticks.y=element_blank())
-
-
-plot_grid(# p1, # comment out the TIF slope 
-          p2, p3, labels = c("E", "F"), rel_widths = c(1, 6), nrow = 1)
-
-# Samples to highlight in the heatmap S3C
-all_compounds_epistasis_TIF %>% 
-  filter(!between(m5C, -0.01, .01)) %>%
-  rownames()
-```
-# Supplementary Figures
-## S4A HMT CCD Heatmap
-```{r S4A HMT CCD, fig.width= 8, fig.height= 6}
-DNMT_drugs = target_set_drugs %>% 
-  rownames_to_column(var = "drug_conc") %>% 
-  filter(target == "DNMT"
-         ) %>% pull(drug_conc)
-
-TIF_synergy_matrix_DNMT = CCD_tib %>%
-  dplyr::select(drug_conc, indelrate_slope_plot, feature) %>%
-  group_by(drug_conc) %>%
-  mutate(onlyNA = sum(is.na(indelrate_slope_plot))) %>% 
-  filter(onlyNA != 25 & drug_conc %in% DNMT_drugs) %>%
-  reshape2::dcast(drug_conc ~ feature, value.var = "indelrate_slope_plot", fill = 0) %>% 
-  column_to_rownames(var = "drug_conc")
-
-# Make matrix with drugs from selected target
-cluster_rows = ifelse(nrow(TIF_synergy_matrix_DNMT) > 1, TRUE, FALSE)
-
-# # change these numbers according to where you want to set the cutoff
-quant_breaks <- quantile(TIF_synergy_matrix_DNMT, c(.05,.95), na.rm = T)
-max_quant = max(abs(quant_breaks))
+quant_breaks <- quantile(all_compounds_epistasis_TIF, c(.01,.99), na.rm = T)
 palette_length <- 100
-breaks <- c(seq(-max_quant, 0, length.out=ceiling(palette_length/2) + 1),
-            seq(max_quant/palette_length, max_quant, length.out=floor(palette_length/2)))
-slope.colors.temp = slope.colors
-colors = diverge_hcl(length(breaks), palette = "Cork")
-colors[which(breaks == 0)-1] = "white"
+breaks <- c(seq(quant_breaks[1], 0, length.out=ceiling(palette_length/2) + 1), 
+            seq(quant_breaks[2]/palette_length, quant_breaks[2], length.out=floor(palette_length/2)))
+colors = rev(diverge_hcl(length(breaks), palette = "Cork"))
+colors[which(quant_breaks == 0)-1] = "gray90"
 
-p = pheatmap(TIF_synergy_matrix_DNMT[, TRIP_chrom_clust$labels],
-             border_color = F,
-             cellwidth = 8,
-             cellheight = 8,
-             cluster_rows = cluster_rows,
-             breaks = breaks,
-             cluster_cols = TRIP_chrom_clust,
-             clustering_distance_rows = "correlation",
-             main = paste("Chromatin synergies - TIF DNMT cluster"),
-             color = colors,
-             annotation_colors = annotation_colors_scr, 
-             annotation_legend = T)
-```
-
-## S4B Scatter plot HMT inhibotors 5mC
-```{r S4B HMT inhibitor synergy with 5mC,  fig.width = 10, fig.height = 6}
-ratios_tib_fc %>% 
-  filter(drug_conc %in% DNMT_drugs)  %>% 
-  ggplot(.,aes(LMNB1, log2.fc.freqCut)) + geom_point() +
-  geom_smooth(method = "lm", se = F) +
-  stat_cor(method = "pearson") +
-  stat_poly_eq(aes(label = paste(after_stat(eq.label),
-                                 after_stat(rr.label), sep = "*\", \"*")),
-               label.x = "left", label.y = "bottom") +
-  facet_wrap(. ~ drug_conc) +
-    geom_vline(xintercept = 0, linetype = 2) + 
-  geom_hline(yintercept = 0, linetype = 2) + 
-  theme_classic(base_size = 16) 
-
-ratios_tib_fc %>% 
-  filter(drug_conc %in% DNMT_drugs)  %>% 
-  ggplot(.,aes(m5C, log2.fc.freqCut)) + geom_point() +
-  geom_smooth(method = "lm", se = F) +
-  stat_cor(method = "pearson") +
-  stat_poly_eq(aes(label = paste(after_stat(eq.label),
-                                 after_stat(rr.label), sep = "*\", \"*")),
-               label.x = "left", label.y = "bottom") +
-  facet_wrap(. ~ drug_conc) +
-    geom_vline(xintercept = 0, linetype = 2) + 
-  geom_hline(yintercept = 0, linetype = 2) + 
-  theme_classic(base_size = 16) 
-```
-
-
-## S4B Scatter plot EPZ & Vorniostat in K27me3
-```{r S4C Bossing in H3K27me3 specifically,  fig.width = 6, fig.height = 4}
-ratios_tib_fc %>% 
-  filter(drug_conc %in% c("Vorinostat 1 µM", "EPZ-6438 10 µM", "GSK J4 HCl 10 µM"))  %>% 
-  ggplot(.,aes(H3K27me3, log2.fc.freqCut)) + geom_point() +
-  geom_smooth(method = "lm", se = F) +
-  stat_cor(method = "pearson") +
-  stat_poly_eq(aes(label = paste(after_stat(eq.label),
-                                 after_stat(rr.label), sep = "*\", \"*")),
-               label.x = "left", label.y = "bottom") +
-  facet_wrap(. ~ drug_conc) +
-  theme_classic(base_size = 16) 
-```
-
-
-```{r eval=FALSE}
-indel.data %>% filter(!between(zscore_TIF_comb_rep, -3.2905, 3.2905) & conc_char != "control" & viab_reproducibility & cor_TIF_filter & filter_zscore_TIF_comb_rep) %>% 
-  # distinct(IPR, drug, replicate, target, tech, conc_char, zscore_TIF, zscore_TIF_comb_tech, zscore_TIF_comb_rep) %>% 
-  distinct(IPR, drug, conc_char, target, zscore_TIF_comb_rep) %>% 
-  ggplot(., aes(IPR, zscore_TIF_comb_rep, color = target)) + 
-  geom_quasirandom() + 
-  facet_grid(. ~ conc_char) + 
-  scale_color_manual(values = colors_targets) +
-  theme_classic2(base_size = 16)
+for(i in unique(target$target)) {
+  target_drugs = target %>% 
+    rownames_to_column(var = "drug_conc") %>%
+    filter(target == i) %>% 
+    pull(drug_conc)
+  
+  all_compounds_epistasis_TIF = CCD_tib %>%
+    dplyr::select(drug_conc, indelrate_slope, feature) %>%
+    group_by(drug_conc) %>%
+    mutate(onlyNA = sum(is.na(indelrate_slope))) %>% 
+    filter(onlyNA != 25) %>%
+    reshape2::dcast(drug_conc ~ feature, value.var = "indelrate_slope", fill = 0) %>% 
+    column_to_rownames(var = "drug_conc")
+  
+  # Make matrix with drugs from selected target
+  TIF_synergy_matrix = all_compounds_epistasis_TIF %>% 
+    rownames_to_column(var = "drug_conc") %>%
+    filter(drug_conc %in% target_drugs) %>%
+    column_to_rownames(var = "drug_conc")
+  
+  if(nrow(TIF_synergy_matrix) > 0) {
+    cluster_rows = ifelse(nrow(TIF_synergy_matrix) > 1, TRUE, FALSE)
+    
+    p = pheatmap(TIF_synergy_matrix[, TRIP_chrom_clust$labels],
+                 border_color = F,
+                 cellwidth = 8,
+                 cellheight = 8,
+                 cluster_rows = cluster_rows,
+                 breaks = breaks,
+                 cluster_cols = TRIP_chrom_clust,
+                 annotation_row = target_set_target,
+                 clustering_distance_rows = "correlation",
+                 main = paste("Chromatin synergies - TIF ", i),
+                 color = colors,
+                 annotation_colors = annotation_colors_scr, 
+                 annotation_legend = T)
+  }
+}
 ```
 
 # Session Info

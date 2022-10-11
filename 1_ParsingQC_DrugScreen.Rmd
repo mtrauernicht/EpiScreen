@@ -32,10 +32,10 @@ render_processing = TRUE
 render_validations = TRUE
 
 # Render Synergies 
-render_synergies = FALSE
+render_synergies = TRUE
 ```
 
-```{r}
+```{r render figures, eval=F}
 # Render all figure scripts
 render_all_figures = TRUE
 

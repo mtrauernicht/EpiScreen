@@ -106,7 +106,7 @@ p.adjust <- function(p, method = p.adjust.methods, n = length(p))
   ## Methods 'Hommel', 'holm', 'BY' and speed improvements
   ## contributed by Gordon Smyth
   method <- match.arg(method)
-  if(method == "fdr") method <- "holm"	# back compatibility
+  if(method == "fdr") method <- "BH"	# back compatibility
   nm <- names(p)
   p <- as.numeric(p)
   p0 <- setNames(p, nm)
@@ -257,7 +257,7 @@ group_colors = c("Euchromatin" = "#f7941d",
 colors_targets <-  c(HDAC="#60988D", HAT="#C6D0A8", Sirtuin="#8FCAAC",
                      HMT="#FDCDAC", DNMT="#D69C81", `Histone Demethylase`="#FFF2AE",
                      HIF="#E3DCD5", JAK="#C8D7E2", PIM="#9AB8C4", `Aurora Kinase`="#F4CAE4",
-                     PARP="#CB546F", `Epigenetic Reader Domain`= "#476D61", `DNA-PK`="#E07A43")
+                     PARP="#CB546F", `Epigenetic Reader Domain`= "#476D61", `DNA-PK`="#779ed7")
 
 conc_control_colors = c("CTRL" = colors_drugs[2], "100 nM" = colors_drugs[7], "1 µM" = colors_drugs[4], "10 µM" = "#000000")
 conc_colors = c("100 nM" = colors_drugs[7], "1 µM" = colors_drugs[4], "10 µM" = "#000000")
@@ -277,7 +277,6 @@ ggplot_custom <- function(...) ggplot2::ggplot(...) +
 #### Import
 ```{r data import, echo = FALSE, warning = FALSE}
 # Import data from preprocessing script
-in.dir = list.dirs(path = "/DATA/projects/DSBrepair/data/R") %>% .[grepl("episcreen", .)] %>% tail(n = 1)
 file = list.files(in.dir, pattern = "episcreen_ratios", full.names = T) %>% tail(n = 1)
 indel.data <- readRDS(file) # %>% filter(pathway_bal_filter == TRUE & viab_reproducibility == TRUE)
 ```
@@ -297,23 +296,6 @@ dmso_freq <- indel.data %>%
 
 iprs <- dmso_freq$IPR
 iprs <- as.character(iprs)
-
-# Set annotation for heatmap
-# viability
-viab_drug = indel.data %>% filter(drug != "PAO") %>% 
-  mutate(drug = gsub(" [(].*[)]", "", drug),
-         drug_conc = paste(drug, conc_char, sep = " ")) %>% 
-  distinct(viab_mean, drug_conc, replicate) %>% 
-  group_by(drug_conc) %>%
-  summarise(viab = mean(viab_mean))
-# Row annotation: annotate drugs with the target group
-target_set_drugs <- indel.data %>% 
-  filter(!target %in% c("Negative Control", "MRN", "DNA-PK")) %>%
-  mutate(drug = gsub(" [(].*[)]", "", drug),
-         drug_conc = paste(drug, conc_char, sep = " ")) %>%
-  left_join(viab_drug) %>%
-  distinct(drug, drug_conc, conc_char, target, viab) %>% 
-  column_to_rownames(var="drug_conc")
 
 # Set annotation for heatmap
 # viability
@@ -384,7 +366,7 @@ annotation_colors_scr = list(
   target = c(HDAC="#60988D", HAT="#C6D0A8", Sirtuin="#8FCAAC",
              HMT="#FDCDAC", DNMT="#D69C81", `Histone Demethylase`="#FFF2AE",
              HIF="#E3DCD5", JAK="#C8D7E2", PIM="#9AB8C4", `Aurora Kinase`="#F4CAE4",
-             PARP="#CB546F", `Epigenetic Reader Domain`= "#476D61", `DNA-PK`="#E07A43"),
+             PARP="#CB546F", `Epigenetic Reader Domain`= "#476D61", `DNA-PK`="#779ed7"),
   conc_char = conc_colors,
   clusters_drugs = sequential_hcl(7, "Plasma"),
   # viab_rep1 = c('#ffeee9', '#ffdcd4', '#ffcbbe', '#ffb8a8', '#fda693', '#f9947e', '#f4826a', '#ef6f56', '#e95b43', '#e24530'),
@@ -462,7 +444,6 @@ file = list.files(in.dir, pattern = "chrom_cluster_heatmap", full.names = T) %>%
 TRIP_chrom_clust <- readRDS(file)
 file = list.files(in.dir, pattern = "FC_ratios", full.names = T) %>% tail(n = 1)
 ratios_tib_fc <- readRDS(file)
-
 ```
 
 ### Annotation
@@ -486,7 +467,7 @@ annotation_colors_scr = list(
   target = c(HDAC="#60988D", HAT="#C6D0A8", Sirtuin="#8FCAAC",
              HMT="#FDCDAC", DNMT="#D69C81", `Histone Demethylase`="#FFF2AE",
              HIF="#E3DCD5", JAK="#C8D7E2", PIM="#9AB8C4", `Aurora Kinase`="#F4CAE4",
-             PARP="#CB546F", `Epigenetic Reader Domain`= "#476D61", `DNA-PK`="#E07A43", 
+             PARP="#CB546F", `Epigenetic Reader Domain`= "#476D61", `DNA-PK`="#779ed7", 
              `Negative Control` = "#65BFA4", `MRN` = "#5D79AC"),
   conc_char = conc_colors,
   conc_char_ctrl = conc_control_colors,
@@ -555,17 +536,16 @@ colors[which(quant_breaks == 0)-1] = "gray90"
 # Main figures
 
 ## 3ABC CCD Examples
-```{r 3A CCD examples, fig.width= 12, fig.height= 4}
+```{r 3ABC CCD examples, fig.width= 4, fig.height= 12}
 CCD_example_tib = indel.data %>% 
   mutate(drug = gsub(" [(].*[)]", "", drug),
          drug_conc = paste(drug, conc_char, sep = " ")) %>%
-  filter(drug_conc %in% c("EPZ-6438 10 µM", "Decitabine 1 µM", "Scriptaid 1 µM", "Vorinostat 1 µM", "PCI-24781 100 nM", "DMSO control", "SNS-314 Mesylate 1 µM")) %>%
-  distinct(IPR, drug, freqCut, H3K27me3.zscore, LMNB1.zscore, m5C.zscore, HDAC1.zscore, tech, replicate, H3K36me3.zscore) %>%
+  filter(drug_conc %in% c("EPZ-6438 10 µM", "Decitabine 1 µM", "Vorinostat 1 µM", "PCI-24781 100 nM", "DMSO control", "SNS-314 Mesylate 1 µM")) %>%
+  distinct(IPR, drug, freqCut, H3K27me3.zscore, LMNB1.zscore, m5C.zscore, H3K4me1.zscore, tech, replicate, H3K36me3.zscore) %>%
   mutate(freqCut_mean = ave(freqCut, IPR, drug, FUN = function(x) mean(x, na.rm = TRUE))) %>%
-  distinct(IPR, drug, freqCut_mean, H3K27me3.zscore, LMNB1.zscore, m5C.zscore, HDAC1.zscore, H3K36me3.zscore) %>%
+  distinct(IPR, drug, freqCut_mean, H3K27me3.zscore, LMNB1.zscore, m5C.zscore, H3K4me1.zscore, H3K36me3.zscore) %>%
   pivot_wider(names_from = drug, values_from = freqCut_mean) %>%
   mutate(Vorinostat_log2_FC_TIF = log2(Vorinostat/DMSO),
-    Scriptaid_log2_FC_TIF = log2(Scriptaid/DMSO),
          PCI_log2_FC_TIF = log2(`PCI-24781`/DMSO),
          EPZ6438_log2_FC_TIF = log2(`EPZ-6438`/DMSO),
          SNSMesyl_log2_FC_TIF = log2(`SNS-314 Mesylate`/DMSO),
@@ -583,8 +563,9 @@ p1 = ggplot(mock.slopes, aes(z_score,value,color = variable)) + theme_bw() +
   xlab("Feature signal (z-score)") + 
   theme(legend.position = "none") + 
   coord_cartesian(ylim= c(-1.5,1.5)) + 
-  scale_color_manual(values = c("black","#01665e","#8c510a"))+
-  theme_classic2(base_size = 16)
+  scale_color_manual(values = c("black","#2E6B9F","#317625"))+
+  theme_classic2(base_size = 16)  +
+  theme(legend.position="none")
 
 # p2 = ggplot(CCD_example_tib,
 #        aes(x = m5C.zscore, y = Decitabine_log2_FC_TIF)) +
@@ -598,15 +579,16 @@ p1 = ggplot(mock.slopes, aes(z_score,value,color = variable)) + theme_bw() +
 # CCD_tib %>% filter(drug_conc == "Decitabine 1 µM" & feature == "m5C")
 
 p2 = ggplot(CCD_example_tib,
-            aes(x = LMNB1.zscore, y = PCI_log2_FC_TIF)) +
+            aes(x = H3K27me3.zscore, y = EPZ6438_log2_FC_TIF)) +
   geom_point() +
-  geom_smooth(method = "lm", color = "#01665e",se = FALSE) +
+  geom_smooth(method = "lm", color = "#2E6B9F",se = FALSE) +
   stat_cor(method = "pearson") +
   geom_vline(xintercept = 0, linetype = 2) + 
   geom_hline(yintercept = 0, linetype = 2) + 
-  xlab("LMNB1 z-score") +
+  xlab("H3K4me1 z-score") +
   ylab("delta log2(TIF)") + 
   coord_cartesian()+
+  ggtitle("EPZ-6438 10 µM") +
   theme_classic2(base_size = 16)
 
 CCD_tib %>% filter(drug_conc == "EPZ-6438 10 µM" & feature == "H3K27me3")
@@ -618,15 +600,28 @@ p3 = ggplot(CCD_example_tib,
   geom_smooth(method = "lm", color = "black",se = FALSE) +
   stat_cor(method = "pearson") +
   xlab("H3K36me3 z-score") +
+  ggtitle("SNS-314 Mesylate 1 µM") +
   ylab("delta log2(TIF)") + 
   geom_vline(xintercept = 0, linetype = 2) + 
   geom_hline(yintercept = 0, linetype = 2) + 
   coord_cartesian()+
   theme_classic2(base_size = 16)
 
-plot_grid(p1, p2, p3, nrow = 1, labels = c("A", "B", "C"))
+CCD_tib %>% filter(drug_conc == "SNS-314 Mesylate 1 µM" & feature == "HDAC1")
+
+plot_grid(p1, p2, p3, ncol = 1, labels = c("A", "B", "C"))
+
+
 ```
 
+
+How many CCDs do we have in total?
+```{r}
+drug_conc_table = target_set_drugs %>% rownames_to_column(var = "drug_conc") %>% distinct(drug_conc, drug)
+
+CCD_tib %>% filter(!is.na(indelrate_slope_plot)) %>% left_join(drug_conc_table) %>% distinct(drug_conc) %>% nrow()
+CCD_tib %>% filter(!is.na(indelrate_slope_plot)) %>% left_join(drug_conc_table) %>% distinct(drug_conc) %>% nrow()
+```
 
 ## 3D All compound synergies with chromatin
 ```{r 3D Synergies chromatin - TIF all, fig.width= 12, fig.height= 14}
@@ -635,8 +630,12 @@ quant_breaks <- quantile(all_compounds_epistasis_TIF, c(.01,.99), na.rm = T)
 palette_length <- 100
 breaks <- c(seq(quant_breaks[1], 0, length.out=ceiling(palette_length/2) + 1), 
             seq(quant_breaks[2]/palette_length, quant_breaks[2], length.out=floor(palette_length/2)))
+<<<<<<< HEAD
 colors = diverge_hcl(length(breaks), palette = "Cork")
 colors = colorRampPalette(c("#d5bdaf", "#e5e5e5", "#84a98c"))(palette_length)
+=======
+colors = rev(diverge_hcl(length(breaks), palette = "Cork"))
+>>>>>>> fe383244ce63b04da97cd58918bd14cca9811c38
 colors[which(breaks == 0)-1] = "white"
 
 pheatmap(all_compounds_epistasis_TIF[, TRIP_chrom_clust$labels],
@@ -713,7 +712,7 @@ for(i in unique(CCD_tib$feature)) {
 
 # Supplementary Figures
 ## S3AB Example mock filtered out CCD
-```{r S3AB example of filtered out CCDs,  fig.width = 8, fig.height = 3}
+```{r S3AB example of filtered out CCDs,  fig.width = 8, fig.height = 4}
 #Create mock examples
 mock.slopes <- tibble(z_score = seq(-3,3,0.25), 
                       A = z_score*0.1 -0.6, 
@@ -728,18 +727,18 @@ p1 = ggplot(mock.slopes, aes(z_score, value, color = variable)) +
   ylab("log2(fold change TIF)") + 
   xlab("Feature signal (z-score)") + 
   coord_cartesian(ylim= c(-1.5,1.5)) + 
-  scale_color_manual(values = c("#01665e","#8c510a"))+
+  scale_color_manual(values = c("#2E6B9F","#317625"))+
   theme_classic2(base_size = 16) + 
   theme(legend.position = "none")
 
 p2 = ggplot(CCD_example_tib,
             aes(x = H3K36me3.zscore, y = EPZ6438_log2_FC_TIF)) +
   geom_point() +
-  geom_smooth(method = "lm", color = "#8c510a",se = FALSE) +
+  geom_smooth(method = "lm", color = "#317625",se = FALSE) +
   stat_cor(method = "pearson") +
   geom_vline(xintercept = 0, linetype = 2) + 
   geom_hline(yintercept = 0, linetype = 2) + 
-  xlab("H3K27me3 z-score") +
+  xlab("H3K36me3 z-score") +
   ylab("delta log2(TIF)") + 
   coord_cartesian() +
   theme_classic2(base_size = 16)
@@ -800,7 +799,7 @@ ggplot(projection_melt, aes(x=feature, y=value, fill=group)) +
 ```
 
 ## S3C Example PCR plots
-```{r S3C Example PCR prediction, fig.width = 6, fig.height = 6}
+```{r S3C Example PCR prediction, fig.width = 4, fig.height = 4}
 FC_tib = ratios_tib_fc %>% dplyr::select(IPR, drug_conc, log2.fc.freqCut, log2.fc.ratio, all_of(chromatin.features.short)) %>% ungroup()
 
 for (i in c("BMN 673 10 µM", "Apicidin 100 nM")){
@@ -836,14 +835,16 @@ for (i in c("BMN 673 10 µM", "Apicidin 100 nM")){
 }
 
 # adjusted pvals from the Synergies preprocessing scripts: 
-# adj_p.value_KO_model %>% filter(drug_conc %in% c("BMN 673 10 µM", "Apicidin 100 nM"), var == "log2.fc.freqCut")
-# BMN 673 10 µM : 0.1697062666
-# Apicidin 100 nM : 0.0001259269
+# adj_p.value_KO_model %>% filter(drug_conc %in% c("BMN 673 10 µM", "Apicidin 100 nM"), var == "log2.fc.freqCut") %>% knitr::kable()
+# |var             |drug_conc       |   p.value|     p.adj|
+# |:---------------|:---------------|---------:|---------:|
+# |log2.fc.freqCut |BMN 673 10 µM   | 0.0846856| 0.1072685|
+# |log2.fc.freqCut |Apicidin 100 nM | 0.0000799| 0.0006183|
 ```
 
 
 ## S3EF Example CCDs
-```{r S3C Example strong synergy hits with LMNB1,  fig.width = 6, fig.height = 4}
+```{r S3C Example strong synergy hits with LMNB1,  fig.width = 8, fig.height = 4}
 top_hit_drugs = CCD_tib %>% filter(!is.na(ratio_slope_plot) & abs(ratio_slope_plot) > 0.2)  %>% distinct(drug_conc) %>% pull(drug_conc)
 
 # Highligh top 4 strongest hits + and - TIF. In the end we kept only LMNB1, but let's keep this code for flexibility.
