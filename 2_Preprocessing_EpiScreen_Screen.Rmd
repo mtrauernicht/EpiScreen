@@ -65,12 +65,6 @@ viab_limit_bal = 0.40
 
 # Read count limit of +1 & -7 combined
 read_count_limit = 30
-
-# minimal correlation for TIF between screens:
-TIF_cor = 0.65
-
-# minimal correlation for MMEJ score between screens:
-bal_cor = 0.65
 ```
 
 
@@ -284,6 +278,14 @@ count_filter %>% pull(sum) %>% table()
 # How many barcodes per IPR on average?
 count_filter %>% group_by(exp) %>% 
   count() %>% pull(n) %>% mean()
+# How many barcodes per IPR on average after the filter?
+count_filter %>% group_by(exp) %>% 
+  filter(sum) %>%
+  count() %>% pull(n) %>% mean()
+# How many barcodes per IPR on average after the filter without PAO control wells?
+count_filter %>% group_by(exp) %>% 
+  filter(sum, !grepl("A01|A12|E01|E12", exp)) %>%
+  count() %>% pull(n) %>% mean()
 
 # Number of wells kept after filter
 complete.mutations.dt %>% distinct(exp) %>% nrow()
@@ -312,16 +314,20 @@ keep_drugs <- mutations.stat.dt %>%
          # count replicates in which this combination is found in
          tech_n = as.numeric(ave(conc_char_drug_rep, conc_char_drug_rep, FUN = length)),
          viab_sum_eff = ave(viab_norm_split > viab_limit_eff, conc_char_drug_rep, FUN = sum),
-         viab_eff = ifelse(tech_n - viab_sum_eff < 2, TRUE, FALSE),
+         viab_eff = case_when(viab_sum_eff >= 2 ~ TRUE, 
+                              viab_sum_eff == 1 & tech_n <= 2 ~ TRUE,
+                              T ~ FALSE),
          viab_sum_bal = ave(viab_norm_split > viab_limit_bal, conc_char_drug_rep, FUN = sum),
-         viab_bal = ifelse(tech_n - viab_sum_bal < 2, TRUE, FALSE)) %>% 
+         viab_bal =  case_when(viab_sum_bal >= 2 ~ TRUE, 
+                              viab_sum_bal == 1 & tech_n <= 2 ~ TRUE,
+                              T ~ FALSE)) %>% 
   # These conditions need to be present in at least 1 out of 2 or 2 out of 3 replicates 
   # per screen
   distinct(conc_char_drug, conc_char, drug, replicate, viab_eff, viab_bal) %>% 
   mutate(rep_bal = ave(viab_bal, conc_char_drug, FUN = sum),
-         pathway_bal_filter = ifelse(rep_bal > 1, TRUE, FALSE),
+         pathway_bal_filter = ifelse(rep_bal == 2, TRUE, FALSE),
          rep_eff = ave(viab_eff, conc_char_drug, FUN = sum),
-         indel_freq_filter = ifelse(rep_eff > 1, TRUE, FALSE)) %>% 
+         indel_freq_filter = ifelse(rep_eff == 2, TRUE, FALSE)) %>% 
   # check if present in both replicates
   # And in both bio replicates
   distinct(conc_char, drug, pathway_bal_filter, indel_freq_filter)
@@ -854,7 +860,9 @@ mean.TIF.zscore.comb = TIF.zscore %>%
     sum_tech  = ave(zscore_TIF, 
                     drug, conc_char, replicate, barcode, 
                     FUN = function(x) sum(abs(x) >= 1.96)),
-    filter_zscore_TIF = ifelse(n_reps-sum_tech < 2, TRUE, FALSE),
+    filter_zscore_TIF = case_when(sum_tech >= 2 ~ TRUE, # 2/3
+                               sum_tech == 1 & n_reps <= 2 ~ TRUE, # 1/2 or 1/1
+                               T ~ FALSE),
     # Filter for same effect. 
     sum_sign = ave(zscore_TIF_tech, drug, conc_char, barcode,
                    FUN = function(x) length(table(sign(x))))) %>%
@@ -881,7 +889,9 @@ mean.TIF.zscore.comb.global = TIF.zscore %>%
     sum_tech_global = ave(zscore_TIF_global, 
                           drug, conc_char, replicate,  
                           FUN = function(x) sum(abs(x) >= 1.96)),
-    filter_zscore_TIF_global = ifelse(n_reps-sum_tech_global < 2, TRUE, FALSE),
+    filter_zscore_TIF_global = case_when(sum_tech_global >= 2 ~ TRUE, # 2/3
+                               sum_tech_global == 1 & n_reps <= 2 ~ TRUE, # 1/2 or 1/1
+                               T ~ FALSE),
     # Filter for same effect.     
     sum_sign_global = ave(zscore_TIF_global_tech, drug, conc_char,
                           FUN = function(x) length(table(sign(x))))) %>%
@@ -994,7 +1004,9 @@ mean.bal.zscore.comb = bal.zscore %>%
     sum_tech  = ave(zscore_bal, 
                     drug, conc_char, replicate, barcode, 
                     FUN = function(x) sum(abs(x) >= 1.96)),
-    filter_zscore_bal = ifelse(n_reps-sum_tech < 2, TRUE, FALSE),
+    filter_zscore_bal = case_when(sum_tech >= 2 ~ TRUE, # 2/3
+                               sum_tech == 1 & n_reps <= 2 ~ TRUE, # 1/2 or 1/1
+                               T ~ FALSE),
     # Filter for same effect. 
     sum_sign = ave(zscore_bal_tech, drug, conc_char, barcode,
                    FUN = function(x) length(table(sign(x))))) %>%
@@ -1021,7 +1033,9 @@ mean.bal.zscore.comb.global = bal.zscore %>%
     sum_tech_global = ave(zscore_bal_global, 
                           drug, conc_char, replicate,  
                           FUN = function(x) sum(abs(x) >= 1.96)),
-    filter_zscore_bal_global = ifelse(n_reps-sum_tech_global < 2, TRUE, FALSE),
+    filter_zscore_bal_global = case_when(sum_tech_global >= 2 ~ TRUE,  # 2/3
+                               sum_tech_global == 1 & n_reps <= 2 ~ TRUE, # 1/2 or 1/1
+                               T ~ FALSE),
     # Filter for same effect.     
     sum_sign_global = ave(zscore_bal_global_tech, drug, conc_char,
                           FUN = function(x) length(table(sign(x))))) %>%
@@ -1051,40 +1065,13 @@ bal.zscore %<>% left_join(mean.bal.zscore.comb) %>% left_join(mean.bal.zscore.co
 # Merge with main table
 screen.ratio.dt <- screen.ratio.dt %>% 
   left_join(TIF.zscore) %>%
-  left_join(bal.zscore)
-```
-
-# Data reproducibility
-## Make filter for feqCut and MMEJratio reproducibility between screens
-```{r check for data reproducibility}
-cor_filter = screen.ratio.dt %>% dplyr::select(barcode, replicate, tech, drug, conc_char, freqCut_mean, MMEJscore_mean, well, plate) %>%
-  group_by(drug, conc_char) %>%
-  pivot_wider(names_from = replicate, values_from = c(freqCut_mean, MMEJscore_mean)) %>%
-  summarise(cor_TIF = cor(freqCut_mean_E1504, freqCut_mean_E177, use = "pairwise.complete.obs"),
-            cor_bal = cor(MMEJscore_mean_E1504, MMEJscore_mean_E177, use = "pairwise.complete.obs")) %>%
-  mutate(cor_TIF_filter = ifelse(cor_TIF >= TIF_cor, TRUE, 
-                                 FALSE),
-         cor_bal_filter = ifelse(cor_bal >= bal_cor, TRUE, 
-                                 FALSE))
-
-screen.ratio.dt = screen.ratio.dt %>% left_join(cor_filter)
-```
-
-
-
-## Fix filters
-Some filters have NA, these need to be changed to FALSE. 
-```{r fix some filters}
-screen.ratio.dt = screen.ratio.dt %>% 
+  left_join(bal.zscore) %>% 
+  # Some filters have NA, these need to be changed to FALSE. 
   mutate(across(.cols = contains("filter"), 
                 ~ replace(., is.na(.), FALSE)))
 ```
-
-
 # Data export
-
 ## Add chromatin data
-
 We'll use the table from Schep et al. 2021 to bind directly all the relevant chromatin data. 
 
 ```{r add chromatin data}
@@ -1137,10 +1124,6 @@ ratio.cols = c("replicate",
                "viab_mean_if",
                "viab_mean_pb",
                "viab_reproducibility",
-               "cor_TIF",
-               "cor_bal",
-               "cor_TIF_filter",
-               "cor_bal_filter",
                "sample",
                "freqCut",
                "freqCut_mean",
