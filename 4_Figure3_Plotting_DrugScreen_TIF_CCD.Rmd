@@ -517,7 +517,7 @@ all_compounds_epistasis_TIF = CCD_tib %>%
   dplyr::select(drug_conc, indelrate_slope_plot, feature) %>%
   group_by(drug_conc) %>%
   mutate(onlyNA = sum(is.na(indelrate_slope_plot))) %>% 
-  filter(onlyNA != 25) %>%
+  filter(onlyNA != 25 & !grepl("control", drug_conc)) %>%
   reshape2::dcast(drug_conc ~ feature, value.var = "indelrate_slope_plot", fill = 0) %>% 
   column_to_rownames(var = "drug_conc")
 
@@ -621,14 +621,14 @@ drug_conc_table = target_set_drugs %>% rownames_to_column(var = "drug_conc") %>%
 
 # CCDs for the TIF
 CCD_tib %>% 
-  filter(!grepl("DNA-PK", drug_conc)) %>%
+  filter(!grepl("DNA-PK|control", drug_conc)) %>%
   filter(!is.na(indelrate_slope_plot)) %>% 
   left_join(drug_conc_table) %>% 
   distinct(drug_conc) %>% 
   nrow()
 
 CCD_tib %>% 
-  filter(!grepl("DNA-PK", drug_conc)) %>%
+  filter(!grepl("DNA-PK|control", drug_conc)) %>%
   filter(!is.na(indelrate_slope_plot)) %>% 
   left_join(drug_conc_table) %>% 
   distinct(drug) %>% 
@@ -636,14 +636,14 @@ CCD_tib %>%
 
 # CCDs for the balance and/or TIF
 CCD_tib %>% 
-  filter(!grepl("DNA-PK", drug_conc)) %>%
+  filter(!grepl("DNA-PK|control", drug_conc)) %>%
   filter(!is.na(ratio_slope_plot) | !is.na(indelrate_slope_plot)) %>% 
   left_join(drug_conc_table) %>% 
   distinct(drug_conc) %>% 
   nrow()
 
 CCD_tib %>% 
-  filter(!grepl("DNA-PK", drug_conc)) %>%
+  filter(!grepl("DNA-PK|control", drug_conc)) %>%
   filter(!is.na(ratio_slope_plot) | !is.na(indelrate_slope_plot)) %>% 
   left_join(drug_conc_table) %>% 
   distinct(drug) %>% 
@@ -651,7 +651,7 @@ CCD_tib %>%
 
 # CCDs for the balance and TIF
 CCD_tib %>% 
-  filter(!grepl("DNA-PK", drug_conc)) %>%
+  filter(!grepl("DNA-PK|control", drug_conc)) %>%
   filter(!is.na(ratio_slope_plot) & !is.na(indelrate_slope_plot)) %>% 
   left_join(drug_conc_table) %>% 
   distinct(drug) %>% 
@@ -665,12 +665,8 @@ quant_breaks <- quantile(all_compounds_epistasis_TIF, c(.01,.99), na.rm = T)
 palette_length <- 100
 breaks <- c(seq(quant_breaks[1], 0, length.out=ceiling(palette_length/2) + 1), 
             seq(quant_breaks[2]/palette_length, quant_breaks[2], length.out=floor(palette_length/2)))
-<<<<<<< HEAD
-colors = diverge_hcl(length(breaks), palette = "Cork")
-colors = colorRampPalette(c("#d5bdaf", "#e5e5e5", "#84a98c"))(palette_length)
-=======
+
 colors = rev(diverge_hcl(length(breaks), palette = "Cork"))
->>>>>>> fe383244ce63b04da97cd58918bd14cca9811c38
 colors[which(breaks == 0)-1] = "white"
 
 pheatmap(all_compounds_epistasis_TIF[, TRIP_chrom_clust$labels],
@@ -695,13 +691,13 @@ drug_conc_tib = indel.data %>%
          drug_conc = paste(drug, conc_char,sep = " "))
 
 TIF_hits = CCD_tib %>% filter(!is.na(indelrate_slope_plot) & 
-                                !grepl("DNA-PK", drug_conc) # remove DNA-PK from this count
+                                !grepl("control|DNA-PK", drug_conc) # remove DNA-PK from this count
                               ) %>% 
   left_join(drug_conc_tib) %>%
   distinct(drug_conc, target) %>% 
   group_by(target) %>%
   count() %>%
-  rename(effect = n) %>%
+  dplyr::rename(effect = n) %>%
   rbind(tibble(target = "other", effect = 0)) %>%
   arrange(target) %>%
   column_to_rownames(var = "target")
@@ -714,7 +710,7 @@ all_drugs = indel.data %>% filter(sample == "Epigenetic Compound") %>%
   distinct(drug_conc, target) %>%
   group_by(target) %>%
   count() %>%
-  rename(no_effect = n) %>%
+  dplyr::rename(no_effect = n) %>%
   arrange(target) %>%
   column_to_rownames(var = "target")
 
@@ -968,7 +964,8 @@ ratios_tib_fc %>%
 
 
 ```{r eval=FALSE}
-indel.data %>% filter(!between(zscore_TIF_comb_rep, -3.2905, 3.2905) & conc_char != "control" & viab_reproducibility & cor_TIF_filter & filter_zscore_TIF_comb_rep) %>% 
+indel.data %>% filter(!between(zscore_TIF_comb_rep, -3.2905, 3.2905) & conc_char != "control" & 
+                        viab_reproducibility & filter_zscore_TIF_comb_rep) %>% 
   # distinct(IPR, drug, replicate, target, tech, conc_char, zscore_TIF, zscore_TIF_comb_tech, zscore_TIF_comb_rep) %>% 
   distinct(IPR, drug, conc_char, target, zscore_TIF_comb_rep) %>% 
   ggplot(., aes(IPR, zscore_TIF_comb_rep, color = target)) + 

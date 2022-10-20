@@ -894,7 +894,6 @@ How well does the MMEJ z-score correlate between the biologcial replicates befor
 biol_repl_TIF <- indel.data %>%
   filter(sample == "Epigenetic Compound" & 
            viab_reproducibility == TRUE & 
-           cor_TIF_filter & 
            !is.na(zscore_TIF_global_tech)) %>%
   dplyr::distinct(zscore_TIF_global_tech, 
                   filter_zscore_TIF_global_comb_rep, 
@@ -906,7 +905,6 @@ biol_repl_TIF <- indel.data %>%
 biol_repl_bal <- indel.data %>%
   filter(sample == "Epigenetic Compound" & 
            viab_reproducibility == TRUE & 
-           cor_bal_filter & 
            !is.na(zscore_bal_global_tech)) %>%
   dplyr::distinct(zscore_bal_global_tech, 
                   filter_zscore_bal_global_comb_rep, 
@@ -991,7 +989,6 @@ plot_grid(p1, p2, p3, p4, ncol = 2, nrow = 2, labels = c("K", "L", "M", "N"))
 biol_repl_TIF <- indel.data %>%
   filter(sample == "Epigenetic Compound" & 
            viab_reproducibility == TRUE & 
-           cor_TIF_filter & 
            !is.na(zscore_TIF_tech)) %>%
   dplyr::distinct(barcode, zscore_TIF_tech, 
                   filter_zscore_TIF_comb_rep, 
@@ -1003,7 +1000,6 @@ biol_repl_TIF <- indel.data %>%
 biol_repl_bal <- indel.data %>%
   filter(sample == "Epigenetic Compound" & 
            viab_reproducibility == TRUE & 
-           cor_bal_filter & 
            !is.na(zscore_bal_tech)) %>%
   dplyr::distinct(zscore_bal_tech, barcode,
                   filter_zscore_bal_comb_rep, 

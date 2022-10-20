@@ -289,7 +289,7 @@ Are there any target groups that are prone to changes in cutting efficiency? And
 indel.data.freq <- indel.data %>%
   filter((sample == "Epigenetic Compound" | drug == "DMSO") & 
            indel_freq_filter & viab_reproducibility &
-           cor_TIF_filter & !is.na(freqCut)) %>%
+           !is.na(freqCut)) %>%
   distinct(IPR, drug, conc_char, sample, target, viab_mean, replicate,
            freqCut_global, freqCut, freqCut_mean, IPR,
            freqCut_diff_global, freqCut_diff_global_mean,
@@ -496,8 +496,7 @@ rank_dt = indel.data %>%
   filter(conc_char != "control" & 
            indel_freq_filter & 
            viab_reproducibility  & 
-           !is.na(zscore_TIF_global_comb_rep)  & 
-           cor_TIF_filter) %>%
+           !is.na(zscore_TIF_global_comb_rep)) %>%
   distinct(drug, conc_char, zscore_TIF_global_comb_rep , target, viab_mean, viab_reproducibility, filter_zscore_TIF_global_comb_rep) %>% 
   mutate(viab_mean = ave(viab_mean, drug, conc_char, FUN = mean),
          mean_eff_pval_comb = 2*pnorm(q = abs(zscore_TIF_global_comb_rep), lower.tail = FALSE),
@@ -1062,7 +1061,7 @@ row_wise_fisher_test(xtab_effect)
 
 ```{r S2A lowered TIF, fig.width = 6, fig.height = 6}
 all_compounds_lowerTIF = indel.data %>% 
-  filter(conc_char != "control" & indel_freq_filter & viab_reproducibility & cor_TIF_filter) %>% 
+  filter(conc_char != "control" & indel_freq_filter & viab_reproducibility) %>% 
   mutate(drug = gsub(" [(].*[)]", "", drug),
          drug_conc = paste(drug, conc_char, sep = " ")) %>% 
   distinct(zscore_TIF_global_comb_rep, viab_mean, drug_conc, target, freqCut_diff_global_mean) %>%

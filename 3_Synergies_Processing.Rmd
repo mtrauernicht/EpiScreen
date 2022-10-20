@@ -530,13 +530,13 @@ epistasis_tib %<>%
   distinct(drug_conc, feature, indelrate_slope, indelrate_slope_plot, ratio_slope, ratio_slope_plot)
 
 TIF_CCDs = epistasis_tib %>% 
-    filter(!grepl("DNA-PK", drug_conc)) %>% 
+    filter(!grepl("DNA-PK|control", drug_conc)) %>% 
   filter(!is.na(indelrate_slope_plot)) %>%
   distinct(drug_conc) %>%
 nrow()
 
 bal_CCDs = epistasis_tib %>% 
-    filter(!grepl("DNA-PK", drug_conc)) %>% 
+    filter(!grepl("DNA-PK|control", drug_conc)) %>% 
   filter(!is.na(ratio_slope_plot)) %>%
   distinct(drug_conc) %>%
   nrow()
@@ -544,7 +544,7 @@ bal_CCDs = epistasis_tib %>%
 paste("Of the 480 drug:concentration combinations,", TIF_CCDs,"had a significant CCD for the TIF and", bal_CCDs,"had a significant CCD for the balance")
 
 drug_conc_tib = filtered_drug_pvals %>% distinct(drug, conc_char) %>% 
-  filter(!grepl("DNA-PK", drug)) %>% 
+  filter(!grepl("DNA-PK|control", drug)) %>% 
   mutate(drug_conc = paste(drug, conc_char,sep = " "))
   
 TIF_CCDs = drug_conc_tib %>% left_join(epistasis_tib)%>% 
