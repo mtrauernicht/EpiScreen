@@ -1,44 +1,45 @@
-drug	target_main	target_second	pan_HDAC	HDAC1	HDAC2	HDAC3	HDAC4	HDAC6	HDAC7	HDAC8	HDAC10	HDAC11
-Apicidin	HDAC2, HDAC3, HDAC8				TRUE	TRUE				TRUE		
-AR-42	pan-HDAC		TRUE									
-Belinostat	pan-HDAC		TRUE									
-BML-210	pan-HDAC	HDAC4	TRUE				TRUE					
-BML-281	HDAC6 	HDAC3				TRUE		TRUE				
-CI994	class I HDAC, HDAC1, HDAC2, HDAC3, and HDAC8			TRUE	TRUE	TRUE				TRUE		
-CUDC-101	pan-HDAC		TRUE									
-Droxinostat	HDAC6, HDAC8	HDAC3				TRUE		TRUE		TRUE		
-Entinostat	HDAC1, HDAC3			TRUE		TRUE						
-Fluoro-SAHA	pan-HDAC		TRUE									
-Givinostat	HD2, HD1B, HD1A											
-ITSA-1	-											
-LAQ824	pan-HDAC		TRUE									
-M344	pan-HDAC		TRUE									
-MC-1293	HDAC1			TRUE								
-MC1568	HD1-A											
-Mocetinostat	HDAC1, HDAC2, HDAC3, HDAC11			TRUE	TRUE	TRUE						TRUE
-NCH-51	HDAC1, HDAC4, HDAC6			TRUE			TRUE	TRUE				
-Nexturastat A	HDAC6							TRUE				
-NSC-3852	pan-HDAC		TRUE									
-Nullscript	-											
-Oxamflatin	pan-HDAC		TRUE									
-PCI-24781	HDAC1, HDAC2, HDAC3, HDAC6, HDAC10			TRUE	TRUE	TRUE		TRUE			TRUE	
-PCI-34051	HDAC8									TRUE		
-Pracinostat	pan-HDAC		TRUE									
-Quisinostat	pan-HDAC		TRUE									
-Resminostat	HDAC1, HDAC3, HDAC6	HDAC8		TRUE		TRUE		TRUE		TRUE		
-RG2833	HDAC1, HDAC3			TRUE		TRUE						
-RGFP966	HDAC3					TRUE						
-Rocilinostat	HDAC6	HDAC1, HDAC2, HDAC3		TRUE	TRUE	TRUE		TRUE				
-Romidepsin	HDAC1, HDAC2			TRUE	TRUE							
-Scriptaid	pan-HDAC		TRUE									
-Sodium Phenylbutyrate	pan-HDAC		TRUE									
-Splitomicin	Sir2p											
-Suberoyl bis-hydroxamic acid	pan-HDAC		TRUE									
-Trichostatin A	pan-HDAC		TRUE									
-Tubacin	HDAC6	HDAC1		TRUE				TRUE				
-Tubastatin A	HDAC6	HDAC8						TRUE		TRUE		
-Tubastatin A HCl	HDAC6							TRUE		TRUE		
-Valproic acid	pan-HDAC		TRUE									
-Valproic acid hydroxamate	pan-HDAC		TRUE									
-Valproic acid sodium salt	pan-HDAC, HDAC2		TRUE									
-Vorinostat	HDAC1, HDAC3	pan-HDAC	TRUE	TRUE		TRUE						
+drug	target_main	target_second	pan_HDAC	HDAC1	HDAC2	HDAC3	HDAC4	HDAC5	HDAC6	HDAC7	HDAC8	HDAC9	HDAC10	HDAC11	other_human	non_human
+Apicidin	HDAC2, HDAC3, HDAC8				TRUE	TRUE					TRUE					
+AR-42	pan-HDAC		TRUE													
+Belinostat	pan-HDAC		TRUE													
+BML-210	pan-HDAC	HDAC4	TRUE				TRUE									
+BML-281	HDAC6 	HDAC3				TRUE			TRUE							
+CI994	class I HDAC, HDAC1, HDAC2, HDAC3, and HDAC8			TRUE	TRUE	TRUE					TRUE					
+CUDC-101	pan-HDAC		TRUE													
+Droxinostat	HDAC6, HDAC8	HDAC3				TRUE			TRUE		TRUE					
+Entinostat	HDAC1, HDAC3			TRUE		TRUE										
+Fluoro-SAHA	pan-HDAC		TRUE													
+Givinostat	HD2, HD1B, HD1A		TRUE													TRUE
+ITSA-1	-															
+LAQ824	pan-HDAC		TRUE													
+M344	pan-HDAC		TRUE													
+MC-1293	HDAC1			TRUE												
+MC1568	HD1-A		TRUE	TRUE			TRUE		TRUE							TRUE
+Mocetinostat	HDAC1, HDAC2, HDAC3, HDAC11			TRUE	TRUE	TRUE								TRUE		
+NCH-51	HDAC1, HDAC4, HDAC6			TRUE			TRUE		TRUE							
+Nexturastat A	HDAC6								TRUE							
+NSC-3852	pan-HDAC		TRUE													
+Nullscript	-															
+Oxamflatin	pan-HDAC		TRUE													
+PCI-24781	HDAC1, HDAC2, HDAC3, HDAC6, HDAC10			TRUE	TRUE	TRUE			TRUE				TRUE			
+PCI-34051	HDAC8										TRUE					
+Pracinostat	pan-HDAC		TRUE													
+Quisinostat	pan-HDAC		TRUE													
+Resminostat	HDAC1, HDAC3, HDAC6	HDAC8		TRUE		TRUE			TRUE		TRUE					
+RG2833	HDAC1, HDAC3			TRUE		TRUE										
+RGFP966	HDAC3					TRUE										
+Rocilinostat	HDAC6	HDAC1, HDAC2, HDAC3		TRUE	TRUE	TRUE			TRUE							
+Romidepsin	HDAC1, HDAC2			TRUE	TRUE											
+Scriptaid	pan-HDAC		TRUE													
+Sodium Phenylbutyrate	pan-HDAC		TRUE													
+Splitomicin	Sir2p														TRUE	
+Suberoyl bis-hydroxamic acid	pan-HDAC		TRUE													
+TMP269	class IIa HDAC						TRUE	TRUE		TRUE		TRUE				
+Trichostatin A	pan-HDAC		TRUE													
+Tubacin	HDAC6	HDAC1		TRUE					TRUE							
+Tubastatin A	HDAC6	HDAC8							TRUE		TRUE					
+Tubastatin A HCl	HDAC6								TRUE		TRUE					
+Valproic acid	pan-HDAC		TRUE													
+Valproic acid hydroxamate	pan-HDAC		TRUE													
+Valproic acid sodium salt	pan-HDAC, HDAC2		TRUE													
+Vorinostat	HDAC1, HDAC3	pan-HDAC	TRUE	TRUE		TRUE										
