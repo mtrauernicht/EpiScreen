@@ -571,10 +571,14 @@ drug_conc_CCDs = drug_conc_tib %>% left_join(epistasis_tib)%>%
 
 paste("Of the 160 drugs,", drug_CCDs,"had a significant CCD for the TIF and/or balance and", drug_conc_CCDs," of the 480 drug-concentrations")
 ```
+```{r separate control and other samples}
+ctrl_CCDs = epistasis_tib %>% filter(grepl("control", drug_conc))
+
+epistasis_tib = epistasis_tib %>% filter(!grepl("control", drug_conc))
+```
 
 
 ## Heatmap annoation
-
 ### Clone 5 clustering
 ```{r Clone 5 clustering}
 clone5.matrix = indel.data %>% 

@@ -828,9 +828,13 @@ dmso.TIF.score %<>% left_join(dmso.TIF.score.global)
 TIF_zscore_calc = screen.ratio.dt %>% 
   filter(!is.na(freqCut)) %>%
   distinct(barcode, replicate, tech, drug, well, plate, freqCut, freqCut_global, drug_plate, conc_char) %>% 
-  mutate(drug = ifelse(drug == "DMSO" & plate %in% c(1:6), paste(drug, drug_plate, well, "1", sep = " "), 
-                       ifelse(drug == "DMSO" & plate %in% c(7:12), paste(drug, drug_plate, well, "2", sep = " "),
-                              ifelse(drug == "DMSO" & plate %in% c(13:18), paste(drug, drug_plate, well, "3", sep = " "),drug)))) %>%
+  mutate(drug = case_when(drug == "DMSO" & plate %in% c(1:6) ~ 
+                            paste(drug, drug_plate, well, "1", sep = " "),
+                          drug == "DMSO" & plate %in% c(7:12) ~
+                            paste(drug, drug_plate, well, "2", sep = " "),
+                              drug == "DMSO" & plate %in% c(13:18) ~
+                            paste(drug, drug_plate, well, "3", sep = " "),
+                          T ~ drug)) %>%
   left_join(dmso.TIF.score)
 ```
 
@@ -961,10 +965,15 @@ dmso.bal.score %<>% left_join(dmso.bal.score.global)
 ```{r combine DMSO bal in table}
 bal_zscore_calc = screen.ratio.dt %>% 
   filter(!is.na(freqCut)) %>%
-  distinct(barcode, replicate, tech, drug, well, plate, MMEJratio, MMEJratio_global, drug_plate, conc_char) %>% 
-  mutate(drug = ifelse(drug == "DMSO" & plate %in% c(1:6), paste(drug, drug_plate, well, "1", sep = " "), 
-                       ifelse(drug == "DMSO" & plate %in% c(7:12), paste(drug, drug_plate, well, "2", sep = " "),
-                              ifelse(drug == "DMSO" & plate %in% c(13:18), paste(drug, drug_plate, well, "3", sep = " "),drug)))) %>%
+  distinct(barcode, replicate, tech, drug, well, plate, 
+           MMEJratio, MMEJratio_global, drug_plate, conc_char) %>% 
+  mutate(drug = case_when(drug == "DMSO" & plate %in% c(1:6) ~ 
+                            paste(drug, drug_plate, well, "1", sep = " "),
+                          drug == "DMSO" & plate %in% c(7:12) ~
+                            paste(drug, drug_plate, well, "2", sep = " "),
+                          drug == "DMSO" & plate %in% c(13:18) ~
+                            paste(drug, drug_plate, well, "3", sep = " "),
+                          T ~ drug)) %>%
   left_join(dmso.bal.score)
 ```
 

@@ -679,6 +679,7 @@ target <- indel.data %>%
   distinct(drug_conc, conc_char, target, viab) %>% 
   column_to_rownames(var="drug_conc")
 ```
+
 ### IPR annotation
 ```{r IPR annotation}
 chromatin <- readRDS(
@@ -700,5 +701,8 @@ TIF_IPR = indel.data %>% filter(drug == "DMSO") %>%
 chromatin_TIF = chromatin %>% rownames_to_column(var = "IPR") %>%
   left_join(TIF_IPR) %>%
   column_to_rownames("IPR")
-```1
+```
+
+
+
 
