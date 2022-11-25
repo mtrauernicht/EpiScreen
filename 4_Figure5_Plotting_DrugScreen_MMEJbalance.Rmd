@@ -751,9 +751,8 @@ dmso_bal <- indel.data %>%
 
 top_50_hits = balance.data.heatmap %>% 
   distinct(drug_conc, MMEJ_log2_FC_mean) %>%
-  arrange(desc(abs(MMEJ_log2_FC_mean))) %>% 
-  distinct(drug_conc) %>% 
-  dplyr::slice_head(n = 60)
+  arrange(desc(abs(MMEJ_log2_FC_mean))) %>%
+  distinct(drug_conc) %>% dplyr::slice_head(n = 50)
 
 balance.data.heatmap2 <- balance.data.heatmap %>% 
   filter(drug_conc %in% top_50_hits$drug_conc) %>%
@@ -904,7 +903,7 @@ dimnames(xtab_effect) <- list(
 row_wise_fisher_test(xtab_effect, p.adjust.method = "BH")
 ```
 
-```{r 5A MMEJ FC heatmap, warning = FALSE, fig.width = 10, fig.height = 12}
+```{r 5A MMEJ FC heatmap, warning = FALSE, fig.width = 10, fig.height = 16}
 # pdf(paste0(figure_out, "rs20220623_indelfrequency_heatmap_allconc.pdf"), width=20, height=8)
 balance.data.matrix = balance.data.heatmap2.clusters %>%
   arrange(target_all) %>%
@@ -937,10 +936,9 @@ Aim: Show which drugs and which target groups are responsible for the biggest gl
 rank_dt = indel.data %>% 
   filter(conc_char != "control" & pathway_bal_filter & 
            viab_reproducibility  & 
-           !is.na(zscore_bal_global_comb_rep)  & 
-           cor_bal_filter) %>%
+           !is.na(zscore_bal_global_comb_rep)) %>%
   #filter(!target %in% c("Aurora Kinase", "JAK", "PARP", "PIM", "HIF")) %>%
-  distinct(drug, conc_char, zscore_bal_global_comb_rep , target, cor_bal, viab_mean, filter_zscore_bal_global_comb_rep) %>% 
+  distinct(drug, conc_char, zscore_bal_global_comb_rep , target, viab_mean, filter_zscore_bal_global_comb_rep) %>% 
   arrange(desc(zscore_bal_global_comb_rep)) %>%
   mutate(viab_mean = ave(viab_mean, drug, conc_char, FUN = mean),
          p_val_bal = 2*pnorm(q = abs(zscore_bal_global_comb_rep), lower.tail = F),
@@ -1625,7 +1623,7 @@ target_all <- target_set_all %>%
   dplyr::select(target, viab)
 ```
 
-```{r S5A MMEJ boosting FC heatmap, warning = FALSE, fig.width = 6, fig.height = 6}
+```{r S5A MMEJ boosting FC heatmap, warning = FALSE, fig.width = 8, fig.height = 8}
 # pdf(paste0(figure_out, "rs20220623_indelfrequency_heatmap_allconc.pdf"), width=20, height=8)
 balance.data.matrix = balance.data.heatmap2.clusters %>%
   arrange(target_all) %>%

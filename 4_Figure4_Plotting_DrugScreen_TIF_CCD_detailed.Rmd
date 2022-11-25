@@ -179,7 +179,7 @@ group_colors = c("Euchromatin" = "#f7941d",
 colors_targets <-  c(HDAC="#60988D", HAT="#C6D0A8", Sirtuin="#8FCAAC",
                      HMT="#FDCDAC", DNMT="#D69C81", `Histone Demethylase`="#FFF2AE",
                      HIF="#E3DCD5", JAK="#C8D7E2", PIM="#9AB8C4", `Aurora Kinase`="#F4CAE4",
-                     PARP="#CB546F", `Epigenetic Reader Domain`= "#476D61", `DNA-PK`="#E07A43")
+                     PARP="#CB546F", `Epigenetic Reader Domain`= "#476D61", `DNA-PK`="#779ed7")
 
 conc_control_colors = c("CTRL" = colors_drugs[2], "100 nM" = colors_drugs[7], "1 µM" = colors_drugs[4], "10 µM" = "#000000")
 conc_colors = c("100 nM" = colors_drugs[7], "1 µM" = colors_drugs[4], "10 µM" = "#000000")
@@ -289,7 +289,7 @@ annotation_colors_scr = list(
   target = c(HDAC="#60988D", HAT="#C6D0A8", Sirtuin="#8FCAAC",
              HMT="#FDCDAC", DNMT="#D69C81", `Histone Demethylase`="#FFF2AE",
              HIF="#E3DCD5", JAK="#C8D7E2", PIM="#9AB8C4", `Aurora Kinase`="#F4CAE4",
-             PARP="#CB546F", `Epigenetic Reader Domain`= "#476D61", `DNA-PK`="#E07A43"),
+             PARP="#CB546F", `Epigenetic Reader Domain`= "#476D61", `DNA-PK`="#779ed7"),
   conc_char = conc_colors,
   clusters_drugs = sequential_hcl(7, "Plasma"),
   # viab_rep1 = c('#ffeee9', '#ffdcd4', '#ffcbbe', '#ffb8a8', '#fda693', '#f9947e', '#f4826a', '#ef6f56', '#e95b43', '#e24530'),
@@ -413,7 +413,7 @@ annotation_colors_scr = list(
   target = c(HDAC="#60988D", HAT="#C6D0A8", Sirtuin="#8FCAAC",
              HMT="#FDCDAC", DNMT="#D69C81", `Histone Demethylase`="#FFF2AE",
              HIF="#E3DCD5", JAK="#C8D7E2", PIM="#9AB8C4", `Aurora Kinase`="#F4CAE4",
-             PARP="#CB546F", `Epigenetic Reader Domain`= "#476D61", `DNA-PK`="#E07A43", 
+             PARP="#CB546F", `Epigenetic Reader Domain`= "#476D61", `DNA-PK`="#779ed7", 
              `Negative Control` = "#65BFA4", `MRN` = "#5D79AC"),
   conc_char = conc_colors,
   conc_char_ctrl = conc_control_colors,
@@ -464,7 +464,8 @@ clustering = data.frame(row.names=c('LMNB1', 'late_replicating', 'H3K9me2', 'H3K
 all_compounds_epistasis_TIF = CCD_tib %>%
   dplyr::select(drug_conc, indelrate_slope_plot, feature) %>%
   group_by(drug_conc) %>%
-  mutate(onlyNA = sum(is.na(indelrate_slope_plot))) %>% 
+  mutate(indelrate_slope_plot = ifelse(indelrate_slope_plot < 0, NA, indelrate_slope_plot),
+         onlyNA = sum(is.na(indelrate_slope_plot))) %>% 
   filter(onlyNA != 25) %>%
   reshape2::dcast(drug_conc ~ feature, value.var = "indelrate_slope_plot", fill = 0) %>% 
   column_to_rownames(var = "drug_conc")
@@ -473,7 +474,7 @@ target_ctrl = dplyr::select(target, -conc_char)
 
 quant_breaks <- quantile(all_compounds_epistasis_TIF, c(.01,.99), na.rm = T)
 palette_length <- 100
-breaks <- c(seq(quant_breaks[1], 0, length.out=ceiling(palette_length/2) + 1), 
+breaks <- c(seq(-0.01, 0, length.out=ceiling(palette_length/2) + 1), 
             seq(quant_breaks[2]/palette_length, quant_breaks[2], length.out=floor(palette_length/2)))
 colors = rev(diverge_hcl(length(breaks), palette = "Cork"))
 colors[which(breaks == 0)-1] = "white"
@@ -528,6 +529,7 @@ rank_dt = CCD_tib %>%
   filter(feature == "H3K27me3", !is.na(indelrate_slope_plot)) %>%
   distinct() %>%
   arrange(desc(indelrate_slope_plot)) %>%
+  filter(indelrate_slope_plot > 0) %>%
   mutate(rank = seq(1:n()))
 
 maxrank = nrow(rank_dt)
@@ -560,8 +562,7 @@ p2 = rank_dt %>%
 
 
 p3 = rank_dt %>% 
-  filter(!between(rank, 11, maxrank-10)) %>%
-  mutate(rank = seq(1:n())) %>% 
+  filter(rank < 11) %>%
   ggplot(., aes(x = rank, y = indelrate_slope_plot, fill = target)) +
   geom_bar(stat = "identity") + 
   scale_x_reverse() +
@@ -578,7 +579,7 @@ p3 = rank_dt %>%
 
 
 plot_grid(# p1, #comment out the slope per rank
-  p2, p3, labels = c("E", "F"), rel_widths = c(1, 7), nrow = 1)
+  p2, p3, rel_widths = c(1, 7), nrow = 1)
 
 # Samples to highlight in the heatmap S3C
 all_compounds_epistasis_TIF %>% 
@@ -596,6 +597,7 @@ rank_dt = CCD_tib %>%
   filter(feature == "m5C", !is.na(indelrate_slope_plot)) %>%
   distinct() %>%
   arrange(desc(indelrate_slope_plot)) %>%
+  filter(indelrate_slope_plot > 0) %>%
   mutate(rank = seq(1:n()))
 
 maxrank = nrow(rank_dt)
@@ -620,8 +622,6 @@ p2 = rank_dt %>%
   geom_vline(xintercept = max(rank_dt[rank_dt$indelrate_slope_plot  > 0.01, ]$rank) + 0.5)
 
 p3 = rank_dt %>% 
-  filter(!between(rank, 6, maxrank-3)) %>%
-  mutate(rank = seq(1:n())) %>% 
   ggplot(., aes(x = rank, y = indelrate_slope_plot, fill = target)) +
   geom_bar(stat = "identity") + 
   scale_x_reverse() +
@@ -637,8 +637,10 @@ p3 = rank_dt %>%
         axis.ticks.y=element_blank())
 
 
-plot_grid(# p1, # comment out the TIF slope 
-  p2, p3, labels = c("E", "F"), rel_widths = c(1, 6), nrow = 1)
+# plot_grid(# p1, # comment out the TIF slope 
+#   p2, p3, rel_widths = c(1, 6), nrow = 1)
+
+p3
 
 # Samples to highlight in the heatmap S3C
 all_compounds_epistasis_TIF %>% 
