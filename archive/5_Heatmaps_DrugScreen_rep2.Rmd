@@ -201,7 +201,7 @@ vorino_model <-lm(mymodel, data = tib.model)
 get_regression_table(vorino_model, conf.level = 0.99)
 
 
-vorino_model <- glm(MMEJ_diff~ , data = tib.model, family = 'binomial')
+vorino_model <- glm(MMEJ_diff~ H3K27me3, data = tib.model, family = 'binomial')
 tib.model
 
 ```

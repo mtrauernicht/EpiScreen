@@ -562,7 +562,7 @@ ggplot_custom(indel.data2[indel.data2$drug != "DNA-PKi",], aes(x = MMEJ_zscore_m
   xlab("MMEJ z-score") + ylab("Viability")+
   geom_smooth(method = lm, color = "grey") +
   theme(text = element_text(size = 14))+
-  facet_wrap(~concentration, nrow = 1, ncol = 3)+
+  facet_wrap(~concentration, nrow = 1, ncol = 3)
   
 # Do we need a more stringent viability cutoff? 0.7?
 
@@ -601,10 +601,10 @@ plt_replicate1 <- ggpairs(correlation.plot.rep1,
                upper = list(continuous = corColor),
                lower = list(continuous = function(data, mapping, ...) {
                    ggally_points(data = data[n, ], mapping = mapping, alpha = 0.1, size = 0.5) +
-                   geom_abline(slope = 1, lty = "dashed", col = "red") +
+                   geom_abline(slope = 1, lty = "dashed", col = "red") 
                    }),
                diag = list(continuous = function(data, mapping, ...) {
-                   ggally_densityDiag(data = data, mapping = mapping, alpha = 0.3, fill = "red") +
+                   ggally_densityDiag(data = data, mapping = mapping, alpha = 0.3, fill = "red") 
                    })) +
   ggtitle("Correlation Between Technical Replicates - replicate 1") +
   theme(text = element_text(size = 20))+
@@ -616,10 +616,10 @@ plt_replicate2 <- ggpairs(correlation.plot.rep2,
                upper = list(continuous = corColor),
                lower = list(continuous = function(data, mapping, ...) {
                    ggally_points(data = data[n, ], mapping = mapping, alpha = 0.1, size = 0.5) +
-                   geom_abline(slope = 1, lty = "dashed", col = "red") +
+                   geom_abline(slope = 1, lty = "dashed", col = "red") 
                    }),
                diag = list(continuous = function(data, mapping, ...) {
-                   ggally_densityDiag(data = data, mapping = mapping, alpha = 0.3, fill = "red") +
+                   ggally_densityDiag(data = data, mapping = mapping, alpha = 0.3, fill = "red") 
                    })) +
   ggtitle("Correlation Between Technical Replicates - replicate 2") +
   theme(text = element_text(size = 20))+
@@ -644,7 +644,7 @@ sp <- ggscatter(indel.data2, x = "E177", y = "E1504",
    conf.int = TRUE, ylab = "rep 2", xlab = "rep 1")
 
 sp + stat_cor(method = "pearson", label.x = -2, label.y = 1) + 
-  facet_wrap(~concentration) + 
+  facet_wrap(~concentration)
 
 
 # Correlation between biological replicates - only DMSO - all IPRs
@@ -658,7 +658,7 @@ sp <- ggscatter(indel.data2, x = "E177", y = "E1504",
    add.params = list(color = "blue", fill = "lightgray"), title = "mean drug effects on efficiency rep 1 vs. rep 2",
    conf.int = TRUE, ylab = "rep 2", xlab = "rep 1")
 
-sp + stat_cor(method = "pearson", label.x = 0.8, label.y = 0.7) +  
+sp + stat_cor(method = "pearson", label.x = 0.8, label.y = 0.7)
 ```
 
 
@@ -1495,7 +1495,6 @@ for (i in targets) {
 ```
 
 
-
 ```{r export}
 setwd("/DATA/usr/m.trauernicht/projects/EpiScreen/files_scripts/")
 filename <- SetFileName("_indel.data", "mt")
@@ -1509,4 +1508,3 @@ getwd()
 date()
 sessionInfo()
 ```
-
