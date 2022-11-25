@@ -516,8 +516,9 @@ clustering = data.frame(row.names=c('LMNB1', 'late_replicating', 'H3K9me2', 'H3K
 all_compounds_epistasis_TIF = CCD_tib %>%
   dplyr::select(drug_conc, indelrate_slope_plot, feature) %>%
   group_by(drug_conc) %>%
-  mutate(onlyNA = sum(is.na(indelrate_slope_plot))) %>% 
-  filter(onlyNA != 25 & !grepl("control", drug_conc)) %>%
+  mutate(indelrate_slope_plot = ifelse(indelrate_slope_plot < 0, NA, indelrate_slope_plot),
+         onlyNA = sum(is.na(indelrate_slope_plot))) %>% 
+  filter(onlyNA != 25) %>%
   reshape2::dcast(drug_conc ~ feature, value.var = "indelrate_slope_plot", fill = 0) %>% 
   column_to_rownames(var = "drug_conc")
 
@@ -659,11 +660,11 @@ CCD_tib %>%
 ```
 
 ## 3D All compound synergies with chromatin
-```{r 3D Synergies chromatin - TIF all, fig.width= 12, fig.height= 14}
+```{r 3D Synergies chromatin - TIF all, fig.width= 12, fig.height= 12}
 # change these numbers according to where you want to set the cutoff
 quant_breaks <- quantile(all_compounds_epistasis_TIF, c(.01,.99), na.rm = T)
 palette_length <- 100
-breaks <- c(seq(quant_breaks[1], 0, length.out=ceiling(palette_length/2) + 1), 
+breaks <- c(seq(-0.01, 0, length.out=ceiling(palette_length/2) + 1), 
             seq(quant_breaks[2]/palette_length, quant_breaks[2], length.out=floor(palette_length/2)))
 
 colors = rev(diverge_hcl(length(breaks), palette = "Cork"))
