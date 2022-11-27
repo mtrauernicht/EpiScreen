@@ -1778,6 +1778,39 @@ all_compounds_epistasis_bal = CCD_tib %>%
 target_ctrl = target %>% 
   dplyr::select(-conc_char, -bal_signif, -TIF_signif)
 ```
+
+
+```{r heatmap clustering, fig.width= 10, fig.height= 20}
+drugs_concs_tib = indel.data %>% distinct(drug, conc_char) %>% 
+  mutate(drug = gsub(" [(].*[)]", "", drug),
+         drug_conc = paste(drug, conc_char, sep = " "))
+
+clust_CCD = CCD_tib %>%
+  dplyr::select(drug_conc, ratio_slope_plot, feature) %>% 
+  left_join(drugs_concs_tib) %>%
+  mutate(ratio_slope_plot = ifelse(ratio_slope_plot < 0, NA, ratio_slope_plot),
+         ratio_slope_plot = ave(ratio_slope_plot, drug, feature, 
+                                    FUN = function(x) mean(x, na.rm = TRUE))) %>% 
+  distinct(ratio_slope_plot, feature, drug) %>%
+  pivot_wider(values_from = ratio_slope_plot, names_from = drug) %>% 
+  dplyr::select(where(~sum(!is.na(.x)) > 0 )) %>% 
+  replace(is.na(.), 0) %>%
+  column_to_rownames(var = "feature") %>%
+  t() %>%
+  dist(., method = "euclidean") %>%
+  hclust(., method = "ward.D2")
+
+drug_order_grouped = CCD_tib %>% 
+  distinct(drug_conc) %>%
+  left_join(drugs_concs_tib) %>%
+  filter(drug %in% labels(clust_CCD)) %>%
+  mutate(conc_char = factor(conc_char, levels = c("100 nM", "1 µM", "10 µM"))) %>%
+  arrange(conc_char) %>%
+  arrange(factor(drug, levels = labels(clust_CCD))) %>%
+  filter(drug_conc %in% rownames(all_compounds_epistasis_bal)) %>%
+  pull(drug_conc)
+```
+
 How many CCDs do we have in total?
 ```{r}
 drug_conc_table = target_set_drugs %>% rownames_to_column(var = "drug_conc") %>% distinct(drug_conc, drug)
@@ -1824,15 +1857,14 @@ slope.colors.temp = slope.colors
 colors = colorRampPalette(slope.colors.temp %>% pull(color))(length(breaks))
 #colors[which(quant_breaks == 0)-1] = "gray90"
 
-p = pheatmap(bal_synergy_matrix[, TRIP_chrom_clust$labels],
+p = pheatmap(bal_synergy_matrix[drug_order_grouped, TRIP_chrom_clust$labels],
              border_color = F,
              cellwidth = 8,
              cellheight = 8,
-             cluster_rows = cluster_rows,
+             cluster_rows = F,
              breaks = breaks,
              cluster_cols = TRIP_chrom_clust,
              annotation_row = target_set_drugs %>% dplyr::select(-drug),
-             clustering_distance_rows = "correlation",
              main = paste("Chromatin synergies - All effective drugs cluster"),
              color = colors,
              annotation_colors = annotation_colors_scr, 
