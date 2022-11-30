@@ -84,7 +84,7 @@ pdf.options(useDingbats = FALSE)
 ```
 
 ```{r parameter}
-max_viab_TIF_down = 0.75
+max_viab_TIF_down = 0.70
 ```
 
 
@@ -358,7 +358,7 @@ target_effects %>% filter(sign_global %in% c("TIF_Decrease", "Mixed_TIF_effect",
 
 mean_viab_table = indel.data %>% distinct(drug, conc_char, replicate, viab_mean, target ) %>%
   group_by(conc_char, drug, target) %>% 
-  summarise(mean_viab = mean(viab_mean)*100,
+  summarise(mean_viab = mean(viab_mean),
             sd_viab = sd(viab_mean)) %>% 
   mutate(drug = gsub(" [(].*[)]", "", drug),
          drug_conc = paste(drug, conc_char, sep = " "))
@@ -386,7 +386,7 @@ global_effects = indel.data %>%
          drug_conc = paste(drug, conc_char, sep = " ")) %>%
   left_join(mean_viab_table) %>%
   filter(mean_TIF_global_pval_adj_comb < 0.01 & 
-           !(freqCut_diff_global_mean < -0.05 & mean_viab < 60) & 
+           !(freqCut_diff_global_mean < -0.03 & mean_viab < max_viab_TIF_down) & 
            viab_reproducibility & 
            indel_freq_filter & 
            filter_zscore_TIF_global_comb_rep) %>%
@@ -447,7 +447,7 @@ all_TIF = indel.data %>%
          drug_conc = paste(drug, conc_char, sep = " ")) %>%
   group_by(drug_conc, target, replicate) %>% 
   dplyr::count() %>% 
-  filter(n == 18) %>% # All 18 sites
+  filter(n == 19) %>% # All 19 sites
   group_by(drug_conc, target) %>% 
   dplyr::count() %>% 
   filter(n == 2) # Both replicates
@@ -476,11 +476,11 @@ comp_near_all_TIF = near_all_TIF %>% # At least 15 sites
   group_by(drug, conc_char, drug_conc, target) %>% 
   dplyr::count() %>% 
   left_join(mean_viab_table) %>%
-  filter(n == 2 & mean_viab > 60) # Both replicates
+  filter(n == 2 & mean_viab > max_viab_TIF_down) # Both replicates
 
 near_all_TIF %>%
   left_join(mean_viab_table) %>% 
-  filter(mean_viab > 60) %>%
+  filter(mean_viab > max_viab_TIF_down) %>%
   knitr::kable()
 
 paste("Compounds that significantly (p BH adj < 0.01) changed the TIF in all 16 of the 18 sites in both replicates: ", paste(comp_near_all_TIF$drug_conc, collapse = ", "))
@@ -525,9 +525,9 @@ neg_zscore_signif = rank_dt %>%
 zscore_signif = min(pos_zscore_signif, neg_zscore_signif)
 
 bottom_hits = rank_dt  %>%
-filter(rank > (maxrank-20) & 
+filter(rank > (maxrank-30) & 
   filter_zscore_TIF_global_comb_rep & 
-  !(viab_mean < max_viab_TIF_down & zscore_TIF_global_comb_rep < -2.54) &
+  !(viab_mean < max_viab_TIF_down) &
     mean_eff_pval_adj_comb < 0.01) %>%
 distinct(drug, conc_char, zscore_TIF_global_comb_rep , target, viab_mean) %>%
 arrange(zscore_TIF_global_comb_rep) %>%
@@ -612,7 +612,7 @@ p1 = rank_dt %>%
 p2 = rank_dt %>% 
   filter(rank <= 75) %>%
   mutate(# n = ifelse(is.na(n), 1, 2),
-    col = case_when(rank < 18 & 
+    col = case_when(rank < 20 & 
                    filter_zscore_TIF_global_comb_rep & 
                    !(viab_mean < max_viab_TIF_down & zscore_TIF_global_comb_rep < -2.54) & 
                    mean_eff_pval_adj_comb < 0.01  & mean_eff_pval_adj_comb < 0.01 ~ target,
@@ -645,9 +645,9 @@ p3 = rank_dt %>%
   filter(rank >= (maxrank-75)) %>%
   # left_join(near_all_TIF) %>%
   mutate(# n = ifelse(is.na(n), 1, 2),
-    col = case_when(rank > (maxrank-20) & 
+    col = case_when(rank > (maxrank-30) & 
                    filter_zscore_TIF_global_comb_rep & 
-                   !(viab_mean < .75 & zscore_TIF_global_comb_rep < -2.54) & 
+                   !(viab_mean < .70 & zscore_TIF_global_comb_rep < -2.54) & 
                    mean_eff_pval_adj_comb < 0.01 ~ target,
                    filter_zscore_TIF_global_comb_rep & mean_eff_pval_adj_comb < 0.01 ~ "black",
                    T ~ "gray20")
@@ -792,7 +792,8 @@ mean_data_drug = indel.data %>%
   #filter(target != "Aurora Kinase") %>%
   filter(sample == "Epigenetic Compound", indel_freq_filter, viab_reproducibility) %>%
   filter(!(viab_mean < max_viab_TIF_down & zscore_TIF_global_comb_rep < -1.96)) %>%  # we can choose to display all drugs that have significant global hits
-  distinct(conc_char, drug, target, IPR, zscore_TIF_comb_rep, freqCut_diff_mean, filter_zscore_TIF_comb_rep) %>%
+  distinct(conc_char, drug, target, IPR, zscore_TIF_comb_rep, 
+           freqCut_diff_mean, filter_zscore_TIF_comb_rep) %>%
   mutate(mean_eff_drug = ave(freqCut_diff_mean, drug, IPR, FUN = mean),
          drug = gsub(" [(].*[)]", "", drug)) %>%
   distinct(mean_eff_drug, drug, IPR) %>% 
@@ -939,10 +940,12 @@ paste(welch_tib %>% filter(p.adj < 0.01) %>% distinct(drug) %>% nrow(),
 # Add this information to the heatmap
 target_all <- target_set_drugs %>% 
   rownames_to_column(var = "drug_conc") %>%
-  left_join(welch_tib) %>%
+  # left_join(welch_tib) %>% # We don't use the Welch test finally.
   filter(drug_conc %in% rownames(eff.data.heatmap2)) %>%
   column_to_rownames(var = "drug_conc") %>%
-  dplyr::select(target, viab, p.adj.Welch)
+  dplyr::select(target, viab, 
+                #p.adj.Welch
+                )
 
 # Control samples
 freqCut_ctrl_tib = indel.data %>% 
@@ -1045,6 +1048,7 @@ plt1 = pheatmap(eff.data.heatmap2[drug_order_grouped , clone5_map_ipr$labels],
 decrease_hits = rank_dt %>% filter(filter_zscore_TIF_global_comb_rep & viab_reproducibility &
                    mean_eff_pval_adj_comb < 0.01 & zscore_TIF_global_comb_rep < 0 &
                      !(viab_mean < max_viab_TIF_down & zscore_TIF_global_comb_rep < -1.96)) %>% 
+  distinct(target, drug) %>%
   group_by(target) %>%
   count() %>%
   dplyr::rename(effect = n) %>%
@@ -1065,7 +1069,7 @@ all_drugs = indel.data %>% filter(sample == "Epigenetic Compound") %>%
 all_drugs = all_drugs-decrease_hits
 
 cont_table = cbind(decrease_hits,all_drugs) %>% as.matrix()
-rownames(cont_table) = c("AurK", "ERD", "other")
+rownames(cont_table) = c("AurK", "ERD", "HDM", "other")
 
 xtab_effect = as.table(cont_table)
 
@@ -1079,63 +1083,75 @@ dimnames(xtab_effect) <- list(
 row_wise_fisher_test(xtab_effect)
 ```
 
-```{r S2A lowered TIF, fig.width = 6, fig.height = 6}
-all_compounds_lowerTIF = indel.data %>% 
-  filter(conc_char != "control" & indel_freq_filter & viab_reproducibility) %>% 
-  mutate(drug = gsub(" [(].*[)]", "", drug),
-         drug_conc = paste(drug, conc_char, sep = " ")) %>% 
-  distinct(zscore_TIF_global_comb_rep, viab_mean, drug_conc, target, freqCut_diff_global_mean) %>%
-  mutate(viab = ave(viab_mean, drug_conc, target, FUN = mean),
-         TIF_diff = ave(freqCut_diff_global_mean, drug_conc, target,  FUN = mean),
-         mean_eff_pval_comb = 2*pnorm(q = abs(zscore_TIF_global_comb_rep), lower.tail = FALSE),
-         mean_eff_pval_adj_comb = p.adjust(mean_eff_pval_comb, method = 'BH')) %>%
-  distinct(target, drug_conc, TIF_diff, viab, mean_eff_pval_adj_comb)
-
+```{r S2A lowered TIF, fig.width = 10, fig.height = 5}
 p1 = indel.data %>% mutate(drug = gsub(" [(].*[)]", "", drug),
                            drug_conc = paste(drug, conc_char, sep = " ")) %>% 
-  filter(drug_conc %in% bottom_hits$drug_conc) %>%
-  distinct(zscore_TIF_global_comb_rep, viab_mean, drug_conc, target, freqCut_diff_global_mean) %>%
-  mutate(viab = ave(viab_mean, drug_conc, target, FUN = mean),
-         TIF_diff = ave(freqCut_diff_global_mean, drug_conc, target,  FUN = mean)) %>%
-  # group_by(drug_conc, target) %>%
-  # summarise(viab_mean = mean(viab_mean),
-  #           freqCut_diff_global_mean = mean(freqCut_diff_global_mean)) %>%
-  ggplot(., aes(viab_mean, freqCut_diff_global_mean, color = target, alpha = 0.8)) +
-  geom_point(size = 3) +
-  geom_point(data = all_compounds_lowerTIF, 
-             aes(viab, TIF_diff, color = "gray70", alpha = 0.8)) +
-  stat_cor(data = all_compounds_lowerTIF, 
-           aes(viab, TIF_diff, group = 1), 
-           method = "pearson",
+  filter(conc_char != "control" & !is.na(freqCut_diff_global_mean)) %>%
+  distinct(zscore_TIF_global_comb_rep, viab_mean, 
+           replicate, drug_conc, target, freqCut_diff_global_mean) %>%
+  group_by(drug_conc, target) %>%
+  summarise(viab_mean = mean(viab_mean),
+            freqCut_diff_global_mean = mean(freqCut_diff_global_mean)) %>%
+  ggplot(., aes(viab_mean, freqCut_diff_global_mean)) +
+  geom_point(size = 2) + 
+  stat_cor(method = "pearson",
            label.y = -.17,
-           label.x = .8) +
-  stat_cor(data = all_compounds_lowerTIF %>% 
-             filter(mean_eff_pval_adj_comb < 0.01 & TIF_diff < 0), 
-           aes(viab, TIF_diff, group = 1), 
-           method = "pearson",
-           label.y = -.2,
-           label.x = .8) +
-  scale_x_continuous(labels = scales::percent, limits = c(0, 1.1)) +
+           label.x = .6) +
+  geom_smooth(method = "lm", color = "red", lty = "dashed") +
+  scale_x_continuous(labels = scales::percent) +
   scale_y_continuous(labels = scales::percent) +
-  geom_point(aes(viab, TIF_diff, color = target, alpha = 1), size = 4) +
-  geom_line(aes(group = drug_conc)) +
   scale_color_manual(values = 
                        annotation_colors_scr$target[names(annotation_colors_scr$target) %in%
                                                       unique(bottom_hits$target)]) +
   theme_classic2(base_size = 16) +
-  geom_vline(xintercept = 0.75, color = "red", linetype="dotted") +
-  annotate("rect",xmin=0,xmax=0.50,ymin=-Inf,ymax=Inf, alpha=0.05, fill="red") +
+  geom_vline(xintercept = 0.25, color = "red", linetype="dotted") +
+  annotate("rect",
+           xmin = 0, xmax = 0.25,
+           ymin = -Inf, ymax = Inf, 
+           alpha = 0.05, fill = "red") +
   ylab("Global TIF change") +
   xlab("Viability compared to control") +
   theme(legend.position="none")
 
-p1
+p2 = indel.data %>% mutate(drug = gsub(" [(].*[)]", "", drug),
+                           drug_conc = paste(drug, conc_char, sep = " ")) %>% 
+  filter(conc_char != "control" & !is.na(freqCut_diff_global_mean)) %>%
+  distinct(zscore_TIF_global_comb_rep, viab_mean, 
+           replicate, drug_conc, target, freqCut_diff_global_mean) %>%
+  group_by(drug_conc, target) %>%
+  summarise(viab_mean = mean(viab_mean),
+            freqCut_diff_global_mean = mean(freqCut_diff_global_mean)) %>%
+  filter(viab_mean > max_viab_TIF_down) %>%
+  ggplot(., aes(viab_mean, freqCut_diff_global_mean)) +
+  geom_point(size = 2) + 
+  geom_point(data = . %>% filter(drug_conc %in% bottom_hits$drug_conc),
+             aes(viab_mean, freqCut_diff_global_mean, color = target), size = 3) +
+  stat_cor(method = "pearson",
+           label.y = -.17,
+           label.x = .6) +
+  geom_smooth(method = "lm") +
+  scale_x_continuous(labels = scales::percent) +
+  scale_y_continuous(labels = scales::percent) +
+  scale_color_manual(values = 
+                       annotation_colors_scr$target[names(annotation_colors_scr$target) %in%
+                                                      unique(bottom_hits$target)]) +
+  theme_classic2(base_size = 16) +
+  geom_vline(xintercept = max_viab_TIF_down, color = "red", linetype="dotted") +
+  annotate("rect",
+           xmin = 0, xmax = max_viab_TIF_down,
+           ymin = -Inf, ymax = Inf, 
+           alpha = 0.05, fill = "red") +
+  ylab("Global TIF change") +
+  xlab("Viability compared to control") +
+  theme(legend.position="none")
+
+plot_grid(p1, p2)
 ```
 
 ---
 
 ```{r SCRATCH: Check replicates, fig.width= 6, fig.height=4, echo = FALSE, eval=FALSE}
-test_drug_short = "PJ34"
+test_drug_short = "Bromosporine"
 
 drug_df <- indel.data %>%
   mutate(drug = gsub(" [(].*[)]", "", drug)) %>%

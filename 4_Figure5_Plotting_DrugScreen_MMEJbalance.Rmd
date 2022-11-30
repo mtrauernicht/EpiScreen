@@ -1170,14 +1170,16 @@ Dec_NU_tib %>%
 ```
 
 ## 5C: Decitabine combined with NU7441
-```{r 5E Dec NU7441 combination TIDE, fig.width = 6, fig.height = 6}
+```{r 5E Dec NU7441 combination TIDE, fig.width = 8, fig.height = 4}
 decitabine_nu7441_all <- read_csv("/DATA/usr/m.trauernicht/projects/EpiScreen/data/decitabine_synergy_indels.csv") %>%
-  filter(mutation %in% c(-7, 0, 1, 2))  %>% 
-  mutate(pathway = as.factor(case_when(mutation == -7 ~ "MMEJ",
+  filter(mutation %in% seq(-12, 2))  %>% 
+  mutate(mutation = factor(mutation, levels = seq(-12, 2)),
+         pathway = case_when(mutation == -7 ~ "MMEJ",
                                        mutation == 1 ~ "NHEJ",
                                        mutation == 2 ~ "SSTR", 
-                                       T ~ "TIF")),
-         pathway = factor(pathway, levels = c("TIF", "NHEJ", "MMEJ", "SSTR")),
+                                       mutation == 0 ~ "TIF", 
+                                       T ~ "other"),
+         pathway = factor(pathway, levels = c("TIF", "NHEJ", "MMEJ", "SSTR", "other")),
          ssODN = case_when(grepl("ssODN", condition) ~ TRUE,
                            T ~ FALSE),
          condition = gsub("_ssODN", "", condition),
@@ -1188,9 +1190,15 @@ decitabine_nu7441_all <- read_csv("/DATA/usr/m.trauernicht/projects/EpiScreen/da
   
 
 decitabine_nu7441_df = decitabine_nu7441_all %>%
-  mutate(percentage_mean = ave(percentage, pathway, condition, ssODN, FUN = mean),
-         percentage_sd = ave(percentage, pathway, condition, ssODN, FUN = sd)) %>%
-  distinct(pathway, condition, percentage_mean, percentage_sd, ssODN)
+  mutate(percentage_mean = ave(percentage, mutation, condition, ssODN, FUN = mean),
+         percentage_sd = ave(percentage, mutation, condition, ssODN, FUN = sd)) %>%
+  distinct(pathway, mutation, condition, 
+           percentage_mean, percentage_sd, ssODN, rep) %>% 
+  filter(ssODN, condition %in% c("DMSO", "Decitabine"))
+
+decitabine_df = decitabine_nu7441_all %>%
+  distinct(pathway, mutation, condition, percentage, ssODN, rep) %>% 
+  filter(ssODN, condition %in% c("DMSO", "Decitabine"))
 
 colors_DecNu = c(Decitabine = "#D69C81", 
                  NU7441 = "#779ed7", 
@@ -1212,16 +1220,17 @@ print(i)
 print(stats_mean)
 }
 
-decitabine_nu7441_all %>%
-  filter(ssODN) %>%
-  ggboxplot(., x = "condition",
-            y = "percentage",
-            color = "condition", 
-            add = "jitter", 
-            palette = colors_DecNu, 
-            facet.by = "pathway") +
-  stat_compare_means(comparisons = my_comparisons, 
-    label = "p.signif", method = "t.test")
+ggplot(decitabine_nu7441_df, 
+            aes(mutation, percentage_mean, group = condition, alpha = condition)) + 
+  geom_bar(stat = "identity", 
+           aes(fill = pathway), 
+           position = position_dodge(width = 1)) + 
+  geom_jitter(data = decitabine_df, 
+              aes(mutation, percentage, fill = pathway, 
+                  shape = factor(rep)), 
+              position = position_dodge(width = 1)) + 
+  scale_fill_manual("legend", values = colors_pathways) + 
+  theme_pubr()
 ```
 *Conclusion Figure 5C: Decitabine blocks resection-dependent repair.*
 
@@ -1257,183 +1266,9 @@ ggplot(chromatin_effect,
   facet_wrap(target ~ ., ncol = 1)
 ```
 
-
-## 5E: Vorinostat pool follow-up
-Aim: Show that Vorinostat also specifically acts on H3K27me3 domains in the pool. 
-```{r 5E Vorinostat pool, fig.width = 12, fig.height = 10}
-vorinostat_validation = indel.data.validation %>% 
-  filter(replicate == "mean" & plasmid == "LBR2", drug %in% c("DMSO", "Vorinostat"), sum_bc_reads > 1000)%>% 
-  dplyr::select(barcode, drug, MMEJ_NHEJ, efficiency, all_of(chromatin_cols)) %>%
-  distinct() 
-
-barcde_all_reps_vorino = vorinostat_validation %>% 
-  distinct(barcode, drug) %>% 
-  group_by(barcode) %>%
-  summarise(bccount = n()) %>% 
-  filter(bccount == 2) %>%
-  pull(barcode)
-
-vorinostat_ratios = vorinostat_validation  %>% 
-  filter(barcode %in% barcde_all_reps_vorino) %>%
-  pivot_wider(names_from = drug, values_from = c(efficiency, MMEJ_NHEJ)) %>%
-  mutate(diff_TIF = efficiency_Vorinostat - efficiency_DMSO,
-         ratio_TIF = efficiency_Vorinostat/efficiency_DMSO,
-         log2_FC_TIF = log2(ratio_TIF),
-         diff_MMEJ_NHEJ = MMEJ_NHEJ_Vorinostat - MMEJ_NHEJ_DMSO,
-         ratio_MMEJ_NHEJ = MMEJ_NHEJ_Vorinostat/MMEJ_NHEJ_DMSO,
-         log2_FC_MMEJ_NHEJ = log2(ratio_MMEJ_NHEJ)) 
-
-barcde_all_reps_gsk = RSTP2_IndelRatios_Chromatin_2kb %>% 
-  distinct(barcode, drug) %>% 
-  group_by(barcode) %>%
-  summarise(bccount = n()) %>% 
-  filter(bccount == 2) %>%
-  pull(barcode)
-
-GSK_ratios = RSTP2_IndelRatios_Chromatin_2kb %>% 
-  filter(barcode %in% barcde_all_reps_gsk) %>%
-  # distinct(barcode, drug, MMEJ_NHEJ , efficiency) %>% 
-  pivot_wider(names_from = drug, values_from = c(efficiency, MMEJ_NHEJ)) %>%
-  mutate(diff_TIF = efficiency_GSK126 - efficiency_DMSO_GSK,
-         ratio_TIF = efficiency_GSK126/efficiency_DMSO_GSK,
-         log2_FC_TIF = log2(ratio_TIF),
-         diff_MMEJ_NHEJ = MMEJ_NHEJ_GSK126 - MMEJ_NHEJ_DMSO_GSK,
-         ratio_MMEJ_NHEJ = MMEJ_NHEJ_GSK126/MMEJ_NHEJ_DMSO_GSK,
-         log2_FC_MMEJ_NHEJ = log2(ratio_MMEJ_NHEJ))
-
-
-domain_levels = c('late_replicating', 'LAD', 'H3K9me2', 'H3K27me3')
-
-domains = paste0(domain_levels, '_domain')
-
-vorino.dt = vorinostat_ratios %>%
-  filter(!is.na(diff_TIF)) %>%
-  dplyr::select(barcode, log2_FC_MMEJ_NHEJ, domains) %>%
-  distinct(barcode, .keep_all = TRUE) %>%
-  data.table()
-
-dim(vorino.dt)
-
-
-
-
-vorino.dt[vorino.dt=='iDomain'] <- 0
-vorino.dt[vorino.dt=='Domain'] <- 1
-vorino.dt[vorino.dt=='DHS'] <- 1
-
-vorino.dt[is.na(LAD_domain), LAD_domain:=0]
-# vorino.dt[is.na(DHS_domain), DHS_domain:=0]
-
-vorino.dt[, (domains) := lapply(.SD, as.numeric), .SDcols = domains]
-
-colnames(vorino.dt) = gsub('_domain', '', colnames(vorino.dt))
-
-opt_df = get_combinations(domain_levels)
-
-k27me3 = vorino.dt %>% filter(late_replicating == 0, 
-                             LAD == 0,
-                             H3K9me2 == 0,
-                             H3K27me3 == 1) %>% 
-  pull(log2_FC_MMEJ_NHEJ)
-
-any.k27me3 = vorino.dt %>% filter(H3K27me3 == 1) %>% 
-  pull(log2_FC_MMEJ_NHEJ)
-
-not.k27me3 = vorino.dt %>% filter(H3K27me3 != 1) %>% 
-  pull(log2_FC_MMEJ_NHEJ)
-
-hetcomb = vorino.dt %>% filter(late_replicating == 1, 
-                              LAD == 1,
-                              H3K9me2 == 1,
-                              H3K27me3 == 0) %>% 
-  pull(log2_FC_MMEJ_NHEJ)
-
-idomain = vorino.dt %>% filter(late_replicating == 0, 
-                              LAD == 0,
-                              H3K9me2 == 0,
-                              H3K27me3 == 0) %>% 
-  pull(log2_FC_MMEJ_NHEJ)
-
-# DHS = vorino.dt %>% filter(late_replicating == 0,
-#                           LAD == 0,
-#                           H3K9me2 == 0,
-#                           H3K27me3 == 0,
-#                           DHS == 1) %>%
-#   pull(diff_TIF)
-
-wilcox.test(idomain, k27me3, alternative = "two.sided")
-
-wilcox.test(idomain, any.k27me3, alternative = "two.sided")
-wilcox.test(not.k27me3, any.k27me3, alternative = "two.sided")
-
-wilcox.test(idomain, hetcomb, alternative = "two.sided")
-
-# vorino.dt %>% mutate(state = ifelse(late_replicating == 1 & 
-#                                       LAD == 1 &
-#                                       H3K9me2 == 1 &
-#                                       H3K27me3 == 0, "Triple Heterochromatin", ifelse(
-#                                         late_replicating == 0 & 
-#                                           LAD == 0 & 
-#                                           H3K9me2 == 0 & 
-#                                           H3K27me3 == 0, "Euchromatin", ifelse(late_replicating == 0 &  
-#                                                                                  LAD == 0 & 
-#                                                                                  H3K9me2 == 0 & 
-#                                                                                  H3K27me3 == 1, "H3K27me3", "other-heterochromatin")))) %>%
-#   mutate(state = factor(state, levels = c("Euchromatin", "other-heterochromatin", "H3K27me3", "Triple Heterochromatin"))) %>%
-#   ggplot(., aes(log2_FC_MMEJ_NHEJ, fill = state)) +
-#   geom_density(alpha = 0.6, color = "white", size = .25) +
-#   scale_fill_manual(values = group_colors)
-
-
-GSK.dt = GSK_ratios %>%
-  filter(!is.na(diff_TIF)) %>%
-  dplyr::select(barcode, log2_FC_MMEJ_NHEJ, 
-                domains) %>%
-  distinct(barcode, .keep_all = TRUE) %>%
-  data.table()
-
-GSK.dt[GSK.dt=='iDomain'] <- 0
-GSK.dt[GSK.dt=='Domain'] <- 1
-GSK.dt[GSK.dt=='DHS'] <- 1
-GSK.dt[is.na(LAD_domain), LAD_domain:=0]
-
-GSK.dt[, (domains) := lapply(.SD, as.numeric), .SDcols = domains]
-colnames(GSK.dt) = gsub('_domain', '', colnames(GSK.dt))
-
-GSK.dt = GSK.dt %>% mutate(state = ifelse(late_replicating == 1 & 
-                                            LAD == 1 &
-                                            H3K9me2 == 1 &
-                                            H3K27me3 == 0, "Triple Heterochromatin", ifelse(
-                                              late_replicating == 0 & 
-                                                LAD == 0 & 
-                                                H3K9me2 == 0 & 
-                                                H3K27me3 == 0, "Euchromatin", ifelse(late_replicating == 0 &  
-                                                                                       LAD == 0 & 
-                                                                                       H3K9me2 == 0 & 
-                                                                                       H3K27me3 == 1, "H3K27me3", "other-heterochromatin"))))
-
-library(rstatix)
-GSK.dt %>% wilcox_test(., log2_FC_MMEJ_NHEJ ~ state)%>%
-  adjust_pvalue(method = "BH") %>%
-  add_significance("p.adj")
-```
-*Conclusion Figure 5D: MMEJ ratio FC is the strongest in H3K27me3 domains*
-
-## 5E: Vorinostat MMEJ FC per chromatin group
-Aim: Present a detailed view of the Vorinostat pool data
-```{r 5E Vorino upset pool, fig.width = 10, fig.height = 6}
-p1 = plot_comb_grid_beeswarm(vorino.dt, opt_df,
-                             domain_levels, 'log2_FC_MMEJ_NHEJ', min_count = 10, y_plabel=c(-2.8, 2.8))
-# p2 = plot_comb_grid_beeswarm(GSK.dt, opt_df,
-#                              domain_levels, 'log2_FC_MMEJ_NHEJ', min_count = 10, y_plabel=c(-2.5, 2.5))
-# plot_grid(p1, p2, labels = c("MMEJ ratio FC HDACi", "MMEJ ratio FC EZH2i"))
-
-p1
-```
-
 ## Vorinostat & GSK
 
-```{r 5F Validations vs screen in HDACi and EZH2i, fig.width=8, fig.height=8}
+```{r 5F Validations vs screen in HDACi and EZH2i, fig.width=8, fig.height=4}
 vorinostat_validation = indel.data.validation %>% 
   filter(replicate == "mean" & plasmid == "LBR2", drug %in% c("DMSO", "Vorinostat"), sum_bc_reads > 1000)%>% 
   dplyr::select(barcode, drug, MMEJ_NHEJ, efficiency, all_of(chromatin_cols)) %>%
@@ -1457,41 +1292,14 @@ vorinostat_ratios = vorinostat_validation  %>%
          log2_FC_MMEJ_NHEJ = log2(ratio_MMEJ_NHEJ),
          drug = "Vorinostat") 
 
-barcde_all_reps_gsk = RSTP2_IndelRatios_Chromatin_2kb %>% 
-  distinct(barcode, drug) %>% 
-  group_by(barcode) %>%
-  summarise(bccount = n()) %>% 
-  filter(bccount == 2) %>%
-  pull(barcode)
 
-GSK_ratios = RSTP2_IndelRatios_Chromatin_2kb %>% 
-  filter(barcode %in% barcde_all_reps_gsk) %>%
-  # distinct(barcode, drug, MMEJ_NHEJ , efficiency) %>% 
-  pivot_wider(names_from = drug, values_from = c(efficiency, MMEJ_NHEJ)) %>%
-  mutate(diff_TIF = efficiency_GSK126 - efficiency_DMSO_GSK,
-         ratio_TIF = efficiency_GSK126/efficiency_DMSO_GSK,
-         log2_FC_TIF = log2(ratio_TIF),
-         diff_MMEJ_NHEJ = MMEJ_NHEJ_GSK126 - MMEJ_NHEJ_DMSO_GSK,
-         ratio_MMEJ_NHEJ = MMEJ_NHEJ_GSK126/MMEJ_NHEJ_DMSO_GSK,
-         log2_FC_MMEJ_NHEJ = log2(ratio_MMEJ_NHEJ),
-         drug = "GSK-126")
-
-pool_validation_ratios = bind_rows(
-  vorinostat_ratios, # %>% filter(efficiency_DMSO < 0.85),  
-  GSK_ratios #%>% filter(efficiency_DMSO_GSK < 0.85)
-  ) %>% 
-  dplyr::select(-efficiency_Vorinostat, -efficiency_DMSO, -MMEJ_NHEJ_DMSO, 
-                -MMEJ_NHEJ_Vorinostat, -MMEJ_NHEJ_DMSO_GSK, -efficiency_DMSO_GSK, 
-                -MMEJ_NHEJ_DMSO_GSK, -MMEJ_NHEJ_GSK126, -efficiency_GSK126)
-
-valid_ratios_long = pool_validation_ratios %>% 
+valid_ratios_long = vorinostat_ratios %>% 
   dplyr::select(barcode, drug, all_of(chromatin.features.short.val), log2_FC_TIF, log2_FC_MMEJ_NHEJ) %>% 
   distinct() %>%
   pivot_longer(cols = chromatin.features.short.val, names_to = "feature", values_to = "zscore")
 
 vorino_screen_K27 = indel.data %>% 
-  filter((grepl("Vorinostat", drug) & conc_char == "1 µM") | 
-           (grepl("3-Deazane", drug) & conc_char == "1 µM")) %>% 
+  filter((grepl("Vorinostat", drug) & conc_char == "1 µM")) %>% 
   distinct(drug, barcode, replicate, tech, freqCut_norm_mean, 
            H3K27me3,POL2, MMEJ_FC) %>%
   group_by(barcode, drug) %>% 
@@ -1544,12 +1352,10 @@ ggplot(vorino_k27.plot %>%
   stat_poly_eq(aes(label = paste(after_stat(eq.label),
                                  after_stat(rr.label), sep = "*\", \"*")),
                label.x = "left", label.y = "bottom") +
-  facet_grid(drug~source_2) +
+  facet_grid(.~source_2) +
   scale_alpha_discrete(range = c(0.2,1)) +
   scale_color_manual(values = c("HDACi" = "#60988D", "EZH2i" = "#FDCDAC"))
 ```
-
-
 
 
 # Supplementary Figure 5
@@ -1568,7 +1374,6 @@ top_10_MMEJ_hits = balance.data.heatmap %>%
   arrange(desc((MMEJ_log2_FC_mean))) %>% 
   distinct(drug_conc) %>%
   dplyr::slice_head(n = 6)
-
 
 
 #eff.data.heatmap2$freqCut_norm_mean[eff.data.heatmap2$mean_eff_zscore_comb > 0.05] <- NA

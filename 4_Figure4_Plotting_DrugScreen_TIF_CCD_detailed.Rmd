@@ -480,6 +480,40 @@ colors = rev(diverge_hcl(length(breaks), palette = "Cork"))
 colors[which(breaks == 0)-1] = "white"
 ```
 
+
+```{r heatmap clustering, fig.width= 10, fig.height= 20}
+drugs_concs_tib = indel.data %>% distinct(drug, conc_char, target) %>% 
+  filter(target == "HDAC") %>%
+  mutate(drug = gsub(" [(].*[)]", "", drug),
+         drug_conc = paste(drug, conc_char, sep = " "))
+
+clust_CCD = CCD_tib %>%
+  filter(drug_conc %in% drugs_concs_tib$drug_conc) %>%
+  dplyr::select(drug_conc, indelrate_slope_plot, feature) %>% 
+  left_join(drugs_concs_tib) %>%
+  mutate(indelrate_slope_plot = ifelse(indelrate_slope_plot < 0, NA, indelrate_slope_plot),
+         indelrate_slope_plot = ave(indelrate_slope_plot, drug, feature, 
+                                    FUN = function(x) mean(x, na.rm = TRUE))) %>% 
+  distinct(indelrate_slope_plot, feature, drug) %>%
+  pivot_wider(values_from = indelrate_slope_plot, names_from = drug) %>% 
+  dplyr::select(where(~sum(!is.na(.x)) > 0 )) %>% 
+  replace(is.na(.), 0) %>%
+  column_to_rownames(var = "feature") %>%
+  t() %>%
+  dist(., method = "euclidean") %>%
+  hclust(., method = "ward.D2")
+
+drug_order_grouped = CCD_tib %>% 
+  distinct(drug_conc) %>%
+  left_join(drugs_concs_tib) %>%
+  filter(drug %in% labels(clust_CCD)) %>%
+  mutate(conc_char = factor(conc_char, levels = c("100 nM", "1 µM", "10 µM"))) %>%
+  arrange(conc_char) %>%
+  arrange(factor(drug, levels = labels(clust_CCD))) %>%
+  filter(drug_conc %in% rownames(all_compounds_epistasis_TIF)) %>%
+  pull(drug_conc)
+```
+
 ---
 
 # Main figures
@@ -503,15 +537,14 @@ cluster_rows = ifelse(nrow(TIF_synergy_matrix) > 1, TRUE, FALSE)
 # colors = colorRampPalette(slope.colors.temp %>% pull(color))(length(breaks))
 # colors[which(quant_breaks == 0)-1] = "gray90"
 
-p = pheatmap(TIF_synergy_matrix[, TRIP_chrom_clust$labels],
+p = pheatmap(TIF_synergy_matrix[drug_order_grouped, TRIP_chrom_clust$labels],
              border_color = F,
              cellwidth = 8,
              cellheight = 8,
-             cluster_rows = cluster_rows,
+             cluster_rows = F,
              breaks = breaks,
              cluster_cols = TRIP_chrom_clust,
              annotation_row = target.HDAC,
-             clustering_distance_rows = "correlation",
              main = paste("Chromatin synergies - TIF HDAC cluster"),
              color = colors,
              annotation_colors = annotation_colors_scr, 
