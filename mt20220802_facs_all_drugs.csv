@@ -1,626 +1,626 @@
 drug;conc;rep;variable;value;exp
-AMG-900;100nm;2;Apoptotic cells;3,90120036934441e-01;effective_drugs
-AR-42;1um;2;Apoptotic cells;3,42410662989774e-01;effective_drugs
-AT9283;100nm;1;Apoptotic cells;1,42857142857143e-01;effective_drugs
-AT9283;100nm;2;Apoptotic cells;3,63700564971751e-01;effective_drugs
-Alisertib;100nm;1;Apoptotic cells;5,12820512820513e-02;effective_drugs
-Alisertib;100nm;2;Apoptotic cells;3,33486660533579e-01;effective_drugs
-Apicidin;100nm;1;Apoptotic cells;6,20925510313134e-02;effective_drugs
-Aurora A Inhibitor I;100nm;1;Apoptotic cells;9,91753239798650e-02;effective_drugs
-Aurora A Inhibitor I;100nm;2;Apoptotic cells;8,71274571972099e-02;effective_drugs
-Aurora A Inhibitor I;10um;1;Apoptotic cells;8,77415267659170e-02;effective_drugs
-Aurora A Inhibitor I;10um;2;Apoptotic cells;2,25142857142857e-01;effective_drugs
-Aurora A Inhibitor I;1um;1;Apoptotic cells;3,86398763523957e-02;effective_drugs
-Aurora A Inhibitor I;1um;2;Apoptotic cells;1,90909090909091e-01;effective_drugs
-Azacitidine;1um;1;Apoptotic cells;6,72428330522766e-02;effective_drugs
-Azacitidine;1um;2;Apoptotic cells;3,52969234438350e-02;effective_drugs
-BML-210;10um;1;Apoptotic cells;5,29128808123998e-02;effective_drugs
-BML-210;10um;2;Apoptotic cells;5,21279274741879e-02;effective_drugs
-BMN 673;1um;1;Apoptotic cells;2,42031334413830e-01;effective_drugs
-BMN 673;1um;2;Apoptotic cells;1,95519348268839e-01;effective_drugs
-Barasertib;1um;1;Apoptotic cells;1,67025862068966e-01;effective_drugs
-Barasertib;1um;2;Apoptotic cells;3,39353502818360e-01;effective_drugs
-C646;10um;1;Apoptotic cells;6,68718819658210e-02;effective_drugs
-C646;10um;2;Apoptotic cells;5,73649148778682e-02;effective_drugs
-CI994;10um;1;Apoptotic cells;8,26525198938992e-02;effective_drugs
-CI994;10um;2;Apoptotic cells;5,65717746820109e-02;effective_drugs
-CTPB;100nm;1;Apoptotic cells;6,48826590209196e-02;effective_drugs
-CTPB;100nm;2;Apoptotic cells;6,01828966880870e-02;effective_drugs
-CTPB;10um;1;Apoptotic cells;6,71554563808309e-02;effective_drugs
-CTPB;10um;2;Apoptotic cells;6,09801720912832e-02;effective_drugs
-CX-6258;1um;1;Apoptotic cells;8,35286597059450e-02;effective_drugs
-CX-6258;1um;2;Apoptotic cells;9,37740199846272e-02;effective_drugs
-CYC116;1um;1;Apoptotic cells;3,59460294572047e-02;effective_drugs
-CYC116;1um;2;Apoptotic cells;2,92849035187287e-01;effective_drugs
-CYT387;10um;1;Apoptotic cells;8,18750662848658e-02;effective_drugs
-CYT387;10um;2;Apoptotic cells;7,26297830855472e-02;effective_drugs
-DMSO;10um;1;Apoptotic cells;8,01610283212091e-02;effective_drugs
-DMSO;10um;2;Apoptotic cells;6,20614767791514e-02;effective_drugs
-DZNeP;1um;1;Apoptotic cells;4,93709694470874e-02;effective_drugs
-DZNeP;1um;2;Apoptotic cells;5,43651279539611e-02;effective_drugs
-Danusertib;100nm;1;Apoptotic cells;2,54460986168303e-02;effective_drugs
-Danusertib;100nm;2;Apoptotic cells;6,14589316484779e-02;effective_drugs
-Entinostat;10um;1;Apoptotic cells;5,94761171032357e-02;effective_drugs
-Entinostat;10um;2;Apoptotic cells;2,00841852074564e-01;effective_drugs
-Givinostat;1um;1;Apoptotic cells;2,49532127261385e-01;effective_drugs
-Givinostat;1um;2;Apoptotic cells;2,93367346938776e-01;effective_drugs
-I-BET-762;10um;1;Apoptotic cells;2,61085785329465e-02;effective_drugs
-I-BET-762;10um;2;Apoptotic cells;2,13825093336350e-02;effective_drugs
-LY2784544;1um;2;Apoptotic cells;1,00503129218309e-01;effective_drugs
-MK-5108;100nm;1;Apoptotic cells;8,88035009072473e-02;effective_drugs
-MK-5108;100nm;2;Apoptotic cells;1,24521561622863e-01;effective_drugs
-NSC-3852;10um;1;Apoptotic cells;1,00420555954457e-01;effective_drugs
-NSC-3852;10um;2;Apoptotic cells;1,33177570093458e-01;effective_drugs
-OTX015;10um;1;Apoptotic cells;NA;effective_drugs
-OTX015;10um;2;Apoptotic cells;1,90190190190190e-02;effective_drugs
-PAO;10um;1;Apoptotic cells;2,25914083136383e-01;effective_drugs
-PAO;10um;2;Apoptotic cells;1,71962616822430e-01;effective_drugs
-PCI-24781;100nm;1;Apoptotic cells;7,75095298602287e-02;effective_drugs
-PCI-24781;100nm;2;Apoptotic cells;6,35258739506327e-02;effective_drugs
-PCI-24781;1um;1;Apoptotic cells;7,23300456039877e-02;effective_drugs
-PCI-24781;1um;2;Apoptotic cells;5,70655515926700e-02;effective_drugs
-PJ34 HCl;10um;1;Apoptotic cells;7,22340425531915e-02;effective_drugs
-PJ34 HCl;10um;2;Apoptotic cells;6,07963823640246e-02;effective_drugs
-Pracinostat;10um;1;Apoptotic cells;4,63286713286713e-01;effective_drugs
-Pracinostat;10um;2;Apoptotic cells;4,87608994951813e-01;effective_drugs
-Quercetin;100nm;1;Apoptotic cells;6,99412706887347e-02;effective_drugs
-Quercetin;100nm;2;Apoptotic cells;5,51041137633316e-02;effective_drugs
-RG2833;10um;1;Apoptotic cells;4,88869954201725e-02;effective_drugs
-RG2833;10um;2;Apoptotic cells;5,59021406727829e-02;effective_drugs
-RGFP966;10um;1;Apoptotic cells;7,29919252018700e-02;effective_drugs
-RGFP966;10um;2;Apoptotic cells;5,97252882021094e-02;effective_drugs
-RVX-208;100nm;1;Apoptotic cells;6,48405735073828e-02;effective_drugs
-RVX-208;100nm;2;Apoptotic cells;5,60129740518962e-02;effective_drugs
-RVX-208;10um;1;Apoptotic cells;5,24914821124361e-02;effective_drugs
-RVX-208;10um;2;Apoptotic cells;5,29338327091136e-02;effective_drugs
-Resveratrol;10um;1;Apoptotic cells;8,76113703860840e-02;effective_drugs
-Resveratrol;10um;2;Apoptotic cells;5,82875686470294e-02;effective_drugs
-SGC 0946;10um;1;Apoptotic cells;8,14861726831328e-02;effective_drugs
-SGC 0946;10um;2;Apoptotic cells;5,65164433617539e-02;effective_drugs
-SGC-CBP30;10um;1;Apoptotic cells;7,56508749466496e-02;effective_drugs
-SGC-CBP30;10um;2;Apoptotic cells;5,98647818070067e-02;effective_drugs
-SNS-314 Mesylate;10um;1;Apoptotic cells;6,69574921375672e-03;effective_drugs
-SNS-314 Mesylate;10um;2;Apoptotic cells;1,26325287615610e-01;effective_drugs
-Scriptaid;1um;1;Apoptotic cells;8,71179966044143e-02;effective_drugs
-Scriptaid;1um;2;Apoptotic cells;5,63207083128382e-02;effective_drugs
-Suramin;100nm;1;Apoptotic cells;6,50786899191833e-02;effective_drugs
-Suramin;100nm;2;Apoptotic cells;6,05220022695751e-02;effective_drugs
-TG101209;1um;1;Apoptotic cells;6,38207945900254e-02;effective_drugs
-TG101209;1um;2;Apoptotic cells;3,37423312883436e-02;effective_drugs
-Tubastatin A HCl;10um;1;Apoptotic cells;6,62995128150815e-02;effective_drugs
-Tubastatin A HCl;10um;2;Apoptotic cells;5,69909753986896e-02;effective_drugs
-Vorinostat;1um;1;Apoptotic cells;5,66835871404399e-02;effective_drugs
-Vorinostat;1um;2;Apoptotic cells;5,16569200779727e-02;effective_drugs
-AMG-900;100nm;2;G1;3,21725965177896e-01;effective_drugs
-AR-42;1um;2;G1;6,39524724794688e-01;effective_drugs
-AT9283;100nm;1;G1;5,36069651741294e-01;effective_drugs
-AT9283;100nm;2;G1;3,29263780984092e-01;effective_drugs
-Alisertib;100nm;1;G1;3,02702702702703e-01;effective_drugs
-Alisertib;100nm;2;G1;2,84679089026915e-01;effective_drugs
-Apicidin;100nm;1;G1;6,62032816773017e-01;effective_drugs
-Aurora A Inhibitor I;100nm;1;G1;6,68172631078350e-01;effective_drugs
-Aurora A Inhibitor I;100nm;2;G1;6,41844956932481e-01;effective_drugs
-Aurora A Inhibitor I;10um;1;G1;5,84490740740741e-01;effective_drugs
-Aurora A Inhibitor I;10um;2;G1;5,29498525073746e-01;effective_drugs
-Aurora A Inhibitor I;1um;1;G1;3,11897106109325e-01;effective_drugs
-Aurora A Inhibitor I;1um;2;G1;2,40168539325843e-01;effective_drugs
-Azacitidine;1um;1;G1;5,97740112994350e-01;effective_drugs
-Azacitidine;1um;2;G1;5,31520395550062e-01;effective_drugs
-BML-210;10um;1;G1;6,47855530474041e-01;effective_drugs
-BML-210;10um;2;G1;6,00425079702444e-01;effective_drugs
-BMN 673;1um;1;G1;7,64076977904490e-01;effective_drugs
-BMN 673;1um;2;G1;6,86919831223629e-01;effective_drugs
-Barasertib;1um;1;G1;6,11901681759379e-01;effective_drugs
-Barasertib;1um;2;G1;3,36061292007661e-01;effective_drugs
-C646;10um;1;G1;6,68865885564782e-01;effective_drugs
-C646;10um;2;G1;6,12485276796231e-01;effective_drugs
-CI994;10um;1;G1;6,51168170252140e-01;effective_drugs
-CI994;10um;2;G1;5,59835644581407e-01;effective_drugs
-CTPB;100nm;1;G1;6,66590960708608e-01;effective_drugs
-CTPB;100nm;2;G1;6,18014464168310e-01;effective_drugs
-CTPB;10um;1;G1;6,82310058093177e-01;effective_drugs
-CTPB;10um;2;G1;6,49402390438247e-01;effective_drugs
-CX-6258;1um;1;G1;6,97512206463613e-01;effective_drugs
-CX-6258;1um;2;G1;6,23409669211196e-01;effective_drugs
-CYC116;1um;1;G1;3,66452991452991e-01;effective_drugs
-CYC116;1um;2;G1;3,56340288924559e-01;effective_drugs
-CYT387;10um;1;G1;6,97701282199376e-01;effective_drugs
-CYT387;10um;2;G1;5,83442838370565e-01;effective_drugs
-DMSO;10um;1;G1;7,17521498771499e-01;effective_drugs
-DMSO;10um;2;G1;6,36298868999911e-01;effective_drugs
-DZNeP;1um;1;G1;6,51690391459075e-01;effective_drugs
-DZNeP;1um;2;G1;6,48711640554189e-01;effective_drugs
-Danusertib;100nm;1;G1;5,22210184182015e-01;effective_drugs
-Danusertib;100nm;2;G1;6,00979192166463e-01;effective_drugs
-Entinostat;10um;1;G1;8,68283093053735e-01;effective_drugs
-Entinostat;10um;2;G1;8,14145974416855e-01;effective_drugs
-Givinostat;1um;1;G1;7,67525630368523e-01;effective_drugs
-Givinostat;1um;2;G1;6,12077453232688e-01;effective_drugs
-I-BET-762;10um;1;G1;6,10638297872340e-01;effective_drugs
-I-BET-762;10um;2;G1;6,10404624277457e-01;effective_drugs
-LY2784544;1um;2;G1;5,22510231923602e-01;effective_drugs
-MK-5108;100nm;1;G1;6,77052828862598e-01;effective_drugs
-MK-5108;100nm;2;G1;6,48498979889245e-01;effective_drugs
-NSC-3852;10um;1;G1;5,50741163055872e-01;effective_drugs
-NSC-3852;10um;2;G1;3,78706199460916e-01;effective_drugs
-OTX015;10um;1;G1;NA;effective_drugs
-OTX015;10um;2;G1;5,60090702947846e-01;effective_drugs
-PAO;10um;1;G1;7,92025862068966e-01;effective_drugs
-PAO;10um;2;G1;3,09819413092551e-01;effective_drugs
-PCI-24781;100nm;1;G1;7,04775022956841e-01;effective_drugs
-PCI-24781;100nm;2;G1;6,06101150655606e-01;effective_drugs
-PCI-24781;1um;1;G1;6,76803475477307e-01;effective_drugs
-PCI-24781;1um;2;G1;5,83018129646537e-01;effective_drugs
-PJ34 HCl;10um;1;G1;6,66208003669304e-01;effective_drugs
-PJ34 HCl;10um;2;G1;6,28594356025144e-01;effective_drugs
-Pracinostat;10um;1;G1;6,82003257328990e-01;effective_drugs
-Pracinostat;10um;2;G1;4,23197492163009e-01;effective_drugs
-Quercetin;100nm;1;G1;6,75086107921929e-01;effective_drugs
-Quercetin;100nm;2;G1;5,87207739854878e-01;effective_drugs
-RG2833;10um;1;G1;5,85666293393057e-01;effective_drugs
-RG2833;10um;2;G1;5,63617517491578e-01;effective_drugs
-RGFP966;10um;1;G1;6,97994269340974e-01;effective_drugs
-RGFP966;10um;2;G1;5,98669623059867e-01;effective_drugs
-RVX-208;100nm;1;G1;6,60183066361556e-01;effective_drugs
-RVX-208;100nm;2;G1;6,30368706224395e-01;effective_drugs
-RVX-208;10um;1;G1;6,27036745701764e-01;effective_drugs
-RVX-208;10um;2;G1;6,38017400474558e-01;effective_drugs
-Resveratrol;10um;1;G1;7,34712857475006e-01;effective_drugs
-Resveratrol;10um;2;G1;6,41484426772697e-01;effective_drugs
-SGC 0946;10um;1;G1;6,98689956331878e-01;effective_drugs
-SGC 0946;10um;2;G1;6,20965659695327e-01;effective_drugs
-SGC-CBP30;10um;1;G1;6,12951633383355e-01;effective_drugs
-SGC-CBP30;10um;2;G1;5,91004184100418e-01;effective_drugs
-SNS-314 Mesylate;10um;1;G1;2,70656725564294e-01;effective_drugs
-SNS-314 Mesylate;10um;2;G1;2,42705912729151e-01;effective_drugs
-Scriptaid;1um;1;G1;6,98593513890503e-01;effective_drugs
-Scriptaid;1um;2;G1;6,15063851967683e-01;effective_drugs
-Suramin;100nm;1;G1;6,55141037306642e-01;effective_drugs
-Suramin;100nm;2;G1;6,32129915447591e-01;effective_drugs
-TG101209;1um;1;G1;6,43340857787810e-01;effective_drugs
-TG101209;1um;2;G1;6,26373626373626e-01;effective_drugs
-Tubastatin A HCl;10um;1;G1;6,61297640653357e-01;effective_drugs
-Tubastatin A HCl;10um;2;G1;6,41059255374934e-01;effective_drugs
-Vorinostat;1um;1;G1;6,19955156950673e-01;effective_drugs
-Vorinostat;1um;2;G1;6,16649537512847e-01;effective_drugs
-AMG-900;100nm;2;G2;5,41256623769871e-01;effective_drugs
-AR-42;1um;2;G2;2,56858291106063e-01;effective_drugs
-AT9283;100nm;1;G2;2,27611940298507e-01;effective_drugs
-AT9283;100nm;2;G2;5,45689974102849e-01;effective_drugs
-Alisertib;100nm;1;G2;5,70810810810811e-01;effective_drugs
-Alisertib;100nm;2;G2;5,77984817115252e-01;effective_drugs
-Apicidin;100nm;1;G2;9,18413855970830e-02;effective_drugs
-Aurora A Inhibitor I;100nm;1;G2;9,76102722625134e-02;effective_drugs
-Aurora A Inhibitor I;100nm;2;G2;1,03917754931926e-01;effective_drugs
-Aurora A Inhibitor I;10um;1;G2;1,79398148148148e-01;effective_drugs
-Aurora A Inhibitor I;10um;2;G2;1,99115044247788e-01;effective_drugs
-Aurora A Inhibitor I;1um;1;G2;4,95176848874598e-01;effective_drugs
-Aurora A Inhibitor I;1um;2;G2;6,12359550561798e-01;effective_drugs
-Azacitidine;1um;1;G2;1,67231638418079e-01;effective_drugs
-Azacitidine;1um;2;G2;1,89122373300371e-01;effective_drugs
-BML-210;10um;1;G2;9,25507900677201e-02;effective_drugs
-BML-210;10um;2;G2;1,00690754516472e-01;effective_drugs
-BMN 673;1um;1;G2;6,77120456165360e-02;effective_drugs
-BMN 673;1um;2;G2;9,02953586497890e-02;effective_drugs
-Barasertib;1um;1;G2;1,79818887451488e-01;effective_drugs
-Barasertib;1um;2;G2;4,97997562249695e-01;effective_drugs
-C646;10um;1;G2;8,54282789216244e-02;effective_drugs
-C646;10um;2;G2;1,10064127731972e-01;effective_drugs
-CI994;10um;1;G2;8,97524866990516e-02;effective_drugs
-CI994;10um;2;G2;1,23009758602979e-01;effective_drugs
-CTPB;100nm;1;G2;8,92573245514422e-02;effective_drugs
-CTPB;100nm;2;G2;1,05851413543721e-01;effective_drugs
-CTPB;10um;1;G2;8,30390705091696e-02;effective_drugs
-CTPB;10um;2;G2;8,49933598937583e-02;effective_drugs
-CX-6258;1um;1;G2;8,16089281562427e-02;effective_drugs
-CX-6258;1um;2;G2;1,02346621430591e-01;effective_drugs
-CYC116;1um;1;G2;4,95726495726496e-01;effective_drugs
-CYC116;1um;2;G2;4,59069020866774e-01;effective_drugs
-CYT387;10um;1;G2;9,66847637749798e-02;effective_drugs
-CYT387;10um;2;G2;1,59001314060447e-01;effective_drugs
-DMSO;10um;1;G2;7,36332923832924e-02;effective_drugs
-DMSO;10um;2;G2;9,47546531302876e-02;effective_drugs
-DZNeP;1um;1;G2;1,04759786476868e-01;effective_drugs
-DZNeP;1um;2;G2;9,87958047390910e-02;effective_drugs
-Danusertib;100nm;1;G2;1,80931744312026e-01;effective_drugs
-Danusertib;100nm;2;G2;1,57894736842105e-01;effective_drugs
-Entinostat;10um;1;G2;6,47662734818698e-02;effective_drugs
-Entinostat;10um;2;G2;8,96914973664409e-02;effective_drugs
-Givinostat;1um;1;G2;1,09587143252979e-01;effective_drugs
-Givinostat;1um;2;G2;2,46143747948802e-01;effective_drugs
-I-BET-762;10um;1;G2;1,79787234042553e-01;effective_drugs
-I-BET-762;10um;2;G2;1,75722543352601e-01;effective_drugs
-LY2784544;1um;2;G2;2,21009549795362e-01;effective_drugs
-MK-5108;100nm;1;G2;9,45296942719925e-02;effective_drugs
-MK-5108;100nm;2;G2;1,08131740017488e-01;effective_drugs
-NSC-3852;10um;1;G2;2,99885974914481e-01;effective_drugs
-NSC-3852;10um;2;G2;3,94878706199461e-01;effective_drugs
-OTX015;10um;1;G2;NA;effective_drugs
-OTX015;10um;2;G2;2,24489795918367e-01;effective_drugs
-PAO;10um;1;G2;6,94594109195402e-02;effective_drugs
-PAO;10um;2;G2;3,62866817155756e-01;effective_drugs
-PCI-24781;100nm;1;G2;7,48393021120294e-02;effective_drugs
-PCI-24781;100nm;2;G2;9,41932031040942e-02;effective_drugs
-PCI-24781;1um;1;G2;8,99737052703784e-02;effective_drugs
-PCI-24781;1um;2;G2;1,15690622146863e-01;effective_drugs
-PJ34 HCl;10um;1;G2;9,07006077284715e-02;effective_drugs
-PJ34 HCl;10um;2;G2;9,58940751638358e-02;effective_drugs
-Pracinostat;10um;1;G2;1,72638436482085e-01;effective_drugs
-Pracinostat;10um;2;G2;4,97089117778773e-01;effective_drugs
-Quercetin;100nm;1;G2;8,61079219288175e-02;effective_drugs
-Quercetin;100nm;2;G2;1,10454178984144e-01;effective_drugs
-RG2833;10um;1;G2;1,22060470324748e-01;effective_drugs
-RG2833;10um;2;G2;1,25421093547551e-01;effective_drugs
-RGFP966;10um;1;G2;7,62177650429799e-02;effective_drugs
-RGFP966;10um;2;G2;1,09169166557976e-01;effective_drugs
-RVX-208;100nm;1;G2;9,49656750572083e-02;effective_drugs
-RVX-208;100nm;2;G2;9,07889520285450e-02;effective_drugs
-RVX-208;10um;1;G2;1,04393752106978e-01;effective_drugs
-RVX-208;10um;2;G2;9,30661745320327e-02;effective_drugs
-Resveratrol;10um;1;G2;7,34712857475006e-02;effective_drugs
-Resveratrol;10um;2;G2;9,34393638170974e-02;effective_drugs
-SGC 0946;10um;1;G2;8,06711100896346e-02;effective_drugs
-SGC 0946;10um;2;G2;1,00180738445649e-01;effective_drugs
-SGC-CBP30;10um;1;G2;1,08853745815537e-01;effective_drugs
-SGC-CBP30;10um;2;G2;1,13493723849372e-01;effective_drugs
-SNS-314 Mesylate;10um;1;G2;6,55704218159534e-01;effective_drugs
-SNS-314 Mesylate;10um;2;G2;6,57113348825200e-01;effective_drugs
-Scriptaid;1um;1;G2;8,17156805765431e-02;effective_drugs
-Scriptaid;1um;2;G2;1,16497263487099e-01;effective_drugs
-Suramin;100nm;1;G2;9,69062784349408e-02;effective_drugs
-Suramin;100nm;2;G2;9,67655348275399e-02;effective_drugs
-TG101209;1um;1;G2;1,12866817155756e-01;effective_drugs
-TG101209;1um;2;G2;1,25763125763126e-01;effective_drugs
-Tubastatin A HCl;10um;1;G2;9,59618874773140e-02;effective_drugs
-Tubastatin A HCl;10um;2;G2;8,75721027792344e-02;effective_drugs
-Vorinostat;1um;1;G2;1,42376681614350e-01;effective_drugs
-Vorinostat;1um;2;G2;1,12281603288798e-01;effective_drugs
-AMG-900;100nm;2;S;1,37017411052233e-01;effective_drugs
-AR-42;1um;2;S;1,03616984099249e-01;effective_drugs
-AT9283;100nm;1;S;2,36318407960199e-01;effective_drugs
-AT9283;100nm;2;S;1,25046244913060e-01;effective_drugs
-Alisertib;100nm;1;S;1,26486486486486e-01;effective_drugs
-Alisertib;100nm;2;S;1,37336093857833e-01;effective_drugs
-Apicidin;100nm;1;S;2,46125797629900e-01;effective_drugs
-Aurora A Inhibitor I;100nm;1;S;2,34217096659137e-01;effective_drugs
-Aurora A Inhibitor I;100nm;2;S;2,54237288135593e-01;effective_drugs
-Aurora A Inhibitor I;10um;1;S;2,36111111111111e-01;effective_drugs
-Aurora A Inhibitor I;10um;2;S;2,71386430678466e-01;effective_drugs
-Aurora A Inhibitor I;1um;1;S;1,92926045016077e-01;effective_drugs
-Aurora A Inhibitor I;1um;2;S;1,47471910112360e-01;effective_drugs
-Azacitidine;1um;1;S;2,35028248587571e-01;effective_drugs
-Azacitidine;1um;2;S;2,79357231149567e-01;effective_drugs
-BML-210;10um;1;S;2,59593679458239e-01;effective_drugs
-BML-210;10um;2;S;2,98884165781084e-01;effective_drugs
-BMN 673;1um;1;S;1,68210976478974e-01;effective_drugs
-BMN 673;1um;2;S;2,22784810126582e-01;effective_drugs
-Barasertib;1um;1;S;2,08279430789133e-01;effective_drugs
-Barasertib;1um;2;S;1,65941145742643e-01;effective_drugs
-C646;10um;1;S;2,45705835513593e-01;effective_drugs
-C646;10um;2;S;2,77450595471797e-01;effective_drugs
-CI994;10um;1;S;2,59079343048809e-01;effective_drugs
-CI994;10um;2;S;3,17154596815614e-01;effective_drugs
-CTPB;100nm;1;S;2,44151714739950e-01;effective_drugs
-CTPB;100nm;2;S;2,76134122287968e-01;effective_drugs
-CTPB;10um;1;S;2,34650871397654e-01;effective_drugs
-CTPB;10um;2;S;2,65604249667995e-01;effective_drugs
-CX-6258;1um;1;S;2,20878865380144e-01;effective_drugs
-CX-6258;1um;2;S;2,74243709358213e-01;effective_drugs
-CYC116;1um;1;S;1,37820512820513e-01;effective_drugs
-CYC116;1um;2;S;1,84590690208668e-01;effective_drugs
-CYT387;10um;1;S;2,05613954025644e-01;effective_drugs
-CYT387;10um;2;S;2,57555847568988e-01;effective_drugs
-DMSO;10um;1;S;2,08845208845209e-01;effective_drugs
-DMSO;10um;2;S;2,68946477869801e-01;effective_drugs
-DZNeP;1um;1;S;2,43549822064057e-01;effective_drugs
-DZNeP;1um;2;S;2,52492554706720e-01;effective_drugs
-Danusertib;100nm;1;S;2,96858071505959e-01;effective_drugs
-Danusertib;100nm;2;S;2,41126070991432e-01;effective_drugs
-Entinostat;10um;1;S;6,69506334643949e-02;effective_drugs
-Entinostat;10um;2;S;9,61625282167043e-02;effective_drugs
-Givinostat;1um;1;S;1,22887226378498e-01;effective_drugs
-Givinostat;1um;2;S;1,41778798818510e-01;effective_drugs
-I-BET-762;10um;1;S;2,09574468085106e-01;effective_drugs
-I-BET-762;10um;2;S;2,13872832369942e-01;effective_drugs
-LY2784544;1um;2;S;2,56480218281037e-01;effective_drugs
-MK-5108;100nm;1;S;2,28417476865409e-01;effective_drugs
-MK-5108;100nm;2;S;2,43369280093267e-01;effective_drugs
-NSC-3852;10um;1;S;1,49372862029647e-01;effective_drugs
-NSC-3852;10um;2;S;2,26415094339623e-01;effective_drugs
-OTX015;10um;1;S;NA;effective_drugs
-OTX015;10um;2;S;2,15419501133787e-01;effective_drugs
-PAO;10um;1;S;1,38514727011494e-01;effective_drugs
-PAO;10um;2;S;3,27313769751693e-01;effective_drugs
-PCI-24781;100nm;1;S;2,20385674931129e-01;effective_drugs
-PCI-24781;100nm;2;S;2,99705646240300e-01;effective_drugs
-PCI-24781;1um;1;S;2,33222819252315e-01;effective_drugs
-PCI-24781;1um;2;S;3,01291248206600e-01;effective_drugs
-PJ34 HCl;10um;1;S;2,43091388602225e-01;effective_drugs
-PJ34 HCl;10um;2;S;2,75511568811021e-01;effective_drugs
-Pracinostat;10um;1;S;1,45358306188925e-01;effective_drugs
-Pracinostat;10um;2;S;7,97133900582176e-02;effective_drugs
-Quercetin;100nm;1;S;2,38805970149254e-01;effective_drugs
-Quercetin;100nm;2;S;3,02338081160978e-01;effective_drugs
-RG2833;10um;1;S;2,92273236282195e-01;effective_drugs
-RG2833;10um;2;S;3,10961388960871e-01;effective_drugs
-RGFP966;10um;1;S;2,25787965616046e-01;effective_drugs
-RGFP966;10um;2;S;2,92161210382157e-01;effective_drugs
-RVX-208;100nm;1;S;2,44851258581236e-01;effective_drugs
-RVX-208;100nm;2;S;2,78842341747060e-01;effective_drugs
-RVX-208;10um;1;S;2,68569502191257e-01;effective_drugs
-RVX-208;10um;2;S;2,68916424993409e-01;effective_drugs
-Resveratrol;10um;1;S;1,91815856777494e-01;effective_drugs
-Resveratrol;10um;2;S;2,65076209410205e-01;effective_drugs
-SGC 0946;10um;1;S;2,20638933578488e-01;effective_drugs
-SGC 0946;10um;2;S;2,78853601859024e-01;effective_drugs
-SGC-CBP30;10um;1;S;2,78194620801108e-01;effective_drugs
-SGC-CBP30;10um;2;S;2,95502092050209e-01;effective_drugs
-SNS-314 Mesylate;10um;1;S;7,36390562761720e-02;effective_drugs
-SNS-314 Mesylate;10um;2;S;1,00180738445649e-01;effective_drugs
-Scriptaid;1um;1;S;2,19690805532954e-01;effective_drugs
-Scriptaid;1um;2;S;2,68438884545218e-01;effective_drugs
-Suramin;100nm;1;S;2,47952684258417e-01;effective_drugs
-Suramin;100nm;2;S;2,71104549724869e-01;effective_drugs
-TG101209;1um;1;S;2,43792325056433e-01;effective_drugs
-TG101209;1um;2;S;2,47863247863248e-01;effective_drugs
-Tubastatin A HCl;10um;1;S;2,42740471869328e-01;effective_drugs
-Tubastatin A HCl;10um;2;S;2,71368641845831e-01;effective_drugs
-Vorinostat;1um;1;S;2,37668161434978e-01;effective_drugs
-Vorinostat;1um;2;S;2,71068859198356e-01;effective_drugs
-AMG-900;100nm;2;sum.apo;8,66400000000000e+01;effective_drugs
-AR-42;1um;2;sum.apo;8,70300000000000e+01;effective_drugs
-AT9283;100nm;1;sum.apo;9,38000000000000e+01;effective_drugs
-AT9283;100nm;2;sum.apo;8,49600000000000e+01;effective_drugs
-Alisertib;100nm;1;sum.apo;9,75000000000000e+01;effective_drugs
-Alisertib;100nm;2;sum.apo;8,69600000000000e+01;effective_drugs
-Apicidin;100nm;1;sum.apo;9,35700000000000e+01;effective_drugs
-Aurora A Inhibitor I;100nm;1;sum.apo;9,33700000000000e+01;effective_drugs
-Aurora A Inhibitor I;100nm;2;sum.apo;7,88500000000000e+01;effective_drugs
-Aurora A Inhibitor I;10um;1;sum.apo;9,47100000000000e+01;effective_drugs
-Aurora A Inhibitor I;10um;2;sum.apo;8,75000000000000e+01;effective_drugs
-Aurora A Inhibitor I;1um;1;sum.apo;9,70500000000000e+01;effective_drugs
-Aurora A Inhibitor I;1um;2;sum.apo;8,80000000000000e+01;effective_drugs
-Azacitidine;1um;1;sum.apo;9,48800000000000e+01;effective_drugs
-Azacitidine;1um;2;sum.apo;8,38600000000000e+01;effective_drugs
-BML-210;10um;1;sum.apo;9,35500000000000e+01;effective_drugs
-BML-210;10um;2;sum.apo;7,94200000000000e+01;effective_drugs
-BMN 673;1um;1;sum.apo;9,25500000000000e+01;effective_drugs
-BMN 673;1um;2;sum.apo;7,36500000000000e+01;effective_drugs
-Barasertib;1um;1;sum.apo;9,28000000000000e+01;effective_drugs
-Barasertib;1um;2;sum.apo;8,69300000000000e+01;effective_drugs
-C646;10um;1;sum.apo;9,42100000000000e+01;effective_drugs
-C646;10um;2;sum.apo;8,10600000000000e+01;effective_drugs
-CI994;10um;1;sum.apo;9,42500000000000e+01;effective_drugs
-CI994;10um;2;sum.apo;8,25500000000000e+01;effective_drugs
-CTPB;100nm;1;sum.apo;9,41700000000000e+01;effective_drugs
-CTPB;100nm;2;sum.apo;8,09200000000000e+01;effective_drugs
-CTPB;10um;1;sum.apo;9,41100000000000e+01;effective_drugs
-CTPB;10um;2;sum.apo;8,01900000000000e+01;effective_drugs
-CX-6258;1um;1;sum.apo;9,38600000000000e+01;effective_drugs
-CX-6258;1um;2;sum.apo;7,80600000000000e+01;effective_drugs
-CYC116;1um;1;sum.apo;9,70900000000000e+01;effective_drugs
-CYC116;1um;2;sum.apo;8,81000000000000e+01;effective_drugs
-CYT387;10um;1;sum.apo;9,42900000000000e+01;effective_drugs
-CYT387;10um;2;sum.apo;8,20600000000000e+01;effective_drugs
-DMSO;10um;1;sum.apo;9,43933333333333e+01;effective_drugs
-DMSO;10um;2;sum.apo;7,98133333333333e+01;effective_drugs
-DZNeP;1um;1;sum.apo;9,45900000000000e+01;effective_drugs
-DZNeP;1um;2;sum.apo;8,16700000000000e+01;effective_drugs
-Danusertib;100nm;1;sum.apo;9,47100000000000e+01;effective_drugs
-Danusertib;100nm;2;sum.apo;8,70500000000000e+01;effective_drugs
-Entinostat;10um;1;sum.apo;9,73500000000000e+01;effective_drugs
-Entinostat;10um;2;sum.apo;8,31500000000000e+01;effective_drugs
-Givinostat;1um;1;sum.apo;9,61800000000000e+01;effective_drugs
-Givinostat;1um;2;sum.apo;8,62400000000000e+01;effective_drugs
-I-BET-762;10um;1;sum.apo;9,65200000000000e+01;effective_drugs
-I-BET-762;10um;2;sum.apo;8,83900000000000e+01;effective_drugs
-LY2784544;1um;2;sum.apo;8,14900000000000e+01;effective_drugs
-MK-5108;100nm;1;sum.apo;9,36900000000000e+01;effective_drugs
-MK-5108;100nm;2;sum.apo;7,83800000000000e+01;effective_drugs
-NSC-3852;10um;1;sum.apo;9,74900000000000e+01;effective_drugs
-NSC-3852;10um;2;sum.apo;8,56000000000000e+01;effective_drugs
-OTX015;10um;1;sum.apo;0,00000000000000e+00;effective_drugs
-OTX015;10um;2;sum.apo;8,99100000000000e+01;effective_drugs
-PAO;10um;1;sum.apo;9,59066666666667e+01;effective_drugs
-PAO;10um;2;sum.apo;7,13333333333333e+01;effective_drugs
-PCI-24781;100nm;1;sum.apo;9,44400000000000e+01;effective_drugs
-PCI-24781;100nm;2;sum.apo;7,98100000000000e+01;effective_drugs
-PCI-24781;1um;1;sum.apo;9,42900000000000e+01;effective_drugs
-PCI-24781;1um;2;sum.apo;8,13100000000000e+01;effective_drugs
-PJ34 HCl;10um;1;sum.apo;9,40000000000000e+01;effective_drugs
-PJ34 HCl;10um;2;sum.apo;7,96100000000000e+01;effective_drugs
-Pracinostat;10um;1;sum.apo;9,15200000000000e+01;effective_drugs
-Pracinostat;10um;2;sum.apo;8,71600000000000e+01;effective_drugs
-Quercetin;100nm;1;sum.apo;9,36500000000000e+01;effective_drugs
-Quercetin;100nm;2;sum.apo;7,87600000000000e+01;effective_drugs
-RG2833;10um;1;sum.apo;9,38900000000000e+01;effective_drugs
-RG2833;10um;2;sum.apo;8,17500000000000e+01;effective_drugs
-RGFP966;10um;1;sum.apo;9,41200000000000e+01;effective_drugs
-RGFP966;10um;2;sum.apo;8,15400000000000e+01;effective_drugs
-RVX-208;100nm;1;sum.apo;9,34600000000000e+01;effective_drugs
-RVX-208;100nm;2;sum.apo;8,01600000000000e+01;effective_drugs
-RVX-208;10um;1;sum.apo;9,39200000000000e+01;effective_drugs
-RVX-208;10um;2;sum.apo;8,01000000000000e+01;effective_drugs
-Resveratrol;10um;1;sum.apo;9,42800000000000e+01;effective_drugs
-Resveratrol;10um;2;sum.apo;8,01200000000000e+01;effective_drugs
-SGC 0946;10um;1;sum.apo;9,47400000000000e+01;effective_drugs
-SGC 0946;10um;2;sum.apo;8,21000000000000e+01;effective_drugs
-SGC-CBP30;10um;1;sum.apo;9,37200000000000e+01;effective_drugs
-SGC-CBP30;10um;2;sum.apo;8,13500000000000e+01;effective_drugs
-SNS-314 Mesylate;10um;1;sum.apo;9,85700000000000e+01;effective_drugs
-SNS-314 Mesylate;10um;2;sum.apo;8,86600000000000e+01;effective_drugs
-Scriptaid;1um;1;sum.apo;9,42400000000000e+01;effective_drugs
-Scriptaid;1um;2;sum.apo;8,13200000000000e+01;effective_drugs
-Suramin;100nm;1;sum.apo;9,40400000000000e+01;effective_drugs
-Suramin;100nm;2;sum.apo;7,93100000000000e+01;effective_drugs
-TG101209;1um;1;sum.apo;9,46400000000000e+01;effective_drugs
-TG101209;1um;2;sum.apo;8,47600000000000e+01;effective_drugs
-Tubastatin A HCl;10um;1;sum.apo;9,44200000000000e+01;effective_drugs
-Tubastatin A HCl;10um;2;sum.apo;8,08900000000000e+01;effective_drugs
-Vorinostat;1um;1;sum.apo;9,45600000000000e+01;effective_drugs
-Vorinostat;1um;2;sum.apo;8,20800000000000e+01;effective_drugs
-AMG-900;100nm;2;sum;5,28400000000000e+01;effective_drugs
-AR-42;1um;2;sum;5,72300000000000e+01;effective_drugs
-AT9283;100nm;1;sum;8,04000000000000e+01;effective_drugs
-AT9283;100nm;2;sum;5,40600000000000e+01;effective_drugs
-Alisertib;100nm;1;sum;9,25000000000000e+01;effective_drugs
-Alisertib;100nm;2;sum;5,79600000000000e+01;effective_drugs
-Apicidin;100nm;1;sum;8,77600000000000e+01;effective_drugs
-Aurora A Inhibitor I;100nm;1;sum;8,41100000000000e+01;effective_drugs
-Aurora A Inhibitor I;100nm;2;sum;7,19800000000000e+01;effective_drugs
-Aurora A Inhibitor I;10um;1;sum;8,64000000000000e+01;effective_drugs
-Aurora A Inhibitor I;10um;2;sum;6,78000000000000e+01;effective_drugs
-Aurora A Inhibitor I;1um;1;sum;9,33000000000000e+01;effective_drugs
-Aurora A Inhibitor I;1um;2;sum;7,12000000000000e+01;effective_drugs
-Azacitidine;1um;1;sum;8,85000000000000e+01;effective_drugs
-Azacitidine;1um;2;sum;8,09000000000000e+01;effective_drugs
-BML-210;10um;1;sum;8,86000000000000e+01;effective_drugs
-BML-210;10um;2;sum;7,52800000000000e+01;effective_drugs
-BMN 673;1um;1;sum;7,01500000000000e+01;effective_drugs
-BMN 673;1um;2;sum;5,92500000000000e+01;effective_drugs
-Barasertib;1um;1;sum;7,73000000000000e+01;effective_drugs
-Barasertib;1um;2;sum;5,74300000000000e+01;effective_drugs
-C646;10um;1;sum;8,79100000000000e+01;effective_drugs
-C646;10um;2;sum;7,64100000000000e+01;effective_drugs
-CI994;10um;1;sum;8,64600000000000e+01;effective_drugs
-CI994;10um;2;sum;7,78800000000000e+01;effective_drugs
-CTPB;100nm;1;sum;8,80600000000000e+01;effective_drugs
-CTPB;100nm;2;sum;7,60500000000000e+01;effective_drugs
-CTPB;10um;1;sum;8,77900000000000e+01;effective_drugs
-CTPB;10um;2;sum;7,53000000000000e+01;effective_drugs
-CX-6258;1um;1;sum;8,60200000000000e+01;effective_drugs
-CX-6258;1um;2;sum;7,07400000000000e+01;effective_drugs
-CYC116;1um;1;sum;9,36000000000000e+01;effective_drugs
-CYC116;1um;2;sum;6,23000000000000e+01;effective_drugs
-CYT387;10um;1;sum;8,65700000000000e+01;effective_drugs
-CYT387;10um;2;sum;7,61000000000000e+01;effective_drugs
-DMSO;10um;1;sum;8,68266666666667e+01;effective_drugs
-DMSO;10um;2;sum;7,48600000000000e+01;effective_drugs
-DZNeP;1um;1;sum;8,99200000000000e+01;effective_drugs
-DZNeP;1um;2;sum;7,72300000000000e+01;effective_drugs
-Danusertib;100nm;1;sum;9,23000000000000e+01;effective_drugs
-Danusertib;100nm;2;sum;8,17000000000000e+01;effective_drugs
-Entinostat;10um;1;sum;9,15600000000000e+01;effective_drugs
-Entinostat;10um;2;sum;6,64500000000000e+01;effective_drugs
-Givinostat;1um;1;sum;7,21800000000000e+01;effective_drugs
-Givinostat;1um;2;sum;6,09400000000000e+01;effective_drugs
-I-BET-762;10um;1;sum;9,40000000000000e+01;effective_drugs
-I-BET-762;10um;2;sum;8,65000000000000e+01;effective_drugs
-LY2784544;1um;2;sum;7,33000000000000e+01;effective_drugs
-MK-5108;100nm;1;sum;8,53700000000000e+01;effective_drugs
-MK-5108;100nm;2;sum;6,86200000000000e+01;effective_drugs
-NSC-3852;10um;1;sum;8,77000000000000e+01;effective_drugs
-NSC-3852;10um;2;sum;7,42000000000000e+01;effective_drugs
-OTX015;10um;1;sum;0,00000000000000e+00;effective_drugs
-OTX015;10um;2;sum;8,82000000000000e+01;effective_drugs
-PAO;10um;1;sum;7,42400000000000e+01;effective_drugs
-PAO;10um;2;sum;5,90666666666667e+01;effective_drugs
-PCI-24781;100nm;1;sum;8,71200000000000e+01;effective_drugs
-PCI-24781;100nm;2;sum;7,47400000000000e+01;effective_drugs
-PCI-24781;1um;1;sum;8,74700000000000e+01;effective_drugs
-PCI-24781;1um;2;sum;7,66700000000000e+01;effective_drugs
-PJ34 HCl;10um;1;sum;8,72100000000000e+01;effective_drugs
-PJ34 HCl;10um;2;sum;7,47700000000000e+01;effective_drugs
-Pracinostat;10um;1;sum;4,91200000000000e+01;effective_drugs
-Pracinostat;10um;2;sum;4,46600000000000e+01;effective_drugs
-Quercetin;100nm;1;sum;8,71000000000000e+01;effective_drugs
-Quercetin;100nm;2;sum;7,44200000000000e+01;effective_drugs
-RG2833;10um;1;sum;8,93000000000000e+01;effective_drugs
-RG2833;10um;2;sum;7,71800000000000e+01;effective_drugs
-RGFP966;10um;1;sum;8,72500000000000e+01;effective_drugs
-RGFP966;10um;2;sum;7,66700000000000e+01;effective_drugs
-RVX-208;100nm;1;sum;8,74000000000000e+01;effective_drugs
-RVX-208;100nm;2;sum;7,56700000000000e+01;effective_drugs
-RVX-208;10um;1;sum;8,89900000000000e+01;effective_drugs
-RVX-208;10um;2;sum;7,58600000000000e+01;effective_drugs
-Resveratrol;10um;1;sum;8,60200000000000e+01;effective_drugs
-Resveratrol;10um;2;sum;7,54500000000000e+01;effective_drugs
-SGC 0946;10um;1;sum;8,70200000000000e+01;effective_drugs
-SGC 0946;10um;2;sum;7,74600000000000e+01;effective_drugs
-SGC-CBP30;10um;1;sum;8,66300000000000e+01;effective_drugs
-SGC-CBP30;10um;2;sum;7,64800000000000e+01;effective_drugs
-SNS-314 Mesylate;10um;1;sum;9,79100000000000e+01;effective_drugs
-SNS-314 Mesylate;10um;2;sum;7,74600000000000e+01;effective_drugs
-Scriptaid;1um;1;sum;8,60300000000000e+01;effective_drugs
-Scriptaid;1um;2;sum;7,67400000000000e+01;effective_drugs
-Suramin;100nm;1;sum;8,79200000000000e+01;effective_drugs
-Suramin;100nm;2;sum;7,45100000000000e+01;effective_drugs
-TG101209;1um;1;sum;8,86000000000000e+01;effective_drugs
-TG101209;1um;2;sum;8,19000000000000e+01;effective_drugs
-Tubastatin A HCl;10um;1;sum;8,81600000000000e+01;effective_drugs
-Tubastatin A HCl;10um;2;sum;7,62800000000000e+01;effective_drugs
-Vorinostat;1um;1;sum;8,92000000000000e+01;effective_drugs
-Vorinostat;1um;2;sum;7,78400000000000e+01;effective_drugs
-AMG-900;100nm;1;G1;3,86285714285714e-01;five_drugs
-AMG-900;10um;1;G1;2,56572029442692e-01;five_drugs
-AMG-900;10um;2;G1;2,51565762004175e-01;five_drugs
-AMG-900;1um;1;G1;3,36842105263158e-01;five_drugs
-AZ-960;100nm;1;G1;5,91408591408591e-01;five_drugs
-AZ-960;100nm;2;G1;6,01593625498008e-01;five_drugs
-AZ-960;10um;1;G1;2,76756756756757e-01;five_drugs
-AZ-960;10um;2;G1;2,43688254665203e-01;five_drugs
-AZ-960;1um;1;G1;4,14814814814815e-01;five_drugs
-AZ-960;1um;2;G1;4,59119496855346e-01;five_drugs
-Decitabine;100nm;1;G1;5,51243781094527e-01;five_drugs
-Decitabine;100nm;2;G1;5,58441558441558e-01;five_drugs
-Decitabine;10um;1;G1;5,86276488395560e-01;five_drugs
-Decitabine;10um;2;G1;5,76576576576577e-01;five_drugs
-Decitabine;1um;1;G1;4,98504486540379e-01;five_drugs
-Decitabine;1um;2;G1;5,27527527527528e-01;five_drugs
-DMSO;10um;1;G1;6,12887112887113e-01;five_drugs
-DMSO;10um;2;G1;5,88822355289421e-01;five_drugs
-AMG-900;100nm;1;G2;4,40000000000000e-01;five_drugs
-AMG-900;10um;1;G2;5,90956887486856e-01;five_drugs
-AMG-900;10um;2;G2;5,94989561586639e-01;five_drugs
-AMG-900;1um;1;G2;4,66315789473684e-01;five_drugs
-AZ-960;100nm;1;G2;1,61838161838162e-01;five_drugs
-AZ-960;100nm;2;G2;1,56374501992032e-01;five_drugs
-AZ-960;10um;1;G2;5,63243243243243e-01;five_drugs
-AZ-960;10um;2;G2;5,94950603732163e-01;five_drugs
-AZ-960;1um;1;G2;2,91005291005291e-01;five_drugs
-AZ-960;1um;2;G2;3,05031446540880e-01;five_drugs
-Decitabine;100nm;1;G2;1,74129353233831e-01;five_drugs
-Decitabine;100nm;2;G2;1,69830169830170e-01;five_drugs
-Decitabine;10um;1;G2;1,85671039354188e-01;five_drugs
-Decitabine;10um;2;G2;1,78178178178178e-01;five_drugs
-Decitabine;1um;1;G2;2,33300099700897e-01;five_drugs
-Decitabine;1um;2;G2;1,99199199199199e-01;five_drugs
-DMSO;10um;1;G2;1,59340659340659e-01;five_drugs
-DMSO;10um;2;G2;1,59680638722555e-01;five_drugs
-AMG-900;100nm;1;S;1,73714285714286e-01;five_drugs
-AMG-900;10um;1;S;1,52471083070452e-01;five_drugs
-AMG-900;10um;2;S;1,53444676409186e-01;five_drugs
-AMG-900;1um;1;S;1,96842105263158e-01;five_drugs
-AZ-960;100nm;1;S;2,46753246753247e-01;five_drugs
-AZ-960;100nm;2;S;2,42031872509960e-01;five_drugs
-AZ-960;10um;1;S;1,60000000000000e-01;five_drugs
-AZ-960;10um;2;S;1,61361141602634e-01;five_drugs
-AZ-960;1um;1;S;2,94179894179894e-01;five_drugs
-AZ-960;1um;2;S;2,35849056603774e-01;five_drugs
-Decitabine;100nm;1;S;2,74626865671642e-01;five_drugs
-Decitabine;100nm;2;S;2,71728271728272e-01;five_drugs
-Decitabine;10um;1;S;2,28052472250252e-01;five_drugs
-Decitabine;10um;2;S;2,45245245245245e-01;five_drugs
-Decitabine;1um;1;S;2,68195413758724e-01;five_drugs
-Decitabine;1um;2;S;2,73273273273273e-01;five_drugs
-DMSO;10um;1;S;2,27772227772228e-01;five_drugs
-DMSO;10um;2;S;2,51497005988024e-01;five_drugs
-AMG-900;100nm;1;sum;8,75000000000000e+01;five_drugs
-AMG-900;10um;1;sum;9,51000000000000e+01;five_drugs
-AMG-900;10um;2;sum;9,58000000000000e+01;five_drugs
-AMG-900;1um;1;sum;9,50000000000000e+01;five_drugs
-AZ-960;100nm;1;sum;1,00100000000000e+02;five_drugs
-AZ-960;100nm;2;sum;1,00400000000000e+02;five_drugs
-AZ-960;10um;1;sum;9,25000000000000e+01;five_drugs
-AZ-960;10um;2;sum;9,11000000000000e+01;five_drugs
-AZ-960;1um;1;sum;9,45000000000000e+01;five_drugs
-AZ-960;1um;2;sum;9,54000000000000e+01;five_drugs
-Decitabine;100nm;1;sum;1,00500000000000e+02;five_drugs
-Decitabine;100nm;2;sum;1,00100000000000e+02;five_drugs
-Decitabine;10um;1;sum;9,91000000000000e+01;five_drugs
-Decitabine;10um;2;sum;9,99000000000000e+01;five_drugs
-Decitabine;1um;1;sum;1,00300000000000e+02;five_drugs
-Decitabine;1um;2;sum;9,99000000000000e+01;five_drugs
-DMSO;10um;1;sum;6,67333333333333e+01;five_drugs
-DMSO;10um;1;sum;1,00000000000000e+02;five_drugs
-DMSO;10um;2;sum;1,00200000000000e+02;five_drugs
+AMG-900;100 nM;2;Apoptotic cells;3,90120036934441e-01;effective_drugs
+AR-42;1 µM;2;Apoptotic cells;3,42410662989774e-01;effective_drugs
+AT9283;100 nM;1;Apoptotic cells;1,42857142857143e-01;effective_drugs
+AT9283;100 nM;2;Apoptotic cells;3,63700564971751e-01;effective_drugs
+Alisertib;100 nM;1;Apoptotic cells;5,12820512820513e-02;effective_drugs
+Alisertib;100 nM;2;Apoptotic cells;3,33486660533579e-01;effective_drugs
+Apicidin;100 nM;1;Apoptotic cells;6,20925510313134e-02;effective_drugs
+Aurora A Inhibitor I;100 nM;1;Apoptotic cells;9,91753239798650e-02;effective_drugs
+Aurora A Inhibitor I;100 nM;2;Apoptotic cells;8,71274571972099e-02;effective_drugs
+Aurora A Inhibitor I;10 µM;1;Apoptotic cells;8,77415267659170e-02;effective_drugs
+Aurora A Inhibitor I;10 µM;2;Apoptotic cells;2,25142857142857e-01;effective_drugs
+Aurora A Inhibitor I;1 µM;1;Apoptotic cells;3,86398763523957e-02;effective_drugs
+Aurora A Inhibitor I;1 µM;2;Apoptotic cells;1,90909090909091e-01;effective_drugs
+Azacitidine;1 µM;1;Apoptotic cells;6,72428330522766e-02;effective_drugs
+Azacitidine;1 µM;2;Apoptotic cells;3,52969234438350e-02;effective_drugs
+BML-210;10 µM;1;Apoptotic cells;5,29128808123998e-02;effective_drugs
+BML-210;10 µM;2;Apoptotic cells;5,21279274741879e-02;effective_drugs
+BMN 673;1 µM;1;Apoptotic cells;2,42031334413830e-01;effective_drugs
+BMN 673;1 µM;2;Apoptotic cells;1,95519348268839e-01;effective_drugs
+Barasertib;1 µM;1;Apoptotic cells;1,67025862068966e-01;effective_drugs
+Barasertib;1 µM;2;Apoptotic cells;3,39353502818360e-01;effective_drugs
+C646;10 µM;1;Apoptotic cells;6,68718819658210e-02;effective_drugs
+C646;10 µM;2;Apoptotic cells;5,73649148778682e-02;effective_drugs
+CI994;10 µM;1;Apoptotic cells;8,26525198938992e-02;effective_drugs
+CI994;10 µM;2;Apoptotic cells;5,65717746820109e-02;effective_drugs
+CTPB;100 nM;1;Apoptotic cells;6,48826590209196e-02;effective_drugs
+CTPB;100 nM;2;Apoptotic cells;6,01828966880870e-02;effective_drugs
+CTPB;10 µM;1;Apoptotic cells;6,71554563808309e-02;effective_drugs
+CTPB;10 µM;2;Apoptotic cells;6,09801720912832e-02;effective_drugs
+CX-6258;1 µM;1;Apoptotic cells;8,35286597059450e-02;effective_drugs
+CX-6258;1 µM;2;Apoptotic cells;9,37740199846272e-02;effective_drugs
+CYC116;1 µM;1;Apoptotic cells;3,59460294572047e-02;effective_drugs
+CYC116;1 µM;2;Apoptotic cells;2,92849035187287e-01;effective_drugs
+CYT387;10 µM;1;Apoptotic cells;8,18750662848658e-02;effective_drugs
+CYT387;10 µM;2;Apoptotic cells;7,26297830855472e-02;effective_drugs
+DMSO;10 µM;1;Apoptotic cells;8,01610283212091e-02;effective_drugs
+DMSO;10 µM;2;Apoptotic cells;6,20614767791514e-02;effective_drugs
+3-Deazaneplanocin A;1 µM;1;Apoptotic cells;4,93709694470874e-02;effective_drugs
+3-Deazaneplanocin A;1 µM;2;Apoptotic cells;5,43651279539611e-02;effective_drugs
+Danusertib;100 nM;1;Apoptotic cells;2,54460986168303e-02;effective_drugs
+Danusertib;100 nM;2;Apoptotic cells;6,14589316484779e-02;effective_drugs
+Entinostat;10 µM;1;Apoptotic cells;5,94761171032357e-02;effective_drugs
+Entinostat;10 µM;2;Apoptotic cells;2,00841852074564e-01;effective_drugs
+Givinostat;1 µM;1;Apoptotic cells;2,49532127261385e-01;effective_drugs
+Givinostat;1 µM;2;Apoptotic cells;2,93367346938776e-01;effective_drugs
+I-BET-762;10 µM;1;Apoptotic cells;2,61085785329465e-02;effective_drugs
+I-BET-762;10 µM;2;Apoptotic cells;2,13825093336350e-02;effective_drugs
+LY2784544;1 µM;2;Apoptotic cells;1,00503129218309e-01;effective_drugs
+MK-5108;100 nM;1;Apoptotic cells;8,88035009072473e-02;effective_drugs
+MK-5108;100 nM;2;Apoptotic cells;1,24521561622863e-01;effective_drugs
+NSC-3852;10 µM;1;Apoptotic cells;1,00420555954457e-01;effective_drugs
+NSC-3852;10 µM;2;Apoptotic cells;1,33177570093458e-01;effective_drugs
+OTX015;10 µM;1;Apoptotic cells;NA;effective_drugs
+OTX015;10 µM;2;Apoptotic cells;1,90190190190190e-02;effective_drugs
+PAO;10 µM;1;Apoptotic cells;2,25914083136383e-01;effective_drugs
+PAO;10 µM;2;Apoptotic cells;1,71962616822430e-01;effective_drugs
+PCI-24781;100 nM;1;Apoptotic cells;7,75095298602287e-02;effective_drugs
+PCI-24781;100 nM;2;Apoptotic cells;6,35258739506327e-02;effective_drugs
+PCI-24781;1 µM;1;Apoptotic cells;7,23300456039877e-02;effective_drugs
+PCI-24781;1 µM;2;Apoptotic cells;5,70655515926700e-02;effective_drugs
+PJ34 HCl;10 µM;1;Apoptotic cells;7,22340425531915e-02;effective_drugs
+PJ34 HCl;10 µM;2;Apoptotic cells;6,07963823640246e-02;effective_drugs
+Pracinostat;10 µM;1;Apoptotic cells;4,63286713286713e-01;effective_drugs
+Pracinostat;10 µM;2;Apoptotic cells;4,87608994951813e-01;effective_drugs
+Quercetin;100 nM;1;Apoptotic cells;6,99412706887347e-02;effective_drugs
+Quercetin;100 nM;2;Apoptotic cells;5,51041137633316e-02;effective_drugs
+RG2833;10 µM;1;Apoptotic cells;4,88869954201725e-02;effective_drugs
+RG2833;10 µM;2;Apoptotic cells;5,59021406727829e-02;effective_drugs
+RGFP966;10 µM;1;Apoptotic cells;7,29919252018700e-02;effective_drugs
+RGFP966;10 µM;2;Apoptotic cells;5,97252882021094e-02;effective_drugs
+RVX-208;100 nM;1;Apoptotic cells;6,48405735073828e-02;effective_drugs
+RVX-208;100 nM;2;Apoptotic cells;5,60129740518962e-02;effective_drugs
+RVX-208;10 µM;1;Apoptotic cells;5,24914821124361e-02;effective_drugs
+RVX-208;10 µM;2;Apoptotic cells;5,29338327091136e-02;effective_drugs
+Resveratrol;10 µM;1;Apoptotic cells;8,76113703860840e-02;effective_drugs
+Resveratrol;10 µM;2;Apoptotic cells;5,82875686470294e-02;effective_drugs
+SGC 0946;10 µM;1;Apoptotic cells;8,14861726831328e-02;effective_drugs
+SGC 0946;10 µM;2;Apoptotic cells;5,65164433617539e-02;effective_drugs
+SGC-CBP30;10 µM;1;Apoptotic cells;7,56508749466496e-02;effective_drugs
+SGC-CBP30;10 µM;2;Apoptotic cells;5,98647818070067e-02;effective_drugs
+SNS-314 Mesylate;10 µM;1;Apoptotic cells;6,69574921375672e-03;effective_drugs
+SNS-314 Mesylate;10 µM;2;Apoptotic cells;1,26325287615610e-01;effective_drugs
+Scriptaid;1 µM;1;Apoptotic cells;8,71179966044143e-02;effective_drugs
+Scriptaid;1 µM;2;Apoptotic cells;5,63207083128382e-02;effective_drugs
+Suramin;100 nM;1;Apoptotic cells;6,50786899191833e-02;effective_drugs
+Suramin;100 nM;2;Apoptotic cells;6,05220022695751e-02;effective_drugs
+TG101209;1 µM;1;Apoptotic cells;6,38207945900254e-02;effective_drugs
+TG101209;1 µM;2;Apoptotic cells;3,37423312883436e-02;effective_drugs
+Tubastatin A HCl;10 µM;1;Apoptotic cells;6,62995128150815e-02;effective_drugs
+Tubastatin A HCl;10 µM;2;Apoptotic cells;5,69909753986896e-02;effective_drugs
+Vorinostat;1 µM;1;Apoptotic cells;5,66835871404399e-02;effective_drugs
+Vorinostat;1 µM;2;Apoptotic cells;5,16569200779727e-02;effective_drugs
+AMG-900;100 nM;2;G1;3,21725965177896e-01;effective_drugs
+AR-42;1 µM;2;G1;6,39524724794688e-01;effective_drugs
+AT9283;100 nM;1;G1;5,36069651741294e-01;effective_drugs
+AT9283;100 nM;2;G1;3,29263780984092e-01;effective_drugs
+Alisertib;100 nM;1;G1;3,02702702702703e-01;effective_drugs
+Alisertib;100 nM;2;G1;2,84679089026915e-01;effective_drugs
+Apicidin;100 nM;1;G1;6,62032816773017e-01;effective_drugs
+Aurora A Inhibitor I;100 nM;1;G1;6,68172631078350e-01;effective_drugs
+Aurora A Inhibitor I;100 nM;2;G1;6,41844956932481e-01;effective_drugs
+Aurora A Inhibitor I;10 µM;1;G1;5,84490740740741e-01;effective_drugs
+Aurora A Inhibitor I;10 µM;2;G1;5,29498525073746e-01;effective_drugs
+Aurora A Inhibitor I;1 µM;1;G1;3,11897106109325e-01;effective_drugs
+Aurora A Inhibitor I;1 µM;2;G1;2,40168539325843e-01;effective_drugs
+Azacitidine;1 µM;1;G1;5,97740112994350e-01;effective_drugs
+Azacitidine;1 µM;2;G1;5,31520395550062e-01;effective_drugs
+BML-210;10 µM;1;G1;6,47855530474041e-01;effective_drugs
+BML-210;10 µM;2;G1;6,00425079702444e-01;effective_drugs
+BMN 673;1 µM;1;G1;7,64076977904490e-01;effective_drugs
+BMN 673;1 µM;2;G1;6,86919831223629e-01;effective_drugs
+Barasertib;1 µM;1;G1;6,11901681759379e-01;effective_drugs
+Barasertib;1 µM;2;G1;3,36061292007661e-01;effective_drugs
+C646;10 µM;1;G1;6,68865885564782e-01;effective_drugs
+C646;10 µM;2;G1;6,12485276796231e-01;effective_drugs
+CI994;10 µM;1;G1;6,51168170252140e-01;effective_drugs
+CI994;10 µM;2;G1;5,59835644581407e-01;effective_drugs
+CTPB;100 nM;1;G1;6,66590960708608e-01;effective_drugs
+CTPB;100 nM;2;G1;6,18014464168310e-01;effective_drugs
+CTPB;10 µM;1;G1;6,82310058093177e-01;effective_drugs
+CTPB;10 µM;2;G1;6,49402390438247e-01;effective_drugs
+CX-6258;1 µM;1;G1;6,97512206463613e-01;effective_drugs
+CX-6258;1 µM;2;G1;6,23409669211196e-01;effective_drugs
+CYC116;1 µM;1;G1;3,66452991452991e-01;effective_drugs
+CYC116;1 µM;2;G1;3,56340288924559e-01;effective_drugs
+CYT387;10 µM;1;G1;6,97701282199376e-01;effective_drugs
+CYT387;10 µM;2;G1;5,83442838370565e-01;effective_drugs
+DMSO;10 µM;1;G1;7,17521498771499e-01;effective_drugs
+DMSO;10 µM;2;G1;6,36298868999911e-01;effective_drugs
+3-Deazaneplanocin A;1 µM;1;G1;6,51690391459075e-01;effective_drugs
+3-Deazaneplanocin A;1 µM;2;G1;6,48711640554189e-01;effective_drugs
+Danusertib;100 nM;1;G1;5,22210184182015e-01;effective_drugs
+Danusertib;100 nM;2;G1;6,00979192166463e-01;effective_drugs
+Entinostat;10 µM;1;G1;8,68283093053735e-01;effective_drugs
+Entinostat;10 µM;2;G1;8,14145974416855e-01;effective_drugs
+Givinostat;1 µM;1;G1;7,67525630368523e-01;effective_drugs
+Givinostat;1 µM;2;G1;6,12077453232688e-01;effective_drugs
+I-BET-762;10 µM;1;G1;6,10638297872340e-01;effective_drugs
+I-BET-762;10 µM;2;G1;6,10404624277457e-01;effective_drugs
+LY2784544;1 µM;2;G1;5,22510231923602e-01;effective_drugs
+MK-5108;100 nM;1;G1;6,77052828862598e-01;effective_drugs
+MK-5108;100 nM;2;G1;6,48498979889245e-01;effective_drugs
+NSC-3852;10 µM;1;G1;5,50741163055872e-01;effective_drugs
+NSC-3852;10 µM;2;G1;3,78706199460916e-01;effective_drugs
+OTX015;10 µM;1;G1;NA;effective_drugs
+OTX015;10 µM;2;G1;5,60090702947846e-01;effective_drugs
+PAO;10 µM;1;G1;7,92025862068966e-01;effective_drugs
+PAO;10 µM;2;G1;3,09819413092551e-01;effective_drugs
+PCI-24781;100 nM;1;G1;7,04775022956841e-01;effective_drugs
+PCI-24781;100 nM;2;G1;6,06101150655606e-01;effective_drugs
+PCI-24781;1 µM;1;G1;6,76803475477307e-01;effective_drugs
+PCI-24781;1 µM;2;G1;5,83018129646537e-01;effective_drugs
+PJ34 HCl;10 µM;1;G1;6,66208003669304e-01;effective_drugs
+PJ34 HCl;10 µM;2;G1;6,28594356025144e-01;effective_drugs
+Pracinostat;10 µM;1;G1;6,82003257328990e-01;effective_drugs
+Pracinostat;10 µM;2;G1;4,23197492163009e-01;effective_drugs
+Quercetin;100 nM;1;G1;6,75086107921929e-01;effective_drugs
+Quercetin;100 nM;2;G1;5,87207739854878e-01;effective_drugs
+RG2833;10 µM;1;G1;5,85666293393057e-01;effective_drugs
+RG2833;10 µM;2;G1;5,63617517491578e-01;effective_drugs
+RGFP966;10 µM;1;G1;6,97994269340974e-01;effective_drugs
+RGFP966;10 µM;2;G1;5,98669623059867e-01;effective_drugs
+RVX-208;100 nM;1;G1;6,60183066361556e-01;effective_drugs
+RVX-208;100 nM;2;G1;6,30368706224395e-01;effective_drugs
+RVX-208;10 µM;1;G1;6,27036745701764e-01;effective_drugs
+RVX-208;10 µM;2;G1;6,38017400474558e-01;effective_drugs
+Resveratrol;10 µM;1;G1;7,34712857475006e-01;effective_drugs
+Resveratrol;10 µM;2;G1;6,41484426772697e-01;effective_drugs
+SGC 0946;10 µM;1;G1;6,98689956331878e-01;effective_drugs
+SGC 0946;10 µM;2;G1;6,20965659695327e-01;effective_drugs
+SGC-CBP30;10 µM;1;G1;6,12951633383355e-01;effective_drugs
+SGC-CBP30;10 µM;2;G1;5,91004184100418e-01;effective_drugs
+SNS-314 Mesylate;10 µM;1;G1;2,70656725564294e-01;effective_drugs
+SNS-314 Mesylate;10 µM;2;G1;2,42705912729151e-01;effective_drugs
+Scriptaid;1 µM;1;G1;6,98593513890503e-01;effective_drugs
+Scriptaid;1 µM;2;G1;6,15063851967683e-01;effective_drugs
+Suramin;100 nM;1;G1;6,55141037306642e-01;effective_drugs
+Suramin;100 nM;2;G1;6,32129915447591e-01;effective_drugs
+TG101209;1 µM;1;G1;6,43340857787810e-01;effective_drugs
+TG101209;1 µM;2;G1;6,26373626373626e-01;effective_drugs
+Tubastatin A HCl;10 µM;1;G1;6,61297640653357e-01;effective_drugs
+Tubastatin A HCl;10 µM;2;G1;6,41059255374934e-01;effective_drugs
+Vorinostat;1 µM;1;G1;6,19955156950673e-01;effective_drugs
+Vorinostat;1 µM;2;G1;6,16649537512847e-01;effective_drugs
+AMG-900;100 nM;2;G2;5,41256623769871e-01;effective_drugs
+AR-42;1 µM;2;G2;2,56858291106063e-01;effective_drugs
+AT9283;100 nM;1;G2;2,27611940298507e-01;effective_drugs
+AT9283;100 nM;2;G2;5,45689974102849e-01;effective_drugs
+Alisertib;100 nM;1;G2;5,70810810810811e-01;effective_drugs
+Alisertib;100 nM;2;G2;5,77984817115252e-01;effective_drugs
+Apicidin;100 nM;1;G2;9,18413855970830e-02;effective_drugs
+Aurora A Inhibitor I;100 nM;1;G2;9,76102722625134e-02;effective_drugs
+Aurora A Inhibitor I;100 nM;2;G2;1,03917754931926e-01;effective_drugs
+Aurora A Inhibitor I;10 µM;1;G2;1,79398148148148e-01;effective_drugs
+Aurora A Inhibitor I;10 µM;2;G2;1,99115044247788e-01;effective_drugs
+Aurora A Inhibitor I;1 µM;1;G2;4,95176848874598e-01;effective_drugs
+Aurora A Inhibitor I;1 µM;2;G2;6,12359550561798e-01;effective_drugs
+Azacitidine;1 µM;1;G2;1,67231638418079e-01;effective_drugs
+Azacitidine;1 µM;2;G2;1,89122373300371e-01;effective_drugs
+BML-210;10 µM;1;G2;9,25507900677201e-02;effective_drugs
+BML-210;10 µM;2;G2;1,00690754516472e-01;effective_drugs
+BMN 673;1 µM;1;G2;6,77120456165360e-02;effective_drugs
+BMN 673;1 µM;2;G2;9,02953586497890e-02;effective_drugs
+Barasertib;1 µM;1;G2;1,79818887451488e-01;effective_drugs
+Barasertib;1 µM;2;G2;4,97997562249695e-01;effective_drugs
+C646;10 µM;1;G2;8,54282789216244e-02;effective_drugs
+C646;10 µM;2;G2;1,10064127731972e-01;effective_drugs
+CI994;10 µM;1;G2;8,97524866990516e-02;effective_drugs
+CI994;10 µM;2;G2;1,23009758602979e-01;effective_drugs
+CTPB;100 nM;1;G2;8,92573245514422e-02;effective_drugs
+CTPB;100 nM;2;G2;1,05851413543721e-01;effective_drugs
+CTPB;10 µM;1;G2;8,30390705091696e-02;effective_drugs
+CTPB;10 µM;2;G2;8,49933598937583e-02;effective_drugs
+CX-6258;1 µM;1;G2;8,16089281562427e-02;effective_drugs
+CX-6258;1 µM;2;G2;1,02346621430591e-01;effective_drugs
+CYC116;1 µM;1;G2;4,95726495726496e-01;effective_drugs
+CYC116;1 µM;2;G2;4,59069020866774e-01;effective_drugs
+CYT387;10 µM;1;G2;9,66847637749798e-02;effective_drugs
+CYT387;10 µM;2;G2;1,59001314060447e-01;effective_drugs
+DMSO;10 µM;1;G2;7,36332923832924e-02;effective_drugs
+DMSO;10 µM;2;G2;9,47546531302876e-02;effective_drugs
+3-Deazaneplanocin A;1 µM;1;G2;1,04759786476868e-01;effective_drugs
+3-Deazaneplanocin A;1 µM;2;G2;9,87958047390910e-02;effective_drugs
+Danusertib;100 nM;1;G2;1,80931744312026e-01;effective_drugs
+Danusertib;100 nM;2;G2;1,57894736842105e-01;effective_drugs
+Entinostat;10 µM;1;G2;6,47662734818698e-02;effective_drugs
+Entinostat;10 µM;2;G2;8,96914973664409e-02;effective_drugs
+Givinostat;1 µM;1;G2;1,09587143252979e-01;effective_drugs
+Givinostat;1 µM;2;G2;2,46143747948802e-01;effective_drugs
+I-BET-762;10 µM;1;G2;1,79787234042553e-01;effective_drugs
+I-BET-762;10 µM;2;G2;1,75722543352601e-01;effective_drugs
+LY2784544;1 µM;2;G2;2,21009549795362e-01;effective_drugs
+MK-5108;100 nM;1;G2;9,45296942719925e-02;effective_drugs
+MK-5108;100 nM;2;G2;1,08131740017488e-01;effective_drugs
+NSC-3852;10 µM;1;G2;2,99885974914481e-01;effective_drugs
+NSC-3852;10 µM;2;G2;3,94878706199461e-01;effective_drugs
+OTX015;10 µM;1;G2;NA;effective_drugs
+OTX015;10 µM;2;G2;2,24489795918367e-01;effective_drugs
+PAO;10 µM;1;G2;6,94594109195402e-02;effective_drugs
+PAO;10 µM;2;G2;3,62866817155756e-01;effective_drugs
+PCI-24781;100 nM;1;G2;7,48393021120294e-02;effective_drugs
+PCI-24781;100 nM;2;G2;9,41932031040942e-02;effective_drugs
+PCI-24781;1 µM;1;G2;8,99737052703784e-02;effective_drugs
+PCI-24781;1 µM;2;G2;1,15690622146863e-01;effective_drugs
+PJ34 HCl;10 µM;1;G2;9,07006077284715e-02;effective_drugs
+PJ34 HCl;10 µM;2;G2;9,58940751638358e-02;effective_drugs
+Pracinostat;10 µM;1;G2;1,72638436482085e-01;effective_drugs
+Pracinostat;10 µM;2;G2;4,97089117778773e-01;effective_drugs
+Quercetin;100 nM;1;G2;8,61079219288175e-02;effective_drugs
+Quercetin;100 nM;2;G2;1,10454178984144e-01;effective_drugs
+RG2833;10 µM;1;G2;1,22060470324748e-01;effective_drugs
+RG2833;10 µM;2;G2;1,25421093547551e-01;effective_drugs
+RGFP966;10 µM;1;G2;7,62177650429799e-02;effective_drugs
+RGFP966;10 µM;2;G2;1,09169166557976e-01;effective_drugs
+RVX-208;100 nM;1;G2;9,49656750572083e-02;effective_drugs
+RVX-208;100 nM;2;G2;9,07889520285450e-02;effective_drugs
+RVX-208;10 µM;1;G2;1,04393752106978e-01;effective_drugs
+RVX-208;10 µM;2;G2;9,30661745320327e-02;effective_drugs
+Resveratrol;10 µM;1;G2;7,34712857475006e-02;effective_drugs
+Resveratrol;10 µM;2;G2;9,34393638170974e-02;effective_drugs
+SGC 0946;10 µM;1;G2;8,06711100896346e-02;effective_drugs
+SGC 0946;10 µM;2;G2;1,00180738445649e-01;effective_drugs
+SGC-CBP30;10 µM;1;G2;1,08853745815537e-01;effective_drugs
+SGC-CBP30;10 µM;2;G2;1,13493723849372e-01;effective_drugs
+SNS-314 Mesylate;10 µM;1;G2;6,55704218159534e-01;effective_drugs
+SNS-314 Mesylate;10 µM;2;G2;6,57113348825200e-01;effective_drugs
+Scriptaid;1 µM;1;G2;8,17156805765431e-02;effective_drugs
+Scriptaid;1 µM;2;G2;1,16497263487099e-01;effective_drugs
+Suramin;100 nM;1;G2;9,69062784349408e-02;effective_drugs
+Suramin;100 nM;2;G2;9,67655348275399e-02;effective_drugs
+TG101209;1 µM;1;G2;1,12866817155756e-01;effective_drugs
+TG101209;1 µM;2;G2;1,25763125763126e-01;effective_drugs
+Tubastatin A HCl;10 µM;1;G2;9,59618874773140e-02;effective_drugs
+Tubastatin A HCl;10 µM;2;G2;8,75721027792344e-02;effective_drugs
+Vorinostat;1 µM;1;G2;1,42376681614350e-01;effective_drugs
+Vorinostat;1 µM;2;G2;1,12281603288798e-01;effective_drugs
+AMG-900;100 nM;2;S;1,37017411052233e-01;effective_drugs
+AR-42;1 µM;2;S;1,03616984099249e-01;effective_drugs
+AT9283;100 nM;1;S;2,36318407960199e-01;effective_drugs
+AT9283;100 nM;2;S;1,25046244913060e-01;effective_drugs
+Alisertib;100 nM;1;S;1,26486486486486e-01;effective_drugs
+Alisertib;100 nM;2;S;1,37336093857833e-01;effective_drugs
+Apicidin;100 nM;1;S;2,46125797629900e-01;effective_drugs
+Aurora A Inhibitor I;100 nM;1;S;2,34217096659137e-01;effective_drugs
+Aurora A Inhibitor I;100 nM;2;S;2,54237288135593e-01;effective_drugs
+Aurora A Inhibitor I;10 µM;1;S;2,36111111111111e-01;effective_drugs
+Aurora A Inhibitor I;10 µM;2;S;2,71386430678466e-01;effective_drugs
+Aurora A Inhibitor I;1 µM;1;S;1,92926045016077e-01;effective_drugs
+Aurora A Inhibitor I;1 µM;2;S;1,47471910112360e-01;effective_drugs
+Azacitidine;1 µM;1;S;2,35028248587571e-01;effective_drugs
+Azacitidine;1 µM;2;S;2,79357231149567e-01;effective_drugs
+BML-210;10 µM;1;S;2,59593679458239e-01;effective_drugs
+BML-210;10 µM;2;S;2,98884165781084e-01;effective_drugs
+BMN 673;1 µM;1;S;1,68210976478974e-01;effective_drugs
+BMN 673;1 µM;2;S;2,22784810126582e-01;effective_drugs
+Barasertib;1 µM;1;S;2,08279430789133e-01;effective_drugs
+Barasertib;1 µM;2;S;1,65941145742643e-01;effective_drugs
+C646;10 µM;1;S;2,45705835513593e-01;effective_drugs
+C646;10 µM;2;S;2,77450595471797e-01;effective_drugs
+CI994;10 µM;1;S;2,59079343048809e-01;effective_drugs
+CI994;10 µM;2;S;3,17154596815614e-01;effective_drugs
+CTPB;100 nM;1;S;2,44151714739950e-01;effective_drugs
+CTPB;100 nM;2;S;2,76134122287968e-01;effective_drugs
+CTPB;10 µM;1;S;2,34650871397654e-01;effective_drugs
+CTPB;10 µM;2;S;2,65604249667995e-01;effective_drugs
+CX-6258;1 µM;1;S;2,20878865380144e-01;effective_drugs
+CX-6258;1 µM;2;S;2,74243709358213e-01;effective_drugs
+CYC116;1 µM;1;S;1,37820512820513e-01;effective_drugs
+CYC116;1 µM;2;S;1,84590690208668e-01;effective_drugs
+CYT387;10 µM;1;S;2,05613954025644e-01;effective_drugs
+CYT387;10 µM;2;S;2,57555847568988e-01;effective_drugs
+DMSO;10 µM;1;S;2,08845208845209e-01;effective_drugs
+DMSO;10 µM;2;S;2,68946477869801e-01;effective_drugs
+3-Deazaneplanocin A;1 µM;1;S;2,43549822064057e-01;effective_drugs
+3-Deazaneplanocin A;1 µM;2;S;2,52492554706720e-01;effective_drugs
+Danusertib;100 nM;1;S;2,96858071505959e-01;effective_drugs
+Danusertib;100 nM;2;S;2,41126070991432e-01;effective_drugs
+Entinostat;10 µM;1;S;6,69506334643949e-02;effective_drugs
+Entinostat;10 µM;2;S;9,61625282167043e-02;effective_drugs
+Givinostat;1 µM;1;S;1,22887226378498e-01;effective_drugs
+Givinostat;1 µM;2;S;1,41778798818510e-01;effective_drugs
+I-BET-762;10 µM;1;S;2,09574468085106e-01;effective_drugs
+I-BET-762;10 µM;2;S;2,13872832369942e-01;effective_drugs
+LY2784544;1 µM;2;S;2,56480218281037e-01;effective_drugs
+MK-5108;100 nM;1;S;2,28417476865409e-01;effective_drugs
+MK-5108;100 nM;2;S;2,43369280093267e-01;effective_drugs
+NSC-3852;10 µM;1;S;1,49372862029647e-01;effective_drugs
+NSC-3852;10 µM;2;S;2,26415094339623e-01;effective_drugs
+OTX015;10 µM;1;S;NA;effective_drugs
+OTX015;10 µM;2;S;2,15419501133787e-01;effective_drugs
+PAO;10 µM;1;S;1,38514727011494e-01;effective_drugs
+PAO;10 µM;2;S;3,27313769751693e-01;effective_drugs
+PCI-24781;100 nM;1;S;2,20385674931129e-01;effective_drugs
+PCI-24781;100 nM;2;S;2,99705646240300e-01;effective_drugs
+PCI-24781;1 µM;1;S;2,33222819252315e-01;effective_drugs
+PCI-24781;1 µM;2;S;3,01291248206600e-01;effective_drugs
+PJ34 HCl;10 µM;1;S;2,43091388602225e-01;effective_drugs
+PJ34 HCl;10 µM;2;S;2,75511568811021e-01;effective_drugs
+Pracinostat;10 µM;1;S;1,45358306188925e-01;effective_drugs
+Pracinostat;10 µM;2;S;7,97133900582176e-02;effective_drugs
+Quercetin;100 nM;1;S;2,38805970149254e-01;effective_drugs
+Quercetin;100 nM;2;S;3,02338081160978e-01;effective_drugs
+RG2833;10 µM;1;S;2,92273236282195e-01;effective_drugs
+RG2833;10 µM;2;S;3,10961388960871e-01;effective_drugs
+RGFP966;10 µM;1;S;2,25787965616046e-01;effective_drugs
+RGFP966;10 µM;2;S;2,92161210382157e-01;effective_drugs
+RVX-208;100 nM;1;S;2,44851258581236e-01;effective_drugs
+RVX-208;100 nM;2;S;2,78842341747060e-01;effective_drugs
+RVX-208;10 µM;1;S;2,68569502191257e-01;effective_drugs
+RVX-208;10 µM;2;S;2,68916424993409e-01;effective_drugs
+Resveratrol;10 µM;1;S;1,91815856777494e-01;effective_drugs
+Resveratrol;10 µM;2;S;2,65076209410205e-01;effective_drugs
+SGC 0946;10 µM;1;S;2,20638933578488e-01;effective_drugs
+SGC 0946;10 µM;2;S;2,78853601859024e-01;effective_drugs
+SGC-CBP30;10 µM;1;S;2,78194620801108e-01;effective_drugs
+SGC-CBP30;10 µM;2;S;2,95502092050209e-01;effective_drugs
+SNS-314 Mesylate;10 µM;1;S;7,36390562761720e-02;effective_drugs
+SNS-314 Mesylate;10 µM;2;S;1,00180738445649e-01;effective_drugs
+Scriptaid;1 µM;1;S;2,19690805532954e-01;effective_drugs
+Scriptaid;1 µM;2;S;2,68438884545218e-01;effective_drugs
+Suramin;100 nM;1;S;2,47952684258417e-01;effective_drugs
+Suramin;100 nM;2;S;2,71104549724869e-01;effective_drugs
+TG101209;1 µM;1;S;2,43792325056433e-01;effective_drugs
+TG101209;1 µM;2;S;2,47863247863248e-01;effective_drugs
+Tubastatin A HCl;10 µM;1;S;2,42740471869328e-01;effective_drugs
+Tubastatin A HCl;10 µM;2;S;2,71368641845831e-01;effective_drugs
+Vorinostat;1 µM;1;S;2,37668161434978e-01;effective_drugs
+Vorinostat;1 µM;2;S;2,71068859198356e-01;effective_drugs
+AMG-900;100 nM;2;sum.apo;8,66400000000000e+01;effective_drugs
+AR-42;1 µM;2;sum.apo;8,70300000000000e+01;effective_drugs
+AT9283;100 nM;1;sum.apo;9,38000000000000e+01;effective_drugs
+AT9283;100 nM;2;sum.apo;8,49600000000000e+01;effective_drugs
+Alisertib;100 nM;1;sum.apo;9,75000000000000e+01;effective_drugs
+Alisertib;100 nM;2;sum.apo;8,69600000000000e+01;effective_drugs
+Apicidin;100 nM;1;sum.apo;9,35700000000000e+01;effective_drugs
+Aurora A Inhibitor I;100 nM;1;sum.apo;9,33700000000000e+01;effective_drugs
+Aurora A Inhibitor I;100 nM;2;sum.apo;7,88500000000000e+01;effective_drugs
+Aurora A Inhibitor I;10 µM;1;sum.apo;9,47100000000000e+01;effective_drugs
+Aurora A Inhibitor I;10 µM;2;sum.apo;8,75000000000000e+01;effective_drugs
+Aurora A Inhibitor I;1 µM;1;sum.apo;9,70500000000000e+01;effective_drugs
+Aurora A Inhibitor I;1 µM;2;sum.apo;8,80000000000000e+01;effective_drugs
+Azacitidine;1 µM;1;sum.apo;9,48800000000000e+01;effective_drugs
+Azacitidine;1 µM;2;sum.apo;8,38600000000000e+01;effective_drugs
+BML-210;10 µM;1;sum.apo;9,35500000000000e+01;effective_drugs
+BML-210;10 µM;2;sum.apo;7,94200000000000e+01;effective_drugs
+BMN 673;1 µM;1;sum.apo;9,25500000000000e+01;effective_drugs
+BMN 673;1 µM;2;sum.apo;7,36500000000000e+01;effective_drugs
+Barasertib;1 µM;1;sum.apo;9,28000000000000e+01;effective_drugs
+Barasertib;1 µM;2;sum.apo;8,69300000000000e+01;effective_drugs
+C646;10 µM;1;sum.apo;9,42100000000000e+01;effective_drugs
+C646;10 µM;2;sum.apo;8,10600000000000e+01;effective_drugs
+CI994;10 µM;1;sum.apo;9,42500000000000e+01;effective_drugs
+CI994;10 µM;2;sum.apo;8,25500000000000e+01;effective_drugs
+CTPB;100 nM;1;sum.apo;9,41700000000000e+01;effective_drugs
+CTPB;100 nM;2;sum.apo;8,09200000000000e+01;effective_drugs
+CTPB;10 µM;1;sum.apo;9,41100000000000e+01;effective_drugs
+CTPB;10 µM;2;sum.apo;8,01900000000000e+01;effective_drugs
+CX-6258;1 µM;1;sum.apo;9,38600000000000e+01;effective_drugs
+CX-6258;1 µM;2;sum.apo;7,80600000000000e+01;effective_drugs
+CYC116;1 µM;1;sum.apo;9,70900000000000e+01;effective_drugs
+CYC116;1 µM;2;sum.apo;8,81000000000000e+01;effective_drugs
+CYT387;10 µM;1;sum.apo;9,42900000000000e+01;effective_drugs
+CYT387;10 µM;2;sum.apo;8,20600000000000e+01;effective_drugs
+DMSO;10 µM;1;sum.apo;9,43933333333333e+01;effective_drugs
+DMSO;10 µM;2;sum.apo;7,98133333333333e+01;effective_drugs
+3-Deazaneplanocin A;1 µM;1;sum.apo;9,45900000000000e+01;effective_drugs
+3-Deazaneplanocin A;1 µM;2;sum.apo;8,16700000000000e+01;effective_drugs
+Danusertib;100 nM;1;sum.apo;9,47100000000000e+01;effective_drugs
+Danusertib;100 nM;2;sum.apo;8,70500000000000e+01;effective_drugs
+Entinostat;10 µM;1;sum.apo;9,73500000000000e+01;effective_drugs
+Entinostat;10 µM;2;sum.apo;8,31500000000000e+01;effective_drugs
+Givinostat;1 µM;1;sum.apo;9,61800000000000e+01;effective_drugs
+Givinostat;1 µM;2;sum.apo;8,62400000000000e+01;effective_drugs
+I-BET-762;10 µM;1;sum.apo;9,65200000000000e+01;effective_drugs
+I-BET-762;10 µM;2;sum.apo;8,83900000000000e+01;effective_drugs
+LY2784544;1 µM;2;sum.apo;8,14900000000000e+01;effective_drugs
+MK-5108;100 nM;1;sum.apo;9,36900000000000e+01;effective_drugs
+MK-5108;100 nM;2;sum.apo;7,83800000000000e+01;effective_drugs
+NSC-3852;10 µM;1;sum.apo;9,74900000000000e+01;effective_drugs
+NSC-3852;10 µM;2;sum.apo;8,56000000000000e+01;effective_drugs
+OTX015;10 µM;1;sum.apo;0,00000000000000e+00;effective_drugs
+OTX015;10 µM;2;sum.apo;8,99100000000000e+01;effective_drugs
+PAO;10 µM;1;sum.apo;9,59066666666667e+01;effective_drugs
+PAO;10 µM;2;sum.apo;7,13333333333333e+01;effective_drugs
+PCI-24781;100 nM;1;sum.apo;9,44400000000000e+01;effective_drugs
+PCI-24781;100 nM;2;sum.apo;7,98100000000000e+01;effective_drugs
+PCI-24781;1 µM;1;sum.apo;9,42900000000000e+01;effective_drugs
+PCI-24781;1 µM;2;sum.apo;8,13100000000000e+01;effective_drugs
+PJ34 HCl;10 µM;1;sum.apo;9,40000000000000e+01;effective_drugs
+PJ34 HCl;10 µM;2;sum.apo;7,96100000000000e+01;effective_drugs
+Pracinostat;10 µM;1;sum.apo;9,15200000000000e+01;effective_drugs
+Pracinostat;10 µM;2;sum.apo;8,71600000000000e+01;effective_drugs
+Quercetin;100 nM;1;sum.apo;9,36500000000000e+01;effective_drugs
+Quercetin;100 nM;2;sum.apo;7,87600000000000e+01;effective_drugs
+RG2833;10 µM;1;sum.apo;9,38900000000000e+01;effective_drugs
+RG2833;10 µM;2;sum.apo;8,17500000000000e+01;effective_drugs
+RGFP966;10 µM;1;sum.apo;9,41200000000000e+01;effective_drugs
+RGFP966;10 µM;2;sum.apo;8,15400000000000e+01;effective_drugs
+RVX-208;100 nM;1;sum.apo;9,34600000000000e+01;effective_drugs
+RVX-208;100 nM;2;sum.apo;8,01600000000000e+01;effective_drugs
+RVX-208;10 µM;1;sum.apo;9,39200000000000e+01;effective_drugs
+RVX-208;10 µM;2;sum.apo;8,01000000000000e+01;effective_drugs
+Resveratrol;10 µM;1;sum.apo;9,42800000000000e+01;effective_drugs
+Resveratrol;10 µM;2;sum.apo;8,01200000000000e+01;effective_drugs
+SGC 0946;10 µM;1;sum.apo;9,47400000000000e+01;effective_drugs
+SGC 0946;10 µM;2;sum.apo;8,21000000000000e+01;effective_drugs
+SGC-CBP30;10 µM;1;sum.apo;9,37200000000000e+01;effective_drugs
+SGC-CBP30;10 µM;2;sum.apo;8,13500000000000e+01;effective_drugs
+SNS-314 Mesylate;10 µM;1;sum.apo;9,85700000000000e+01;effective_drugs
+SNS-314 Mesylate;10 µM;2;sum.apo;8,86600000000000e+01;effective_drugs
+Scriptaid;1 µM;1;sum.apo;9,42400000000000e+01;effective_drugs
+Scriptaid;1 µM;2;sum.apo;8,13200000000000e+01;effective_drugs
+Suramin;100 nM;1;sum.apo;9,40400000000000e+01;effective_drugs
+Suramin;100 nM;2;sum.apo;7,93100000000000e+01;effective_drugs
+TG101209;1 µM;1;sum.apo;9,46400000000000e+01;effective_drugs
+TG101209;1 µM;2;sum.apo;8,47600000000000e+01;effective_drugs
+Tubastatin A HCl;10 µM;1;sum.apo;9,44200000000000e+01;effective_drugs
+Tubastatin A HCl;10 µM;2;sum.apo;8,08900000000000e+01;effective_drugs
+Vorinostat;1 µM;1;sum.apo;9,45600000000000e+01;effective_drugs
+Vorinostat;1 µM;2;sum.apo;8,20800000000000e+01;effective_drugs
+AMG-900;100 nM;2;sum;5,28400000000000e+01;effective_drugs
+AR-42;1 µM;2;sum;5,72300000000000e+01;effective_drugs
+AT9283;100 nM;1;sum;8,04000000000000e+01;effective_drugs
+AT9283;100 nM;2;sum;5,40600000000000e+01;effective_drugs
+Alisertib;100 nM;1;sum;9,25000000000000e+01;effective_drugs
+Alisertib;100 nM;2;sum;5,79600000000000e+01;effective_drugs
+Apicidin;100 nM;1;sum;8,77600000000000e+01;effective_drugs
+Aurora A Inhibitor I;100 nM;1;sum;8,41100000000000e+01;effective_drugs
+Aurora A Inhibitor I;100 nM;2;sum;7,19800000000000e+01;effective_drugs
+Aurora A Inhibitor I;10 µM;1;sum;8,64000000000000e+01;effective_drugs
+Aurora A Inhibitor I;10 µM;2;sum;6,78000000000000e+01;effective_drugs
+Aurora A Inhibitor I;1 µM;1;sum;9,33000000000000e+01;effective_drugs
+Aurora A Inhibitor I;1 µM;2;sum;7,12000000000000e+01;effective_drugs
+Azacitidine;1 µM;1;sum;8,85000000000000e+01;effective_drugs
+Azacitidine;1 µM;2;sum;8,09000000000000e+01;effective_drugs
+BML-210;10 µM;1;sum;8,86000000000000e+01;effective_drugs
+BML-210;10 µM;2;sum;7,52800000000000e+01;effective_drugs
+BMN 673;1 µM;1;sum;7,01500000000000e+01;effective_drugs
+BMN 673;1 µM;2;sum;5,92500000000000e+01;effective_drugs
+Barasertib;1 µM;1;sum;7,73000000000000e+01;effective_drugs
+Barasertib;1 µM;2;sum;5,74300000000000e+01;effective_drugs
+C646;10 µM;1;sum;8,79100000000000e+01;effective_drugs
+C646;10 µM;2;sum;7,64100000000000e+01;effective_drugs
+CI994;10 µM;1;sum;8,64600000000000e+01;effective_drugs
+CI994;10 µM;2;sum;7,78800000000000e+01;effective_drugs
+CTPB;100 nM;1;sum;8,80600000000000e+01;effective_drugs
+CTPB;100 nM;2;sum;7,60500000000000e+01;effective_drugs
+CTPB;10 µM;1;sum;8,77900000000000e+01;effective_drugs
+CTPB;10 µM;2;sum;7,53000000000000e+01;effective_drugs
+CX-6258;1 µM;1;sum;8,60200000000000e+01;effective_drugs
+CX-6258;1 µM;2;sum;7,07400000000000e+01;effective_drugs
+CYC116;1 µM;1;sum;9,36000000000000e+01;effective_drugs
+CYC116;1 µM;2;sum;6,23000000000000e+01;effective_drugs
+CYT387;10 µM;1;sum;8,65700000000000e+01;effective_drugs
+CYT387;10 µM;2;sum;7,61000000000000e+01;effective_drugs
+DMSO;10 µM;1;sum;8,68266666666667e+01;effective_drugs
+DMSO;10 µM;2;sum;7,48600000000000e+01;effective_drugs
+3-Deazaneplanocin A;1 µM;1;sum;8,99200000000000e+01;effective_drugs
+3-Deazaneplanocin A;1 µM;2;sum;7,72300000000000e+01;effective_drugs
+Danusertib;100 nM;1;sum;9,23000000000000e+01;effective_drugs
+Danusertib;100 nM;2;sum;8,17000000000000e+01;effective_drugs
+Entinostat;10 µM;1;sum;9,15600000000000e+01;effective_drugs
+Entinostat;10 µM;2;sum;6,64500000000000e+01;effective_drugs
+Givinostat;1 µM;1;sum;7,21800000000000e+01;effective_drugs
+Givinostat;1 µM;2;sum;6,09400000000000e+01;effective_drugs
+I-BET-762;10 µM;1;sum;9,40000000000000e+01;effective_drugs
+I-BET-762;10 µM;2;sum;8,65000000000000e+01;effective_drugs
+LY2784544;1 µM;2;sum;7,33000000000000e+01;effective_drugs
+MK-5108;100 nM;1;sum;8,53700000000000e+01;effective_drugs
+MK-5108;100 nM;2;sum;6,86200000000000e+01;effective_drugs
+NSC-3852;10 µM;1;sum;8,77000000000000e+01;effective_drugs
+NSC-3852;10 µM;2;sum;7,42000000000000e+01;effective_drugs
+OTX015;10 µM;1;sum;0,00000000000000e+00;effective_drugs
+OTX015;10 µM;2;sum;8,82000000000000e+01;effective_drugs
+PAO;10 µM;1;sum;7,42400000000000e+01;effective_drugs
+PAO;10 µM;2;sum;5,90666666666667e+01;effective_drugs
+PCI-24781;100 nM;1;sum;8,71200000000000e+01;effective_drugs
+PCI-24781;100 nM;2;sum;7,47400000000000e+01;effective_drugs
+PCI-24781;1 µM;1;sum;8,74700000000000e+01;effective_drugs
+PCI-24781;1 µM;2;sum;7,66700000000000e+01;effective_drugs
+PJ34 HCl;10 µM;1;sum;8,72100000000000e+01;effective_drugs
+PJ34 HCl;10 µM;2;sum;7,47700000000000e+01;effective_drugs
+Pracinostat;10 µM;1;sum;4,91200000000000e+01;effective_drugs
+Pracinostat;10 µM;2;sum;4,46600000000000e+01;effective_drugs
+Quercetin;100 nM;1;sum;8,71000000000000e+01;effective_drugs
+Quercetin;100 nM;2;sum;7,44200000000000e+01;effective_drugs
+RG2833;10 µM;1;sum;8,93000000000000e+01;effective_drugs
+RG2833;10 µM;2;sum;7,71800000000000e+01;effective_drugs
+RGFP966;10 µM;1;sum;8,72500000000000e+01;effective_drugs
+RGFP966;10 µM;2;sum;7,66700000000000e+01;effective_drugs
+RVX-208;100 nM;1;sum;8,74000000000000e+01;effective_drugs
+RVX-208;100 nM;2;sum;7,56700000000000e+01;effective_drugs
+RVX-208;10 µM;1;sum;8,89900000000000e+01;effective_drugs
+RVX-208;10 µM;2;sum;7,58600000000000e+01;effective_drugs
+Resveratrol;10 µM;1;sum;8,60200000000000e+01;effective_drugs
+Resveratrol;10 µM;2;sum;7,54500000000000e+01;effective_drugs
+SGC 0946;10 µM;1;sum;8,70200000000000e+01;effective_drugs
+SGC 0946;10 µM;2;sum;7,74600000000000e+01;effective_drugs
+SGC-CBP30;10 µM;1;sum;8,66300000000000e+01;effective_drugs
+SGC-CBP30;10 µM;2;sum;7,64800000000000e+01;effective_drugs
+SNS-314 Mesylate;10 µM;1;sum;9,79100000000000e+01;effective_drugs
+SNS-314 Mesylate;10 µM;2;sum;7,74600000000000e+01;effective_drugs
+Scriptaid;1 µM;1;sum;8,60300000000000e+01;effective_drugs
+Scriptaid;1 µM;2;sum;7,67400000000000e+01;effective_drugs
+Suramin;100 nM;1;sum;8,79200000000000e+01;effective_drugs
+Suramin;100 nM;2;sum;7,45100000000000e+01;effective_drugs
+TG101209;1 µM;1;sum;8,86000000000000e+01;effective_drugs
+TG101209;1 µM;2;sum;8,19000000000000e+01;effective_drugs
+Tubastatin A HCl;10 µM;1;sum;8,81600000000000e+01;effective_drugs
+Tubastatin A HCl;10 µM;2;sum;7,62800000000000e+01;effective_drugs
+Vorinostat;1 µM;1;sum;8,92000000000000e+01;effective_drugs
+Vorinostat;1 µM;2;sum;7,78400000000000e+01;effective_drugs
+AMG-900;100 nM;1;G1;3,86285714285714e-01;five_drugs
+AMG-900;10 µM;1;G1;2,56572029442692e-01;five_drugs
+AMG-900;10 µM;2;G1;2,51565762004175e-01;five_drugs
+AMG-900;1 µM;1;G1;3,36842105263158e-01;five_drugs
+AZ-960;100 nM;1;G1;5,91408591408591e-01;five_drugs
+AZ-960;100 nM;2;G1;6,01593625498008e-01;five_drugs
+AZ-960;10 µM;1;G1;2,76756756756757e-01;five_drugs
+AZ-960;10 µM;2;G1;2,43688254665203e-01;five_drugs
+AZ-960;1 µM;1;G1;4,14814814814815e-01;five_drugs
+AZ-960;1 µM;2;G1;4,59119496855346e-01;five_drugs
+Decitabine;100 nM;1;G1;5,51243781094527e-01;five_drugs
+Decitabine;100 nM;2;G1;5,58441558441558e-01;five_drugs
+Decitabine;10 µM;1;G1;5,86276488395560e-01;five_drugs
+Decitabine;10 µM;2;G1;5,76576576576577e-01;five_drugs
+Decitabine;1 µM;1;G1;4,98504486540379e-01;five_drugs
+Decitabine;1 µM;2;G1;5,27527527527528e-01;five_drugs
+DMSO;10 µM;1;G1;6,12887112887113e-01;five_drugs
+DMSO;10 µM;2;G1;5,88822355289421e-01;five_drugs
+AMG-900;100 nM;1;G2;4,40000000000000e-01;five_drugs
+AMG-900;10 µM;1;G2;5,90956887486856e-01;five_drugs
+AMG-900;10 µM;2;G2;5,94989561586639e-01;five_drugs
+AMG-900;1 µM;1;G2;4,66315789473684e-01;five_drugs
+AZ-960;100 nM;1;G2;1,61838161838162e-01;five_drugs
+AZ-960;100 nM;2;G2;1,56374501992032e-01;five_drugs
+AZ-960;10 µM;1;G2;5,63243243243243e-01;five_drugs
+AZ-960;10 µM;2;G2;5,94950603732163e-01;five_drugs
+AZ-960;1 µM;1;G2;2,91005291005291e-01;five_drugs
+AZ-960;1 µM;2;G2;3,05031446540880e-01;five_drugs
+Decitabine;100 nM;1;G2;1,74129353233831e-01;five_drugs
+Decitabine;100 nM;2;G2;1,69830169830170e-01;five_drugs
+Decitabine;10 µM;1;G2;1,85671039354188e-01;five_drugs
+Decitabine;10 µM;2;G2;1,78178178178178e-01;five_drugs
+Decitabine;1 µM;1;G2;2,33300099700897e-01;five_drugs
+Decitabine;1 µM;2;G2;1,99199199199199e-01;five_drugs
+DMSO;10 µM;1;G2;1,59340659340659e-01;five_drugs
+DMSO;10 µM;2;G2;1,59680638722555e-01;five_drugs
+AMG-900;100 nM;1;S;1,73714285714286e-01;five_drugs
+AMG-900;10 µM;1;S;1,52471083070452e-01;five_drugs
+AMG-900;10 µM;2;S;1,53444676409186e-01;five_drugs
+AMG-900;1 µM;1;S;1,96842105263158e-01;five_drugs
+AZ-960;100 nM;1;S;2,46753246753247e-01;five_drugs
+AZ-960;100 nM;2;S;2,42031872509960e-01;five_drugs
+AZ-960;10 µM;1;S;1,60000000000000e-01;five_drugs
+AZ-960;10 µM;2;S;1,61361141602634e-01;five_drugs
+AZ-960;1 µM;1;S;2,94179894179894e-01;five_drugs
+AZ-960;1 µM;2;S;2,35849056603774e-01;five_drugs
+Decitabine;100 nM;1;S;2,74626865671642e-01;five_drugs
+Decitabine;100 nM;2;S;2,71728271728272e-01;five_drugs
+Decitabine;10 µM;1;S;2,28052472250252e-01;five_drugs
+Decitabine;10 µM;2;S;2,45245245245245e-01;five_drugs
+Decitabine;1 µM;1;S;2,68195413758724e-01;five_drugs
+Decitabine;1 µM;2;S;2,73273273273273e-01;five_drugs
+DMSO;10 µM;1;S;2,27772227772228e-01;five_drugs
+DMSO;10 µM;2;S;2,51497005988024e-01;five_drugs
+AMG-900;100 nM;1;sum;8,75000000000000e+01;five_drugs
+AMG-900;10 µM;1;sum;9,51000000000000e+01;five_drugs
+AMG-900;10 µM;2;sum;9,58000000000000e+01;five_drugs
+AMG-900;1 µM;1;sum;9,50000000000000e+01;five_drugs
+AZ-960;100 nM;1;sum;1,00100000000000e+02;five_drugs
+AZ-960;100 nM;2;sum;1,00400000000000e+02;five_drugs
+AZ-960;10 µM;1;sum;9,25000000000000e+01;five_drugs
+AZ-960;10 µM;2;sum;9,11000000000000e+01;five_drugs
+AZ-960;1 µM;1;sum;9,45000000000000e+01;five_drugs
+AZ-960;1 µM;2;sum;9,54000000000000e+01;five_drugs
+Decitabine;100 nM;1;sum;1,00500000000000e+02;five_drugs
+Decitabine;100 nM;2;sum;1,00100000000000e+02;five_drugs
+Decitabine;10 µM;1;sum;9,91000000000000e+01;five_drugs
+Decitabine;10 µM;2;sum;9,99000000000000e+01;five_drugs
+Decitabine;1 µM;1;sum;1,00300000000000e+02;five_drugs
+Decitabine;1 µM;2;sum;9,99000000000000e+01;five_drugs
+DMSO;10 µM;1;sum;6,67333333333333e+01;five_drugs
+DMSO;10 µM;1;sum;1,00000000000000e+02;five_drugs
+DMSO;10 µM;2;sum;1,00200000000000e+02;five_drugs
