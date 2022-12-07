@@ -413,6 +413,17 @@ global_effects %>%
   group_by(conc_char, effect) %>% 
   dplyr::count() %>%
   knitr::kable()
+
+global_effects %>%
+  distinct(target, drug) %>%
+  group_by(target) %>% 
+  dplyr::count() %>%
+  knitr::kable()
+
+global_effects %>%
+  distinct(drug) %>%
+  dplyr::count() %>%
+  knitr::kable()
 ```
 
 Are there any drugs (per concentration) that significantly change the cutting efficiency significantly across all IPRs?
@@ -541,6 +552,7 @@ drug_conc = paste(drug, conc_char, sep = " "))
 ```{r Fisher test increase}
 increase_hits = rank_dt %>% filter(filter_zscore_TIF_global_comb_rep & viab_reproducibility &
                    mean_eff_pval_adj_comb < 0.01 & zscore_TIF_global_comb_rep > 0) %>% 
+  distinct(drug, target) %>%
   group_by(target) %>%
   count() %>%
   dplyr::rename(effect = n) %>%
@@ -552,7 +564,7 @@ all_drugs = indel.data %>% filter(sample == "Epigenetic Compound") %>%
         drug_conc = paste(drug, conc_char, sep = " "),
         target = case_when(target %in% rownames(increase_hits) ~ target,
          T ~ "other")) %>%
-  distinct(drug_conc, target) %>%
+  distinct(drug, target) %>%
   group_by(target) %>%
   count() %>%
   dplyr::rename(no_effect = n) %>%
@@ -569,6 +581,8 @@ dimnames(xtab_effect) <- list(
   Groups = rownames(xtab_effect),
   Effect = c("Yes", "No")
 )
+
+xtab_effect
 
 # Compare the proportion of males and females in each category
 row_wise_fisher_test(xtab_effect, p.adjust.method = "BH")
@@ -1151,7 +1165,7 @@ plot_grid(p1, p2)
 ---
 
 ```{r SCRATCH: Check replicates, fig.width= 6, fig.height=4, echo = FALSE, eval=FALSE}
-test_drug_short = "Bromosporine"
+test_drug_short = "(+)-JQ1"
 
 drug_df <- indel.data %>%
   mutate(drug = gsub(" [(].*[)]", "", drug)) %>%
