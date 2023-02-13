@@ -533,7 +533,7 @@ insertion <- function(import, decomposition) {
 Define the arguments: 
 ```{r}
 ref.file <- "/DATA/usr/m.trauernicht/projects/EpiScreen/E2159/mt20230306_seq_LBR.txt"
-output.file <- "/DATA/usr/m.trauernicht/projects/EpiScreen/E2159/mt20230207_TIDE_LBR.pdf"
+output.file <- "/DATA/usr/m.trauernicht/projects/EpiScreen/E2159/mt20230213_TIDE_LBR.pdf"
 folder <- ""
 seqstart = 65
 seqend = 225
@@ -551,9 +551,9 @@ plot_list = apply(table, 1, function(x){
   print(x[1])
   x[1:2] = paste0(folder, x[1:2])
   imp = import(x[1], x[2], x[3], seqstart, seqend, maxshift)
-  p_qual = quality(imp)
+  #p_qual = quality(imp)
   p_comp = decomposition(imp, x[4])
-  return(p_qual)
+  #return(p_qual)
   return(p_comp)
 })
 dev.off()
@@ -578,7 +578,7 @@ percentage_df <- percentage_df %>%
 Define the arguments: 
 ```{r}
 ref.file <- "/DATA/usr/m.trauernicht/projects/EpiScreen/E2159/mt20230306_seq_selected.txt"
-output.file <- "/DATA/usr/m.trauernicht/projects/EpiScreen/E2159/mt20230207_TIDE.pdf"
+output.file <- "/DATA/usr/m.trauernicht/projects/EpiScreen/E2159/mt20230213_TIDE.pdf"
 folder <- ""
 seqstart = 200
 seqend = 450
@@ -595,9 +595,9 @@ plot_list = apply(table, 1, function(x){
   print(x[1])
   x[1:2] = paste0(folder, x[1:2])
   imp = import(x[1], x[2], x[3], seqstart, seqend, maxshift)
-  p_qual = quality(imp)
+  #p_qual = quality(imp)
   p_comp = decomposition(imp, x[4])
-  return(p_qual)
+  #return(p_qual)
   return(p_comp)
 })
 dev.off()
@@ -626,7 +626,7 @@ percentage_df <- rbind(percentage_df, percentage_df2)
 ## Calculate TIF
 ```{r}
 ## Annotate dataframe
-TIF_df <- percentage_df %>%
+percentage_df <- percentage_df %>%
   mutate(condition = gsub("_r[1-3]", "", sample)) %>%
   mutate(replicate = gsub(".*(r[1-3])", "\\1", sample)) %>%
   mutate(gRNA = gsub("_.*", "", condition)) %>%
@@ -634,7 +634,7 @@ TIF_df <- percentage_df %>%
   filter(str_detect(condition, "ssODN", negate = T))
 
 ## Calculate TIF
-TIF_df <- TIF_df %>%
+TIF_df <- percentage_df %>%
   mutate(freq = as.numeric(freq)) %>%
   spread(key = "mutation", value = "freq") %>%
   mutate(TIF = 1 - `0`) %>%
@@ -710,5 +710,70 @@ for (i in unique(TIF_df_2$gRNA)) {
 
 pval_df %>% arrange(pval)
 ```
+
+
+## Indel plots
+```{r}
+colors_pathways = c("wt" = "#808184", "other" = "black", "NHEJ" = "#e1251b", "MMEJ" = "#26419a", "SSTR" = "#007A4C")
+
+percentage_df2 <- percentage_df %>%
+  mutate(mutation = factor(mutation, levels = seq(-12, 2))) %>%
+  mutate(freq = as.numeric(freq)) %>%
+  mutate(percentage_mean = ave(freq, mutation, condition, FUN = mean)) %>%
+  mutate(pathway = case_when(mutation == -7 ~ "MMEJ",
+                             mutation == 1 ~ "NHEJ",
+                             mutation == 2 ~ "SSTR", 
+                             mutation == 0 ~ "TIF", 
+                             T ~ "other"),
+         pathway = factor(pathway, levels = c("TIF", "NHEJ", "MMEJ", "SSTR", "other"))) %>%
+  mutate(replicate = as.numeric(gsub("r", "", replicate))) %>%
+  mutate(gRNA = factor(gRNA, levels = c("LBR1", "LBR2", "TBX5", "LAD2", "LAD7", "LAD10"))) %>%
+  mutate(drug = factor(drug, levels = c("DMSO", "AT9283", "PCI", "Resveratrol", "Tubastatin"))) %>%
+  na.omit()
+
+ggplot(percentage_df2, 
+            aes(mutation, percentage_mean, group = drug, alpha = drug)) + 
+  geom_bar(stat = "identity", 
+           aes(fill = pathway), 
+           position = position_dodge(width = 1)) + 
+  geom_jitter(data = percentage_df2, 
+              aes(mutation, freq, fill = pathway, 
+                  shape = factor(replicate)), 
+              position = position_dodge(width = 1)) + 
+  scale_fill_manual("legend", values = colors_pathways) + 
+  theme_pubr() +
+  facet_wrap(~gRNA)
+
+ggplot(percentage_df2 %>%
+         filter(gRNA == "LAD10"), 
+            aes(mutation, percentage_mean)) + 
+  geom_bar(stat = "identity", 
+           aes(fill = pathway), 
+           position = position_dodge(width = 1)) + 
+  geom_jitter(data = percentage_df2 %>%
+         filter(gRNA == "LAD10"), 
+              aes(mutation, freq, fill = pathway, 
+                  shape = factor(replicate)), 
+              position = position_dodge(width = 1)) + 
+  scale_fill_manual("legend", values = colors_pathways) + 
+  theme_pubr() +
+  facet_wrap(~drug)
+
+ggplot(percentage_df2 %>%
+         filter(!gRNA %in% c("LBR1", "LBR2")), 
+            aes(mutation, percentage_mean)) + 
+  geom_bar(stat = "identity", 
+           aes(fill = pathway), 
+           position = position_dodge(width = 1)) + 
+  geom_jitter(data = percentage_df2 %>%
+         filter(!gRNA %in% c("LBR1", "LBR2")), 
+              aes(mutation, freq, fill = pathway, 
+                  shape = factor(replicate)), 
+              position = position_dodge(width = 1)) + 
+  scale_fill_manual("legend", values = colors_pathways) + 
+  theme_pubr() +
+  facet_grid(gRNA~drug)
+```
+
 
 
