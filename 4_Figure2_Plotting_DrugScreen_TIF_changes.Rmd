@@ -1135,7 +1135,7 @@ p2 = indel.data %>% mutate(drug = gsub(" [(].*[)]", "", drug),
   group_by(drug_conc, target) %>%
   summarise(viab_mean = mean(viab_mean),
             freqCut_diff_global_mean = mean(freqCut_diff_global_mean)) %>%
-  filter(viab_mean > max_viab_TIF_down) %>%
+  filter(!(viab_mean < max_viab_TIF_down & freqCut_diff_global_mean < 0)) %>%
   ggplot(., aes(viab_mean, freqCut_diff_global_mean)) +
   geom_point(size = 2) + 
   geom_point(data = . %>% filter(drug_conc %in% bottom_hits$drug_conc),
@@ -1153,7 +1153,7 @@ p2 = indel.data %>% mutate(drug = gsub(" [(].*[)]", "", drug),
   geom_vline(xintercept = max_viab_TIF_down, color = "red", linetype="dotted") +
   annotate("rect",
            xmin = 0, xmax = max_viab_TIF_down,
-           ymin = -Inf, ymax = Inf, 
+           ymin = -Inf, ymax = 0, 
            alpha = 0.05, fill = "red") +
   ylab("Global TIF change") +
   xlab("Viability compared to control") +
