@@ -770,13 +770,23 @@ balance.data.heatmap2 <- balance.data.heatmap %>%
 
 
 # Make clustering of samples with all the data: 
-balance.clustering %<>% 
+balance.clustering <- balance.data.heatmap %>%
   filter(drug_conc %in% top_50_hits$drug_conc) %>%
-  dplyr::select(-min_score, -drug, -conc_char, -target) %>%
-  spread(IPR, MMEJ_log2_FC_mean) %>%
-  column_to_rownames(var = "drug_conc")
+  mutate(mean_eff_drug = ave(MMEJ_log2_FC_mean, drug, IPR, FUN = mean),
+         drug = gsub(" [(].*[)]", "", drug)) %>%
+  distinct(mean_eff_drug, drug, IPR) %>%
+  spread(IPR, mean_eff_drug) %>%
+  column_to_rownames(var = "drug")
 
-balance.clustering =  dist(balance.clustering, method = "minkowski")
+balance.clustering.dist =  dist(balance.clustering, method = "manhattan")
+
+balance.clustering.clust = hclust(balance.clustering.dist, method = "ward.D2")
+
+drug_order_grouped = balance.data.heatmap %>% distinct(drug, conc_char, drug_conc) %>%
+  mutate(conc_char = factor(conc_char, levels = c("100 nM", "1 µM", "10 µM"))) %>%
+  arrange(conc_char) %>%
+  arrange(factor(drug, levels = labels(balance.clustering.clust))) %>%
+  pull(drug_conc)
 
 
 balance.data.heatmap2 <- balance.data.heatmap2[,c("drug", "target", "conc_char", iprs)]
@@ -919,9 +929,10 @@ balance.data.matrix = balance.data.heatmap2.clusters %>%
   column_to_rownames('drug_conc') %>%
   dplyr::select(contains('IPR'))
 
-plt1 = pheatmap(balance.data.matrix[hclust(balance.clustering, method = "ward.D2")$labels,
-                                    clone5_map_ipr$labels],
+plt1 = pheatmap(balance.data.matrix[drug_order_grouped , clone5_map_ipr$labels] %>%
+                  na.omit(),
                 cluster_cols = clone5_map_ipr,
+                cluster_rows = F,
                 border_color = F,
                 cellwidth = 8,
                 cellheight = 8,
@@ -1707,6 +1718,43 @@ p = pheatmap(bal_synergy_matrix[drug_order_grouped, TRIP_chrom_clust$labels],
 
 
 ```
+
+
+
+### Comparing Pool & Clone CCDs of Vorinostat
+```{r}
+file = list.files(in.dir, pattern = "CCD_validation_table", full.names = T) %>% tail(n = 1)
+vorinostat_pool_tib <- readRDS(file) %>%
+  filter(drug == "Vorinostat") %>%
+  dplyr::select(drug, "pool_ratio_slope" = ratio_slope_plot, feature)
+
+vorinostat_clone_tib <- CCD_tib %>%
+  filter(drug_conc == "Vorinostat 1 µM") %>%
+  dplyr::select("drug" = drug_conc, "clone_ratio_slope" = ratio_slope_plot, feature) %>%
+  mutate(drug = "Vorinostat")
+
+vorinostat_tib <- merge(vorinostat_clone_tib, vorinostat_pool_tib, by = c("drug", "feature"), all = T) %>%
+  mutate(pool_ratio_slope = ifelse(is.na(pool_ratio_slope), 0, pool_ratio_slope)) %>%
+  mutate(clone_ratio_slope = ifelse(is.na(clone_ratio_slope), 0, clone_ratio_slope)) 
+
+vorinostat_tib <- vorinostat_tib %>% 
+           dplyr::select(-drug) %>%
+           column_to_rownames("feature") %>%
+           t()
+
+pheatmap(vorinostat_tib[, TRIP_chrom_clust$labels],
+         cluster_rows = F,
+         cluster_cols = TRIP_chrom_clust,
+         border_color = F,
+         cellwidth = 8,
+         cellheight = 8,
+         color = colors,
+         breaks = breaks)
+```
+
+
+
+
 
 ```{r Fisher test CCD}
 drug_conc_tib = indel.data %>% distinct(drug, conc_char, target) %>% mutate(drug = gsub(" [(].*[)]", "", drug),
