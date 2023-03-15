@@ -1,0 +1,220 @@
+## ChIP data selection
+
+Script for selecting ChIP and DamID data for both the pool and the clonal lines.
+
+```{r libs and fun, echo = FALSE}
+
+library(data.table)
+library(ggcorrplot)
+library(yaml)
+library(caret)
+
+
+
+dam_files = list.files('/DATA/projects/DSBrepair/data/rs20230216_episcreen_gRNAs_E2159/dam/',
+                       full.names=T)
+
+dam_meta.dt = data.table(pool=gsub('.*/(.*)-[0-9]+_.*', '\\1', dam_files),
+                         binsize=as.numeric(gsub('.*-([0-9]+)_.*', '\\1', dam_files)),
+				         dam_name=gsub('.*-[0-9]+_(.*).txt', '\\1', dam_files),
+				         filename=dam_files)
+
+
+cov_files = list.files('/DATA/projects/DSBrepair/data/rs20230216_episcreen_gRNAs_E2159/coverage',
+                       full.names=T, patter='.tsv')
+
+
+cov_meta.dt = data.table(pool=gsub('.*/(.*)-[0-9]+_.*', '\\1', cov_files),
+                         binsize=as.numeric(gsub('.*-([0-9]+)_.*', '\\1', cov_files)),
+				         filename=cov_files)
+
+
+cov_data.dt = cov_meta.dt[,fread(filename, stringsAsFactors=F),by=c('pool', 'binsize')]
+
+
+dnase_pseudo = cov_data.dt[DNAse_SE>0, min(DNAse_SE)] / 2
+cov_data.dt[,DNAse:=(log2(DNAse_PE) + log2(DNAse_SE + dnase_pseudo))/2]
+
+cov_data.dt[,m5C:=(log2(WGBS_r1) + log2(WGBS_r2))/2]
+colnames(cov_data.dt) = gsub('TT-seq', 'TTseq', colnames(cov_data.dt))
+cov_data.dt[,TTseq_r1 := TTseq_min_r1 + TTseq_plus_r1]
+cov_data.dt[,TTseq_r2 := TTseq_min_r2 + TTseq_plus_r2]
+
+ttseq_pseudo_r1 = min(cov_data.dt[TTseq_r1 > 0, TTseq_r1])
+
+ttseq_pseudo_r2 = min(cov_data.dt[TTseq_r2 > 0, TTseq_r2])
+
+
+cov_data.dt[,TTseq:=(log2(TTseq_r1 + ttseq_pseudo_r1) +
+                     log2(TTseq_r2 + ttseq_pseudo_r2))/2]
+
+
+cov_data.dt[,late_replicating_r1 := log2(repliseq_r1_late / repliseq_r1_early)]
+
+cov_data.dt[,late_replicating_r2 := log2(repliseq_r2_late / repliseq_r2_early)]
+
+cov_data.dt[,late_replicating:=(late_replicating_r1 + late_replicating_r2)/2]
+cov_data.dt[!is.finite(late_replicating),late_replicating:=0]
+
+
+# cov_data.dt[,TTseq:=(TTseq_min_r1 + TTseq_plus_r1 +
+#                      TTseq_min_r2 + TTseq_plus_r2)/2]
+
+chip_files = list.files('/DATA/projects/DSBrepair/data/rs20230216_episcreen_gRNAs_E2159/chip/site_means/',
+                        full.names=T)
+
+meta.dt = data.table(pool=gsub('.*/(.*)-[0-9]+_.*', '\\1', chip_files),
+                     binsize=as.numeric(gsub('.*-([0-9]+)_.*', '\\1', chip_files)),
+				     chip_name=gsub('.*-[0-9]+_(.*).txt', '\\1', chip_files),
+				     filename=chip_files)
+
+meta.dt[,chip_source:=gsub('(.*)_.*_.*', '\\1', chip_name)]
+meta.dt[,chip_target:=gsub('.*_(.*)_.*', '\\1', chip_name)]
+meta.dt[,chip_id:=gsub('.*_.*_(.*)', '\\1', chip_name)]
+
+chip_yaml = yaml.load_file('/DATA/scratch/usr/c.leemans/projects/chip_snake/config.yaml')
+
+exp = chip_yaml$experiment$K562
+
+meta.dt[,sra_chip:=paste(exp[[chip_source]][[chip_target]][[chip_id]][['treatment']],
+                         collapse=','),
+        by=c('chip_source', 'chip_target', 'chip_id')]
+
+meta.dt[,sra_input:=paste(exp[[chip_source]][[chip_target]][[chip_id]][['control']],
+                          collapse=','),
+        by=c('chip_source', 'chip_target', 'chip_id')]
+
+meta.dt[,PMID:=paste(exp[[chip_source]][[chip_target]][[chip_id]][['PMID']],
+                     collapse='_'),
+        by=c('chip_source', 'chip_target', 'chip_id')]
+
+
+meta.dt[,DOI:=paste(exp[[chip_source]][[chip_target]][[chip_id]][['DOI']],
+                     collapse='_'),
+        by=c('chip_source', 'chip_target', 'chip_id')]
+
+chip.dt = meta.dt[, fread(filename, stringsAsFactors=F)[,c('ID', 'Input', 'log2_mean', 'z_score')],
+                  by=filename]
+
+chip_full.dt = merge(chip.dt, meta.dt, by='filename')
+
+
+xChip = readRDS('/DATA/projects/DSBrepair/data/R/XV20191118_ChIPcorrelations.rds')
+
+xChip.dt = data.table(dcast(xChip, ID ~ antibody, value.var='ChIPseq'))
+setkey(xChip.dt, 'ID')
+
+
+
+damid.dt = dam_meta.dt[, fread(filename, stringsAsFactors=F,
+                               col.names=c('ID', 'mean', 'gmean', 'DAM',
+						                   'ctrl_gmean', 'z_score'))[,c('ID', 'mean', 'DAM', 'z_score')],
+                       by=filename]
+colnames(damid.dt)[4] = 'Dam'
+
+damid.dt = merge(damid.dt, dam_meta.dt, by='filename')
+
+
+#
+# dam_files = list.files('/DATA/projects/DSBrepair/data/features/',
+#                         full.names=T, pattern='pool_r[0-9]_Dam')
+#
+#
+#
+# meta_dam.dt = data.table(dam_name=gsub('.*_(r[0-9]+_.*)-.*', '\\1',
+# 						                dam_files),
+# 				         filename=dam_files)
+#
+# meta_dam.dt[,rep:=gsub('(.*?)_.*', '\\1', dam_name)]
+# meta_dam.dt[,dam_id:=gsub('.*?_(.*)', '\\1', dam_name)]
+# meta_dam.dt[,dam_id:=gsub('_.*', '', dam_id)]
+#
+#
+# dam.dt = meta_dam.dt[, fread(filename, stringsAsFactors=F,
+# 	                         col.names=c('ID', 'count')),
+#                   by=c('dam_name', 'rep', 'dam_id', 'filename')]
+# dam.dt[,count:=ifelse(is.na(count),0,count)]
+#
+# dam_mean = dam.dt[,list(sum=sum(count) + 1), by=ID]
+# setkey(dam_mean, 'ID')
+
+
+meta_selection.dt = meta.dt[chip_source%in%c('Minoda2018', 'Schmidl2015', 'Bernstein2012',
+											 'Snyder2016', 'Bernstein2011',
+											 'Ratnakumar2012', 'Shah2018', 'Liu2018',
+											 'Tyler2017', 'Snyder2017', 'Snyder2018',
+										     'Salzberg2017', 'Snyder2012')]
+
+meta_selection.dt = meta_selection.dt[!(chip_source=='Schmidl2015' &
+                                        chip_target%in%c('H3K4me1', 'H3K4me3')), ]
+
+## H3K9me2 ChIP has very low dynamic range.
+meta_selection.dt = meta_selection.dt[!(chip_source=='Liu2018' &
+                                        chip_target=='H3K9me2'), ]
+
+## A Pol2 chip from Snyder that is not as good as the other one from the same lab
+meta_selection.dt = meta_selection.dt[!chip_id%in%c('ENCSR031TFS'),]
+meta_selection.dt = meta_selection.dt[chip_id!='chipseq' & binsize==2000,]
+
+meta_selection.dt = meta_selection.dt[chip_target%in%c('H2AFZ', 'H3K79me2',
+                                                       'H4K5acK8ac', 'H3K122ac',
+													   'H3K27ac', 'H3K4me1',
+													   'H3K9me2', 'H3K9me3',
+													   'H3K27me3', 'H3K36me3',
+													   'H3K4me3', 'H3K4me2',
+												       'POL2', 'POL2AS2', 'HDAC1',
+												       'HDAC2', 'HDAC3', 'SMC3',
+												       'EZH2', 'CTCF'),]
+
+chip.dt = meta_selection.dt[, fread(filename, stringsAsFactors=F)[,c('ID', 'Input', 'mean', 'log2_mean', 'z_score')],
+					        by=filename]
+
+chip.dt = merge(chip.dt, meta.dt, by='filename')
+
+mean_source_chip.dt = chip.dt[,list(log2_mean=mean(log2_mean), mean=mean(mean), z_score=mean(z_score)),
+							  by=c('binsize', 'ID', 'pool', 'chip_target', 'chip_source') ]
+
+mean_chip.dt = mean_source_chip.dt[,list(log2_mean=mean(log2_mean), mean=mean(mean), z_score=mean(z_score)),
+								   by=c('binsize', 'ID', 'pool', 'chip_target') ]
+chip_cast.dt = data.table::dcast(mean_chip.dt, binsize + ID + pool ~ chip_target,
+					 value.var='log2_mean')
+
+
+
+
+damid_cast.dt = data.table::dcast(damid.dt, binsize + ID + pool ~ dam_name,
+								  value.var='mean')
+
+chip_dam.dt = merge(chip_cast.dt, damid_cast.dt[,c('ID', 'pool', 'binsize', 'LMNB1')],
+					  by=c('ID', 'binsize', 'pool'))
+
+chip_dam.dt = merge(chip_dam.dt, damid.dt[dam_name=='LMNB1',c('ID','binsize','Dam')],
+                      by=c('ID', 'binsize'))
+
+chip_dam.dt = merge(chip_dam.dt, cov_data.dt[,c('barcode', 'binsize', 'pool',
+												 'DNAse', 'm5C', 'late_replicating',
+												 'TTseq')],
+					by.y=c('barcode','binsize', 'pool'),
+					by.x=c('ID', 'binsize', 'pool'))
+
+
+
+## To make correct z-score I'll add the data from the pool
+pool.dt = readRDS('/DATA/projects/DSBrepair/data/R/cl20201026_ChIP_mean_selection.RDS')
+
+chip_dam_pool.dt = rbind(chip_dam.dt, pool.dt)
+
+
+calc_z <- function(X){
+    z_pre = preProcess(X, method=c('center', 'scale'))
+    return(predict(z_pre, X))
+}
+
+z_score = chip_dam_pool.dt[,calc_z(.SD[,-c('ID', 'pool')]), by='binsize']
+
+chip_z.dt = cbind(chip_dam_pool.dt[,c('ID', 'pool')],
+                  z_score)
+
+saveRDS(chip_z.dt, './rs20230216_gRNA_valid_chip_Zscore.RDS')
+saveRDS(chip_dam.dt, './rs20230216_gRNA_valid_chip_mean.RDS')
+```

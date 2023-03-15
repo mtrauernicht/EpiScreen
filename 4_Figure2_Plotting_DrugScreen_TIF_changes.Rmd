@@ -1161,6 +1161,83 @@ p2 = indel.data %>% mutate(drug = gsub(" [(].*[)]", "", drug),
 
 plot_grid(p1, p2)
 ```
+## S2B gRNA chromatin
+
+```{r S2B gRNA chromatin}
+# Feature clustering based on whole TRIP pool
+gRNA_chrom_tib <- readRDS('./rs20230216_gRNA_valid_chip_Zscore.RDS') %>% 
+# Remove HDAC1 and 2 as they do not reach higher than the 80th percentile of the HDAC 
+  filter(pool == "episcreen_gRNA")  
+  
+gRNA_chrom = gRNA_chrom_tib %>% dplyr::select(-binsize, -pool) %>% column_to_rownames("ID")
+
+
+# make clustering with some column rotation for better visualisation
+# Feature clustering based on whole TRIP pool
+TRIP_chrom_tib <- readRDS('/DATA/projects/DSBrepair/data/R/cl20201026_ChIP_zscore_selection.RDS')
+
+TRIP_chrom = TRIP_chrom_tib %>% dplyr::select(-binsize, -pool) %>% column_to_rownames("ID")
+# make clustering with some column rotation for better visualisation
+gRNA_chrom_clust = hclust(dist(t(TRIP_chrom)), method = "ward.D")
+
+## Chromatin groups
+group_colors = c("Euchromatin" = "#f7941d",
+                 "other-heterochromatin" = "#838687",
+                 "Triple Heterochromatin" = "#662d91",
+                 "H3K27me3" = "#d21f8a")
+
+clustering = data.frame(row.names=c('LMNB1', 'late_replicating', 
+                                    'H3K9me2', 'H3K9me3',
+                                    'H3K27me3', 'EZH2', 
+                                    'CTCF', 'SMC3',
+                                    'HDAC3', 'HDAC2', 'HDAC1', 
+                                    'H3K4me1', 'H3K4me2', 'H3K4me3', 'H3K27ac',
+                                    'H4K5acK8ac', 'H2AFZ', 
+                                    'DNAse', 'Dam', 'm5C',
+                                    'H3K79me2', 
+                                    'TTseq', 
+                                    'H3K36me3', 'POL2AS2',
+                                    'POL2'),
+                        group=factor(c(rep('repressive', 6), 
+                                       # rep('repressive', 4), 
+                                       rep('insulator', 2),
+                                       rep('HDAC', 3), 
+                                       rep('euchromatin', 6),
+                                       rep('accessibility', 2), 'methylation',
+                                       rep('transcribing', 5)
+                                       # rep('transcribing', 4)
+                        ),
+                        levels=c('transcribing', 'accessibility',
+                                 'methylation', 'euchromatin',
+                                 'HDAC', 'insulator', 'repressive')))
+feature_fill = c(insulator="#a6b5a3", repressive="#304441", euchromatin="#cda4cc",
+                 transcribing="#d68d7d", HDAC="#aac9e0", accessibility='#cebc85',
+                 methylation='#7dc98f')
+
+order_vec=rownames(clustering)[nrow(clustering):1]
+
+### Colors
+quant_breaks <- quantile(gRNA_chrom, c(.01,.99), na.rm = T) # change these numbers according to where you want to set the cutoff
+palette_length <- 100
+max_quant = max(abs(quant_breaks[1]), abs(quant_breaks[2]))
+
+breaks.chip <- c(seq(-quant_breaks[2], 0, length.out=ceiling(palette_length/2) + 1), 
+                 seq(quant_breaks[2]/palette_length, quant_breaks[2], length.out=floor(palette_length/2)))
+
+
+colors = colorRampPalette(rev(brewer.pal(n = 11, name="RdBu")))(palette_length)
+
+pheatmap(t(gRNA_chrom), 
+         cluster_rows = gRNA_chrom_clust,
+         cluster_cols = F,
+         annotation_row=clustering,
+         cellwidth = 10,
+         cellheight = 10,
+         annotation_colors=list(chromatin=group_colors, group=feature_fill),
+         color = colors, 
+         breaks = breaks.chip)
+```
+
 
 ---
 
