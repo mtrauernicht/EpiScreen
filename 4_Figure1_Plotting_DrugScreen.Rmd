@@ -557,7 +557,8 @@ indel.data  %>%
   filter(!indel_freq_filter | !viab_reproducibility) %>% # freqCut is NA if sample didn't pass filter for viability.
   distinct(drug, conc_char) %>% # unique compound and concentration combination
   pull(conc_char) %>% 
-  table() # count compounds per concentration that are removed
+  table() %>%
+  knitr::kable() # count compounds per concentration that are removed
 
 indel.data  %>% 
   filter(!indel_freq_filter) %>% # freqCut is NA if sample didn't pass filter for viability.

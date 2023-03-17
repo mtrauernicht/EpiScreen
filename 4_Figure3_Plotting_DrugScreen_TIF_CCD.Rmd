@@ -391,6 +391,9 @@ dmso.eff.score <- indel.data %>%
   distinct(replicate, tech, well, plate, DMSO) %>% 
   pull(DMSO) %>%
   fitdistr(., "normal") %>% tidy()
+
+chromatin.features <- colnames(indel.data)[grepl("[.]zscore", colnames(indel.data))]
+chromatin.features.short = gsub(".zscore", "", chromatin.features)
 ```
 
 #### processing screen data for heatmaps
@@ -688,6 +691,21 @@ CCD_tib %>%
   left_join(drug_conc_table) %>% 
   distinct(drug) %>% 
   nrow()
+
+# Positive CCDs for the TIF
+CCD_tib %>% 
+  filter(!grepl("DNA-PK|control", drug_conc)) %>%
+  filter(indelrate_slope_plot > 0) %>% 
+  left_join(drug_conc_table) %>% 
+  distinct(drug_conc) %>% 
+  nrow()
+
+CCD_tib %>% 
+  filter(!grepl("DNA-PK|control", drug_conc)) %>%
+  filter(indelrate_slope_plot > 0) %>% 
+  left_join(drug_conc_table) %>% 
+  distinct(drug) %>% 
+  nrow()
 ```
 
 ## 3D All compound synergies with chromatin
@@ -856,9 +874,6 @@ p2 = ggplot(CCD_example_tib,
 plot_grid(p1, p2, nrow = 1, labels = c("C", "D"))
 
 CCD_tib %>% filter(feature == "H3K36me3" & drug_conc == "EPZ-6438 10 µM") %>% pull(indelrate_slope_plot)
-
-chromatin.features <- colnames(indel.data)[grepl("[.]zscore", colnames(indel.data))]
-chromatin.features.short = gsub(".zscore", "", chromatin.features)
 ```
 
 
