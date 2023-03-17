@@ -12,6 +12,8 @@ library(dplyr)
 library(stringr)
 library(tidyr)
 library(ggpubr)
+library(tidyverse)
+library(pheatmap)
 ```
 
 Functions
@@ -533,7 +535,7 @@ insertion <- function(import, decomposition) {
 Define the arguments: 
 ```{r}
 ref.file <- "/DATA/usr/m.trauernicht/projects/EpiScreen/E2159/mt20230306_seq_LBR.txt"
-output.file <- "/DATA/usr/m.trauernicht/projects/EpiScreen/E2159/mt20230213_TIDE_LBR.pdf"
+output.file <- "/DATA/usr/m.trauernicht/projects/EpiScreen/E2159/mt20230317_TIDE_LBR.pdf"
 folder <- ""
 seqstart = 65
 seqend = 225
@@ -578,7 +580,7 @@ percentage_df <- percentage_df %>%
 Define the arguments: 
 ```{r}
 ref.file <- "/DATA/usr/m.trauernicht/projects/EpiScreen/E2159/mt20230306_seq_selected.txt"
-output.file <- "/DATA/usr/m.trauernicht/projects/EpiScreen/E2159/mt20230213_TIDE.pdf"
+output.file <- "/DATA/usr/m.trauernicht/projects/EpiScreen/E2159/mt20230317_TIDE.pdf"
 folder <- ""
 seqstart = 200
 seqend = 450
@@ -627,8 +629,8 @@ percentage_df <- rbind(percentage_df, percentage_df2)
 ```{r}
 ## Annotate dataframe
 percentage_df <- percentage_df %>%
-  mutate(condition = gsub("_r[1-3]", "", sample)) %>%
-  mutate(replicate = gsub(".*(r[1-3])", "\\1", sample)) %>%
+  mutate(condition = gsub("_r[1-5]", "", sample)) %>%
+  mutate(replicate = gsub(".*(r[1-5])", "\\1", sample)) %>%
   mutate(gRNA = gsub("_.*", "", condition)) %>%
   mutate(drug = gsub(".*_", "", condition)) %>%
   filter(str_detect(condition, "ssODN", negate = T))
@@ -658,7 +660,16 @@ TIF_df <- TIF_df %>%
 ggplot(TIF_df,
        aes(x = drug, y = TIF, fill = mean_difTIF)) +
   geom_point() +
-  geom_boxplot() +
+  geom_boxplot(outlier.shape = NA) +
+  theme_classic_lines_90() +
+  scale_fill_gradient2(low = "#74733B", mid = "white", high = "#005076") +
+  facet_wrap(~gRNA)
+
+ggplot(TIF_df %>%
+         filter(gRNA %in% c( "TBX5", "LAD2", "LAD7", "LAD10")),
+       aes(x = drug, y = TIF, fill = mean_difTIF)) +
+  geom_boxplot(outlier.shape = NA) +
+  geom_jitter(aes(shape = replicate), size = 2, width = .2) +
   theme_classic_lines_90() +
   scale_fill_gradient2(low = "#74733B", mid = "white", high = "#005076") +
   facet_wrap(~gRNA)
@@ -667,6 +678,15 @@ ggplot(TIF_df,
        aes(x = gRNA, y = TIF, fill = mean_difTIF)) +
   geom_point() +
   geom_boxplot() +
+  theme_classic_lines_90() +
+  scale_fill_gradient2(low = "#74733B", mid = "white", high = "#005076") +
+  facet_wrap(~drug)
+
+ggplot(TIF_df %>%
+         filter(gRNA %in% c( "TBX5", "LAD2", "LAD7", "LAD10")),
+       aes(x = gRNA, y = TIF, fill = mean_difTIF)) +
+  geom_boxplot() +
+  geom_jitter(aes(shape = replicate), size = 2, width = .2) +
   theme_classic_lines_90() +
   scale_fill_gradient2(low = "#74733B", mid = "white", high = "#005076") +
   facet_wrap(~drug)
@@ -682,14 +702,27 @@ ggplot(TIF_df %>%
   facet_wrap(~gRNA)
 
 ggplot(TIF_df %>%
-         filter(drug != "DMSO"),
+         filter(drug != "DMSO") %>%
+         filter(gRNA %in% c( "TBX5", "LAD2", "LAD7", "LAD10")),
        aes(x = gRNA, y = difTIF, fill = mean_difTIF)) +
   geom_hline(yintercept = 0, lty = 2) +
   geom_boxplot() +
-  geom_point() +
+  geom_jitter(aes(shape = replicate), size = 2, width = .2) +
   theme_classic_lines_90() +
   scale_fill_gradient2(low = "#74733B", mid = "white", high = "#005076") +
   facet_wrap(~drug)
+
+
+## Heatmaps
+TIF_heatmap <- TIF_df %>%
+  filter(drug != "DMSO") %>%
+  mutate(gRNA_rep = paste(gRNA, replicate, sep = "_")) %>%
+  distinct(gRNA_rep, drug, difTIF) %>%
+  spread(key = "drug", value = "difTIF") %>%
+  column_to_rownames("gRNA_rep")
+
+pheatmap(TIF_heatmap)
+
 
 ## T-tests
 pval_df <- merge(unique(TIF_df$drug), unique(TIF_df$gRNA)) %>%
@@ -771,7 +804,7 @@ ggplot(percentage_df2 %>%
                   shape = factor(replicate)), 
               position = position_dodge(width = 1)) + 
   scale_fill_manual("legend", values = colors_pathways) + 
-  theme_pubr() +
+  theme_pubr(border = T) +
   facet_grid(gRNA~drug)
 ```
 
