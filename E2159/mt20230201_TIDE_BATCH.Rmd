@@ -535,7 +535,7 @@ insertion <- function(import, decomposition) {
 Define the arguments: 
 ```{r}
 ref.file <- "/DATA/usr/m.trauernicht/projects/EpiScreen/E2159/mt20230306_seq_LBR.txt"
-output.file <- "/DATA/usr/m.trauernicht/projects/EpiScreen/E2159/mt20230317_TIDE_LBR.pdf"
+output.file <- "/DATA/usr/m.trauernicht/projects/EpiScreen/E2159/mt20230329_TIDE_LBR.pdf"
 folder <- ""
 seqstart = 65
 seqend = 225
@@ -580,7 +580,7 @@ percentage_df <- percentage_df %>%
 Define the arguments: 
 ```{r}
 ref.file <- "/DATA/usr/m.trauernicht/projects/EpiScreen/E2159/mt20230306_seq_selected.txt"
-output.file <- "/DATA/usr/m.trauernicht/projects/EpiScreen/E2159/mt20230317_TIDE.pdf"
+output.file <- "/DATA/usr/m.trauernicht/projects/EpiScreen/E2159/mt20230329_TIDE.pdf"
 folder <- ""
 seqstart = 200
 seqend = 450
@@ -629,11 +629,12 @@ percentage_df <- rbind(percentage_df, percentage_df2)
 ```{r}
 ## Annotate dataframe
 percentage_df <- percentage_df %>%
-  mutate(condition = gsub("_r[1-5]", "", sample)) %>%
-  mutate(replicate = gsub(".*(r[1-5])", "\\1", sample)) %>%
+  mutate(condition = gsub("_r[1-6]", "", sample)) %>%
+  mutate(replicate = gsub(".*(r[1-6])", "\\1", sample)) %>%
   mutate(gRNA = gsub("_.*", "", condition)) %>%
   mutate(drug = gsub(".*_", "", condition)) %>%
-  filter(str_detect(condition, "ssODN", negate = T))
+  filter(str_detect(condition, "ssODN", negate = T)) %>%
+  filter(replicate != "r6")
 
 ## Calculate TIF
 TIF_df <- percentage_df %>%
@@ -673,6 +674,26 @@ ggplot(TIF_df %>%
   theme_classic_lines_90() +
   scale_fill_gradient2(low = "#74733B", mid = "white", high = "#005076") +
   facet_wrap(~gRNA)
+
+ggplot() +
+    # geom_errorbar(data = TIF_df %>%
+    #          filter(gRNA %in% c( "TBX5", "LAD2", "LAD7", "LAD10")) %>%
+    #            mutate(TIF_sd = ave(TIF, drug, gRNA, FUN = sd)) %>%
+    #          distinct(drug, mean_TIF, mean_difTIF, gRNA, TIF_sd),
+    #             aes(y = mean_TIF, x = drug,
+    #                 ymin = mean_TIF - TIF_sd,
+    #                 ymax = mean_TIF + TIF_sd), stat="identity", width=0.25) +
+  geom_bar(data = TIF_df %>%
+             filter(gRNA %in% c( "TBX5", "LAD2", "LAD7", "LAD10")) %>%
+             distinct(drug, mean_TIF, mean_difTIF, gRNA),
+           stat = "identity", aes(x = drug, y = mean_TIF, fill = mean_difTIF), color = "black", alpha = .8) +
+  geom_jitter(data = TIF_df %>%
+             filter(gRNA %in% c( "TBX5", "LAD2", "LAD7", "LAD10")), 
+             aes(shape = replicate, x = drug, y = TIF), size = 2, width = .2) +
+  theme_classic_lines_90() +
+  scale_fill_gradient2(low = "#74733B", mid = "white", high = "#005076") +
+  facet_wrap(~gRNA) +
+  theme_pubr(border = T)
 
 ggplot(TIF_df,
        aes(x = gRNA, y = TIF, fill = mean_difTIF)) +
@@ -741,7 +762,7 @@ for (i in unique(TIF_df_2$gRNA)) {
   }
 }
 
-pval_df %>% arrange(pval)
+pval_df %>% filter(drug != "DMSO", gRNA != "LBR2") %>% group_by(gRNA) %>% mutate(pval_adj = p.adjust(pval, method = "fdr")) %>% arrange(pval_adj)
 ```
 
 
