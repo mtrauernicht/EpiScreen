@@ -1,0 +1,306 @@
+---
+title: "Script Title"
+author: 
+  - name: "Author Name"
+    email: "user@nki.nl"
+    affiliation: "Netherlands Cancer Institute"
+date: '`r format(Sys.time(), "%d/%m/%Y")`'
+output: 
+  html_document:
+    theme: united
+    highlight: pygments
+    fig_caption: yes
+    code_folding: hide
+    df_print: kable
+    toc: true
+    toc_depth: 4
+    toc_float:
+      collapsed: false
+  pdf_document:
+    toc: yes
+    toc_depth: '4'
+---
+
+*knitr document van Steensel lab*
+
+
+# Introduction
+Write a couple of sentences introducing the project.
+
+# Setup {.tabset}
+
+<!-- little HTML script to do indentation of the table of contents -->
+<script>
+$(document).ready(function() {
+$items = $('div#TOC li');
+$items.each(function(idx) {
+num_ul = $(this).parentsUntil('#TOC').length;
+$(this).css({'text-indent': num_ul * 10, 'padding-left': 0});
+});
+});
+</script>
+
+```{css, echo = FALSE}
+div.sourceCode {
+overflow-x: hidden;
+}
+```
+
+## Libraries
+```{r setup}
+knitr::opts_chunk$set(echo = TRUE)
+pdf.options(useDingbats = FALSE)
+StartTime <-Sys.time()
+
+# 8-digit Date tag:
+Date <- substr(gsub("-","",Sys.time()),1,8) 
+
+## Select outdir
+out.dir = paste0(getwd(),"/", Date, "_output")
+dir.create(out.dir)
+knitr::opts_chunk$set(dev=c('png', 'pdf'), fig.path = file.path(out.dir))
+```
+
+
+```{r libraries, warning=FALSE}
+# libraries:
+library(tidyverse)
+library(report)
+library(magrittr)
+```
+
+## Custom functions
+```{r functions}
+```
+
+# Data import
+```{r data import, warning=FALSE}
+file = "/DATA/projects/DSBrepair/git/EpiScreen/config/rs20210713_E177_E1504_EpiScreen_metadata.txt"
+screen_meta_data = fread(file, header = TRUE)
+
+# Read metadata file
+metadata <- read.table("/DATA/projects/DSBrepair/git/EpiScreen/config/rs20230315_EpiScreen_validations_metadata.txt", 
+                       header = TRUE, 
+                       stringsAsFactors = FALSE) %>% 
+  filter(cell_line == "RSTP2_pools" & plasmid == "LBR2") %>%
+  data.table()
+
+
+
+
+```
+
+## Processing
+```{r BioSample, warning=FALSE}
+bs.screen.long.dt = screen_meta_data %>% 
+  mutate(cell_subtype = "K562-17 ddCas9 DSB-TRIP (RSTP2) clone 5", 
+         conc_char = case_when(drug == "DMSO" ~ "1:1000",
+                               drug %in% c("DNA-PKi","PAO", "Mirin") ~  "1 uM", 
+                               concentration == 100 ~ paste0(concentration, " nM"), 
+                               T ~ paste0(concentration, " uM")),
+         conc_char = factor(conc_char, 
+                            levels = c("1:1000", "control", "100 nM", "1 uM", "10 uM")),
+         drug = paste(conc_char, drug, sep = " "), 
+         trasfected_plasmid = "LBR2",
+         description = case_when(drug == "1:1000 DMSO" ~ 
+                                   "Sample from drug screen treated with 1:1000 DMSO in positions B01, B12, F01 & F12, in plate 1 & 2",
+                                 drug == "1 uM PAO" ~ 
+                                   "Sample from drug screen treated with 1 µM PAO in positions A01, A12, E01 & E12, in plate 1 & 2",
+                                 drug == "1 uM DNA-PKi" ~ 
+                                   "Sample from drug screen treated with 1 µM DNA-PKi in positions D01, D12, H01 & H12, in plate 1 & 2",
+                                 drug == "1 uM Mirin" ~ 
+                                   "Sample from drug screen treated with 1 µM Mirin in positions C01, C12, G01 & G12, in plate 1 & 2",
+                                 T ~ paste("Sample from drug screen treated with", drug , "in position", well, "in plate", drug_plate)))
+
+bs.screen.dt = bs.screen.long.dt %>%
+  distinct(drug, cell_subtype, trasfected_plasmid, description) 
+
+bs.valid.long.dt = metadata %>%
+  mutate(cell_subtype = "K562-17 ddCas9 DSB-TRIP (RSTP2) pools", trasfected_plasmid = plasmid, description = paste("Sample from validation experiment treated with ", drug))
+  
+bs.valid.dt = bs.valid.long.dt %>%
+  distinct(drug, cell_subtype, trasfected_plasmid, description)
+
+bs.dt = rbind(bs.screen.dt, bs.valid.dt) %>% 
+  mutate(organism = "Homo sapiens",
+         isolate = "patient with chronic myelogenous leukemia (CML)",
+         age = 53,
+         biomaterial_provider = "Bas van Steensel, Division of Gene Regulation, Netherlands Cancer Institute",
+         sex = "female",
+         tissue = "bone marrow",
+         cell_line = "K562",
+         sample_type = "cell culture",
+         cell_type = "Chronic Myeloid Leukemia",
+         sample_name = case_when(grepl("pools", cell_subtype) ~ paste("K562 ddCas9 RSTP2 pools treated with", drug),
+                                 T ~ paste("K562 ddCas9 RSTP2 clone5 treated with", drug)),
+         sample_name = gsub("µ", "u", sample_name),
+         sample_name = gsub("·", " ", sample_name)) %>%
+  dplyr::select(sample_name, organism, isolate, age, biomaterial_provider, sex, 
+         tissue, cell_line, cell_subtype, cell_type, sample_type,
+         trasfected_plasmid, drug, description)
+
+```
+
+
+```{r SRA Metadata, warning=FALSE}
+SRA.screen.dt = bs.screen.long.dt %>% mutate(sample_name = case_when(grepl("pools", cell_subtype) ~ paste("K562 ddCas9 RSTP2 pools treated with", drug),
+                                                                          T ~ paste("K562 ddCas9 RSTP2 clone5 treated with", drug)),
+                                                  sample_name = gsub("µ", "u", sample_name),
+                                                  sample_name = gsub("·", " ", sample_name),
+                                                  description = gsub("µ", "u", description),
+                                                  description = gsub("·", " ", description),
+                                                  rep = case_when(replicate == "E177" ~ paste("screen 1 replicate", tech),
+                                                                  T ~ paste("screen 2 replicate", tech)),
+                                                  title	= paste("CRISPR/Cas9 mutation readout on the pathway reporters in", rep, ":",
+                                                                description),
+                                                  instrument_model = case_when(grepl("6475", file) ~ "NextSeq 500",
+                                                                               grepl("5280", file) ~ "Illumina MiSeq",
+                                                                               T ~ "missing"),
+                                                  design_description = "CRISPR/Cas9 mutation readout on the pathway reporters in different K562 TRIP clone #5, 72 hours after activation the cells were collected and processed with two successive PCRs on the integrated pathway reporters to generate the libraries, spanning the sgRNA target site and the barcode",
+                                                  filename = gsub("/DATA/projects/DSBrepair/data/raw/6475_EpiScreen_Rep2_NextSeq_Med/|/DATA/projects/DSBrepair/data/5280_DrugScreen/raw/", "", file), 
+                                                  filename = gsub("demux_last/", "", filename)) %>% 
+  dplyr::select(ID, sample_name, title,  
+                instrument_model, design_description, filename)
+
+
+# Same for the validations
+SRA.valid.dt = bs.valid.long.dt %>% 
+  mutate(sample_name = paste("K562 ddCas9 RSTP2 pools treated with", drug),
+         sample_name = gsub("µ", "u", sample_name),
+         sample_name = gsub("·", " ", sample_name),
+         description = gsub("µ", "u", description),
+         description = gsub("·", " ", description),
+         rep = as.character(gsub("HDACi_rep", "", replicate)),
+         title	= paste("CRISPR/Cas9 mutation readout on the pathway reporters in validation replicate", rep, ":",
+                       description),
+         instrument_model = "NextSeq 500",
+         design_description = "CRISPR/Cas9 mutation readout on the pathway reporters in different K562 TRIP pools treated with Vorinostat or DMSO (equal volume), 72 hours after activation the cells were collected and processed with two successive PCRs on the integrated pathway reporters to generate the libraries, spanning the sgRNA target site and the barcode",
+         filename = gsub("/DATA/projects/DSBrepair/data/raw/6543_HDACi_Vorinostat/",
+                         "", file)) %>% 
+  dplyr::select(ID, sample_name, title,
+                instrument_model, design_description, filename)
+
+SRA.dt = rbind(SRA.screen.dt, SRA.valid.dt) %>% 
+  mutate(library_ID = ID,
+         library_strategy = "AMPLICON",
+         library_source = "GENOMIC",
+         library_selection = "PCR",
+         library_layout = "single",
+         platform = "ILLUMINA",
+         filetype = "fastq") %>% 
+  dplyr::select(sample_name, library_ID, title, library_strategy, 
+                library_source, library_selection, library_layout,
+                platform, instrument_model, design_description, filetype, filename)
+
+```
+
+---
+
+# Export
+```{r export}
+write_tsv(bs.dt, "SRA_submission/rs20230422_BioSample_table.tsv")
+write_tsv(SRA.dt, "SRA_submission/rs20230422_SRAData_table.tsv")
+
+# Max 1000 samples per SRA submission, so split it up: 
+SRA_1.dt = SRA.dt %>% slice(1:1000)
+write_tsv(SRA_1.dt, "SRA_submission/rs20230422_SRAData_table_1.tsv")
+
+# For the other files we need to add the BioSample Accession numbers. These are extracted from the following file
+BioSample_accession = read.table("SRA_submission/PRJNA960840_attributes.tsv", 
+                       header = TRUE, 
+                       stringsAsFactors = FALSE, sep = "\t") %>% 
+  dplyr::select(sample_name, accession)
+
+SRA_acc.dt = SRA.dt %>% left_join(BioSample_accession) %>% 
+  dplyr::select(accession, everything()) %>% 
+  dplyr::select(-sample_name)
+
+SRA_2.dt = SRA_acc.dt %>% slice(1001:2000)
+SRA_3.dt = SRA_acc.dt %>% slice(2001:3000)
+SRA_4.dt = SRA_acc.dt %>% slice(3001:nrow(SRA_acc.dt))
+
+write_tsv(SRA_2.dt, "SRA_submission/rs20230422_SRAData_table_2.tsv")
+write_tsv(SRA_3.dt, "SRA_submission/rs20230422_SRAData_table_3.tsv")
+write_tsv(SRA_4.dt, "SRA_submission/rs20230422_SRAData_table_4.tsv")
+
+# Also make some .txt files for the archiving of the documents to .tar archives for SRA upload. 
+file_list = bs.screen.long.dt %>% 
+  dplyr::select(file) %>% 
+  rbind(dplyr::select(bs.valid.long.dt, file)) %>%
+  pull(file) 
+
+file_list[1:1000] %>% write.table(., "SRA_submission/SRA_files_table_1.txt", quote = F, row.names = F, col.names = F)
+file_list[1001:2000] %>% write.table(., "SRA_submission/SRA_files_table_2.txt", quote = F, row.names = F, col.names = F)
+file_list[2001:3000] %>% write.table(., "SRA_submission/SRA_files_table_3.txt", quote = F, row.names = F, col.names = F)
+file_list[3001:length(file_list)] %>% write.table(., "SRA_submission/SRA_files_table_4.txt", quote = F, row.names = F, col.names = F)
+
+# I then made .tar archives of all the files in each list with the following command in the DNARepair/data/rs20230423_SRA_Submission_Episcreen folder.
+# tar -cvf SRA_files_set1.tar -T ../../git/EpiScreen/SRA_submission/SRA_files_table_1.txt
+# tar -cvf SRA_files_set2.tar -T ../../git/EpiScreen/SRA_submission/SRA_files_table_2.txt
+# tar -cvf SRA_files_set3.tar -T ../../git/EpiScreen/SRA_submission/SRA_files_table_3.txt
+# tar -cvf SRA_files_set4.tar -T ../../git/EpiScreen/SRA_submission/SRA_files_table_4.txt
+```
+
+```{r correct metadata titles} 
+ID_title.dt = SRA.dt %>% dplyr::select(library_ID, title)
+
+ID_set1.dt = read.table("SRA_submission/ID_title_1.txt", sep = "\t", col.names = c("library_ID", "old_title")) %>%
+  left_join(ID_title.dt) %>% dplyr::select(-old_title)
+write.table(ID_set1.dt, "SRA_submission/Fixed_ID_title_1.txt", quote = F, row.names = F, col.names = F, sep = "\t")
+
+ID_set2.dt = read.table("SRA_submission/ID_title_2.txt", sep = "\t", col.names = c("library_ID", "old_title")) %>%
+  left_join(ID_title.dt) %>% dplyr::select(-old_title)
+write.table(ID_set2.dt, "SRA_submission/Fixed_ID_title_2.txt", quote = F, row.names = F, col.names = F, sep = "\t")
+
+ID_set3.dt = read.table("SRA_submission/ID_title_3.txt", sep = "\t", col.names = c("library_ID", "old_title")) %>%
+  left_join(ID_title.dt) %>% dplyr::select(-old_title)
+write.table(ID_set3.dt, "SRA_submission/Fixed_ID_title_3.txt", quote = F, row.names = F, col.names = F, sep = "\t")
+
+ID_set4.dt = read.table("SRA_submission/ID_title_4.txt", sep = "\t", col.names = c("library_ID", "old_title")) %>%
+  left_join(ID_title.dt) %>% dplyr::select(-old_title)
+write.table(ID_set4.dt, "SRA_submission/Fixed_ID_title_4.txt", quote = F, row.names = F, col.names = F, sep = "\t")
+
+ID_set5.dt = read.table("SRA_submission/ID_title_5.txt", sep = "\t", col.names = c("library_ID", "old_title")) %>%
+  left_join(ID_title.dt) %>% dplyr::select(-old_title)
+write.table(ID_set5.dt, "SRA_submission/Fixed_ID_title_5.txt", quote = F, row.names = F, col.names = F, sep = "\t")
+
+ID_set6.dt = read.table("SRA_submission/ID_title_6.txt", sep = "\t", col.names = c("library_ID", "old_title")) %>%
+  left_join(ID_title.dt) %>% dplyr::select(-old_title)
+write.table(ID_set6.dt, "SRA_submission/Fixed_ID_title_6.txt", quote = F, row.names = F, col.names = F, sep = "\t")
+
+ID_set7.dt = read.table("SRA_submission/ID_title_7.txt", sep = "\t", col.names = c("library_ID", "old_title")) %>%
+  left_join(ID_title.dt) %>% dplyr::select(-old_title)
+write.table(ID_set7.dt, "SRA_submission/Fixed_ID_title_7.txt", quote = F, row.names = F, col.names = F, sep = "\t")
+
+# These tables were used to update the metadata titles in the SRA submission
+```
+
+
+
+```{bash, eval = FALSE}
+cd /DATA/projects/DSBrepair/data/rs20230423_SRA_Submission_Episcreen
+tar -cvf SRA_files_set1.tar -T ../../git/EpiScreen/SRA_submission/SRA_files_table_1.txt
+tar -cvf SRA_files_set2.tar -T ../../git/EpiScreen/SRA_submission/SRA_files_table_2.txt
+tar -cvf SRA_files_set3.tar -T ../../git/EpiScreen/SRA_submission/SRA_files_table_3.txt
+tar -cvf SRA_files_set4.tar -T ../../git/EpiScreen/SRA_submission/SRA_files_table_4.txt
+```
+
+
+# Conclusions
+<!--write the conclusions in one or two sentences-->
+
+# Bibliography
+```{r citations}
+cite_packages()
+```
+
+# Session Info  
+<!--Some basic session info-->
+```{r session info QC}
+sessionInfo()
+getwd()
+date()
+paste("Run time: ",format(Sys.time()-StartTime))
+rm(list = ls(all.names = TRUE)) #will clear all objects includes hidden objects.
+gc() #free up memrory and report the memory usage.
+```

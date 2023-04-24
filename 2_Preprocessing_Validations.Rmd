@@ -192,7 +192,7 @@ n.samples <- length(df.list)
 load("/DATA/projects/DSBrepair/data/R/rs20210311/Analyis_Mapping_RSTP2_2000.RData")
 
 # Read metadata file
-metadata <- read.table("/DATA/projects/DSBrepair/git/EpiScreen/config/rs20220816_EpiScreen_validations_metadata.txt", 
+metadata <- read.table("/DATA/projects/DSBrepair/git/EpiScreen/config/rs20230315_EpiScreen_validations_metadata.txt", 
                        header = TRUE, 
                        stringsAsFactors = FALSE) %>% 
   dplyr::select(-file, -run, -index_length) %>%

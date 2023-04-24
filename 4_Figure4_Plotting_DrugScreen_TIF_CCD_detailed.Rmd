@@ -176,10 +176,10 @@ group_colors = c("Euchromatin" = "#f7941d",
                  "Triple Heterochromatin" = "#662d91",
                  "H3K27me3" = "#d21f8a")
 
-colors_targets <-  c(HDAC="#60988D", HAT="#C6D0A8", Sirtuin="#8FCAAC",
-                     HMT="#FDCDAC", DNMT="#D69C81", `Histone Demethylase`="#FFF2AE",
-                     HIF="#E3DCD5", JAK="#C8D7E2", PIM="#9AB8C4", `Aurora Kinase`="#F4CAE4",
-                     PARP="#CB546F", `Epigenetic Reader Domain`= "#476D61", `DNA-PK`="#779ed7")
+colors_targets <-  c(HDAC="#157834", HAT="#C6D0A8", Sirtuin="#802155",
+                     HMT="#8EC9AB", DNMT="#9A9932", `Histone Demethylase`="#DECD77",
+                     HIF="#E2DBD4", JAK="#CB546F", PIM="#45AB9A", `Aurora Kinase`="#A74694",
+                     PARP="#D69C81", `Epigenetic Reader Domain`= "#8ACDEF", `DNA-PK`="#779ed7")
 
 conc_control_colors = c("CTRL" = colors_drugs[2], "100 nM" = colors_drugs[7], "1 µM" = colors_drugs[4], "10 µM" = "#000000")
 conc_colors = c("100 nM" = colors_drugs[7], "1 µM" = colors_drugs[4], "10 µM" = "#000000")
@@ -286,7 +286,7 @@ names(viab_colors) = seq(0, 1, by = 0.1)
 
 annotation_colors_scr = list(
   chromatin = group_colors,
-  target = c(HDAC="#60988D", HAT="#C6D0A8", Sirtuin="#8FCAAC",
+  target = c(HDAC="#157834", HAT="#C6D0A8", Sirtuin="#8FCAAC",
              HMT="#FDCDAC", DNMT="#D69C81", `Histone Demethylase`="#FFF2AE",
              HIF="#E3DCD5", JAK="#C8D7E2", PIM="#9AB8C4", `Aurora Kinase`="#F4CAE4",
              PARP="#CB546F", `Epigenetic Reader Domain`= "#476D61", `DNA-PK`="#779ed7"),
@@ -410,7 +410,7 @@ names(viab_colors) = as.numeric(seq(0, 1, by = 0.1))
 # Annotation colors heatmaps
 annotation_colors_scr = list(
   chromatin = group_colors,
-  target = c(HDAC="#60988D", HAT="#C6D0A8", Sirtuin="#8FCAAC",
+  target = c(HDAC="#157834", HAT="#C6D0A8", Sirtuin="#8FCAAC",
              HMT="#FDCDAC", DNMT="#D69C81", `Histone Demethylase`="#FFF2AE",
              HIF="#E3DCD5", JAK="#C8D7E2", PIM="#9AB8C4", `Aurora Kinase`="#F4CAE4",
              PARP="#CB546F", `Epigenetic Reader Domain`= "#476D61", `DNA-PK`="#779ed7", 

@@ -201,7 +201,7 @@ indel.statistics.tib %<>% left_join(cell.viab.data) %>%
                             levels = c("control", "100 nM", "1 µM", "10 µM")),
          concentration = ifelse(drug %in% c("DNA-PKi","PAO", "Mirin", "DMSO"), 
                            0, concentration)) %>%
-  select(-ctrl_mean, -bp, -bp_written) # remove this column
+  dplyr::select(-ctrl_mean, -bp, -bp_written) # remove this column
 ```
 
 
@@ -519,7 +519,7 @@ viab_plot_tib = indel.statistics.tib %>%
   group_by(drug, conc_char, replicate) %>%
   mutate(viab_var = var(viab_norm, na.rm = T),
          viab_mean = mean(viab_norm, na.rm = T)) %>%
-  select(-viab_norm) %>%
+  dplyr::select(-viab_norm) %>%
   distinct() %>%
   pivot_wider(names_from = replicate, values_from = c(viab_mean, viab_var)) %>%
   filter(!is.na(conc_char)) %>%
@@ -688,7 +688,7 @@ viab_plot_tib %<>%
 filename <- SetFileName("Episcreen_Reads_Viab_Metadata", initials = initials, extension = "RDS")
 
 indel.statistics.tib %>%
-  select(-reads_written, -n_tooshort,
+  dplyr::select(-reads_written, -n_tooshort,
          -index, -pat1, -barcode,  -pat2) %>%
   left_join(viab_plot_tib)  %>%
   write_rds(.,
@@ -716,10 +716,43 @@ rmarkdown::render("2_Preprocessing_Validations.Rmd")
 
 # Render validations
 if(render_synergies) {
-rmarkdown::render("3_Synergies_Processing.Rmd")
+  rmarkdown::render("3_Synergies_Processing.Rmd")
 }
 ```
 
+```{r render figure scripts}
+# Render figure scrips
+if(render_all_figures) {
+  rmarkdown::render("4_Figure1_Plotting_DrugScreen.Rmd")
+  rmarkdown::render("4_Figure2_Plotting_DrugScreen_TIF_changes.Rmd")
+  rmarkdown::render("4_Figure3_Plotting_DrugScreen_TIF_CCD.Rmd")
+  rmarkdown::render("4_Figure4_Plotting_DrugScreen_TIF_CCD_detailed.Rmd")
+  rmarkdown::render("4_Figure5_Plotting_DrugScreen_MMEJbalance.Rmd")
+} else {
+
+  # Render figure 1
+  if(fig1) {
+    rmarkdown::render("4_Figure1_Plotting_DrugScreen.Rmd")
+  }
+  
+  # Render figure 2
+  if(fig2) {
+    rmarkdown::render("4_Figure2_Plotting_DrugScreen_TIF_changes.Rmd")
+  }
+  # Render figure 3
+  if(fig3) {
+    rmarkdown::render("4_Figure3_Plotting_DrugScreen_TIF_CCD.Rmd")
+  }
+  # Render figure 4
+  if(fig4) {
+    rmarkdown::render("4_Figure4_Plotting_DrugScreen_TIF_CCD_detailed.Rmd")
+  }
+  # Render figure 5
+  if(fig5) {
+    rmarkdown::render("4_Figure5_Plotting_DrugScreen_MMEJbalance.Rmd")
+  }
+}
+```
 
 # Session Info  
 ```{r session info QC}

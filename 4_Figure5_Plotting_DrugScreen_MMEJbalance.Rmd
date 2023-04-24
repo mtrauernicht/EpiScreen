@@ -484,10 +484,10 @@ theme_set(theme_classic_lines())
 colors_diverse <- c("#264653", "#9AC1AE", "#5D987B", "#f2cc8f", "#e76f51")
 colors_drugs <- c("#FA8D62", "#65BFA4", "#8CA0C4", "#808184", "#F6D289", "#E5E5E5", "#ACACAC", "#737373")
 #colors_diverse <- c("#264653", "#2a9d8f", "#e9c46a", "#f4a261", "#e76f51") 
-colors_targets <-  c(HDAC="#60988D", HAT="#C6D0A8", Sirtuin="#8FCAAC",
-                     HMT="#FDCDAC", DNMT="#D69C81", `Histone Demethylase`="#FFF2AE",
-                     HIF="#E3DCD5", JAK="#C8D7E2", PIM="#9AB8C4", `Aurora Kinase`="#F4CAE4",
-                     PARP="#CB546F", `Epigenetic Reader Domain`= "#476D61", `DNA-PK`="#779ed7")
+colors_targets <-  c(HDAC="#157834", HAT="#C6D0A8", Sirtuin="#802155",
+                     HMT="#8EC9AB", DNMT="#9A9932", `Histone Demethylase`="#DECD77",
+                     HIF="#E2DBD4", JAK="#CB546F", PIM="#45AB9A", `Aurora Kinase`="#A74694",
+                     PARP="#D69C81", `Epigenetic Reader Domain`= "#8ACDEF", `DNA-PK`="#779ed7")
 colors_pathways = c("wt" = "#808184", "other" = "black", "NHEJ" = "#e1251b", "MMEJ" = "#26419a", "SSTR" = "#007A4C")
 slope.colors <- tibble(color = c("#8c510a", "#f5f5f5","#01665e"),label = c("negative","none","positive"), feature = "epistasis")
 
@@ -624,10 +624,10 @@ names(viab_colors) = seq(0, 1, by = 0.1)
 
 annotation_colors_scr = list(
   chromatin = group_colors,
-  target = c(HDAC="#60988D", HAT="#C6D0A8", Sirtuin="#8FCAAC",
-             HMT="#FDCDAC", DNMT="#D69C81", `Histone Demethylase`="#FFF2AE",
-             HIF="#E3DCD5", JAK="#C8D7E2", PIM="#9AB8C4", `Aurora Kinase`="#F4CAE4",
-             PARP="#CB546F", `Epigenetic Reader Domain`= "#476D61", `DNA-PK`="#779ed7"),
+  target = c(HDAC="#157834", HAT="#C6D0A8", Sirtuin="#802155",
+                     HMT="#8EC9AB", DNMT="#9A9932", `Histone Demethylase`="#DECD77",
+                     HIF="#E2DBD4", JAK="#CB546F", PIM="#45AB9A", `Aurora Kinase`="#A74694",
+                     PARP="#D69C81", `Epigenetic Reader Domain`= "#8ACDEF", `DNA-PK`="#779ed7"),
   p.adj.Welch = c(n.s. = "#F9F9F9", `p < 0.01` = "#0066A5"),
   clusters_drugs = sequential_hcl(4, "YlGn"),
   # viab_rep1 = c('#ffeee9', '#ffdcd4', '#ffcbbe', '#ffb8a8', '#fda693', '#f9947e', '#f4826a', '#ef6f56', '#e95b43', '#e24530'),
@@ -1375,7 +1375,7 @@ ggplot(vorino_k27.plot %>%
                label.x = "left", label.y = "bottom") +
   facet_grid(.~source_2) +
   scale_alpha_discrete(range = c(0.2,1)) +
-  scale_color_manual(values = c("HDACi" = "#60988D", "EZH2i" = "#FDCDAC"))
+  scale_color_manual(values = c("HDACi" = "#157834", "EZH2i" = "#FDCDAC"))
 ```
 
 

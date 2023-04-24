@@ -272,10 +272,10 @@ group_colors = c("Euchromatin" = "#f7941d",
                  "H3K27me3" = "#d21f8a")
 colors_pathways = c("wt" = "#808184", "other" = "black", "NHEJ" = "#e1251b", "MMEJ" = "#26419a", "SSTR" = "#007A4C")
 
-target_color = c(HDAC="#60988D", HAT="#C6D0A8", Sirtuin="#8FCAAC",
-                 HMT="#FDCDAC", DNMT="#D69C81", `Histone Demethylase`="#FFF2AE",
-                 HIF="#E3DCD5", JAK="#C8D7E2", PIM="#9AB8C4", `Aurora Kinase`="#F4CAE4",
-                 PARP="#CB546F", `Epigenetic Reader Domain`= "#476D61", `DNA-PK`="#779ed7")
+target_color = c(HDAC="#157834", HAT="#C6D0A8", Sirtuin="#802155",
+                     HMT="#8EC9AB", DNMT="#9A9932", `Histone Demethylase`="#DECD77",
+                     HIF="#E2DBD4", JAK="#CB546F", PIM="#45AB9A", `Aurora Kinase`="#A74694",
+                     PARP="#D69C81", `Epigenetic Reader Domain`= "#8ACDEF", `DNA-PK`="#779ed7")
 
 changeLevels <- function(object, column = "chr_r", levels = c(paste0("chr", 1:22), "chrX")) {
   object[, column] <- as.character(object[, column])
@@ -408,13 +408,7 @@ clustering = data.frame(row.names=c('LMNB1', 'late_replicating',
                                        rep('accessibility', 2), 'methylation',
                                        rep('transcribing', 5)
                                        # rep('transcribing', 4)
-                        ),
-                        levels=c('transcribing', 'accessibility',
-                                 'methylation', 'euchromatin',
-                                 'HDAC', 'insulator', 'repressive')))
-feature_fill = c(insulator="#a6b5a3", repressive="#304441", euchromatin="#cda4cc",
-                 transcribing="#d68d7d", HDAC="#aac9e0", accessibility='#cebc85',
-                 methylation='#7dc98f')
+                        )))
 
 order_vec=rownames(clustering)[nrow(clustering):1]
 
@@ -432,7 +426,7 @@ colors = colorRampPalette(rev(brewer.pal(n = 11, name="RdBu")))(palette_length)
 pheatmap(t(clone5.matrix)[TRIP_chrom_clust$labels, ], 
          cluster_rows = TRIP_chrom_clust,
          annotation_row=clustering,
-         annotation_colors=list(chromatin=group_colors, group=feature_fill),
+         annotation_colors=list(chromatin=group_colors),
          color = colors, 
          breaks = breaks.chip,
          annotation_col = domain_matrix,

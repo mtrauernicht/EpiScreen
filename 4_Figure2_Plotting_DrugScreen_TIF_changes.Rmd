@@ -209,21 +209,30 @@ corColor <- function(data, mapping, color = I("black"), sizeRange = c(1, 3), ...
 
 theme_classic_lines <- function() {
   theme_pubr(border = T, legend = "top") +
-    theme(panel.grid.major = element_line(colour = "#adb5bd", size = 0.25),
+    theme(panel.grid.major = element_line(colour = "#adb5bd", linewidth = 0.25),
           strip.background = element_rect(fill = "white", color = "white")
     )
 }
 theme_classic_lines_45 <- function() {
   theme_pubr(border = T, legend = "top", x.text.angle = 45) +
-    theme(panel.grid.major = element_line(colour = "#adb5bd", size = 0.25),
+    theme(panel.grid.major = element_line(colour = "#adb5bd", linewidth = 0.25),
           strip.background = element_rect(fill = "white", color = "white")
     )
 }
 
 theme_classic_lines_90 <- function() {
   theme_pubr(border = T, legend = "top", x.text.angle = 90) +
-    theme(panel.grid.major = element_line(colour = "#adb5bd", size = 0.25),
+    theme(panel.grid.major = element_line(colour = "#adb5bd", linewidth = 0.25),
           strip.background = element_rect(fill = "white", color = "white")
+    )
+}
+
+theme_classic_lines_90_noborder <- function() {
+  theme_pubr(border = F, 
+             legend = "top", 
+             x.text.angle = 90) +
+    theme(strip.background = element_rect(fill = "white", 
+                                          color = "white")
     )
 }
 
@@ -232,10 +241,10 @@ theme_set(theme_classic_lines())
 colors_diverse <- c("#264653", "#9AC1AE", "#5D987B", "#f2cc8f", "#e76f51")
 colors_drugs <- c("#FA8D62", "#65BFA4", "#8CA0C4", "#808184", "#F6D289", "#E5E5E5", "#ACACAC", "#737373")
 #colors_diverse <- c("#264653", "#2a9d8f", "#e9c46a", "#f4a261", "#e76f51") 
-colors_targets <-  c(HDAC="#60988D", HAT="#C6D0A8", Sirtuin="#8FCAAC",
-                     HMT="#FDCDAC", DNMT="#D69C81", `Histone Demethylase`="#FFF2AE",
-                     HIF="#E3DCD5", JAK="#C8D7E2", PIM="#9AB8C4", `Aurora Kinase`="#F4CAE4",
-                     PARP="#CB546F", `Epigenetic Reader Domain`= "#476D61", `DNA-PK`="#779ed7")
+colors_targets <-  c(HDAC="#157834", HAT="#C6D0A8", Sirtuin="#802155",
+                     HMT="#8EC9AB", DNMT="#9A9932", `Histone Demethylase`="#DECD77",
+                     HIF="#E2DBD4", JAK="#CB546F", PIM="#45AB9A", `Aurora Kinase`="#A74694",
+                     PARP="#D69C81", `Epigenetic Reader Domain`= "#8ACDEF", `DNA-PK`="#779ed7")
 
 conc_colors = c("100 nM" = colors_drugs[7], "1 µM" = colors_drugs[4], "10 µM" = "#000000")
 
@@ -773,10 +782,10 @@ names(viab_colors) = seq(0, 1, by = 0.1)
 
 annotation_colors_scr = list(
   chromatin = group_colors,
-  target = c(HDAC="#60988D", HAT="#C6D0A8", Sirtuin="#8FCAAC",
-             HMT="#FDCDAC", DNMT="#D69C81", `Histone Demethylase`="#FFF2AE",
-             HIF="#E3DCD5", JAK="#C8D7E2", PIM="#9AB8C4", `Aurora Kinase`="#F4CAE4",
-             PARP="#CB546F", `Epigenetic Reader Domain`= "#476D61", `DNA-PK`="#779ed7"),
+  target = c(HDAC="#157834", HAT="#C6D0A8", Sirtuin="#802155",
+                     HMT="#8EC9AB", DNMT="#9A9932", `Histone Demethylase`="#DECD77",
+                     HIF="#E2DBD4", JAK="#CB546F", PIM="#45AB9A", `Aurora Kinase`="#A74694",
+                     PARP="#D69C81", `Epigenetic Reader Domain`= "#8ACDEF", `DNA-PK`="#779ed7"),
   p.adj.Welch = c(n.s. = "#F9F9F9", `p < 0.01` = "#0066A5"),
   clusters_drugs = sequential_hcl(4, "Greens"),
   # viab_rep1 = c('#ffeee9', '#ffdcd4', '#ffcbbe', '#ffb8a8', '#fda693', '#f9947e', '#f4826a', '#ef6f56', '#e95b43', '#e24530'),
@@ -1236,6 +1245,34 @@ pheatmap(t(gRNA_chrom),
          annotation_colors=list(chromatin=group_colors, group=feature_fill),
          color = colors, 
          breaks = breaks.chip)
+```
+
+```{r LBR2 validation with the drugs in clone 5}
+# Import data from preprocessing validation script
+file.validation = list.files(in.dir, pattern = "validation_ratio", full.names = T) %>% tail(n = 1)
+indel.data.validation <- readRDS(file.validation)
+
+LBR2.validations = indel.data.validation %>% filter(exp_ID == "E2223")
+
+
+ggplot(LBR2.validations, aes(drug, efficiency, color = drug)) +
+  geom_jitter() + 
+  # facet_wrap(. ~ barcode) + 
+  theme_classic_lines_90_noborder()
+
+library(rstatix)
+
+stat.test <- LBR2.validations %>%
+  mutate(barcode = gsub(".B", "", barcode)) %>%
+  left_join(indel.data %>% distinct(barcode, chromatin)) %>%
+  group_by(chromatin) %>%
+  pairwise_t_test(
+    efficiency ~ drug, paired = TRUE,
+    ref.group = "DMSOnG",
+    p.adjust.method = "BH"
+    ) %>%
+  dplyr::select(-df) # Remove details
+stat.test
 ```
 
 

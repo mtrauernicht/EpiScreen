@@ -1,0 +1,500 @@
+E177_03_100_2_1_G08	CRISPR/Cas9 mutation readout on the pathway reporters in screen 1 replicate 2 : Sample from drug screen treated with 100 nM TG101348 (SAR302503) in position G08 in plate 1
+E177_03_100_2_1_G07	CRISPR/Cas9 mutation readout on the pathway reporters in screen 1 replicate 2 : Sample from drug screen treated with 100 nM AR-42 in position G07 in plate 1
+E177_03_100_2_1_G06	CRISPR/Cas9 mutation readout on the pathway reporters in screen 1 replicate 2 : Sample from drug screen treated with 100 nM AZD1480 in position G06 in plate 1
+E177_03_100_2_1_G05	CRISPR/Cas9 mutation readout on the pathway reporters in screen 1 replicate 2 : Sample from drug screen treated with 100 nM MC1568 in position G05 in plate 1
+E177_03_100_2_1_G04	CRISPR/Cas9 mutation readout on the pathway reporters in screen 1 replicate 2 : Sample from drug screen treated with 100 nM PFI-1 (PF-6405761) in position G04 in plate 1
+E177_03_100_2_1_G03	CRISPR/Cas9 mutation readout on the pathway reporters in screen 1 replicate 2 : Sample from drug screen treated with 100 nM AG-490 (Tyrphostin B42) in position G03 in plate 1
+E177_03_100_2_1_G02	CRISPR/Cas9 mutation readout on the pathway reporters in screen 1 replicate 2 : Sample from drug screen treated with 100 nM MLN8054 in position G02 in plate 1
+E177_03_100_2_1_G01	CRISPR/Cas9 mutation readout on the pathway reporters in screen 1 replicate 2 : Sample from drug screen treated with 1 uM Mirin in positions C01, C12, G01 & G12, in plate 1 & 2
+E177_03_100_2_1_F12	CRISPR/Cas9 mutation readout on the pathway reporters in screen 1 replicate 2 : Sample from drug screen treated with 1:1000 DMSO in positions B01, B12, F01 & F12, in plate 1 & 2
+E1504_12_1_3_2_D09	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 3 : Sample from drug screen treated with 1 uM Nicotinamide in position D09 in plate 2
+E177_03_100_2_1_F11	CRISPR/Cas9 mutation readout on the pathway reporters in screen 1 replicate 2 : Sample from drug screen treated with 100 nM Tofacitinib (CP-690550) Citrate in position F11 in plate 1
+E177_03_100_2_1_F10	CRISPR/Cas9 mutation readout on the pathway reporters in screen 1 replicate 2 : Sample from drug screen treated with 100 nM S-Ruxolitinib (INCB018424) in position F10 in plate 1
+E177_03_100_2_1_A03	CRISPR/Cas9 mutation readout on the pathway reporters in screen 1 replicate 2 : Sample from drug screen treated with 100 nM Danusertib (PHA-739358) in position A03 in plate 1
+E177_03_100_2_1_A02	CRISPR/Cas9 mutation readout on the pathway reporters in screen 1 replicate 2 : Sample from drug screen treated with 100 nM Belinostat (PXD101) in position A02 in plate 1
+E1504_12_1_3_2_D02	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 3 : Sample from drug screen treated with 1 uM C646 in position D02 in plate 2
+E177_03_100_2_1_A01	CRISPR/Cas9 mutation readout on the pathway reporters in screen 1 replicate 2 : Sample from drug screen treated with 1 uM PAO in positions A01, A12, E01 & E12, in plate 1 & 2
+E177_02_100_1_2_H12	CRISPR/Cas9 mutation readout on the pathway reporters in screen 1 replicate 1 : Sample from drug screen treated with 1 uM DNA-PKi in positions D01, D12, H01 & H12, in plate 1 & 2
+E177_02_100_1_2_H11	CRISPR/Cas9 mutation readout on the pathway reporters in screen 1 replicate 1 : Sample from drug screen treated with 100 nM Triacetylresveratrol in position H11 in plate 2
+E177_02_100_1_2_H10	CRISPR/Cas9 mutation readout on the pathway reporters in screen 1 replicate 1 : Sample from drug screen treated with 100 nM CTPB in position H10 in plate 2
+E177_02_100_1_2_H09	CRISPR/Cas9 mutation readout on the pathway reporters in screen 1 replicate 1 : Sample from drug screen treated with 100 nM Valproic acid hydroxamate in position H09 in plate 2
+E177_02_100_1_2_H08	CRISPR/Cas9 mutation readout on the pathway reporters in screen 1 replicate 1 : Sample from drug screen treated with 100 nM Isonicotinamide in position H08 in plate 2
+E177_02_100_1_2_H07	CRISPR/Cas9 mutation readout on the pathway reporters in screen 1 replicate 1 : Sample from drug screen treated with 100 nM (+)-JQ1 in position H07 in plate 2
+E177_02_100_1_2_H06	CRISPR/Cas9 mutation readout on the pathway reporters in screen 1 replicate 1 : Sample from drug screen treated with 100 nM Olaparib (AZD2281, Ku-0059436) in position H06 in plate 2
+E177_02_100_1_2_H05	CRISPR/Cas9 mutation readout on the pathway reporters in screen 1 replicate 1 : Sample from drug screen treated with 100 nM Pacritinib (SB1518) in position H05 in plate 2
+E177_02_100_1_2_H04	CRISPR/Cas9 mutation readout on the pathway reporters in screen 1 replicate 1 : Sample from drug screen treated with 100 nM Rocilinostat (ACY-1215) in position H04 in plate 2
+E1504_12_1_3_2_D01	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 3 : Sample from drug screen treated with 1 uM DNA-PKi in positions D01, D12, H01 & H12, in plate 1 & 2
+E177_02_100_1_2_H03	CRISPR/Cas9 mutation readout on the pathway reporters in screen 1 replicate 1 : Sample from drug screen treated with 100 nM CPI-203 in position H03 in plate 2
+E177_02_100_1_2_H02	CRISPR/Cas9 mutation readout on the pathway reporters in screen 1 replicate 1 : Sample from drug screen treated with 100 nM IOX1 in position H02 in plate 2
+E177_02_100_1_2_H01	CRISPR/Cas9 mutation readout on the pathway reporters in screen 1 replicate 1 : Sample from drug screen treated with 1 uM DNA-PKi in positions D01, D12, H01 & H12, in plate 1 & 2
+E177_02_100_1_2_G12	CRISPR/Cas9 mutation readout on the pathway reporters in screen 1 replicate 1 : Sample from drug screen treated with 1 uM Mirin in positions C01, C12, G01 & G12, in plate 1 & 2
+E177_02_100_1_2_G11	CRISPR/Cas9 mutation readout on the pathway reporters in screen 1 replicate 1 : Sample from drug screen treated with 100 nM BML-281 in position G11 in plate 2
+E177_02_100_1_2_G10	CRISPR/Cas9 mutation readout on the pathway reporters in screen 1 replicate 1 : Sample from drug screen treated with 100 nM Butyrolactone 3 in position G10 in plate 2
+E177_02_100_1_2_G09	CRISPR/Cas9 mutation readout on the pathway reporters in screen 1 replicate 1 : Sample from drug screen treated with 100 nM Fluoro-SAHA in position G09 in plate 2
+E177_02_100_1_2_G08	CRISPR/Cas9 mutation readout on the pathway reporters in screen 1 replicate 1 : Sample from drug screen treated with 100 nM Nullscript in position G08 in plate 2
+E177_02_100_1_2_G07	CRISPR/Cas9 mutation readout on the pathway reporters in screen 1 replicate 1 : Sample from drug screen treated with 100 nM AZD1208 in position G07 in plate 2
+E177_02_100_1_2_G06	CRISPR/Cas9 mutation readout on the pathway reporters in screen 1 replicate 1 : Sample from drug screen treated with 100 nM Entinostat (MS-275) in position G06 in plate 2
+E177_02_100_1_2_C11	CRISPR/Cas9 mutation readout on the pathway reporters in screen 1 replicate 1 : Sample from drug screen treated with 100 nM BML-278 in position C11 in plate 2
+E177_02_100_1_2_C10	CRISPR/Cas9 mutation readout on the pathway reporters in screen 1 replicate 1 : Sample from drug screen treated with 100 nM MC-1293 in position C10 in plate 2
+E177_02_100_1_2_C09	CRISPR/Cas9 mutation readout on the pathway reporters in screen 1 replicate 1 : Sample from drug screen treated with 100 nM Valproic acid in position C09 in plate 2
+E177_02_100_1_2_C08	CRISPR/Cas9 mutation readout on the pathway reporters in screen 1 replicate 1 : Sample from drug screen treated with 100 nM Splitomicin in position C08 in plate 2
+E177_02_100_1_2_C07	CRISPR/Cas9 mutation readout on the pathway reporters in screen 1 replicate 1 : Sample from drug screen treated with 100 nM EPZ5676 in position C07 in plate 2
+E177_02_100_1_2_C06	CRISPR/Cas9 mutation readout on the pathway reporters in screen 1 replicate 1 : Sample from drug screen treated with 100 nM Panobinostat (LBH589) in position C06 in plate 2
+E177_02_100_1_2_C05	CRISPR/Cas9 mutation readout on the pathway reporters in screen 1 replicate 1 : Sample from drug screen treated with 100 nM BIX 01294 in position C05 in plate 2
+E177_02_100_1_2_C04	CRISPR/Cas9 mutation readout on the pathway reporters in screen 1 replicate 1 : Sample from drug screen treated with 100 nM OTX015 in position C04 in plate 2
+E1504_12_1_3_2_C07	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 3 : Sample from drug screen treated with 1 uM EPZ5676 in position C07 in plate 2
+E177_02_100_1_2_C03	CRISPR/Cas9 mutation readout on the pathway reporters in screen 1 replicate 1 : Sample from drug screen treated with 100 nM MM-102 in position C03 in plate 2
+E177_02_100_1_2_C02	CRISPR/Cas9 mutation readout on the pathway reporters in screen 1 replicate 1 : Sample from drug screen treated with 100 nM EPZ-6438 in position C02 in plate 2
+E177_02_100_1_2_C01	CRISPR/Cas9 mutation readout on the pathway reporters in screen 1 replicate 1 : Sample from drug screen treated with 1 uM Mirin in positions C01, C12, G01 & G12, in plate 1 & 2
+E177_02_100_1_2_B12	CRISPR/Cas9 mutation readout on the pathway reporters in screen 1 replicate 1 : Sample from drug screen treated with 1:1000 DMSO in positions B01, B12, F01 & F12, in plate 1 & 2
+E177_02_100_1_2_B11	CRISPR/Cas9 mutation readout on the pathway reporters in screen 1 replicate 1 : Sample from drug screen treated with 100 nM Suramin 6Na in position B11 in plate 2
+E177_02_100_1_2_B10	CRISPR/Cas9 mutation readout on the pathway reporters in screen 1 replicate 1 : Sample from drug screen treated with 100 nM Salermide in position B10 in plate 2
+E177_02_100_1_2_B09	CRISPR/Cas9 mutation readout on the pathway reporters in screen 1 replicate 1 : Sample from drug screen treated with 100 nM Tranylcypromine hemisulfate in position B09 in plate 2
+E177_02_100_1_2_B08	CRISPR/Cas9 mutation readout on the pathway reporters in screen 1 replicate 1 : Sample from drug screen treated with 100 nM Garcinol in position B08 in plate 2
+E177_02_100_1_2_B07	CRISPR/Cas9 mutation readout on the pathway reporters in screen 1 replicate 1 : Sample from drug screen treated with 100 nM BMN 673 in position B07 in plate 2
+E177_02_100_1_2_B06	CRISPR/Cas9 mutation readout on the pathway reporters in screen 1 replicate 1 : Sample from drug screen treated with 100 nM FG-4592 in position B06 in plate 2
+E1504_12_1_3_2_C06	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 3 : Sample from drug screen treated with 1 uM Panobinostat (LBH589) in position C06 in plate 2
+E177_02_100_1_2_B05	CRISPR/Cas9 mutation readout on the pathway reporters in screen 1 replicate 1 : Sample from drug screen treated with 100 nM SMI-4a in position B05 in plate 2
+E177_02_100_1_2_B04	CRISPR/Cas9 mutation readout on the pathway reporters in screen 1 replicate 1 : Sample from drug screen treated with 100 nM EPZ004777 in position B04 in plate 2
+E177_02_100_1_2_B03	CRISPR/Cas9 mutation readout on the pathway reporters in screen 1 replicate 1 : Sample from drug screen treated with 100 nM SGC-CBP30 in position B03 in plate 2
+E177_02_100_1_2_B02	CRISPR/Cas9 mutation readout on the pathway reporters in screen 1 replicate 1 : Sample from drug screen treated with 100 nM 3-Deazaneplanocin A (DZNeP) in position B02 in plate 2
+E177_01_100_1_1_D08	CRISPR/Cas9 mutation readout on the pathway reporters in screen 1 replicate 1 : Sample from drug screen treated with 100 nM Resminostat in position D08 in plate 1
+E1504_12_1_3_2_B11	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 3 : Sample from drug screen treated with 1 uM Suramin 6Na in position B11 in plate 2
+E177_01_100_1_1_D07	CRISPR/Cas9 mutation readout on the pathway reporters in screen 1 replicate 1 : Sample from drug screen treated with 100 nM AZ 960 in position D07 in plate 1
+E177_01_100_1_1_D06	CRISPR/Cas9 mutation readout on the pathway reporters in screen 1 replicate 1 : Sample from drug screen treated with 100 nM Azacitidine in position D06 in plate 1
+E177_01_100_1_1_D05	CRISPR/Cas9 mutation readout on the pathway reporters in screen 1 replicate 1 : Sample from drug screen treated with 100 nM Droxinostat in position D05 in plate 1
+E177_01_100_1_1_D04	CRISPR/Cas9 mutation readout on the pathway reporters in screen 1 replicate 1 : Sample from drug screen treated with 100 nM ENMD-2076 in position D04 in plate 1
+E177_01_100_1_1_D03	CRISPR/Cas9 mutation readout on the pathway reporters in screen 1 replicate 1 : Sample from drug screen treated with 100 nM INO-1001 in position D03 in plate 1
+E177_01_100_1_1_D02	CRISPR/Cas9 mutation readout on the pathway reporters in screen 1 replicate 1 : Sample from drug screen treated with 100 nM LAQ824 (Dacinostat) in position D02 in plate 1
+E177_01_100_1_1_D01	CRISPR/Cas9 mutation readout on the pathway reporters in screen 1 replicate 1 : Sample from drug screen treated with 1 uM DNA-PKi in positions D01, D12, H01 & H12, in plate 1 & 2
+E177_01_100_1_1_C12	CRISPR/Cas9 mutation readout on the pathway reporters in screen 1 replicate 1 : Sample from drug screen treated with 1 uM Mirin in positions C01, C12, G01 & G12, in plate 1 & 2
+E177_01_100_1_1_C11	CRISPR/Cas9 mutation readout on the pathway reporters in screen 1 replicate 1 : Sample from drug screen treated with 100 nM Tranylcypromine (2-PCPA) HCl in position C11 in plate 1
+E177_01_100_1_1_C10	CRISPR/Cas9 mutation readout on the pathway reporters in screen 1 replicate 1 : Sample from drug screen treated with 100 nM Baricitinib (LY3009104, INCB028050) in position C10 in plate 1
+E1504_12_1_3_2_B10	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 3 : Sample from drug screen treated with 1 uM Salermide in position B10 in plate 2
+E177_01_100_1_1_C09	CRISPR/Cas9 mutation readout on the pathway reporters in screen 1 replicate 1 : Sample from drug screen treated with 100 nM M344 in position C09 in plate 1
+E177_01_100_1_1_C08	CRISPR/Cas9 mutation readout on the pathway reporters in screen 1 replicate 1 : Sample from drug screen treated with 100 nM TG101209 in position C08 in plate 1
+E177_01_100_1_1_C07	CRISPR/Cas9 mutation readout on the pathway reporters in screen 1 replicate 1 : Sample from drug screen treated with 100 nM SGI-1776 free base in position C07 in plate 1
+E177_01_100_1_1_C06	CRISPR/Cas9 mutation readout on the pathway reporters in screen 1 replicate 1 : Sample from drug screen treated with 100 nM EX 527 (Selisistat) in position C06 in plate 1
+E177_01_100_1_1_C05	CRISPR/Cas9 mutation readout on the pathway reporters in screen 1 replicate 1 : Sample from drug screen treated with 100 nM Resveratrol in position C05 in plate 1
+E177_01_100_1_1_C04	CRISPR/Cas9 mutation readout on the pathway reporters in screen 1 replicate 1 : Sample from drug screen treated with 100 nM CYC116 in position C04 in plate 1
+E177_01_100_1_1_C03	CRISPR/Cas9 mutation readout on the pathway reporters in screen 1 replicate 1 : Sample from drug screen treated with 100 nM SRT1720 in position C03 in plate 1
+E177_01_100_1_1_C02	CRISPR/Cas9 mutation readout on the pathway reporters in screen 1 replicate 1 : Sample from drug screen treated with 100 nM PCI-24781 (Abexinostat) in position C02 in plate 1
+E177_01_100_1_1_C01	CRISPR/Cas9 mutation readout on the pathway reporters in screen 1 replicate 1 : Sample from drug screen treated with 1 uM Mirin in positions C01, C12, G01 & G12, in plate 1 & 2
+E177_01_100_1_1_B12	CRISPR/Cas9 mutation readout on the pathway reporters in screen 1 replicate 1 : Sample from drug screen treated with 1:1000 DMSO in positions B01, B12, F01 & F12, in plate 1 & 2
+E1504_12_1_3_2_B09	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 3 : Sample from drug screen treated with 1 uM Tranylcypromine hemisulfate in position B09 in plate 2
+E177_01_100_1_1_B11	CRISPR/Cas9 mutation readout on the pathway reporters in screen 1 replicate 1 : Sample from drug screen treated with 100 nM Sodium Phenylbutyrate in position B11 in plate 1
+E177_01_100_1_1_B10	CRISPR/Cas9 mutation readout on the pathway reporters in screen 1 replicate 1 : Sample from drug screen treated with 100 nM RG108 in position B10 in plate 1
+E177_01_100_1_1_B09	CRISPR/Cas9 mutation readout on the pathway reporters in screen 1 replicate 1 : Sample from drug screen treated with 100 nM MK-5108 (VX-689) in position B09 in plate 1
+E177_01_100_1_1_B08	CRISPR/Cas9 mutation readout on the pathway reporters in screen 1 replicate 1 : Sample from drug screen treated with 100 nM NVP-BSK805 2HCl in position B08 in plate 1
+E177_01_100_1_1_B07	CRISPR/Cas9 mutation readout on the pathway reporters in screen 1 replicate 1 : Sample from drug screen treated with 100 nM LY2784544 in position B07 in plate 1
+E177_01_100_1_1_B06	CRISPR/Cas9 mutation readout on the pathway reporters in screen 1 replicate 1 : Sample from drug screen treated with 100 nM Hesperadin in position B06 in plate 1
+E177_01_100_1_1_B05	CRISPR/Cas9 mutation readout on the pathway reporters in screen 1 replicate 1 : Sample from drug screen treated with 100 nM Ruxolitinib (INCB018424) in position B05 in plate 1
+E177_01_100_1_1_B04	CRISPR/Cas9 mutation readout on the pathway reporters in screen 1 replicate 1 : Sample from drug screen treated with 100 nM Valproic acid sodium salt (Sodium valproate) in position B04 in plate 1
+E177_01_100_1_1_B03	CRISPR/Cas9 mutation readout on the pathway reporters in screen 1 replicate 1 : Sample from drug screen treated with 100 nM Mocetinostat (MGCD0103) in position B03 in plate 1
+E177_01_100_1_1_B02	CRISPR/Cas9 mutation readout on the pathway reporters in screen 1 replicate 1 : Sample from drug screen treated with 100 nM Iniparib (BSI-201) in position B02 in plate 1
+E1504_12_1_3_2_B08	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 3 : Sample from drug screen treated with 1 uM Garcinol in position B08 in plate 2
+E177_01_100_1_1_B01	CRISPR/Cas9 mutation readout on the pathway reporters in screen 1 replicate 1 : Sample from drug screen treated with 1:1000 DMSO in positions B01, B12, F01 & F12, in plate 1 & 2
+E177_01_100_1_1_A12	CRISPR/Cas9 mutation readout on the pathway reporters in screen 1 replicate 1 : Sample from drug screen treated with 1 uM PAO in positions A01, A12, E01 & E12, in plate 1 & 2
+E177_01_100_1_1_A11	CRISPR/Cas9 mutation readout on the pathway reporters in screen 1 replicate 1 : Sample from drug screen treated with 100 nM Entacapone in position A11 in plate 1
+E177_01_100_1_1_A10	CRISPR/Cas9 mutation readout on the pathway reporters in screen 1 replicate 1 : Sample from drug screen treated with 100 nM CI994 (Tacedinaline) in position A10 in plate 1
+E177_01_100_1_1_A09	CRISPR/Cas9 mutation readout on the pathway reporters in screen 1 replicate 1 : Sample from drug screen treated with 100 nM CUDC-907 in position A09 in plate 1
+E177_01_100_1_1_A08	CRISPR/Cas9 mutation readout on the pathway reporters in screen 1 replicate 1 : Sample from drug screen treated with 100 nM Tubastatin A HCl in position A08 in plate 1
+E177_01_100_1_1_A07	CRISPR/Cas9 mutation readout on the pathway reporters in screen 1 replicate 1 : Sample from drug screen treated with 100 nM AG-14361 in position A07 in plate 1
+E177_01_100_1_1_A06	CRISPR/Cas9 mutation readout on the pathway reporters in screen 1 replicate 1 : Sample from drug screen treated with 100 nM CCT129202 in position A06 in plate 1
+E177_01_100_1_1_A05	CRISPR/Cas9 mutation readout on the pathway reporters in screen 1 replicate 1 : Sample from drug screen treated with 100 nM JNJ-7706621 in position A05 in plate 1
+E177_01_100_1_1_A04	CRISPR/Cas9 mutation readout on the pathway reporters in screen 1 replicate 1 : Sample from drug screen treated with 100 nM SNS-314 Mesylate in position A04 in plate 1
+E1504_12_1_3_2_B07	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 3 : Sample from drug screen treated with 1 uM BMN 673 in position B07 in plate 2
+E177_01_100_1_1_A03	CRISPR/Cas9 mutation readout on the pathway reporters in screen 1 replicate 1 : Sample from drug screen treated with 100 nM Danusertib (PHA-739358) in position A03 in plate 1
+E177_01_100_1_1_A02	CRISPR/Cas9 mutation readout on the pathway reporters in screen 1 replicate 1 : Sample from drug screen treated with 100 nM Belinostat (PXD101) in position A02 in plate 1
+E1504_18_10_3_2_G03	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 3 : Sample from drug screen treated with 10 uM PJ34 HCl in position G03 in plate 2
+E1504_18_10_3_2_G02	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 3 : Sample from drug screen treated with 10 uM Bromosporine in position G02 in plate 2
+E1504_18_10_3_2_G01	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 3 : Sample from drug screen treated with 1 uM Mirin in positions C01, C12, G01 & G12, in plate 1 & 2
+E1504_18_10_3_2_F12	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 3 : Sample from drug screen treated with 1:1000 DMSO in positions B01, B12, F01 & F12, in plate 1 & 2
+E1504_18_10_3_2_F11	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 3 : Sample from drug screen treated with 10 uM Aminoresveratrol sulfate in position F11 in plate 2
+E1504_18_10_3_2_F10	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 3 : Sample from drug screen treated with 10 uM BIX-01294 3HCl in position F10 in plate 2
+E1504_12_1_3_2_B04	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 3 : Sample from drug screen treated with 1 uM EPZ004777 in position B04 in plate 2
+E1504_11_1_3_1_E01	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 3 : Sample from drug screen treated with 1 uM PAO in positions A01, A12, E01 & E12, in plate 1 & 2
+E1504_18_10_3_2_F09	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 3 : Sample from drug screen treated with 10 uM Piceatannol in position F09 in plate 2
+E1504_18_10_3_2_F08	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 3 : Sample from drug screen treated with 10 uM Suberoyl bis-hydroxamic acid in position F08 in plate 2
+E1504_18_10_3_2_F07	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 3 : Sample from drug screen treated with 10 uM UNC1215 in position F07 in plate 2
+E1504_18_10_3_2_F06	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 3 : Sample from drug screen treated with 10 uM VX-680 (Tozasertib, MK-0457) in position F06 in plate 2
+E1504_18_10_3_2_F05	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 3 : Sample from drug screen treated with 10 uM Tubastatin A in position F05 in plate 2
+E1504_18_10_3_2_F04	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 3 : Sample from drug screen treated with 10 uM Nexturastat A in position F04 in plate 2
+E1504_18_10_3_2_F03	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 3 : Sample from drug screen treated with 10 uM RVX-208 in position F03 in plate 2
+E1504_18_10_3_2_F02	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 3 : Sample from drug screen treated with 10 uM RGFP966 in position F02 in plate 2
+E1504_18_10_3_2_F01	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 3 : Sample from drug screen treated with 1:1000 DMSO in positions B01, B12, F01 & F12, in plate 1 & 2
+E1504_18_10_3_2_E12	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 3 : Sample from drug screen treated with 1 uM PAO in positions A01, A12, E01 & E12, in plate 1 & 2
+E1504_12_1_3_2_B03	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 3 : Sample from drug screen treated with 1 uM SGC-CBP30 in position B03 in plate 2
+E1504_18_10_3_2_E11	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 3 : Sample from drug screen treated with 10 uM NSC-3852 in position E11 in plate 2
+E1504_18_10_3_2_E10	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 3 : Sample from drug screen treated with 10 uM B2 in position E10 in plate 2
+E1504_18_10_3_2_E09	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 3 : Sample from drug screen treated with 10 uM BML-266 in position E09 in plate 2
+E1504_18_10_3_2_E08	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 3 : Sample from drug screen treated with 10 uM Apicidin in position E08 in plate 2
+E1504_18_10_3_2_E07	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 3 : Sample from drug screen treated with 10 uM SGC 0946 in position E07 in plate 2
+E1504_17_10_3_1_D06	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 3 : Sample from drug screen treated with 10 uM Azacitidine in position D06 in plate 1
+E1504_17_10_3_1_D05	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 3 : Sample from drug screen treated with 10 uM Droxinostat in position D05 in plate 1
+E1504_17_10_3_1_D04	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 3 : Sample from drug screen treated with 10 uM ENMD-2076 in position D04 in plate 1
+E1504_17_10_3_1_D03	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 3 : Sample from drug screen treated with 10 uM INO-1001 in position D03 in plate 1
+E1504_17_10_3_1_D02	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 3 : Sample from drug screen treated with 10 uM LAQ824 (Dacinostat) in position D02 in plate 1
+E1504_17_10_3_1_D01	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 3 : Sample from drug screen treated with 1 uM DNA-PKi in positions D01, D12, H01 & H12, in plate 1 & 2
+E1504_17_10_3_1_C12	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 3 : Sample from drug screen treated with 1 uM Mirin in positions C01, C12, G01 & G12, in plate 1 & 2
+E1504_12_1_3_2_A03	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 3 : Sample from drug screen treated with 1 uM OG-L002 in position A03 in plate 2
+E1504_17_10_3_1_C11	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 3 : Sample from drug screen treated with 10 uM Tranylcypromine (2-PCPA) HCl in position C11 in plate 1
+E1504_17_10_3_1_C10	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 3 : Sample from drug screen treated with 10 uM Baricitinib (LY3009104, INCB028050) in position C10 in plate 1
+E1504_17_10_3_1_C09	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 3 : Sample from drug screen treated with 10 uM M344 in position C09 in plate 1
+E1504_17_10_3_1_C08	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 3 : Sample from drug screen treated with 10 uM TG101209 in position C08 in plate 1
+E1504_17_10_3_1_C07	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 3 : Sample from drug screen treated with 10 uM SGI-1776 free base in position C07 in plate 1
+E1504_17_10_3_1_C06	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 3 : Sample from drug screen treated with 10 uM EX 527 (Selisistat) in position C06 in plate 1
+E1504_17_10_3_1_C05	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 3 : Sample from drug screen treated with 10 uM Resveratrol in position C05 in plate 1
+E1504_17_10_3_1_C04	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 3 : Sample from drug screen treated with 10 uM CYC116 in position C04 in plate 1
+E1504_17_10_3_1_C03	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 3 : Sample from drug screen treated with 10 uM SRT1720 in position C03 in plate 1
+E1504_17_10_3_1_C02	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 3 : Sample from drug screen treated with 10 uM PCI-24781 (Abexinostat) in position C02 in plate 1
+E1504_12_1_3_2_A02	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 3 : Sample from drug screen treated with 1 uM Zebularine in position A02 in plate 2
+E1504_17_10_3_1_C01	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 3 : Sample from drug screen treated with 1 uM Mirin in positions C01, C12, G01 & G12, in plate 1 & 2
+E1504_17_10_3_1_B12	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 3 : Sample from drug screen treated with 1:1000 DMSO in positions B01, B12, F01 & F12, in plate 1 & 2
+E1504_17_10_3_1_B11	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 3 : Sample from drug screen treated with 10 uM Sodium Phenylbutyrate in position B11 in plate 1
+E1504_17_10_3_1_B10	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 3 : Sample from drug screen treated with 10 uM RG108 in position B10 in plate 1
+E1504_17_10_3_1_B09	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 3 : Sample from drug screen treated with 10 uM MK-5108 (VX-689) in position B09 in plate 1
+E1504_16_10_2_2_H10	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 2 : Sample from drug screen treated with 10 uM CTPB in position H10 in plate 2
+E1504_16_10_2_2_H09	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 2 : Sample from drug screen treated with 10 uM Valproic acid hydroxamate in position H09 in plate 2
+E1504_16_10_2_2_H08	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 2 : Sample from drug screen treated with 10 uM Isonicotinamide in position H08 in plate 2
+E1504_11_1_3_1_H11	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 3 : Sample from drug screen treated with 1 uM XL019 in position H11 in plate 1
+E1504_16_10_2_2_H07	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 2 : Sample from drug screen treated with 10 uM (+)-JQ1 in position H07 in plate 2
+E1504_16_10_2_2_H06	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 2 : Sample from drug screen treated with 10 uM Olaparib (AZD2281, Ku-0059436) in position H06 in plate 2
+E1504_16_10_2_2_H05	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 2 : Sample from drug screen treated with 10 uM Pacritinib (SB1518) in position H05 in plate 2
+E1504_16_10_2_2_H04	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 2 : Sample from drug screen treated with 10 uM Rocilinostat (ACY-1215) in position H04 in plate 2
+E1504_16_10_2_2_H03	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 2 : Sample from drug screen treated with 10 uM CPI-203 in position H03 in plate 2
+E1504_16_10_2_2_H02	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 2 : Sample from drug screen treated with 10 uM IOX1 in position H02 in plate 2
+E1504_16_10_2_2_H01	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 2 : Sample from drug screen treated with 1 uM DNA-PKi in positions D01, D12, H01 & H12, in plate 1 & 2
+E1504_16_10_2_2_G12	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 2 : Sample from drug screen treated with 1 uM Mirin in positions C01, C12, G01 & G12, in plate 1 & 2
+E1504_16_10_2_2_G11	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 2 : Sample from drug screen treated with 10 uM BML-281 in position G11 in plate 2
+E1504_16_10_2_2_G10	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 2 : Sample from drug screen treated with 10 uM Butyrolactone 3 in position G10 in plate 2
+E1504_11_1_3_1_H10	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 3 : Sample from drug screen treated with 1 uM Romidepsin (FK228, Depsipeptide) in position H10 in plate 1
+E1504_16_10_2_2_G09	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 2 : Sample from drug screen treated with 10 uM Fluoro-SAHA in position G09 in plate 2
+E1504_16_10_2_2_G08	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 2 : Sample from drug screen treated with 10 uM Nullscript in position G08 in plate 2
+E1504_16_10_2_2_G07	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 2 : Sample from drug screen treated with 10 uM AZD1208 in position G07 in plate 2
+E1504_16_10_2_2_G06	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 2 : Sample from drug screen treated with 10 uM Entinostat (MS-275) in position G06 in plate 2
+E1504_16_10_2_2_G05	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 2 : Sample from drug screen treated with 10 uM Lomeguatrib in position G05 in plate 2
+E1504_16_10_2_2_G04	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 2 : Sample from drug screen treated with 10 uM Filgotinib (GLPG0634) in position G04 in plate 2
+E1504_16_10_2_2_G03	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 2 : Sample from drug screen treated with 10 uM PJ34 HCl in position G03 in plate 2
+E1504_16_10_2_2_G02	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 2 : Sample from drug screen treated with 10 uM Bromosporine in position G02 in plate 2
+E1504_16_10_2_2_G01	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 2 : Sample from drug screen treated with 1 uM Mirin in positions C01, C12, G01 & G12, in plate 1 & 2
+E1504_11_1_3_1_H07	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 3 : Sample from drug screen treated with 1 uM Quercetin in position H07 in plate 1
+E1504_16_10_2_2_E03	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 2 : Sample from drug screen treated with 10 uM RG2833 (RGFP109) in position E03 in plate 2
+E1504_16_10_2_2_E02	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 2 : Sample from drug screen treated with 10 uM I-BET-762 in position E02 in plate 2
+E1504_16_10_2_2_E01	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 2 : Sample from drug screen treated with 1 uM PAO in positions A01, A12, E01 & E12, in plate 1 & 2
+E1504_16_10_2_2_D12	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 2 : Sample from drug screen treated with 1 uM DNA-PKi in positions D01, D12, H01 & H12, in plate 1 & 2
+E1504_16_10_2_2_D11	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 2 : Sample from drug screen treated with 10 uM NCH-51 in position D11 in plate 2
+E1504_16_10_2_2_D10	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 2 : Sample from drug screen treated with 10 uM Anacardic acid in position D10 in plate 2
+E1504_16_10_2_2_D09	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 2 : Sample from drug screen treated with 10 uM Nicotinamide in position D09 in plate 2
+E1504_16_10_2_2_D08	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 2 : Sample from drug screen treated with 10 uM BML-210 in position D08 in plate 2
+E1504_16_10_2_2_D07	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 2 : Sample from drug screen treated with 10 uM GSK J4 HCl in position D07 in plate 2
+E1504_16_10_2_2_D06	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 2 : Sample from drug screen treated with 10 uM Trichostatin A (TSA) in position D06 in plate 2
+E1504_11_1_3_1_H06	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 3 : Sample from drug screen treated with 1 uM Givinostat (ITF2357) in position H06 in plate 1
+E1504_16_10_2_2_D05	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 2 : Sample from drug screen treated with 10 uM UPF 1069 in position D05 in plate 2
+E1504_16_10_2_2_D04	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 2 : Sample from drug screen treated with 10 uM UNC669 in position D04 in plate 2
+E1504_16_10_2_2_D03	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 2 : Sample from drug screen treated with 10 uM SGI-1027 in position D03 in plate 2
+E1504_16_10_2_2_D02	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 2 : Sample from drug screen treated with 10 uM C646 in position D02 in plate 2
+E1504_16_10_2_2_D01	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 2 : Sample from drug screen treated with 1 uM DNA-PKi in positions D01, D12, H01 & H12, in plate 1 & 2
+E1504_16_10_2_2_C12	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 2 : Sample from drug screen treated with 1 uM Mirin in positions C01, C12, G01 & G12, in plate 1 & 2
+E1504_16_10_2_2_C11	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 2 : Sample from drug screen treated with 10 uM BML-278 in position C11 in plate 2
+E1504_16_10_2_2_C10	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 2 : Sample from drug screen treated with 10 uM MC-1293 in position C10 in plate 2
+E1504_16_10_2_2_C09	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 2 : Sample from drug screen treated with 10 uM Valproic acid in position C09 in plate 2
+E1504_16_10_2_2_C08	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 2 : Sample from drug screen treated with 10 uM Splitomicin in position C08 in plate 2
+E1504_11_1_3_1_H05	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 3 : Sample from drug screen treated with 1 uM Pracinostat (SB939) in position H05 in plate 1
+E1504_16_10_2_2_C07	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 2 : Sample from drug screen treated with 10 uM EPZ5676 in position C07 in plate 2
+E1504_14_10_1_2_E01	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 1 : Sample from drug screen treated with 1 uM PAO in positions A01, A12, E01 & E12, in plate 1 & 2
+E1504_14_10_1_2_D12	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 1 : Sample from drug screen treated with 1 uM DNA-PKi in positions D01, D12, H01 & H12, in plate 1 & 2
+E1504_14_10_1_2_D11	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 1 : Sample from drug screen treated with 10 uM NCH-51 in position D11 in plate 2
+E1504_14_10_1_2_D10	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 1 : Sample from drug screen treated with 10 uM Anacardic acid in position D10 in plate 2
+E1504_14_10_1_2_D09	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 1 : Sample from drug screen treated with 10 uM Nicotinamide in position D09 in plate 2
+E1504_14_10_1_2_D08	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 1 : Sample from drug screen treated with 10 uM BML-210 in position D08 in plate 2
+E1504_11_1_3_1_F11	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 3 : Sample from drug screen treated with 1 uM Tofacitinib (CP-690550) Citrate in position F11 in plate 1
+E1504_14_10_1_2_D07	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 1 : Sample from drug screen treated with 10 uM GSK J4 HCl in position D07 in plate 2
+E1504_14_10_1_2_D06	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 1 : Sample from drug screen treated with 10 uM Trichostatin A (TSA) in position D06 in plate 2
+E1504_14_10_1_2_D05	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 1 : Sample from drug screen treated with 10 uM UPF 1069 in position D05 in plate 2
+E1504_14_10_1_2_D04	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 1 : Sample from drug screen treated with 10 uM UNC669 in position D04 in plate 2
+E1504_14_10_1_2_D03	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 1 : Sample from drug screen treated with 10 uM SGI-1027 in position D03 in plate 2
+E1504_14_10_1_2_D02	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 1 : Sample from drug screen treated with 10 uM C646 in position D02 in plate 2
+E1504_14_10_1_2_D01	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 1 : Sample from drug screen treated with 1 uM DNA-PKi in positions D01, D12, H01 & H12, in plate 1 & 2
+E1504_14_10_1_2_C12	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 1 : Sample from drug screen treated with 1 uM Mirin in positions C01, C12, G01 & G12, in plate 1 & 2
+E1504_14_10_1_2_C11	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 1 : Sample from drug screen treated with 10 uM BML-278 in position C11 in plate 2
+E1504_14_10_1_2_C10	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 1 : Sample from drug screen treated with 10 uM MC-1293 in position C10 in plate 2
+E1504_11_1_3_1_F10	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 3 : Sample from drug screen treated with 1 uM S-Ruxolitinib (INCB018424) in position F10 in plate 1
+E1504_14_10_1_2_C09	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 1 : Sample from drug screen treated with 10 uM Valproic acid in position C09 in plate 2
+E1504_14_10_1_2_C08	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 1 : Sample from drug screen treated with 10 uM Splitomicin in position C08 in plate 2
+E1504_14_10_1_2_C07	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 1 : Sample from drug screen treated with 10 uM EPZ5676 in position C07 in plate 2
+E1504_14_10_1_2_C06	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 1 : Sample from drug screen treated with 10 uM Panobinostat (LBH589) in position C06 in plate 2
+E1504_14_10_1_2_C05	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 1 : Sample from drug screen treated with 10 uM BIX 01294 in position C05 in plate 2
+E1504_14_10_1_2_C04	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 1 : Sample from drug screen treated with 10 uM OTX015 in position C04 in plate 2
+E1504_13_10_1_1_D01	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 1 : Sample from drug screen treated with 1 uM DNA-PKi in positions D01, D12, H01 & H12, in plate 1 & 2
+E1504_13_10_1_1_C12	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 1 : Sample from drug screen treated with 1 uM Mirin in positions C01, C12, G01 & G12, in plate 1 & 2
+E1504_13_10_1_1_C11	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 1 : Sample from drug screen treated with 10 uM Tranylcypromine (2-PCPA) HCl in position C11 in plate 1
+E1504_13_10_1_1_C10	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 1 : Sample from drug screen treated with 10 uM Baricitinib (LY3009104, INCB028050) in position C10 in plate 1
+E1504_13_10_1_1_C09	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 1 : Sample from drug screen treated with 10 uM M344 in position C09 in plate 1
+E1504_13_10_1_1_C08	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 1 : Sample from drug screen treated with 10 uM TG101209 in position C08 in plate 1
+E1504_13_10_1_1_C07	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 1 : Sample from drug screen treated with 10 uM SGI-1776 free base in position C07 in plate 1
+E1504_13_10_1_1_C06	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 1 : Sample from drug screen treated with 10 uM EX 527 (Selisistat) in position C06 in plate 1
+E1504_11_1_3_1_E12	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 3 : Sample from drug screen treated with 1 uM PAO in positions A01, A12, E01 & E12, in plate 1 & 2
+E1504_13_10_1_1_C05	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 1 : Sample from drug screen treated with 10 uM Resveratrol in position C05 in plate 1
+E1504_13_10_1_1_C04	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 1 : Sample from drug screen treated with 10 uM CYC116 in position C04 in plate 1
+E1504_13_10_1_1_C03	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 1 : Sample from drug screen treated with 10 uM SRT1720 in position C03 in plate 1
+E1504_13_10_1_1_C02	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 1 : Sample from drug screen treated with 10 uM PCI-24781 (Abexinostat) in position C02 in plate 1
+E1504_13_10_1_1_C01	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 1 : Sample from drug screen treated with 1 uM Mirin in positions C01, C12, G01 & G12, in plate 1 & 2
+E1504_13_10_1_1_B12	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 1 : Sample from drug screen treated with 1:1000 DMSO in positions B01, B12, F01 & F12, in plate 1 & 2
+E1504_13_10_1_1_B11	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 1 : Sample from drug screen treated with 10 uM Sodium Phenylbutyrate in position B11 in plate 1
+E1504_13_10_1_1_B10	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 1 : Sample from drug screen treated with 10 uM RG108 in position B10 in plate 1
+E1504_13_10_1_1_B09	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 1 : Sample from drug screen treated with 10 uM MK-5108 (VX-689) in position B09 in plate 1
+E1504_13_10_1_1_B08	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 1 : Sample from drug screen treated with 10 uM NVP-BSK805 2HCl in position B08 in plate 1
+E1504_11_1_3_1_E11	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 3 : Sample from drug screen treated with 1 uM Procainamide HCl in position E11 in plate 1
+E1504_13_10_1_1_B07	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 1 : Sample from drug screen treated with 10 uM LY2784544 in position B07 in plate 1
+E1504_13_10_1_1_B06	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 1 : Sample from drug screen treated with 10 uM Hesperadin in position B06 in plate 1
+E1504_13_10_1_1_B05	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 1 : Sample from drug screen treated with 10 uM Ruxolitinib (INCB018424) in position B05 in plate 1
+E1504_13_10_1_1_B04	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 1 : Sample from drug screen treated with 10 uM Valproic acid sodium salt (Sodium valproate) in position B04 in plate 1
+E1504_11_1_3_1_E04	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 3 : Sample from drug screen treated with 1 uM CUDC-101 in position E04 in plate 1
+E1504_11_1_3_1_D07	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 3 : Sample from drug screen treated with 1 uM AZ 960 in position D07 in plate 1
+E1504_11_1_3_1_D06	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 3 : Sample from drug screen treated with 1 uM Azacitidine in position D06 in plate 1
+E1504_16_10_2_2_F12	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 2 : Sample from drug screen treated with 1:1000 DMSO in positions B01, B12, F01 & F12, in plate 1 & 2
+E1504_11_1_3_1_H09	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 3 : Sample from drug screen treated with 1 uM CEP-33779 in position H09 in plate 1
+E1504_16_10_2_2_F11	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 2 : Sample from drug screen treated with 10 uM Aminoresveratrol sulfate in position F11 in plate 2
+E1504_16_10_2_2_F10	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 2 : Sample from drug screen treated with 10 uM BIX-01294 3HCl in position F10 in plate 2
+E1504_16_10_2_2_F09	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 2 : Sample from drug screen treated with 10 uM Piceatannol in position F09 in plate 2
+E1504_16_10_2_2_F08	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 2 : Sample from drug screen treated with 10 uM Suberoyl bis-hydroxamic acid in position F08 in plate 2
+E1504_16_10_2_2_F07	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 2 : Sample from drug screen treated with 10 uM UNC1215 in position F07 in plate 2
+E1504_16_10_2_2_F06	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 2 : Sample from drug screen treated with 10 uM VX-680 (Tozasertib, MK-0457) in position F06 in plate 2
+E1504_16_10_2_2_F05	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 2 : Sample from drug screen treated with 10 uM Tubastatin A in position F05 in plate 2
+E1504_16_10_2_2_F04	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 2 : Sample from drug screen treated with 10 uM Nexturastat A in position F04 in plate 2
+E1504_16_10_2_2_F03	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 2 : Sample from drug screen treated with 10 uM RVX-208 in position F03 in plate 2
+E1504_16_10_2_2_F02	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 2 : Sample from drug screen treated with 10 uM RGFP966 in position F02 in plate 2
+E1504_11_1_3_1_H08	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 3 : Sample from drug screen treated with 1 uM CCT137690 in position H08 in plate 1
+E1504_11_1_3_1_D11	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 3 : Sample from drug screen treated with 1 uM 3-Aminobenzamide in position D11 in plate 1
+E1504_16_10_2_2_F01	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 2 : Sample from drug screen treated with 1:1000 DMSO in positions B01, B12, F01 & F12, in plate 1 & 2
+E1504_16_10_2_2_E12	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 2 : Sample from drug screen treated with 1 uM PAO in positions A01, A12, E01 & E12, in plate 1 & 2
+E1504_16_10_2_2_E11	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 2 : Sample from drug screen treated with 10 uM NSC-3852 in position E11 in plate 2
+E1504_16_10_2_2_E10	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 2 : Sample from drug screen treated with 10 uM B2 in position E10 in plate 2
+E1504_16_10_2_2_E09	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 2 : Sample from drug screen treated with 10 uM BML-266 in position E09 in plate 2
+E1504_16_10_2_2_E08	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 2 : Sample from drug screen treated with 10 uM Apicidin in position E08 in plate 2
+E1504_16_10_2_2_E07	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 2 : Sample from drug screen treated with 10 uM SGC 0946 in position E07 in plate 2
+E1504_16_10_2_2_E06	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 2 : Sample from drug screen treated with 10 uM Vorinostat (SAHA, MK0683) in position E06 in plate 2
+E1504_16_10_2_2_E05	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 2 : Sample from drug screen treated with 10 uM Scriptaid in position E05 in plate 2
+E1504_16_10_2_2_E04	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 2 : Sample from drug screen treated with 10 uM ME0328 in position E04 in plate 2
+E1504_15_10_2_1_G10	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 2 : Sample from drug screen treated with 10 uM IOX2 in position G10 in plate 1
+E1504_15_10_2_1_G09	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 2 : Sample from drug screen treated with 10 uM Sirtinol in position G09 in plate 1
+E1504_15_10_2_1_G08	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 2 : Sample from drug screen treated with 10 uM TG101348 (SAR302503) in position G08 in plate 1
+E1504_15_10_2_1_G07	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 2 : Sample from drug screen treated with 10 uM AR-42 in position G07 in plate 1
+E1504_15_10_2_1_G06	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 2 : Sample from drug screen treated with 10 uM AZD1480 in position G06 in plate 1
+E1504_11_1_3_1_G12	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 3 : Sample from drug screen treated with 1 uM Mirin in positions C01, C12, G01 & G12, in plate 1 & 2
+E1504_15_10_2_1_G05	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 2 : Sample from drug screen treated with 10 uM MC1568 in position G05 in plate 1
+E1504_15_10_2_1_G04	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 2 : Sample from drug screen treated with 10 uM PFI-1 (PF-6405761) in position G04 in plate 1
+E1504_15_10_2_1_G03	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 2 : Sample from drug screen treated with 10 uM AG-490 (Tyrphostin B42) in position G03 in plate 1
+E1504_15_10_2_1_G02	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 2 : Sample from drug screen treated with 10 uM MLN8054 in position G02 in plate 1
+E1504_15_10_2_1_G01	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 2 : Sample from drug screen treated with 1 uM Mirin in positions C01, C12, G01 & G12, in plate 1 & 2
+E1504_15_10_2_1_F12	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 2 : Sample from drug screen treated with 1:1000 DMSO in positions B01, B12, F01 & F12, in plate 1 & 2
+E1504_15_10_2_1_F11	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 2 : Sample from drug screen treated with 10 uM Tofacitinib (CP-690550) Citrate in position F11 in plate 1
+E1504_15_10_2_1_F10	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 2 : Sample from drug screen treated with 10 uM S-Ruxolitinib (INCB018424) in position F10 in plate 1
+E1504_15_10_2_1_F09	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 2 : Sample from drug screen treated with 10 uM WP1066 in position F09 in plate 1
+E1504_15_10_2_1_F08	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 2 : Sample from drug screen treated with 10 uM AMG-900 in position F08 in plate 1
+E1504_11_1_3_1_G11	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 3 : Sample from drug screen treated with 1 uM AZD2461 in position G11 in plate 1
+E1504_15_10_2_1_F07	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 2 : Sample from drug screen treated with 10 uM Tubacin in position F07 in plate 1
+E1504_15_10_2_1_F06	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 2 : Sample from drug screen treated with 10 uM KW-2449 in position F06 in plate 1
+E1504_15_10_2_1_F05	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 2 : Sample from drug screen treated with 10 uM PHA-680632 in position F05 in plate 1
+E1504_15_10_2_1_F04	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 2 : Sample from drug screen treated with 10 uM Decitabine in position F04 in plate 1
+E1504_15_10_2_1_F03	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 2 : Sample from drug screen treated with 10 uM AT9283 in position F03 in plate 1
+E1504_15_10_2_1_F02	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 2 : Sample from drug screen treated with 10 uM Rucaparib (AG-014699,PF-01367338) in position F02 in plate 1
+E1504_15_10_2_1_F01	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 2 : Sample from drug screen treated with 1:1000 DMSO in positions B01, B12, F01 & F12, in plate 1 & 2
+E1504_14_10_1_2_F10	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 1 : Sample from drug screen treated with 10 uM BIX-01294 3HCl in position F10 in plate 2
+E1504_14_10_1_2_F09	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 1 : Sample from drug screen treated with 10 uM Piceatannol in position F09 in plate 2
+E1504_14_10_1_2_F08	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 1 : Sample from drug screen treated with 10 uM Suberoyl bis-hydroxamic acid in position F08 in plate 2
+E1504_14_10_1_2_F07	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 1 : Sample from drug screen treated with 10 uM UNC1215 in position F07 in plate 2
+E1504_14_10_1_2_F06	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 1 : Sample from drug screen treated with 10 uM VX-680 (Tozasertib, MK-0457) in position F06 in plate 2
+E1504_14_10_1_2_F05	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 1 : Sample from drug screen treated with 10 uM Tubastatin A in position F05 in plate 2
+E1504_14_10_1_2_F04	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 1 : Sample from drug screen treated with 10 uM Nexturastat A in position F04 in plate 2
+E1504_11_1_3_1_G01	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 3 : Sample from drug screen treated with 1 uM Mirin in positions C01, C12, G01 & G12, in plate 1 & 2
+E1504_14_10_1_2_F03	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 1 : Sample from drug screen treated with 10 uM RVX-208 in position F03 in plate 2
+E1504_14_10_1_2_F02	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 1 : Sample from drug screen treated with 10 uM RGFP966 in position F02 in plate 2
+E1504_14_10_1_2_F01	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 1 : Sample from drug screen treated with 1:1000 DMSO in positions B01, B12, F01 & F12, in plate 1 & 2
+E1504_14_10_1_2_E12	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 1 : Sample from drug screen treated with 1 uM PAO in positions A01, A12, E01 & E12, in plate 1 & 2
+E1504_14_10_1_2_E11	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 1 : Sample from drug screen treated with 10 uM NSC-3852 in position E11 in plate 2
+E1504_14_10_1_2_E10	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 1 : Sample from drug screen treated with 10 uM B2 in position E10 in plate 2
+E1504_14_10_1_2_E09	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 1 : Sample from drug screen treated with 10 uM BML-266 in position E09 in plate 2
+E1504_14_10_1_2_E08	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 1 : Sample from drug screen treated with 10 uM Apicidin in position E08 in plate 2
+E1504_14_10_1_2_E07	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 1 : Sample from drug screen treated with 10 uM SGC 0946 in position E07 in plate 2
+E1504_14_10_1_2_E06	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 1 : Sample from drug screen treated with 10 uM Vorinostat (SAHA, MK0683) in position E06 in plate 2
+E1504_11_1_3_1_F12	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 3 : Sample from drug screen treated with 1:1000 DMSO in positions B01, B12, F01 & F12, in plate 1 & 2
+E1504_11_1_3_1_D09	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 3 : Sample from drug screen treated with 1 uM I-BET151 (GSK1210151A) in position D09 in plate 1
+E1504_14_10_1_2_E05	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 1 : Sample from drug screen treated with 10 uM Scriptaid in position E05 in plate 2
+E1504_14_10_1_2_E04	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 1 : Sample from drug screen treated with 10 uM ME0328 in position E04 in plate 2
+E1504_14_10_1_2_E03	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 1 : Sample from drug screen treated with 10 uM RG2833 (RGFP109) in position E03 in plate 2
+E1504_14_10_1_2_E02	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 1 : Sample from drug screen treated with 10 uM I-BET-762 in position E02 in plate 2
+E1504_14_10_1_2_C03	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 1 : Sample from drug screen treated with 10 uM MM-102 in position C03 in plate 2
+E1504_14_10_1_2_C02	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 1 : Sample from drug screen treated with 10 uM EPZ-6438 in position C02 in plate 2
+E1504_14_10_1_2_C01	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 1 : Sample from drug screen treated with 1 uM Mirin in positions C01, C12, G01 & G12, in plate 1 & 2
+E1504_14_10_1_2_B12	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 1 : Sample from drug screen treated with 1:1000 DMSO in positions B01, B12, F01 & F12, in plate 1 & 2
+E1504_11_1_3_1_F09	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 3 : Sample from drug screen treated with 1 uM WP1066 in position F09 in plate 1
+E1504_14_10_1_2_B11	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 1 : Sample from drug screen treated with 10 uM Suramin 6Na in position B11 in plate 2
+E1504_14_10_1_2_B10	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 1 : Sample from drug screen treated with 10 uM Salermide in position B10 in plate 2
+E1504_14_10_1_2_B09	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 1 : Sample from drug screen treated with 10 uM Tranylcypromine hemisulfate in position B09 in plate 2
+E1504_14_10_1_2_B08	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 1 : Sample from drug screen treated with 10 uM Garcinol in position B08 in plate 2
+E1504_14_10_1_2_B07	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 1 : Sample from drug screen treated with 10 uM BMN 673 in position B07 in plate 2
+E1504_14_10_1_2_B06	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 1 : Sample from drug screen treated with 10 uM FG-4592 in position B06 in plate 2
+E1504_14_10_1_2_B05	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 1 : Sample from drug screen treated with 10 uM SMI-4a in position B05 in plate 2
+E1504_14_10_1_2_B04	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 1 : Sample from drug screen treated with 10 uM EPZ004777 in position B04 in plate 2
+E1504_14_10_1_2_B03	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 1 : Sample from drug screen treated with 10 uM SGC-CBP30 in position B03 in plate 2
+E1504_14_10_1_2_B02	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 1 : Sample from drug screen treated with 10 uM 3-Deazaneplanocin A (DZNeP) in position B02 in plate 2
+E1504_11_1_3_1_F08	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 3 : Sample from drug screen treated with 1 uM AMG-900 in position F08 in plate 1
+E1504_14_10_1_2_B01	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 1 : Sample from drug screen treated with 1:1000 DMSO in positions B01, B12, F01 & F12, in plate 1 & 2
+E1504_14_10_1_2_A12	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 1 : Sample from drug screen treated with 1 uM PAO in positions A01, A12, E01 & E12, in plate 1 & 2
+E1504_14_10_1_2_A11	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 1 : Sample from drug screen treated with 10 uM Oxamflatin in position A11 in plate 2
+E1504_14_10_1_2_A10	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 1 : Sample from drug screen treated with 10 uM AGK2 in position A10 in plate 2
+E1504_14_10_1_2_A09	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 1 : Sample from drug screen treated with 10 uM ITSA-1 in position A09 in plate 2
+E1504_14_10_1_2_A08	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 1 : Sample from drug screen treated with 10 uM 2,4-Pyridinedicarboxylic Acid in position A08 in plate 2
+E1504_14_10_1_2_A07	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 1 : Sample from drug screen treated with 10 uM CX-6258 HCl in position A07 in plate 2
+E1504_14_10_1_2_A06	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 1 : Sample from drug screen treated with 10 uM Veliparib (ABT-888) in position A06 in plate 2
+E1504_13_10_1_1_B03	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 1 : Sample from drug screen treated with 10 uM Mocetinostat (MGCD0103) in position B03 in plate 1
+E1504_13_10_1_1_B02	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 1 : Sample from drug screen treated with 10 uM Iniparib (BSI-201) in position B02 in plate 1
+E1504_13_10_1_1_B01	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 1 : Sample from drug screen treated with 1:1000 DMSO in positions B01, B12, F01 & F12, in plate 1 & 2
+E1504_13_10_1_1_A12	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 1 : Sample from drug screen treated with 1 uM PAO in positions A01, A12, E01 & E12, in plate 1 & 2
+E1504_13_10_1_1_A11	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 1 : Sample from drug screen treated with 10 uM Entacapone in position A11 in plate 1
+E1504_13_10_1_1_A10	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 1 : Sample from drug screen treated with 10 uM CI994 (Tacedinaline) in position A10 in plate 1
+E1504_11_1_3_1_E10	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 3 : Sample from drug screen treated with 1 uM PJ34 in position E10 in plate 1
+E1504_13_10_1_1_A09	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 1 : Sample from drug screen treated with 10 uM CUDC-907 in position A09 in plate 1
+E1504_13_10_1_1_A08	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 1 : Sample from drug screen treated with 10 uM Tubastatin A HCl in position A08 in plate 1
+E1504_13_10_1_1_A07	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 1 : Sample from drug screen treated with 10 uM AG-14361 in position A07 in plate 1
+E1504_13_10_1_1_A06	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 1 : Sample from drug screen treated with 10 uM CCT129202 in position A06 in plate 1
+E1504_13_10_1_1_A05	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 1 : Sample from drug screen treated with 10 uM JNJ-7706621 in position A05 in plate 1
+E1504_13_10_1_1_A04	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 1 : Sample from drug screen treated with 10 uM SNS-314 Mesylate in position A04 in plate 1
+E1504_13_10_1_1_A03	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 1 : Sample from drug screen treated with 10 uM Danusertib (PHA-739358) in position A03 in plate 1
+E1504_13_10_1_1_A02	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 1 : Sample from drug screen treated with 10 uM Belinostat (PXD101) in position A02 in plate 1
+E1504_13_10_1_1_A01	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 1 : Sample from drug screen treated with 1 uM PAO in positions A01, A12, E01 & E12, in plate 1 & 2
+E1504_12_1_3_2_H12	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 3 : Sample from drug screen treated with 1 uM DNA-PKi in positions D01, D12, H01 & H12, in plate 1 & 2
+E1504_11_1_3_1_E09	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 3 : Sample from drug screen treated with 1 uM Tofacitinib (CP-690550,Tasocitinib) in position E09 in plate 1
+E1504_12_1_3_2_H11	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 3 : Sample from drug screen treated with 1 uM Triacetylresveratrol in position H11 in plate 2
+E1504_12_1_3_2_H10	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 3 : Sample from drug screen treated with 1 uM CTPB in position H10 in plate 2
+E1504_12_1_3_2_H09	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 3 : Sample from drug screen treated with 1 uM Valproic acid hydroxamate in position H09 in plate 2
+E1504_12_1_3_2_H08	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 3 : Sample from drug screen treated with 1 uM Isonicotinamide in position H08 in plate 2
+E1504_12_1_3_2_H07	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 3 : Sample from drug screen treated with 1 uM (+)-JQ1 in position H07 in plate 2
+E1504_12_1_3_2_H06	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 3 : Sample from drug screen treated with 1 uM Olaparib (AZD2281, Ku-0059436) in position H06 in plate 2
+E177_02_100_1_2_B01	CRISPR/Cas9 mutation readout on the pathway reporters in screen 1 replicate 1 : Sample from drug screen treated with 1:1000 DMSO in positions B01, B12, F01 & F12, in plate 1 & 2
+E177_02_100_1_2_A12	CRISPR/Cas9 mutation readout on the pathway reporters in screen 1 replicate 1 : Sample from drug screen treated with 1 uM PAO in positions A01, A12, E01 & E12, in plate 1 & 2
+E177_02_100_1_2_A11	CRISPR/Cas9 mutation readout on the pathway reporters in screen 1 replicate 1 : Sample from drug screen treated with 100 nM Oxamflatin in position A11 in plate 2
+E177_02_100_1_2_A10	CRISPR/Cas9 mutation readout on the pathway reporters in screen 1 replicate 1 : Sample from drug screen treated with 100 nM AGK2 in position A10 in plate 2
+E177_02_100_1_2_A09	CRISPR/Cas9 mutation readout on the pathway reporters in screen 1 replicate 1 : Sample from drug screen treated with 100 nM ITSA-1 in position A09 in plate 2
+E177_02_100_1_2_A08	CRISPR/Cas9 mutation readout on the pathway reporters in screen 1 replicate 1 : Sample from drug screen treated with 100 nM 2,4-Pyridinedicarboxylic Acid in position A08 in plate 2
+E1504_12_1_3_2_C05	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 3 : Sample from drug screen treated with 1 uM BIX 01294 in position C05 in plate 2
+E177_02_100_1_2_A07	CRISPR/Cas9 mutation readout on the pathway reporters in screen 1 replicate 1 : Sample from drug screen treated with 100 nM CX-6258 HCl in position A07 in plate 2
+E177_02_100_1_2_A06	CRISPR/Cas9 mutation readout on the pathway reporters in screen 1 replicate 1 : Sample from drug screen treated with 100 nM Veliparib (ABT-888) in position A06 in plate 2
+E177_02_100_1_2_A05	CRISPR/Cas9 mutation readout on the pathway reporters in screen 1 replicate 1 : Sample from drug screen treated with 100 nM ZM 39923 HCl in position A05 in plate 2
+E177_02_100_1_2_A04	CRISPR/Cas9 mutation readout on the pathway reporters in screen 1 replicate 1 : Sample from drug screen treated with 100 nM TMP269 in position A04 in plate 2
+E177_02_100_1_2_A03	CRISPR/Cas9 mutation readout on the pathway reporters in screen 1 replicate 1 : Sample from drug screen treated with 100 nM OG-L002 in position A03 in plate 2
+E177_02_100_1_2_A02	CRISPR/Cas9 mutation readout on the pathway reporters in screen 1 replicate 1 : Sample from drug screen treated with 100 nM Zebularine in position A02 in plate 2
+E177_02_100_1_2_A01	CRISPR/Cas9 mutation readout on the pathway reporters in screen 1 replicate 1 : Sample from drug screen treated with 1 uM PAO in positions A01, A12, E01 & E12, in plate 1 & 2
+E177_01_100_1_1_H12	CRISPR/Cas9 mutation readout on the pathway reporters in screen 1 replicate 1 : Sample from drug screen treated with 1 uM DNA-PKi in positions D01, D12, H01 & H12, in plate 1 & 2
+E177_01_100_1_1_H11	CRISPR/Cas9 mutation readout on the pathway reporters in screen 1 replicate 1 : Sample from drug screen treated with 100 nM XL019 in position H11 in plate 1
+E177_01_100_1_1_H10	CRISPR/Cas9 mutation readout on the pathway reporters in screen 1 replicate 1 : Sample from drug screen treated with 100 nM Romidepsin (FK228, Depsipeptide) in position H10 in plate 1
+E1504_12_1_3_2_C04	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 3 : Sample from drug screen treated with 1 uM OTX015 in position C04 in plate 2
+E177_01_100_1_1_H09	CRISPR/Cas9 mutation readout on the pathway reporters in screen 1 replicate 1 : Sample from drug screen treated with 100 nM CEP-33779 in position H09 in plate 1
+E177_01_100_1_1_H08	CRISPR/Cas9 mutation readout on the pathway reporters in screen 1 replicate 1 : Sample from drug screen treated with 100 nM CCT137690 in position H08 in plate 1
+E177_01_100_1_1_H07	CRISPR/Cas9 mutation readout on the pathway reporters in screen 1 replicate 1 : Sample from drug screen treated with 100 nM Quercetin in position H07 in plate 1
+E177_01_100_1_1_H06	CRISPR/Cas9 mutation readout on the pathway reporters in screen 1 replicate 1 : Sample from drug screen treated with 100 nM Givinostat (ITF2357) in position H06 in plate 1
+E177_01_100_1_1_H05	CRISPR/Cas9 mutation readout on the pathway reporters in screen 1 replicate 1 : Sample from drug screen treated with 100 nM Pracinostat (SB939) in position H05 in plate 1
+E177_01_100_1_1_H04	CRISPR/Cas9 mutation readout on the pathway reporters in screen 1 replicate 1 : Sample from drug screen treated with 100 nM 2-Methoxyestradiol (2-MeOE2) in position H04 in plate 1
+E177_01_100_1_1_H03	CRISPR/Cas9 mutation readout on the pathway reporters in screen 1 replicate 1 : Sample from drug screen treated with 100 nM Barasertib (AZD1152-HQPA) in position H03 in plate 1
+E177_01_100_1_1_H02	CRISPR/Cas9 mutation readout on the pathway reporters in screen 1 replicate 1 : Sample from drug screen treated with 100 nM ZM 447439 in position H02 in plate 1
+E177_01_100_1_1_H01	CRISPR/Cas9 mutation readout on the pathway reporters in screen 1 replicate 1 : Sample from drug screen treated with 1 uM DNA-PKi in positions D01, D12, H01 & H12, in plate 1 & 2
+E177_01_100_1_1_G12	CRISPR/Cas9 mutation readout on the pathway reporters in screen 1 replicate 1 : Sample from drug screen treated with 1 uM Mirin in positions C01, C12, G01 & G12, in plate 1 & 2
+E1504_12_1_3_2_C03	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 3 : Sample from drug screen treated with 1 uM MM-102 in position C03 in plate 2
+E177_01_100_1_1_G11	CRISPR/Cas9 mutation readout on the pathway reporters in screen 1 replicate 1 : Sample from drug screen treated with 100 nM AZD2461 in position G11 in plate 1
+E177_01_100_1_1_G10	CRISPR/Cas9 mutation readout on the pathway reporters in screen 1 replicate 1 : Sample from drug screen treated with 100 nM IOX2 in position G10 in plate 1
+E177_01_100_1_1_G09	CRISPR/Cas9 mutation readout on the pathway reporters in screen 1 replicate 1 : Sample from drug screen treated with 100 nM Sirtinol in position G09 in plate 1
+E177_01_100_1_1_G08	CRISPR/Cas9 mutation readout on the pathway reporters in screen 1 replicate 1 : Sample from drug screen treated with 100 nM TG101348 (SAR302503) in position G08 in plate 1
+E177_01_100_1_1_G07	CRISPR/Cas9 mutation readout on the pathway reporters in screen 1 replicate 1 : Sample from drug screen treated with 100 nM AR-42 in position G07 in plate 1
+E177_01_100_1_1_G06	CRISPR/Cas9 mutation readout on the pathway reporters in screen 1 replicate 1 : Sample from drug screen treated with 100 nM AZD1480 in position G06 in plate 1
+E177_01_100_1_1_G05	CRISPR/Cas9 mutation readout on the pathway reporters in screen 1 replicate 1 : Sample from drug screen treated with 100 nM MC1568 in position G05 in plate 1
+E177_01_100_1_1_G04	CRISPR/Cas9 mutation readout on the pathway reporters in screen 1 replicate 1 : Sample from drug screen treated with 100 nM PFI-1 (PF-6405761) in position G04 in plate 1
+E177_01_100_1_1_G03	CRISPR/Cas9 mutation readout on the pathway reporters in screen 1 replicate 1 : Sample from drug screen treated with 100 nM AG-490 (Tyrphostin B42) in position G03 in plate 1
+E177_01_100_1_1_G02	CRISPR/Cas9 mutation readout on the pathway reporters in screen 1 replicate 1 : Sample from drug screen treated with 100 nM MLN8054 in position G02 in plate 1
+E1504_12_1_3_2_C02	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 3 : Sample from drug screen treated with 1 uM EPZ-6438 in position C02 in plate 2
+E1504_11_1_3_1_E02	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 3 : Sample from drug screen treated with 1 uM Quisinostat (JNJ-26481585) in position E02 in plate 1
+E177_01_100_1_1_G01	CRISPR/Cas9 mutation readout on the pathway reporters in screen 1 replicate 1 : Sample from drug screen treated with 1 uM Mirin in positions C01, C12, G01 & G12, in plate 1 & 2
+E177_01_100_1_1_F12	CRISPR/Cas9 mutation readout on the pathway reporters in screen 1 replicate 1 : Sample from drug screen treated with 1:1000 DMSO in positions B01, B12, F01 & F12, in plate 1 & 2
+E177_01_100_1_1_F11	CRISPR/Cas9 mutation readout on the pathway reporters in screen 1 replicate 1 : Sample from drug screen treated with 100 nM Tofacitinib (CP-690550) Citrate in position F11 in plate 1
+E177_01_100_1_1_F10	CRISPR/Cas9 mutation readout on the pathway reporters in screen 1 replicate 1 : Sample from drug screen treated with 100 nM S-Ruxolitinib (INCB018424) in position F10 in plate 1
+E177_01_100_1_1_F09	CRISPR/Cas9 mutation readout on the pathway reporters in screen 1 replicate 1 : Sample from drug screen treated with 100 nM WP1066 in position F09 in plate 1
+E177_01_100_1_1_F08	CRISPR/Cas9 mutation readout on the pathway reporters in screen 1 replicate 1 : Sample from drug screen treated with 100 nM AMG-900 in position F08 in plate 1
+E177_01_100_1_1_F07	CRISPR/Cas9 mutation readout on the pathway reporters in screen 1 replicate 1 : Sample from drug screen treated with 100 nM Tubacin in position F07 in plate 1
+E177_01_100_1_1_F06	CRISPR/Cas9 mutation readout on the pathway reporters in screen 1 replicate 1 : Sample from drug screen treated with 100 nM KW-2449 in position F06 in plate 1
+E177_01_100_1_1_F05	CRISPR/Cas9 mutation readout on the pathway reporters in screen 1 replicate 1 : Sample from drug screen treated with 100 nM PHA-680632 in position F05 in plate 1
+E177_01_100_1_1_F04	CRISPR/Cas9 mutation readout on the pathway reporters in screen 1 replicate 1 : Sample from drug screen treated with 100 nM Decitabine in position F04 in plate 1
+E1504_12_1_3_2_C01	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 3 : Sample from drug screen treated with 1 uM Mirin in positions C01, C12, G01 & G12, in plate 1 & 2
+E177_01_100_1_1_F03	CRISPR/Cas9 mutation readout on the pathway reporters in screen 1 replicate 1 : Sample from drug screen treated with 100 nM AT9283 in position F03 in plate 1
+E177_01_100_1_1_F02	CRISPR/Cas9 mutation readout on the pathway reporters in screen 1 replicate 1 : Sample from drug screen treated with 100 nM Rucaparib (AG-014699,PF-01367338) in position F02 in plate 1
+E177_01_100_1_1_F01	CRISPR/Cas9 mutation readout on the pathway reporters in screen 1 replicate 1 : Sample from drug screen treated with 1:1000 DMSO in positions B01, B12, F01 & F12, in plate 1 & 2
+E177_01_100_1_1_E12	CRISPR/Cas9 mutation readout on the pathway reporters in screen 1 replicate 1 : Sample from drug screen treated with 1 uM PAO in positions A01, A12, E01 & E12, in plate 1 & 2
+E177_01_100_1_1_E11	CRISPR/Cas9 mutation readout on the pathway reporters in screen 1 replicate 1 : Sample from drug screen treated with 100 nM Procainamide HCl in position E11 in plate 1
+E177_01_100_1_1_E10	CRISPR/Cas9 mutation readout on the pathway reporters in screen 1 replicate 1 : Sample from drug screen treated with 100 nM PJ34 in position E10 in plate 1
+E177_01_100_1_1_E09	CRISPR/Cas9 mutation readout on the pathway reporters in screen 1 replicate 1 : Sample from drug screen treated with 100 nM Tofacitinib (CP-690550,Tasocitinib) in position E09 in plate 1
+E177_01_100_1_1_E08	CRISPR/Cas9 mutation readout on the pathway reporters in screen 1 replicate 1 : Sample from drug screen treated with 100 nM TAK-901 in position E08 in plate 1
+E177_01_100_1_1_E07	CRISPR/Cas9 mutation readout on the pathway reporters in screen 1 replicate 1 : Sample from drug screen treated with 100 nM CYT387 in position E07 in plate 1
+E177_01_100_1_1_E06	CRISPR/Cas9 mutation readout on the pathway reporters in screen 1 replicate 1 : Sample from drug screen treated with 100 nM PCI-34051 in position E06 in plate 1
+E1504_12_1_3_2_B12	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 3 : Sample from drug screen treated with 1:1000 DMSO in positions B01, B12, F01 & F12, in plate 1 & 2
+E177_01_100_1_1_E05	CRISPR/Cas9 mutation readout on the pathway reporters in screen 1 replicate 1 : Sample from drug screen treated with 100 nM Aurora A Inhibitor I in position E05 in plate 1
+E177_01_100_1_1_E04	CRISPR/Cas9 mutation readout on the pathway reporters in screen 1 replicate 1 : Sample from drug screen treated with 100 nM CUDC-101 in position E04 in plate 1
+E177_01_100_1_1_E03	CRISPR/Cas9 mutation readout on the pathway reporters in screen 1 replicate 1 : Sample from drug screen treated with 100 nM Alisertib (MLN8237) in position E03 in plate 1
+E177_01_100_1_1_E02	CRISPR/Cas9 mutation readout on the pathway reporters in screen 1 replicate 1 : Sample from drug screen treated with 100 nM Quisinostat (JNJ-26481585) in position E02 in plate 1
+E177_01_100_1_1_E01	CRISPR/Cas9 mutation readout on the pathway reporters in screen 1 replicate 1 : Sample from drug screen treated with 1 uM PAO in positions A01, A12, E01 & E12, in plate 1 & 2
+E177_01_100_1_1_D12	CRISPR/Cas9 mutation readout on the pathway reporters in screen 1 replicate 1 : Sample from drug screen treated with 1 uM DNA-PKi in positions D01, D12, H01 & H12, in plate 1 & 2
+E177_01_100_1_1_D11	CRISPR/Cas9 mutation readout on the pathway reporters in screen 1 replicate 1 : Sample from drug screen treated with 100 nM 3-Aminobenzamide in position D11 in plate 1
+E177_01_100_1_1_D10	CRISPR/Cas9 mutation readout on the pathway reporters in screen 1 replicate 1 : Sample from drug screen treated with 100 nM WHI-P154 in position D10 in plate 1
+E177_01_100_1_1_D09	CRISPR/Cas9 mutation readout on the pathway reporters in screen 1 replicate 1 : Sample from drug screen treated with 100 nM I-BET151 (GSK1210151A) in position D09 in plate 1
+E177_01_100_1_1_A01	CRISPR/Cas9 mutation readout on the pathway reporters in screen 1 replicate 1 : Sample from drug screen treated with 1 uM PAO in positions A01, A12, E01 & E12, in plate 1 & 2
+E1504_18_10_3_2_H12	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 3 : Sample from drug screen treated with 1 uM DNA-PKi in positions D01, D12, H01 & H12, in plate 1 & 2
+E1504_18_10_3_2_H11	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 3 : Sample from drug screen treated with 10 uM Triacetylresveratrol in position H11 in plate 2
+E1504_18_10_3_2_H10	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 3 : Sample from drug screen treated with 10 uM CTPB in position H10 in plate 2
+E1504_18_10_3_2_H09	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 3 : Sample from drug screen treated with 10 uM Valproic acid hydroxamate in position H09 in plate 2
+E1504_18_10_3_2_H08	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 3 : Sample from drug screen treated with 10 uM Isonicotinamide in position H08 in plate 2
+E1504_18_10_3_2_H07	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 3 : Sample from drug screen treated with 10 uM (+)-JQ1 in position H07 in plate 2
+E1504_18_10_3_2_H06	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 3 : Sample from drug screen treated with 10 uM Olaparib (AZD2281, Ku-0059436) in position H06 in plate 2
+E1504_12_1_3_2_B06	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 3 : Sample from drug screen treated with 1 uM FG-4592 in position B06 in plate 2
+E1504_18_10_3_2_H05	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 3 : Sample from drug screen treated with 10 uM Pacritinib (SB1518) in position H05 in plate 2
+E1504_18_10_3_2_H04	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 3 : Sample from drug screen treated with 10 uM Rocilinostat (ACY-1215) in position H04 in plate 2
+E1504_18_10_3_2_H03	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 3 : Sample from drug screen treated with 10 uM CPI-203 in position H03 in plate 2
+E1504_18_10_3_2_H02	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 3 : Sample from drug screen treated with 10 uM IOX1 in position H02 in plate 2
+E1504_18_10_3_2_H01	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 3 : Sample from drug screen treated with 1 uM DNA-PKi in positions D01, D12, H01 & H12, in plate 1 & 2
+E1504_18_10_3_2_G12	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 3 : Sample from drug screen treated with 1 uM Mirin in positions C01, C12, G01 & G12, in plate 1 & 2
+E1504_18_10_3_2_G11	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 3 : Sample from drug screen treated with 10 uM BML-281 in position G11 in plate 2
+E1504_18_10_3_2_G10	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 3 : Sample from drug screen treated with 10 uM Butyrolactone 3 in position G10 in plate 2
+E1504_18_10_3_2_G09	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 3 : Sample from drug screen treated with 10 uM Fluoro-SAHA in position G09 in plate 2
+E1504_18_10_3_2_G08	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 3 : Sample from drug screen treated with 10 uM Nullscript in position G08 in plate 2
+E1504_12_1_3_2_B05	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 3 : Sample from drug screen treated with 1 uM SMI-4a in position B05 in plate 2
+E1504_18_10_3_2_G07	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 3 : Sample from drug screen treated with 10 uM AZD1208 in position G07 in plate 2
+E1504_18_10_3_2_G06	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 3 : Sample from drug screen treated with 10 uM Entinostat (MS-275) in position G06 in plate 2
+E1504_18_10_3_2_G05	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 3 : Sample from drug screen treated with 10 uM Lomeguatrib in position G05 in plate 2
+E1504_18_10_3_2_G04	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 3 : Sample from drug screen treated with 10 uM Filgotinib (GLPG0634) in position G04 in plate 2
+E1504_18_10_3_2_A10	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 3 : Sample from drug screen treated with 10 uM AGK2 in position A10 in plate 2
+E1504_12_1_3_2_A10	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 3 : Sample from drug screen treated with 1 uM AGK2 in position A10 in plate 2
+E1504_18_10_3_2_A09	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 3 : Sample from drug screen treated with 10 uM ITSA-1 in position A09 in plate 2
+E1504_18_10_3_2_A08	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 3 : Sample from drug screen treated with 10 uM 2,4-Pyridinedicarboxylic Acid in position A08 in plate 2
+E1504_18_10_3_2_A07	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 3 : Sample from drug screen treated with 10 uM CX-6258 HCl in position A07 in plate 2
+E1504_18_10_3_2_A06	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 3 : Sample from drug screen treated with 10 uM Veliparib (ABT-888) in position A06 in plate 2
+E1504_18_10_3_2_A05	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 3 : Sample from drug screen treated with 10 uM ZM 39923 HCl in position A05 in plate 2
+E1504_18_10_3_2_A04	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 3 : Sample from drug screen treated with 10 uM TMP269 in position A04 in plate 2
+E1504_18_10_3_2_A03	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 3 : Sample from drug screen treated with 10 uM OG-L002 in position A03 in plate 2
+E1504_18_10_3_2_A02	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 3 : Sample from drug screen treated with 10 uM Zebularine in position A02 in plate 2
+E1504_18_10_3_2_A01	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 3 : Sample from drug screen treated with 1 uM PAO in positions A01, A12, E01 & E12, in plate 1 & 2
+E1504_17_10_3_1_H12	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 3 : Sample from drug screen treated with 1 uM DNA-PKi in positions D01, D12, H01 & H12, in plate 1 & 2
+E1504_12_1_3_2_A09	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 3 : Sample from drug screen treated with 1 uM ITSA-1 in position A09 in plate 2
+E1504_17_10_3_1_H11	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 3 : Sample from drug screen treated with 10 uM XL019 in position H11 in plate 1
+E1504_17_10_3_1_H10	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 3 : Sample from drug screen treated with 10 uM Romidepsin (FK228, Depsipeptide) in position H10 in plate 1
+E1504_17_10_3_1_H09	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 3 : Sample from drug screen treated with 10 uM CEP-33779 in position H09 in plate 1
+E1504_17_10_3_1_H08	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 3 : Sample from drug screen treated with 10 uM CCT137690 in position H08 in plate 1
+E1504_17_10_3_1_H07	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 3 : Sample from drug screen treated with 10 uM Quercetin in position H07 in plate 1
+E1504_17_10_3_1_H06	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 3 : Sample from drug screen treated with 10 uM Givinostat (ITF2357) in position H06 in plate 1
+E1504_13_10_1_1_H08	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 1 : Sample from drug screen treated with 10 uM CCT137690 in position H08 in plate 1
+E1504_13_10_1_1_H07	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 1 : Sample from drug screen treated with 10 uM Quercetin in position H07 in plate 1
+E1504_13_10_1_1_H06	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 1 : Sample from drug screen treated with 10 uM Givinostat (ITF2357) in position H06 in plate 1
+E1504_11_1_3_1_F06	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 3 : Sample from drug screen treated with 1 uM KW-2449 in position F06 in plate 1
+E1504_13_10_1_1_H05	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 1 : Sample from drug screen treated with 10 uM Pracinostat (SB939) in position H05 in plate 1
+E1504_13_10_1_1_H04	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 1 : Sample from drug screen treated with 10 uM 2-Methoxyestradiol (2-MeOE2) in position H04 in plate 1
+E1504_13_10_1_1_H03	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 1 : Sample from drug screen treated with 10 uM Barasertib (AZD1152-HQPA) in position H03 in plate 1
+E1504_13_10_1_1_H02	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 1 : Sample from drug screen treated with 10 uM ZM 447439 in position H02 in plate 1
+E1504_13_10_1_1_H01	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 1 : Sample from drug screen treated with 1 uM DNA-PKi in positions D01, D12, H01 & H12, in plate 1 & 2
+E1504_13_10_1_1_G12	CRISPR/Cas9 mutation readout on the pathway reporters in screen 2 replicate 1 : Sample from drug screen treated with 1 uM Mirin in positions C01, C12, G01 & G12, in plate 1 & 2
