@@ -7,7 +7,7 @@ results/
 data/
 misc/
 Mapping_Clone5_9
-files_scripts/
+# files_scripts/
 FACS/Data/
 archive/
 
@@ -16,12 +16,11 @@ archive/
 *.pdf
 *.png
 *.jpg
-/figures/
-/results/
-/data/
-/docs/
-/docs/*
-# /files_scripts/
+./figures/
+./results/
+./data/
+./docs/
+./docs/*
 *.table
 
 ### R ###
