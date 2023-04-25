@@ -175,7 +175,10 @@ all.samples = repl.filter %>% left_join(all.samples.unfiltered) %>% ungroup()  %
 
 ## Exporting potential data. 
 ```{r}
-write_rds(all.samples, file = "FACS_set1.RDS")
+all.samples.export <- all.samples.unfiltered %>%
+  mutate(exp = "effective_drugs")
+
+write_csv(all.samples.export, "/DATA/usr/m.trauernicht/projects/EpiScreen/files_scripts/mt20220802_facs_all_drugs.csv")
 ```
 
 # Session Info

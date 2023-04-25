@@ -1477,7 +1477,7 @@ plt1 = pheatmap(balance.data.matrix[ , clone5_map_ipr$labels],
 ## S5B: Cell cycle analysis
 Aim: Show which drugs are affected by G2 arrest. 
 ```{r S5B Cell cycle FACS, fig.width = 8, fig.height = 6}
-# rmarkdown::render("3_Processing_FACS.Rmd")
+# Import flow cytometry data - this data is derived from 3_Processing_FACS.Rmd
 all.samples = read_csv2("files_scripts/mt20220802_facs_all_drugs.csv")
 
 drugs_tworeps = all.samples %>% filter(exp == "effective_drugs" & variable == "G2" & !is.na(value)) %>%
