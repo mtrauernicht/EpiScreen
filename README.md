@@ -1,36 +1,22 @@
 # Epigenetic Screening on TRIP Clone
-In this repository all code regarding the epigenetic screening on the K562 CRISPR-Cas9 DSB clone#5 with 18 integrations is uploaded. 
+In this repository all code regarding the epigenetic drug screening on the K562 CRISPR-Cas9 DSB clone#5 with 19 integrations is uploaded. 
 
+In short we tested 162 epigenetic drugs for their effect on Cas9 cutting efficiency and DNA repair pathway balance. 
+
+![](Figure 1.png)
+
+All relevant processed files can be found here: zenodo.org and in the files_scripts folder.
 
 ## Code is structured in the following script units:
-**Script 0: Clone Annotation**\
-Characterizing the chromatin environment of the 18 integrations of clone#5.
+**Script #1: Parsing QC**\
+General quality checks of the sequencing data. Includes read counts and viability check.
 
-**Script 1: Parsing QC**\
-General quality checks of the sequencing data.
-
-**Script 2: Preprocessing drug screen**\
+**Scripts #2: Preprocessing drug screen and validations**\
 Mutating sequencing data to large data frame. Adding all relevant annotations.
 
-**Script 3: Indel plots**\
-Indel plots of individual drugs can be obtained using this script.
+**Script #3: Synergy calculations**\
+Scripts related to the calculation of the chromatin context dependencies.
 
-**Script 4: Statistics & Plotting**\
-Indel data are normalized and plots are made characterizing the effect of the drugs.
+**Scripts #4: Statistics & Plotting**\
+All the plots are generated with these scripts, split up by figure.
 
-**Script 5: Heatmaps**
-- The effect of the drugs on the indel ratio and efficiency change are plotted using heatmaps. 
-- Correlation of indel ratio changes with chromatin marks.
-- Indel ratio drug dose response plots.
-
-
-```
-     .-",
-     `~||
-       ||___
-       (':.)`
-       || ||
-Hello  || ||
-Ruben  ^^ ^^
-
-```
