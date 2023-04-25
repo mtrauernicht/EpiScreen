@@ -21,7 +21,7 @@ archive/
 /data/
 /docs/
 /docs/*
-/files_scripts/
+# /files_scripts/
 *.table
 
 ### R ###
@@ -30,11 +30,11 @@ archive/
 *.Rapp.history
 
 # Session Data files
-*.RData
+# *.RData
 *.Ruserdata
 
 # R data files
-*.RDS
+# *.RDS
 
 # Example code in package build process
 *-Ex.R
