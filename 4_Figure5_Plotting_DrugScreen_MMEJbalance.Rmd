@@ -534,12 +534,12 @@ chromatin.features.short.val = chromatin.features.short[!grepl("H3K9me3", chroma
 # List chromatin name columns from this table
 chromatin_cols = colnames(indel.data.validation)[42:75]
 # Import data from DSB TRIP paper
-RSTP2_IndelRatios_Chromatin_2kb <- readRDS("/DATA/usr/r.schep/DSBrepair/data/R/rs20210311/RSTP2_IndelRatios_Chromatin_2kb.RDS") %>% 
-  filter(replicate == "mean" & drug %in% c("DMSO_GSK", "GSK126") & plasmid == "LBR2") %>%
-  dplyr::select(barcode, drug, MMEJ, NHEJ, efficiency, all_of(chromatin_cols)) %>%
-  distinct() %>%
-  mutate(MMEJ_NHEJ = MMEJ/NHEJ) %>%
-  dplyr::select(-NHEJ, -MMEJ)
+# RSTP2_IndelRatios_Chromatin_2kb <- readRDS(url("https://osf.io/download/rqba8/", "rb")) %>% 
+#   filter(replicate == "mean" & drug %in% c("DMSO_GSK", "GSK126") & plasmid == "LBR2") %>%
+#   dplyr::select(barcode, drug, MMEJ, NHEJ, efficiency, all_of(chromatin_cols)) %>%
+#   distinct() %>%
+#   mutate(MMEJ_NHEJ = MMEJ/NHEJ) %>%
+#   dplyr::select(-NHEJ, -MMEJ)
 ```
 
 ## Prepare heatmaps
@@ -600,8 +600,7 @@ clone5_map_ipr = hclust(dist(clone5.matrix), method = "ward.D") %>%
   dendextend::rotate(c(1:6, 10:7, 11:18))
 
 # Chromatin annotation
-chromatin <- readRDS(
-  "/DATA/usr/x.vergara/XV_ChIPIndels/XV20200902_DDR_RS_revision/XV20200902_DDR_RS_revision/data/xv20200915_DDR_data_CHIP.rds") %>% 
+chromatin <- readRDS("files_scripts/xv20200915_DDR_data_CHIP.rds") %>% 
   distinct(barcode, chromatin) %>%
   left_join(distinct(indel.data, barcode, IPR)) %>%
   left_join(dmso_freq)
@@ -1192,7 +1191,7 @@ Dec_NU_tib %>%
 
 ## 5C: Decitabine combined with NU7441
 ```{r 5E Dec NU7441 combination TIDE, fig.width = 8, fig.height = 4}
-decitabine_nu7441_all <- read_csv("/DATA/usr/m.trauernicht/projects/EpiScreen/data/decitabine_synergy_indels.csv") %>%
+decitabine_nu7441_all <- read_csv("files_scripts/decitabine_synergy_indels.csv") %>%
   filter(mutation %in% seq(-12, 2))  %>% 
   mutate(mutation = factor(mutation, levels = seq(-12, 2)),
          pathway = case_when(mutation == -7 ~ "MMEJ",
@@ -1479,7 +1478,7 @@ plt1 = pheatmap(balance.data.matrix[ , clone5_map_ipr$labels],
 Aim: Show which drugs are affected by G2 arrest. 
 ```{r S5B Cell cycle FACS, fig.width = 8, fig.height = 6}
 # rmarkdown::render("3_Processing_FACS.Rmd")
-all.samples = read_csv2("mt20220802_facs_all_drugs.csv")
+all.samples = read_csv2("files_scripts/mt20220802_facs_all_drugs.csv")
 
 drugs_tworeps = all.samples %>% filter(exp == "effective_drugs" & variable == "G2" & !is.na(value)) %>%
   mutate(drug_conc = paste(drug, conc, sep = " ")) %>% 
@@ -1879,7 +1878,7 @@ all_compounds_epistasis_bal %>%
 
 ## S5x: HDACi only heatmap
 ```{r HDACi only, fig.width = 10, fig.height = 10, eval = F}
-HDAC_tib = read.table("rs20220708_HDAC_targets.txt", sep = "\t", fill = NA, header = T) %>%
+HDAC_tib = read.table("files_scripts/rs20220708_HDAC_targets.txt", sep = "\t", fill = NA, header = T) %>%
   dplyr::select(-target_main, -target_second) %>%
   as_tibble()
 

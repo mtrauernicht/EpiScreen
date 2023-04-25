@@ -102,6 +102,9 @@ out.dir = list.dirs(path = "/DATA/projects/DSBrepair/data/R") %>% .[grepl("episc
 in.dir = out.dir
 dir.create(out.dir, showWarnings = FALSE)
 
+# directory that contains the output of the snakemake pipeline
+in.dir.snakemake = "/DATA/projects/DSBrepair/data/rs20210628_EpiScreen/"
+
 # initials (for file export)
 initials = "rs"
 ``` 
@@ -168,7 +171,7 @@ Data import from mapping. These files were generated on 30.09.2018, with a minim
 ```{r import validation}
 # Import files in list and make individual tables
 # I use this if all the samples are good. Here however I do not use all the samples.
-file.list <- list.files("/DATA/projects/DSBrepair/data/rs20210628_EpiScreen/indelPCR_counts/",
+file.list <- list.files(paste0(in.dir.snakemake, "indelPCR_counts/"),
                         pattern="_.*[.]count", full.names=T)
 
 file.list = file.list[!grepl("E1504|E177", file.list)]
@@ -189,10 +192,10 @@ names(df.list) <- gsub(".*?/(.*?)[.]cou.*", "\\1", file.list)
 head(names(df.list))
 # count the sample number
 n.samples <- length(df.list)
-load("/DATA/projects/DSBrepair/data/R/rs20210311/Analyis_Mapping_RSTP2_2000.RData")
+load("files_scripts/Analyis_Mapping_RSTP2_2000.RData")
 
 # Read metadata file
-metadata <- read.table("/DATA/projects/DSBrepair/git/EpiScreen/config/rs20230315_EpiScreen_validations_metadata.txt", 
+metadata <- read.table("config/rs20230315_EpiScreen_validations_metadata.txt", 
                        header = TRUE, 
                        stringsAsFactors = FALSE) %>% 
   dplyr::select(-file, -run, -index_length) %>%
@@ -693,9 +696,9 @@ validation_indels_tib =  tib_ratios
 
 
 ```{r add chromatin data from Schep et al}
-schep_et_al_tib = readRDS("/DATA/projects/DSBrepair/data/R/RSTP2_Chromatin_2kb_Schep_et_al.RDS")
+schep_et_al_tib = readRDS("files_scripts/RSTP2_Chromatin_2kb_Schep_et_al.RDS")
 
-clone5_chrom_tib <- readRDS("~/DSBrepair/data/R/rs20200519_clone5_newdoms_chromatin.RDS") %>% 
+clone5_chrom_tib <- readRDS("files_scripts/rs20200519_clone5_newdoms_chromatin.RDS") %>% 
   mutate(barcode = paste0(barcode, ".B"))
 
 
@@ -720,7 +723,8 @@ validation_ratios_tib = validation_indels_tib %>%
 # List chromatin name columns from this table
 chromatin_cols = colnames(validation_ratios_tib)[42:75]
 
-RSTP2_IndelRatios_Chromatin_2kb <- readRDS("/DATA/usr/r.schep/DSBrepair/data/R/rs20210311/RSTP2_IndelRatios_Chromatin_2kb.RDS") %>% 
+# Load RSTP2_IndelRatios_Chromatin_2kb.RDS, from Schep et al. 2021 available at https://osf.io/cywxd/
+RSTP2_IndelRatios_Chromatin_2kb <- readRDS(url("https://osf.io/download/rqba8/", "rb")) %>% 
   filter(replicate == "mean" & drug %in% c("DMSO_GSK", "GSK126") & plasmid == "LBR2") %>%
   dplyr::select(barcode, drug, MMEJ, NHEJ, efficiency, all_of(chromatin_cols)) %>%
   distinct() %>%

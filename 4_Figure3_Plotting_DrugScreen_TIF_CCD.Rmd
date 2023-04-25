@@ -323,7 +323,7 @@ ctrl.vals <- indel.data %>%
            ctrl_balance,
            IPR)
 
-HDAC_tib = read.table("rs20220708_HDAC_targets.txt", sep = "\t", fill = NA, header = T) %>%
+HDAC_tib = read.table("files_scripts/rs20220708_HDAC_targets.txt", sep = "\t", fill = NA, header = T) %>%
   dplyr::select(-target_main, -target_second) %>%
   as_tibble()
 
@@ -339,8 +339,7 @@ clone5_map_ipr = hclust(dist(clone5.matrix), method = "ward.D") %>%
   dendextend::rotate(c(1:6, 10:7, 11:18))
 
 # Chromatin annotation
-chromatin <- readRDS(
-  "/DATA/usr/x.vergara/XV_ChIPIndels/XV20200902_DDR_RS_revision/XV20200902_DDR_RS_revision/data/xv20200915_DDR_data_CHIP.rds") %>% 
+chromatin <- readRDS("files_scripts/xv20200915_DDR_data_CHIP.rds") %>% 
   distinct(barcode, chromatin) %>%
   left_join(distinct(indel.data, barcode, IPR)) %>%
   left_join(dmso_freq)

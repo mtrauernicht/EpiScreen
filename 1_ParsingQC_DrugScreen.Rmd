@@ -37,14 +37,14 @@ render_synergies = TRUE
 
 ```{r render figures, eval=F}
 # Render all figure scripts
-render_all_figures = TRUE
+render_all_figures = FALSE
 
 # Individual figures
-fig1 = TRUE
-fig2 = TRUE
-fig3 = TRUE
-fig4 = TRUE
-fig5 = TRUE
+fig1 = FALSE
+fig2 = FALSE
+fig3 = FALSE
+fig4 = FALSE
+fig5 = FALSE
 ```
 
 
@@ -75,7 +75,9 @@ library(PerformanceAnalytics)
 library(corrr)
 
 ## In directory
-in.dir = "/DATA/projects/DSBrepair/git/EpiScreen/files_scripts/"
+in.dir = "files_scripts/"
+# directory that contains the output of the snakemake pipeline
+in.dir.snakemake = "/DATA/projects/DSBrepair/data/rs20210628_EpiScreen/"
 ## Select out directory
 out.dir = paste0("/DATA/projects/DSBrepair/data/R/rs", Date, "_episcreen")
 dir.create(out.dir, showWarnings = FALSE)
@@ -143,11 +145,11 @@ These are data from the crispr-trip.snake script, and a text file that has has b
 
 ```{r Data import}
 # Import metadata 
-file = "/DATA/projects/DSBrepair/git/EpiScreen/config/rs20210713_E177_E1504_EpiScreen_metadata.txt"
+file = "config/rs20210713_E177_E1504_EpiScreen_metadata.txt"
 screen_meta_data = fread(file, header = TRUE) 
 
 # load the statistics data from the indels.
-file.list <- list.files(path = "/DATA/projects/DSBrepair/data/rs20210628_EpiScreen/parsed", pattern="indelPCR[.]E1.*statistics.txt", full.names = TRUE)
+file.list <- list.files(path = paste0(in.dir.snakemake, "parsed"), pattern="indelPCR[.]E1.*statistics.txt", full.names = TRUE)
 indel.statistics.list <- lapply(file.list, read.table, 
                                 header = TRUE)
 names(indel.statistics.list)<- gsub(".*//indelPCR.indel_(.*?).statistics.txt", 

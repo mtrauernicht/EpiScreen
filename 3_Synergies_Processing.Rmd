@@ -76,6 +76,9 @@ out.dir = list.dirs(path = "/DATA/projects/DSBrepair/data/R") %>% .[grepl("episc
 in.dir = out.dir
 dir.create(out.dir, showWarnings = FALSE)
 
+# Temp figure output folder
+figure_out = "/DATA/projects/DSBrepair/scratch/episcreen/"
+
 # initials (for file export)
 initials = "rs"
 
@@ -117,7 +120,7 @@ indel.data <- readRDS(file) %>% filter(viab_reproducibility) %>%
   # whole pool.
  # dplyr::select(-HDAC1, -HDAC2)
 
-TRIP_chrom_tib <- readRDS('/DATA/projects/DSBrepair/data/R/cl20201026_ChIP_zscore_selection.RDS') # %>% 
+TRIP_chrom_tib <- readRDS('files_scripts/cl20201026_ChIP_zscore_selection.RDS') # %>% 
   # Same for the TRIP chromatin features
   #dplyr::select(-HDAC1, -HDAC2)
 
@@ -126,7 +129,7 @@ TRIP_chrom = TRIP_chrom_tib %>% dplyr::select(-binsize, -pool) %>% column_to_row
 TRIP_chrom_clust = hclust(dist(t(TRIP_chrom)), method = "ward.D")
 
 
-figure_out = "/DATA/projects/DSBrepair/scratch/episcreen/"
+
 chromatin.features <- colnames(indel.data)[grepl("[.]zscore", colnames(indel.data))]
 chrom_data = indel.data %>% dplyr::select(IPR, all_of(chromatin.features)) %>% distinct()  %>%
   rename_with(., ~gsub(".zscore", "", .x))
@@ -206,7 +209,7 @@ corColor <- function(data, mapping, color = I("black"), sizeRange = c(1, 3), ...
 }
 
 boundaries <- c(-0.7, -.5,0.5,0.7)
-pdf("/DATA/projects/DSBrepair/git/EpiScreen/rs20220722_chrom_cor_clones.pdf", width=20, height=20)
+pdf(paste0(figure_out, "rs20220722_chrom_cor_clones.pdf"), width=20, height=20)
 ggpairs(chrom_data[, labels(TRIP_chrom_clust)],
         upper = list(continuous = corColor),
         # lower = list(continuous = "density"),
@@ -238,10 +241,10 @@ names(viab_colors) = as.numeric(seq(0, 1, by = 0.1))
 
 annotation_colors_scr = list(
   chromatin = group_colors,
-  target = c(HDAC="#60988D", HAT="#C6D0A8", Sirtuin="#8FCAAC",
-             HMT="#FDCDAC", DNMT="#D69C81", `Histone Demethylase`="#FFF2AE",
-             HIF="#E3DCD5", JAK="#C8D7E2", PIM="#9AB8C4", `Aurora Kinase`="#F4CAE4",
-             PARP="#CB546F", `Epigenetic Reader Domain`= "#476D61", `DNA-PK`="#E07A43", 
+  target = c(HDAC="#157834", HAT="#C6D0A8", Sirtuin="#802155",
+             HMT="#8EC9AB", DNMT="#9A9932", `Histone Demethylase`="#DECD77",
+             HIF="#E2DBD4", JAK="#CB546F", PIM="#45AB9A", `Aurora Kinase`="#A74694",
+             PARP="#D69C81", `Epigenetic Reader Domain`= "#8ACDEF", `DNA-PK`="#779ed7", 
              `Negative Control` = "#65BFA4", `MRN` = "#5D79AC"),
   conc_char = conc_colors,
   conc_char_ctrl = conc_control_colors,
@@ -618,8 +621,7 @@ target <- indel.data %>%
 ```
 ### IPR annotation
 ```{r IPR annotation}
-chromatin <- readRDS(
-  "/DATA/usr/x.vergara/XV_ChIPIndels/XV20200902_DDR_RS_revision/XV20200902_DDR_RS_revision/data/xv20200915_DDR_data_CHIP.rds") %>% 
+chromatin <- readRDS("files_scripts/xv20200915_DDR_data_CHIP.rds") %>% 
   distinct(barcode, chromatin) %>%
   left_join(distinct(indel.data, IPR, barcode)) 
 

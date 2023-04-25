@@ -65,6 +65,9 @@ viab_limit_bal = 0.40
 
 # Read count limit of +1 & -7 combined
 read_count_limit = 30
+
+# directory that contains the output of the snakemake pipeline
+in.dir.snakemake = "/DATA/projects/DSBrepair/data/rs20210628_EpiScreen/"
 ```
 
 
@@ -128,7 +131,7 @@ Data import from mapping, files were generated on 21.01.2019.
 ```{r import screen}
 # Import files in list and make individual tables
 # First list the files from the screen (E177 & 1504). The other will be processed in another script.
-file.list <- list.files("/DATA/projects/DSBrepair/data/rs20210628_EpiScreen/indelPCR_counts",
+file.list <- list.files(paste0(in.dir.snakemake, "indelPCR_counts"),
                         pattern="E177_.*[.]count|E1504_.*[.]count", full.names=T)
 
 # import the data
@@ -1084,14 +1087,14 @@ screen.ratio.dt <- screen.ratio.dt %>%
 We'll use the table from Schep et al. 2021 to bind directly all the relevant chromatin data. 
 
 ```{r add chromatin data}
-clone5_z.score_chrom_tib <- readRDS('/DATA/projects/DSBrepair/data/R/cl20201026_ChIP_zscore_selection.RDS') %>%
+clone5_z.score_chrom_tib <- readRDS('files_scripts/cl20201026_ChIP_zscore_selection.RDS') %>%
   filter(pool == "clone_set") %>% 
   setNames(paste0(names(.), ".zscore")) %>% 
   plyr::rename(., c('ID.zscore' = 'barcode')) %>% 
   dplyr::select(-pool.zscore, -binsize.zscore)
 
 
-clone5_chrom_tib <- readRDS("/DATA/projects/DSBrepair/data/R/rs20200519_clone5_newdoms_chromatin.RDS") %>%
+clone5_chrom_tib <- readRDS("files_scripts/rs20200519_clone5_newdoms_chromatin.RDS") %>%
   # filter(IPR != "IPR1") %>%
   left_join(clone5_z.score_chrom_tib)
 

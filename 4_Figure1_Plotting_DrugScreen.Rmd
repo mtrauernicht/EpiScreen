@@ -289,7 +289,6 @@ changeLevels <- function(object, column = "chr_r", levels = c(paste0("chr", 1:22
 
 ```{r data import, results = 'hide', warning = FALSE}
 # Import data from preprocessing script
-in.dir = list.dirs(path = "/DATA/projects/DSBrepair/data/R") %>% .[grepl("episcreen", .)] %>% tail(n = 1)
 file = list.files(in.dir, pattern = "episcreen_ratios", full.names = T) %>% tail(n = 1)
 indel.data <- readRDS(file)
 
@@ -309,12 +308,11 @@ meta.viab.file = list.files(in.dir, full.names = T)  %>% .[grepl("Viab_Meta", .)
 indel.statistics.dt = readRDS(meta.viab.file) %>%
   dplyr::select(ID, drug, target, replicate, viability, conc_char, tech)
 
-chromatin <- readRDS(
-  "/DATA/usr/x.vergara/XV_ChIPIndels/XV20200902_DDR_RS_revision/XV20200902_DDR_RS_revision/data/xv20200915_DDR_data_CHIP.rds") %>% 
+chromatin <- readRDS("files_scripts/xv20200915_DDR_data_CHIP.rds") %>% 
   distinct(barcode, chromatin) %>%
   left_join(distinct(indel.data, barcode))
 
-map_clones = read_table("/DATA/projects/DSBrepair/data/cl20220321_cured_mapping_clones.txt", col_names = c("chr", "start", "barcode", "clone")) %>%
+map_clones = read_table("files_scripts/cl20220321_cured_mapping_clones.txt", col_names = c("chr", "start", "barcode", "clone")) %>%
   filter(chr != "chrY" & clone == "RSTP2_5") %>%
   mutate(chr = factor(chr, levels = c("chr1", "chr2", "chr3", "chr4", "chr5", 
                                       "chr6", "chr7", "chr8", "chr9", "chr10", 
@@ -325,7 +323,7 @@ map_clones = read_table("/DATA/projects/DSBrepair/data/cl20220321_cured_mapping_
   left_join(chromatin) %>%
   filter(barcode != "ACCCCTAAAGGCGCTG")
 
-chromsizes = read_table("/DATA/projects/DSBrepair/data/rs20220602_chromsizes_hg38_UCSC.txt", col_names = T) %>% 
+chromsizes = read_table("files_scripts/rs20220602_chromsizes_hg38_UCSC.txt", col_names = T) %>% 
   filter(chr != "chrY") %>%
   mutate(chr = factor(chr, levels = c("chr1", "chr2", "chr3", "chr4", "chr5", 
                                       "chr6", "chr7", "chr8", "chr9", "chr10", 
@@ -334,7 +332,7 @@ chromsizes = read_table("/DATA/projects/DSBrepair/data/rs20220602_chromsizes_hg3
                                       "chr21", "chr22", "chrX")),
          start = start / 1e6)
 
-centromeres = read_table("/DATA/projects/DSBrepair/git/EpiScreen/rs20220714_UCSC_centromeres_24501022.txt") %>%
+centromeres = read_table("files_scripts/rs20220714_UCSC_centromeres_24501022.txt") %>%
   group_by(chr) %>%
   filter(chr != "chrY") %>%
   mutate(chr = factor(chr, levels = c("chr1", "chr2", "chr3", "chr4", "chr5", 
@@ -355,8 +353,7 @@ conc_colors = c("100 nM" = colors_drugs[7], "1 µM" = colors_drugs[4], "10 µM" 
 ## 1A: Clone 5 heatmap of chromatin values
 What is the chromatin environment of each IPR?
 ```{r 1A clone 5 heatmap, warning = FALSE, fig.height=6, fig.width=8}
-domain_dt <- readRDS(
-  "/DATA/usr/x.vergara/XV_ChIPIndels/XV20200902_DDR_RS_revision/XV20200902_DDR_RS_revision/data/xv20200915_DDR_data_CHIP.rds") %>% 
+domain_dt <- readRDS("files_scripts/xv20200915_DDR_data_CHIP.rds") %>%
   distinct(barcode, chromatin)
 
 bc_IPR = indel.data %>% 
@@ -373,7 +370,7 @@ clone5.matrix = indel.data %>%
 clone5_map_ipr = hclust(dist(clone5.matrix), method = "ward.D")
 
 # Feature clustering based on whole TRIP pool
-TRIP_chrom_tib <- readRDS('/DATA/projects/DSBrepair/data/R/cl20201026_ChIP_zscore_selection.RDS') # %>% 
+TRIP_chrom_tib <- readRDS('files_scripts/cl20201026_ChIP_zscore_selection.RDS') # %>% 
 # Remove HDAC1 and 2 as they do not reach higher than the 80th percentile of the HDAC 
 # districtubion in the TRIP pool for the reporters in Clone 5. 
 # dplyr::select(-HDAC1, -HDAC2)
