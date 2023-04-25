@@ -3,7 +3,7 @@ In this repository all code regarding the epigenetic drug screening on the K562 
 
 In short we tested 162 epigenetic drugs for their effect on Cas9 cutting efficiency and DNA repair pathway balance. 
 
-![]([Figure 1. Overview of the reporter system and screen data.](Figure%201.png))
+![Figure 1. Overview of the reporter system and screen data.](Figure%201.png)
 
 All relevant processed files can be found here: zenodo.org and in the files_scripts folder.
 
