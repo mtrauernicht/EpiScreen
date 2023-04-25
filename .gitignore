@@ -1,8 +1,8 @@
 # Folders
 .Rproj.user
 .Rhistory
-.RData
 .Ruserdata
+.RData
 results/
 data/
 misc/
