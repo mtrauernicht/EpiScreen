@@ -1,0 +1,249 @@
+---
+title: "Parsing_QC"
+author: "Max Trauernicht & Ruben Schep"
+date: "`r format(Sys.time(), '%Y-%m-%d')`"
+output:
+  html_document:
+    theme: journal #cerulean
+    highlight: monochrome
+    toc: true
+    toc_float: true
+    code_folding: show
+  editor_options:
+    chunk_output_type: console
+---
+
+knitr document van Steensel lab
+
+# Parsing and starcode quality control
+# Introduction
+After demultiplexing all the samples from the sequencing data, the data has been processed by the CRISPR-TRIP snakemake script. This script maps the barcodes from the iPCR (iPCR from 5 feb 2018). It calls the true barcodes with the starcode script for both the mutation and mapping reads. It call the mutations on all the mutation samples and spits them in mapped, unmapped and non genuine.
+
+
+Here we want to do a QC of the parsing of the mapping, the barcodes and mutations. We will load the statistics data of all the files. We will also look at barcode counts from the table files (those list the barcodes from the starcode stript). I obtained the counts though shell with 
+
+Pasted the result in a text editor and changes all `^ ` and changed the spaces to `\t`, removed the last total row, removed `.table` at the end and saved as text file. 
+I will export a bed file also containing the broad integrations for the generation of mean chip values over the integration sites. 
+```{r render processing pipeline}
+# Render Parsing QC
+render_processing = TRUE
+
+# Render Validation Processing
+render_validations = TRUE
+
+# Render Synergies 
+render_synergies = TRUE
+```
+
+```{r render figures, eval=F}
+# Render all figure scripts
+render_all_figures = FALSE
+
+# Individual figures
+fig1 = FALSE
+fig2 = FALSE
+fig3 = FALSE
+fig4 = FALSE
+fig5 = FALSE
+```
+
+
+# Data loading and processing 
+
+## Path, Libraries, Parameters and Useful Functions  
+
+```{r libraries validations, message=FALSE}
+StartTime <-Sys.time()
+
+# 6-digit Date tag:
+Date <- substr(gsub("-","",Sys.time()),1,8) 
+
+# libraries:
+library(tidyverse)
+library(GenomicRanges)
+library(RColorBrewer)
+library(ggplot2)
+library(magrittr)
+library(platetools)
+library(grid)
+library(gridExtra)
+library(purrr)
+library(cowplot)
+library(data.table)
+library(gghighlight)
+library(PerformanceAnalytics)
+library(corrr)
+library(ggpubr)
+
+## In directory
+in.dir = "files_scripts/"
+# directory that contains the output of the snakemake pipeline
+in.dir.snakemake = "/DATA/projects/DSBrepair/data/xv20230921_drug_screen_revision/"
+## Select out directory
+out.dir = paste0("/DATA/projects/DSBrepair/data/R/mt", Date, "_episcreen")
+dir.create(out.dir, showWarnings = FALSE)
+
+## Initials (for file naming)
+initials = "rs"
+```
+
+## Custom functions  
+
+Functions used in this script:   
+
+```{r functions}
+MakeGranges <- function(x) {
+  x$end_pos <- as.numeric(as.character(x$start_pos+3))
+  colnames(x) <- c("name",
+                   "seqname", 
+                   "strand", 
+                   "start",
+                   "total_mapped", 
+                   "mapq_sum1", 
+                   "reads1", 
+                   "mapq_sum2", 
+                   "reads2", 
+                   "seq", 
+                   "end")
+  gr <- makeGRangesFromDataFrame(x, keep.extra.columns = T)
+  return(gr)
+}
+
+BarcodeOverlap <- function(read1, read2) {
+  counts <- c(nrow(read1), 
+              nrow(read2), 
+              sum(read2$barcode %in% read1$barcode), 
+              sum(!read1$barcode %in% read2$barcode),
+              sum(!read2$barcode %in% read1$barcode))
+}
+
+serialNext = function(prefix, extension){
+  i=0
+  repeat {
+    f = paste0(prefix, "_", i , ".", extension)
+    if(!file.exists(f)){return(f)}
+    i=i+1
+  }
+}
+
+SetFileName <- function(filename, initials, extension) {
+  # Set filename with extension and initials to make filename with date integrated.
+  filename <- substitute(filename)
+  filename <- paste0(out.dir, "/", initials, substr(gsub("-","",Sys.time()),1,8), "_", filename)
+  filename <- serialNext(filename, extension)
+  filename
+}
+
+CallTrueBarcodes <- function(df) {
+  df %<>% filter(barcode %in% barcodes.clone5)
+  df
+}
+```
+
+## Data loading  
+
+These are data from the crispr-trip.snake script, and a text file that has has been obtained as explained above.  
+
+```{r Data import}
+# Import metadata 
+file = "/DATA/projects/DSBrepair/data/xv20230921_drug_screen_revision/xv20230921_metadata_file.tsv"
+screen_meta_data = fread(file, header = TRUE) %>%
+  mutate(rep = gsub(".*(r[1-3]{1})_.*", "\\1", ID)) %>%
+  mutate(drug = gsub(".*RPE1_(.*)_r[1-3]{1}_.*", "\\1", ID))
+
+# load the statistics data from the indels.
+file.list <- list.files(path = paste0(in.dir.snakemake, "parsed"), pattern="indelPCR.*.statistics.txt", full.names = TRUE)
+indel.statistics.list <- lapply(file.list, read.table, 
+                                header = TRUE)
+names(indel.statistics.list)<- gsub(".*indelPCR.(.*).statistics.txt", 
+                                    "\\1", 
+                                    file.list)
+
+# Format the statistics and bind the meta data
+indel.statistics.tib <- do.call(rbind.data.frame, 
+                                indel.statistics.list) %>% 
+  rownames_to_column(var = "ID") %>%
+  as_tibble() %>%
+  mutate(ID = gsub(".*indelPCR.(.*).statistics.txt", "\\1", ID)) %>%
+  left_join(screen_meta_data)
+
+# Calculate fraction written
+indel.statistics.tib %<>% 
+  mutate(r_written_pct = reads_written / reads)
+
+filename <- SetFileName("Episcreen_Reads", initials = initials, extension = "RDS")
+
+indel.statistics.tib %>%
+  dplyr::select(-reads_written, -n_tooshort,
+         -index, -pat1) %>%
+  write_rds(.,
+            file = filename)
+```
+
+
+# Data plotting
+
+Couple of plots to see how the reads are distributed. This will tell us if there are any biases. 
+
+## Plotting the general read counts per index, barcode, column and row 
+
+```{r general plots}
+ggplot(indel.statistics.tib, aes(x = ID, y = reads)) + 
+  geom_bar(stat = "identity") +
+  theme_pubr(x.text.angle = 90)
+```
+
+
+```{r render processing scripts}
+
+render_processing = TRUE
+
+# Render screen processing
+if(render_processing) {
+rmarkdown::render("2_Preprocessing_EpiScreen_Screen.Rmd")
+}
+```
+
+```{r render figure scripts}
+# Render figure scrips
+if(render_all_figures) {
+  rmarkdown::render("4_Figure1_Plotting_DrugScreen.Rmd")
+  rmarkdown::render("4_Figure2_Plotting_DrugScreen_TIF_changes.Rmd")
+  rmarkdown::render("4_Figure3_Plotting_DrugScreen_TIF_CCD.Rmd")
+  rmarkdown::render("4_Figure4_Plotting_DrugScreen_TIF_CCD_detailed.Rmd")
+  rmarkdown::render("4_Figure5_Plotting_DrugScreen_MMEJbalance.Rmd")
+} else {
+
+  # Render figure 1
+  if(fig1) {
+    rmarkdown::render("4_Figure1_Plotting_DrugScreen.Rmd")
+  }
+  
+  # Render figure 2
+  if(fig2) {
+    rmarkdown::render("4_Figure2_Plotting_DrugScreen_TIF_changes.Rmd")
+  }
+  # Render figure 3
+  if(fig3) {
+    rmarkdown::render("4_Figure3_Plotting_DrugScreen_TIF_CCD.Rmd")
+  }
+  # Render figure 4
+  if(fig4) {
+    rmarkdown::render("4_Figure4_Plotting_DrugScreen_TIF_CCD_detailed.Rmd")
+  }
+  # Render figure 5
+  if(fig5) {
+    rmarkdown::render("4_Figure5_Plotting_DrugScreen_MMEJbalance.Rmd")
+  }
+}
+```
+
+# Session Info  
+```{r session info QC}
+sessionInfo()
+getwd()
+date()
+paste("Run time: ",format(Sys.time()-StartTime))
+rm(list = ls(all.names = TRUE)) #will clear all objects includes hidden objects.
+gc() #free up memrory and report the memory usage.
+```
