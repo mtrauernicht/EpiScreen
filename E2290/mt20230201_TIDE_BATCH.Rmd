@@ -1,0 +1,762 @@
+---
+title: "RSTP2 TIDE batch"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(knitr)
+library(dplyr)
+library(stringr)
+library(tidyr)
+library(ggpubr)
+library(tidyverse)
+library(pheatmap)
+```
+
+Functions
+
+```{r functions}
+theme_classic_lines <- function() {
+  theme_pubr(border = T, legend = "top") +
+    theme(panel.grid.major = element_line(colour = "#adb5bd", size = 0.25),
+          strip.background = element_rect(fill = "white", color = "white")
+    )
+}
+theme_classic_lines_45 <- function() {
+  theme_pubr(border = T, legend = "top", x.text.angle = 45) +
+    theme(panel.grid.major = element_line(colour = "#adb5bd", size = 0.25),
+          strip.background = element_rect(fill = "white", color = "white")
+    )
+}
+
+theme_classic_lines_90 <- function() {
+  theme_pubr(border = T, legend = "top", x.text.angle = 90) +
+    theme(panel.grid.major = element_line(colour = "#adb5bd", size = 0.25),
+          strip.background = element_rect(fill = "white", color = "white")
+    )
+}
+
+theme_classic_lines_90_noborder <- function() {
+  theme_pubr(border = F, legend = "top", x.text.angle = 90) +
+    theme(strip.background = element_rect(fill = "white", color = "white")
+    )
+}
+
+theme_set(theme_classic_lines())
+
+
+import <- function(control_file, experimental_file, guide, seqstart, seqend, maxshift, rg1 = NA, rg2 = NA) {
+  ##Arguments: 
+  ##control_file (char) & experimental_file (char): Sanger chromatogram files (.ab1 or .scf) 
+  ##   control is typically transfected with Cas9 but without guide seq
+  ##   experimental has typically been treated Cas9 + guide RNA
+  ## guide (char): 20 bp guide sequence that is recognized by the Cas9 
+  ## seqstart (numeric): start of sequence read from where data will be included (because beginning of seq reads tends to be poor quality)
+  ## seqend (numeric): last bp to be included in analysis (will be automatically adjusted if reads are shorter, see below)
+  ## maxshift (numeric): range of basepair shifts (indels) to be analyzed, both positive and negative
+  ## rg1, rg2 (numeric): [optional] the first (rg1) and last (rg2) base of the sequence region that is used for decomposition; will be automatically set if NA
+  ##   Note: rg1&rg2 should be after the breaksite (if not, this will be corrected)
+  
+  require("Biostrings")
+  require("sangerseqR")
+  
+  B<-c("A","C","G","T") #four bases, in the order that is always used by sangerseqR package
+  
+  patched.readsangerseq<-function(filename)
+    #This is a slightly modified version of readsangerseq() in the sangerseqR package
+    #It fixes a problem with reading some .ab1 files, which appear to have an aberrant last 
+    #character in the sequence strings, which sangerseq() cannot cope with. It returns a sangerseq object.
+  { require(sangerseqR)
+    fc <- file(filename, open = "r+b")
+    rawdata <- readBin(fc, what = "raw", n = 1.2 * file.info(filename)$size)
+    close(fc)
+    filetype <- suppressWarnings(rawToChar(rawdata[1:4]))
+    if (filetype == ".scf") {
+      seq <- read.scf(filename)
+    }
+    else if (filetype == "ABIF") {
+      seq <- read.abif(filename)
+      l<-nchar(seq@data$PBAS.1)
+      if(! substr(seq@data$PBAS.1,l,l) %in% LETTERS) { #if last character is not uppercase text
+        seq@data$PBAS.1<-substr(seq@data$PBAS.1,1,l-1)
+      }
+      l<-nchar(seq@data$PBAS.2)
+      if(! substr(seq@data$PBAS.2,l,l) %in% LETTERS) { #if last character is not uppercase text
+        seq@data$PBAS.2<-substr(seq@data$PBAS.2,1,l-1)
+      }
+    }
+    else stop("Invalid File.")
+    return(sangerseq(seq))
+  }
+  
+
+  ##load data (now automatically handles IBAF and SCF formats)
+  control<-patched.readsangerseq(control_file)
+  sample<-patched.readsangerseq(experimental_file)
+  
+  #extract primary sequences as called by sequencer:
+  sequence_ctr <- primarySeq(control)
+  sequence_mut <- primarySeq(sample)
+  
+  #adjust seqend to shortest sequence if necessary:
+  seqend<-min(seqend,length(sequence_ctr), length(sequence_mut))
+  
+  
+  
+  #Alignments:
+  
+  #find position of gRNA (also if on opposite strand) and calculate breaksite: 
+  Dguide<-DNAString(guide)
+  if(!length(Dguide)==20){
+    stop("guide sequence should be 20 nucleotides")}
+  guide.align.f <- pairwiseAlignment(pattern=Dguide, subject=sequence_ctr, type="local")
+  guide.hit.f <- identical(as.character(Dguide), as.character(subject(guide.align.f))) #forward hit if full match found
+  guide.align.r <- pairwiseAlignment(pattern=reverseComplement(Dguide), subject=sequence_ctr, type="local")
+  guide.hit.r <- identical(as.character(reverseComplement(Dguide)), as.character(subject(guide.align.r))) #reverse hit if full match found  
+  
+  #there can only be one match with the top strands or with the bottom strand.
+  if(guide.hit.f & !guide.hit.r) {breaksite<-start(subject(guide.align.f))+16}
+  if(!guide.hit.f & guide.hit.r) {breaksite<-start(subject(guide.align.r))+3}
+  if(guide.hit.f & guide.hit.r){stop("at least two gRNA matches")}
+  if(!guide.hit.f & !guide.hit.r){
+    stop(paste("no gRNA matches 
+               \n investigate if there is a mismatch in control sequence due to sanger sequencing. If so, change guide into identical IUPAC nucleotides as the control sequence.
+               \n guide forward:", Dguide, 
+               "\n guide reverse complement:", reverseComplement(Dguide),
+               "\n control sequence:", sequence_ctr))}
+  
+  #align the sample to the control sequence and calculate offset
+  if(seqstart>(breaksite-maxshift)){
+    stop(paste("the breaksite (",breaksite,") is too close to the start of the sequence read -> If possible set start of sequence read lower.
+               The sequence start of sequence read is maximal n bp breaksite - n bp of the chosen indel size range."))}
+  
+  #get the sequence interval on which the alignment should be based:
+  if((nchar(sequence_ctr) < ((breaksite-maxshift)-seqstart)) | (nchar(sequence_mut) < ((breaksite-maxshift)-seqstart)))
+  {
+    stop(paste("(one of) the sequence run(s) is too short for proper alignment"))}
+  
+  seq_ctr <- substr(sequence_ctr, seqstart, breaksite-maxshift)
+  seq_mut <- substr(sequence_mut, seqstart, breaksite-maxshift)
+  align_seq <- pairwiseAlignment(pattern = seq_mut, subject = seq_ctr, type = "local")
+  if(align_seq@score<20){
+    stop("there is no good alignment found between the control amd test sample -> 
+         The alignment window is too small or of bad quality or the control and test sample do not match")}
+  offset_mut <- align_seq@pattern@range@start-align_seq@subject@range@start
+  
+  #extract control data:
+  if (control@primarySeqID == "From scf file") {
+    if(peakPosMatrix(control)[1,1]==0){peakPosMatrix(control)[1,1] <- 1}
+    peak_ctr_loc <- peakPosMatrix(control)[,1]
+  } else if (control@primarySeqID == "From ab1 file") { 
+    if(peakPosMatrix(control)[1,1]==1){peakPosMatrix(control)[1,1] <- 2}
+    peak_ctr_loc <- peakPosMatrix(control)[,1]-1 #for some reason sangerseq() added 1, so we substract it again
+  }
+  
+  peak_ctr_height <- traceMatrix(control)[peak_ctr_loc,] #matrix with a column for each base 
+  peak_ctr_height <- peak_ctr_height[1:seqend,]
+  peak_ctr_height[is.na(peak_ctr_height)]<-0 #set NAs to 0
+  colnames(peak_ctr_height)<-B
+  
+  #extract experimental data:
+  if (sample@primarySeqID == "From scf file") {
+    if(peakPosMatrix(sample)[1,1]==0){peakPosMatrix(sample)[1,1] <- 1}
+    peak_mut_loc <- peakPosMatrix(sample)[,1]
+  } else if (sample@primarySeqID == "From ab1 file") { 
+    if(peakPosMatrix(sample)[1,1]==1){peakPosMatrix(sample)[1,1] <- 2}
+    peak_mut_loc <- peakPosMatrix(sample)[,1]-1 #sangerseq() added 1, we substract it again
+  }
+  
+  peak_mut_height <- traceMatrix(sample)[peak_mut_loc,] #matrix with a column for each base 
+  peak_mut_height <- peak_mut_height[1:seqend,]
+  peak_mut_height[is.na(peak_mut_height)]<-0 #set NAs to 0
+  colnames(peak_mut_height)<-B
+  
+  #set rg1 and rg2, if not provided by user:
+  rg1<-ifelse(is.na(rg1), breaksite+maxshift+5, rg1)
+  rg2<-ifelse(is.na(rg2), seqend-maxshift-5, rg2)
+  
+  #check if rg1 and rg2 are within meaningful range: 
+  if(rg1< breaksite+maxshift+5) {
+    rg1<- breaksite+maxshift+5
+    warning(paste("left boundary of decomposition window was adjusted", rg1, 
+                  "It must be at least 5bp plus the maximum indel size downstream of the expected break site"))
+  }
+  
+  if(rg2 > seqend-maxshift-5) {
+    rg2<- seqend-maxshift-5
+    warning(paste("right boundary of decomposition window was adjusted to",rg2,
+                  "It cannot be more than the length of the shortest sequence read minus the maximum indel size minus 5bp."))
+  }
+  
+  if(rg2 > seqend-offset_mut) {
+    rg2<- seqend-offset_mut-5
+    warning(paste("right boundary of decomposition window was adjusted to",rg2,
+                  "It cannot be more than the length of the shortest sequence read minus the maximum indel size minus 5bp."))
+  }
+  
+  if(rg2<rg1+maxshift*2) {
+    stop(paste("boundaries of decomposed region are not acceptable -> 
+               Set boundaries further apart or use smaller indel size if possible. 
+               Maximum decomposition window spans from 5bp + n bp indel size range downstream of the break to 5bp + n bp indel size from the end of the shortest sequence read"))}
+  
+  #control for wrongly not/extra annotated peaks
+  ctr_loc1 <- ctr_loc2 <- NA
+  ctr_loc1<- peak_ctr_loc[1:seqend]
+  ctr_loc2<- peak_ctr_loc[2:seqend]
+  
+  mut_loc1 <- mut_loc2 <- NA
+  mut_loc1<- peak_mut_loc[1:seqend]
+  mut_loc2<- peak_mut_loc[2:seqend]
+  
+  #average distance between peaks
+  ctr_distance <- cbind(ctr_loc1[(seqstart+1):(seqend)]-ctr_loc1[(seqstart):(seqend-1)])
+  ctr_av_dis <- colMeans(ctr_distance)
+  
+  mut_distance <- cbind(mut_loc1[(seqstart+1):(seqend)]-mut_loc1[(seqstart):(seqend-1)])
+  mut_av_dis <- colMeans(mut_distance)
+  
+  #adjusted average distance for the smallest average distance
+  if(ctr_av_dis<mut_av_dis) {
+    Means_dis_s <- ctr_av_dis
+  } else {
+    Means_dis_s <- mut_av_dis
+  }
+  
+  #adjusted average distance for the biggest average distance
+  if(ctr_av_dis>mut_av_dis) {
+    Means_dis_b <- ctr_av_dis
+  } else {
+    Means_dis_b <- mut_av_dis
+  }
+  
+  #check for abnormalities in the entire sample, is the spacing between the nucleotides contant or not.
+  ctr_outlier_s <- mut_outlier_s <- 0
+  ctr_outlier_b <- mut_outlier_b <- 0
+  
+  ctr_outlier_s <- which(ctr_loc2[seqstart:rg2]>ctr_loc1[seqstart:rg2]+(3*Means_dis_s/2))+seqstart
+  mut_outlier_s <- which(mut_loc2[seqstart:rg2]>mut_loc1[seqstart:rg2]+(3*Means_dis_s/2))+seqstart
+  ctr_outlier_b <- which(ctr_loc2[seqstart:rg2]<ctr_loc1[seqstart:rg2]+(Means_dis_b/2))+seqstart
+  mut_outlier_b <- which(mut_loc2[seqstart:rg2]<mut_loc1[seqstart:rg2]+(Means_dis_b/2))+seqstart
+  
+  if(length(ctr_outlier_s)>0 | length(mut_outlier_s)>0 | length(ctr_outlier_b)>0 | length(mut_outlier_b)>0){
+    warning(paste("the spacing between the nucleotides in (one of) sanger sequence file(s) is not contant. This might indicate for wrongly not or extra annotated nucleotides. This can influence the TIDE estimation, check the chromotogram for abnormalities"))}
+  
+  
+  return(list(
+    ctr=peak_ctr_height, 
+    mut=peak_mut_height, 
+    seqstart=seqstart,
+    seqend=seqend,
+    maxshift=maxshift,
+    rg1=rg1,
+    rg2=rg2,
+    breaksite=breaksite,
+    offset_mut=offset_mut,
+    B=B))
+  }
+
+quality <- function(import) {
+  ## All the arguments are generated in the function 'TIDE_import'. 
+  ## import$ctr = peakheigths of the control sample (e.g. transfected CRISPR without guide seq)
+  ## import$mut = peakheigths of the sample that have had a DSB/repair
+  ## import$breaksite = site the crispr-guide is supposed to break according to literature (3 bp before the PAM sequence)
+  ## import$seqstart = start of sequence read from where data will be included (because beginning of seq reads tends to be poor quality)
+  ## import$seqend = last bp to be included in analysis (will be automatically adjusted if reads are shorter, see below)
+  ## import$maxshift = which basepair shifts (indels) you want to know the percentage of.
+  ##   Note: import$maxshift is the number to one direction, in the calculation it determines the shift to both direction (deletion & insertion) 
+  ## import$rg1/import$rg2 = the sequence trace that is used for decomposition
+  ##   Note: rg1&rg2 should be always after the breaksite
+  # import$offset_mut = the offset that seuquence trace of the sample has with repect to the control sequence trace.
+  
+  ## The function will return a plot of the percentages of aberrant sequence trance per location.
+  ##   plot will indicate expected breaksite location
+  ##   plot will indicate the sequence window that is used for decomposition   
+  ## The function will return the difference percentages of aberrant sequences compared to the control
+  
+  #Calculate percentage of each bp per peak and correct for the offset
+  procent_ctr <- import$ctr  
+  procent_mut <- import$mut;
+  if (import$offset_mut>0){
+    procent_mut <- rbind(import$mut[(1+import$offset_mut):nrow(import$mut),],matrix(NA,import$offset_mut,4))
+    procent_mut <- (procent_mut/(rowSums(procent_mut)))*100
+    procent_ctr <- (import$ctr/(rowSums(import$ctr)))*100
+  } else if (import$offset_mut<0){
+    procent_mut <- rbind(matrix(NA,-import$offset_mut,4),import$mut[1:(nrow(import$mut)+import$offset_mut),])
+    procent_mut <- (procent_mut/(rowSums(procent_mut)))*100
+    procent_ctr <- (import$ctr/(rowSums(import$ctr)))*100
+  } else if (import$offset_mut==0){
+    procent_ctr <- (import$ctr/(rowSums(import$ctr)))*100
+    procent_mut <- (import$mut/(rowSums(import$mut)))*100
+  }
+  
+  ## calculate total percentage mutations
+  percentage_mutation_ctr <- rowSums(procent_ctr * t(apply(procent_ctr,1,function(x){!(x==max(x))})))
+  percentage_mutation_sample <- rowSums(procent_mut * t(apply(procent_ctr,1,function(x){!(x==max(x))})))
+  
+  #plot aberrant sequence signal
+  plot(percentage_mutation_sample, 
+       type="h", col="green3", 
+       xlim=c(import$seqstart, import$seqend), 
+       ylim=c(0,100),
+       xlab="basepair",
+       ylab="% of aberrant sequences")
+  lines(percentage_mutation_ctr, type="h", col="black")
+  
+  legend("topleft",legend=c("control sample", "test sample"), bty="n", pch=15, col=c(1,3))
+  
+  #show decomposition window
+  rect(import$rg1, 110 , import$rg2, 110, density = 1, xpd=TRUE, col="grey", lwd=6) 
+  text(import$rg1+((import$rg2-import$rg1)/2), (110+6), xpd=TRUE, col="grey", as.character("region for decomposition"))    
+  
+  #indicate theoretical breaksite
+  if (import$breaksite>0){
+    abline(v=import$breaksite, lty=5,lwd=3,col='blue')
+    legend("topright",legend=paste('expected cut at ',import$breaksite,'bp',sep=''),text.col='blue', bty="n")}
+  else{
+    legend("topright",legend='no cut',text.col='blue', bty="n")
+  }
+  
+  #calculate average mutation percentage 
+  meanper_ctr_prebreak <- mean(percentage_mutation_ctr[import$seqstart:(import$breaksite-20)])
+  meanper_mut_prebreak <- mean(percentage_mutation_sample[import$seqstart:(import$breaksite-20)])
+  meanper_ctr_postbreak <- mean(percentage_mutation_ctr[import$breaksite:(import$seqend-20)])
+  meanper_mut_postbreak <- mean(percentage_mutation_sample[import$breaksite:(import$seqend-20)]) 
+  
+  #print the percentages of each shift
+  percentage_mutation <- data.frame(percentage = round(c(meanper_ctr_prebreak, meanper_mut_prebreak, meanper_ctr_postbreak, meanper_mut_postbreak),1))
+  rownames(percentage_mutation) <- c("mean % pre-break control sample", "mean % pre-break test sample", "mean % post-break control sample", "mean % post-break test sample");
+  
+  print(percentage_mutation)
+  
+}
+
+decomposition <- function(import, plottitle,  p.threshold = 0.001) {     
+  ## All the arguments are generated in the function 'TIDE_import', except p.threshold
+  ## import$ctr = peakheigths of the control sample (e.g. transfected CRISPR without guide seq)
+  ## import$mut = peakheigths of the sample that have had a DSB/repair
+  ## import$maxshift = size range of indels to be considered in the decomposition.
+  ##   Note: calculation is always done in both directions, i.e. for both deletions and insertions of sizes 0:maxshift 
+  ## import$rg1 = first base in the sequence sequence traces that is used for decomposition
+  ## import$rg2 = last base in the sequence sequence traces that is used for decomposition
+  ##   Note: rg1&rg2 should be always after the breaksite
+  ## import$offset_mut = the offset that seuquence trace of the sample has with repect to the control sequence trace.
+  ## p.threshold = p-value signicance threshold
+  
+  ## The function will generate a barplot with the prediction of the most prominent indels in the population of cells  
+  ## The function will return the percentages of each indel in the sample with associated p-value
+  
+  require("colorspace")
+  require("nnls")
+  
+  shiftrange<-c(-import$maxshift: import$maxshift) 
+  
+  #decomposite import$mut sequence data into indel combinations, 
+  #separately for each base in c("A","C","G","T"). Stack up the data for the four bases in one aggragation matrix
+  I_matrix <- c()
+  I_vec <- c()
+  
+  for(b in import$B) #loop through four bases
+  {#simulate sequencing peak data for all hypothesized indels from control peaks:
+    sim <- matrix(NA, nrow=import$rg2-import$rg1+1, ncol=import$maxshift*2+1)
+    colnames(sim)<-shiftrange
+    for(i in shiftrange) {sim[,as.character(i)] <- import$ctr[(import$rg1:import$rg2)-i,b]}
+    I_matrix <- rbind(I_matrix, sim)
+    I_vec <- c(I_vec,import$mut[(import$rg1:import$rg2)+import$offset_mut,b])
+  }
+  
+  #non-negative linear fit:
+  NNFIT <- nnls(I_matrix,I_vec)
+  
+  ## pvalue calculation (source: https://www.princeton.edu/~slynch/soc504/mult_reg2.pdf)
+  #standard error:
+  se <- sqrt(diag((sum((NNFIT$fitted-I_vec)^2)/(nrow(I_matrix)-(import$maxshift*2+1)))*solve(t(I_matrix)%*%I_matrix)));
+  
+  #p-value:
+  pv <- 2*pnorm(-abs(NNFIT$x/se))
+  
+  #R^2
+  Rsq <- cor(NNFIT$fit,I_vec)^2
+  
+  #components in percentages:
+  comper<-(Rsq*100*(NNFIT$x/sum(NNFIT$x)))
+  
+  COL <- ifelse(pv<p.threshold,"red","black")
+  COL[import$maxshift+1] <- ifelse(pv[import$maxshift+1]<p.threshold,"#FF000080","black")
+  plttit <- plottitle
+  #plot decomposition graph              
+  bp <- barplot(comper, 
+                col=COL, 
+                border = COL, 
+                names.arg=shiftrange, 
+                ylim=c(0, max(comper+10)), 
+                xlab="<--deletion     insertion-->", 
+                ylab="% of sequences",  
+                main = plttit ,
+                xaxt='n')
+  
+  #make x-axis 
+  a <- min(ceiling(shiftrange/5)*5)
+  p <- pretty (c(a:-a), n=(round((length(shiftrange)-1)/5,0)-1))
+  axis(1,at=bp[p+max(p)+1+a+max(shiftrange)],labels=p)
+  
+  
+  
+  
+  #above each group of bars: show percentage (mean across four bases)
+  if(length(bp[pv<p.threshold]) > 0)
+  {  
+    text(bp[pv<p.threshold], (comper+5)[pv<p.threshold], as.character(((round(comper,1))[pv<p.threshold])))
+  }  
+  #display Rsq values as an indication of the accuracy:
+  legend("topright",legend=as.expression(c(bquote(p < .(p.threshold)), bquote(p >= .(p.threshold)))), title= as.expression(bquote(R^2 == .(round(Rsq,2)))), pch=15, col=c("red",'black'), bty="n")
+  eff <- round((Rsq*100) - comper[import$maxshift+1],1)
+  cat("overall efficiency =", eff, "%\n")
+  
+  decomp.summary <- data.frame(percentage = round(comper,1), pvalue = signif(pv,2))
+  rownames(decomp.summary) <- shiftrange
+  rownames(decomp.summary)[which(shiftrange>0)]=paste('+',rownames(decomp.summary)[which(shiftrange>0)],sep='')
+  
+  print(decomp.summary)
+  
+  invisible(list(
+    bp=bp,
+    pv=pv, 
+    p.threshold=p.threshold, 
+    NNFIT=NNFIT
+  ))  
+}
+
+insertion <- function(import, decomposition) {   
+  ## All the arguments are generated in the function 'TIDE_import' and the function 'TIDE_decomposition'. 
+  ## import$ctr = peakheigths of the control sample (e.g. transfected CRISPR without guide seq)
+  ## import$mut = peakheigths of the sample that have had a DSB/repair
+  ## import$breaksite = site the crispr-guide is supposed to break according to literature (3 bp before the PAM sequence)
+  ## import$seqstart = start of sequence read from where data will be included (because beginning of seq reads tends to be poor quality)
+  ## import$seqend = last bp to be included in analysis (will be automatically adjusted if reads are shorter, see below)
+  ## import$maxshift = which basepair shifts (indels) you want to know the percentage of.
+  ##   Note: maxshift is the number to one direction, in the calculation it determines the shift to both direction (deletion & insertion) 
+  ## import$rg1/import$rg2 = the sequence trace that is used for decomposition
+  ##   Note: rg1&rg2 should be always after the breaksite
+  ## import$offset_mut = the offset that seuquence trace of the sample has with repect to the control sequence trace.
+  ## decomposition$p.threshold = threshold of what you determine to be significant
+  ## decomposition$pv = p-value of the various indels in the sample
+  ## decomposition$NNFIT = non-negative linear fit
+  
+  ## The function will return a plot with the ratio of the inserted basepair when there is a +1 insertion due to the CRISPR-Cas9 system
+  
+  # get insertion bases
+  # only continue with the significant shifts
+  #which indels (e.g. -2,-1, 0, +1,... etc) are significant
+  if(length(decomposition$bp[decomposition$pv<decomposition$p.threshold])==0){stop("no insertions")}
+  if(length(decomposition$bp[decomposition$pv<decomposition$p.threshold]) > 0)
+  {
+    SigShift <- which(decomposition$pv<decomposition$p.threshold)-import$maxshift-1; 
+    #what are the corresponding percentages of the significant peaks
+    PerShift <- decomposition$NNFIT$x[which(decomposition$pv<decomposition$p.threshold)];
+    names(PerShift) <- SigShift;
+    
+    ## generate shift table
+    #for each +1 insertion, one bp is added on top of the ctr sequence and 1 is removed from the bottom, for each +2 insertion 2 bps are added on top of the ctr sequence and 2 are removed from the bottom of the sequence, etc. 
+    #This shifting makes a similution in the ctr sequence of the 'real' happened shifts
+    
+    SigShiftList <- rep(list(NULL),length(SigShift));
+    names(SigShiftList) <- SigShift;
+    
+    for (i in 1:length(SigShift)){
+      agg <- matrix(NA, abs(SigShift[i]),4); 
+      
+      if (sign(SigShift[i])==1){
+        SigShiftList[[i]] <- rbind(agg,import$ctr[1:(nrow(import$ctr)-abs(SigShift[i])),]);
+      } else if (sign(SigShift[i])== -1){
+        SigShiftList[[i]] <- rbind(import$ctr[(abs(SigShift[i])+1):(nrow(import$ctr)),],agg);
+      } else if (sign(SigShift[i])== 0){
+        SigShiftList[[i]] <- import$ctr;
+      }
+    } 
+    
+    #Get insertion
+    #From this point, we separate the insertions from the deletions
+    #Note: if you want to spot point mutations, you can take the wt along (change ">" to ">=")
+    insertion_mtx <- matrix(NA,length(which(SigShift >0)),4);
+    rownames(insertion_mtx) <- (SigShift)[which(SigShift >0)];
+    colnames(insertion_mtx) <- import$B;
+    
+    if(length(insertion_mtx)==0){stop("no insertions")}
+    if(length(insertion_mtx)>0){
+      for(i in 1:nrow(insertion_mtx)){
+        subS <- SigShiftList[which(SigShift<as.numeric(rownames(insertion_mtx))[i])];
+        subP <- PerShift[which(SigShift<as.numeric(rownames(insertion_mtx))[i])]
+        
+        #correct for the offset_mut in the sample
+        lto <- import$mut;
+        if (import$offset_mut>0){
+          lto <- rbind(import$mut[(1+import$offset_mut):nrow(import$mut),],matrix(NA,import$offset_mut,4))
+        } else if (import$offset_mut<0){
+          lto <- rbind(matrix(NA,-import$offset_mut,4),import$mut[1:(nrow(import$mut)+import$offset_mut),])
+        }
+        
+        #substract the simulated mutated ctr sequence that contain only the deletions (SubS) from the real mutated sequence (lto) --> insertion mutation will remain
+        for (j in 1:length(subS)){
+          lto <- lto-subS[[names(subS)[j]]]*subP[names(subS)[j]]
+        }
+        
+        insertion_mtx[i,] <- lto[import$breaksite+as.numeric(rownames(insertion_mtx)[i]),]/PerShift[rownames(insertion_mtx)[i]];
+      }
+      
+      #plot bp composition insertion
+      one_insertion <- (insertion_mtx)*(insertion_mtx>0)
+      insertion.summary <- round(((one_insertion/rowSums(one_insertion))*100),1)
+      
+      #plot +1 insertion
+      if((as.numeric(rownames(insertion.summary))==1)){
+        
+        int <- matrix(as.vector(t(insertion.summary)[,which(as.numeric(rownames(insertion.summary))==1)]),4,1)
+        barplot(int, col=c(3,4,1,2), names.arg="+1 insertion", width = 0.1, xlim = c(0, 1))
+        legend("top",legend=c("T", "G", "C", "A"), bty="n", pch=15, col=c(2,1,4,3))
+        
+        insert <- matrix(insertion.summary[1,],1,4)
+        colnames(insert) <- import$B
+        rownames(insert) <- "+1 insertion"
+        print(insert)
+      }
+      
+      if(!as.numeric(rownames(insertion.summary))==1){stop("no +1 insertion")}
+      
+    }
+  }
+}
+
+```
+
+
+Define the arguments: 
+```{r}
+ref.file <- "/DATA/usr/m.trauernicht/projects/EpiScreen/E2290/mt20230306_seq_LBR.txt"
+output.file <- "/DATA/usr/m.trauernicht/projects/EpiScreen/E2290/mt20230329_TIDE_LBR.pdf"
+folder <- ""
+seqstart = 65
+seqend = 225
+maxshift = 10
+```
+
+
+Run Batch
+```{r}
+table <- read.delim(ref.file)
+pdf(output.file, width = 11, height = 8)
+par(mfrow=c(2,2))
+percentages <- list()
+plot_list = apply(table, 1, function(x){
+  print(x[1])
+  x[1:2] = paste0(folder, x[1:2])
+  imp = import(x[1], x[2], x[3], seqstart, seqend, maxshift)
+  p_qual = quality(imp)
+  p_comp = decomposition(imp, x[4])
+  #return(p_qual)
+  return(p_comp)
+})
+dev.off()
+```
+
+
+## Export percentages
+```{r}
+percentage_df <- data.frame("sample" = unique(table$name), "freq" = "", "x" = 1:length(table$name))
+percentage_df <- merge(percentage_df, data.frame('y' = 1:21, 'mutation' = -maxshift:maxshift))
+
+
+for (i in 1:length(plot_list)) {
+  for (j in 1:21) {
+  percentage_df$freq[percentage_df$x == i & percentage_df$y == j] <- plot_list[[i]]$NNFIT$x[j]/sum(plot_list[[i]]$NNFIT$x)
+  }
+}
+
+percentage_df <- percentage_df %>%
+  distinct(sample, freq, mutation)
+```
+
+
+## Calculate TIF
+```{r}
+## Calculate TIF
+TIF_df <- percentage_df %>%
+  mutate(freq = as.numeric(freq)) %>%
+  spread(key = "mutation", value = "freq") %>%
+  mutate(TIF = 1 - `0`) %>%
+  distinct(sample, sample, TIF)
+
+
+## Plot TIF
+ggplot(TIF_df,
+       aes(x = drug, y = TIF, fill = mean_difTIF)) +
+  geom_point() +
+  geom_boxplot(outlier.shape = NA) +
+  theme_classic_lines_90() +
+  scale_fill_gradient2(low = "#74733B", mid = "white", high = "#005076") +
+  facet_wrap(~gRNA)
+
+ggplot(TIF_df,
+       aes(x = reorder(sample, -TIF), y = TIF)) +
+  geom_bar(stat = "identity") +
+  theme_pubr(x.text.angle = 45) +
+  xlab("Sample (S = Shield, D = Dox, Number = Dilution)")
+
+ggplot() +
+    # geom_errorbar(data = TIF_df %>%
+    #          filter(gRNA %in% c( "TBX5", "LAD2", "LAD7", "LAD10")) %>%
+    #            mutate(TIF_sd = ave(TIF, drug, gRNA, FUN = sd)) %>%
+    #          distinct(drug, mean_TIF, mean_difTIF, gRNA, TIF_sd),
+    #             aes(y = mean_TIF, x = drug,
+    #                 ymin = mean_TIF - TIF_sd,
+    #                 ymax = mean_TIF + TIF_sd), stat="identity", width=0.25) +
+  geom_bar(data = TIF_df %>%
+             filter(gRNA %in% c( "TBX5", "LAD2", "LAD7", "LAD10")) %>%
+             distinct(drug, mean_TIF, mean_difTIF, gRNA),
+           stat = "identity", aes(x = drug, y = mean_TIF, fill = mean_difTIF), color = "black", alpha = .8) +
+  geom_jitter(data = TIF_df %>%
+             filter(gRNA %in% c( "TBX5", "LAD2", "LAD7", "LAD10")), 
+             aes(shape = replicate, x = drug, y = TIF), size = 2, width = .2) +
+  theme_classic_lines_90() +
+  scale_fill_gradient2(low = "#74733B", mid = "white", high = "#005076") +
+  facet_wrap(~gRNA) +
+  theme_pubr(border = T)
+
+ggplot(TIF_df,
+       aes(x = gRNA, y = TIF, fill = mean_difTIF)) +
+  geom_point() +
+  geom_boxplot() +
+  theme_classic_lines_90() +
+  scale_fill_gradient2(low = "#74733B", mid = "white", high = "#005076") +
+  facet_wrap(~drug)
+
+ggplot(TIF_df %>%
+         filter(gRNA %in% c( "TBX5", "LAD2", "LAD7", "LAD10")),
+       aes(x = gRNA, y = TIF, fill = mean_difTIF)) +
+  geom_boxplot() +
+  geom_jitter(aes(shape = replicate), size = 2, width = .2) +
+  theme_classic_lines_90() +
+  scale_fill_gradient2(low = "#74733B", mid = "white", high = "#005076") +
+  facet_wrap(~drug)
+
+ggplot(TIF_df %>%
+         filter(drug != "DMSO"),
+       aes(x = drug, y = difTIF, fill = mean_difTIF)) +
+  geom_hline(yintercept = 0, lty = 2) +
+  geom_boxplot() +
+  geom_point() +
+  theme_classic_lines_90() +
+  scale_fill_gradient2(low = "#74733B", mid = "white", high = "#005076") +
+  facet_wrap(~gRNA)
+
+ggplot(TIF_df %>%
+         filter(drug != "DMSO") %>%
+         filter(gRNA %in% c( "TBX5", "LAD2", "LAD7", "LAD10")),
+       aes(x = gRNA, y = difTIF, fill = mean_difTIF)) +
+  geom_hline(yintercept = 0, lty = 2) +
+  geom_boxplot() +
+  geom_jitter(aes(shape = replicate), size = 2, width = .2) +
+  theme_classic_lines_90() +
+  scale_fill_gradient2(low = "#74733B", mid = "white", high = "#005076") +
+  facet_wrap(~drug)
+
+
+## Heatmaps
+TIF_heatmap <- TIF_df %>%
+  filter(drug != "DMSO") %>%
+  mutate(gRNA_rep = paste(gRNA, replicate, sep = "_")) %>%
+  distinct(gRNA_rep, drug, difTIF) %>%
+  spread(key = "drug", value = "difTIF") %>%
+  column_to_rownames("gRNA_rep")
+
+pheatmap(TIF_heatmap)
+
+
+## T-tests
+pval_df <- merge(unique(TIF_df$drug), unique(TIF_df$gRNA)) %>%
+  na.omit() %>%
+  mutate(pval = "") %>%
+  dplyr::select("drug" = x, "gRNA" = y, pval)
+
+TIF_df_2 <- TIF_df %>%
+  distinct(gRNA, drug, replicate, TIF)
+
+for (i in unique(TIF_df_2$gRNA)) {
+  for (j in unique(TIF_df_2$drug)) {
+    replicates <- unique(TIF_df_2$replicate[TIF_df_2$drug == j & TIF_df_2$gRNA == i])
+    pval_df$pval[pval_df$drug == j & pval_df$gRNA == i] <- t.test(TIF_df_2$TIF[TIF_df_2$drug == "DMSO" & TIF_df_2$gRNA == i & TIF_df_2$replicate %in% replicates], 
+                                                                  TIF_df_2$TIF[TIF_df_2$drug == j & TIF_df_2$gRNA == i], paired = T, var.equal = T)$p.value
+  }
+}
+
+pval_df %>% filter(drug != "DMSO", gRNA != "LBR2") %>% group_by(gRNA) %>% mutate(pval_adj = p.adjust(pval, method = "fdr")) %>% arrange(pval_adj)
+```
+
+
+## Indel plots
+```{r}
+colors_pathways = c("wt" = "#808184", "other" = "black", "NHEJ" = "#e1251b", "MMEJ" = "#26419a", "SSTR" = "#007A4C")
+
+percentage_df2 <- percentage_df %>%
+  mutate(mutation = factor(mutation, levels = seq(-12, 2))) %>%
+  mutate(freq = as.numeric(freq)) %>%
+  mutate(percentage_mean = ave(freq, mutation, condition, FUN = mean)) %>%
+  mutate(pathway = case_when(mutation == -7 ~ "MMEJ",
+                             mutation == 1 ~ "NHEJ",
+                             mutation == 2 ~ "SSTR", 
+                             mutation == 0 ~ "TIF", 
+                             T ~ "other"),
+         pathway = factor(pathway, levels = c("TIF", "NHEJ", "MMEJ", "SSTR", "other"))) %>%
+  mutate(replicate = as.numeric(gsub("r", "", replicate))) %>%
+  mutate(gRNA = factor(gRNA, levels = c("LBR1", "LBR2", "TBX5", "LAD2", "LAD7", "LAD10"))) %>%
+  mutate(drug = factor(drug, levels = c("DMSO", "AT9283", "PCI", "Resveratrol", "Tubastatin"))) %>%
+  na.omit()
+
+ggplot(percentage_df2, 
+            aes(mutation, percentage_mean, group = drug, alpha = drug)) + 
+  geom_bar(stat = "identity", 
+           aes(fill = pathway), 
+           position = position_dodge(width = 1)) + 
+  geom_jitter(data = percentage_df2, 
+              aes(mutation, freq, fill = pathway, 
+                  shape = factor(replicate)), 
+              position = position_dodge(width = 1)) + 
+  scale_fill_manual("legend", values = colors_pathways) + 
+  theme_pubr() +
+  facet_wrap(~gRNA)
+
+ggplot(percentage_df2 %>%
+         filter(gRNA == "LAD10"), 
+            aes(mutation, percentage_mean)) + 
+  geom_bar(stat = "identity", 
+           aes(fill = pathway), 
+           position = position_dodge(width = 1)) + 
+  geom_jitter(data = percentage_df2 %>%
+         filter(gRNA == "LAD10"), 
+              aes(mutation, freq, fill = pathway, 
+                  shape = factor(replicate)), 
+              position = position_dodge(width = 1)) + 
+  scale_fill_manual("legend", values = colors_pathways) + 
+  theme_pubr() +
+  facet_wrap(~drug)
+
+ggplot(percentage_df2 %>%
+         filter(!gRNA %in% c("LBR1", "LBR2")), 
+            aes(mutation, percentage_mean)) + 
+  geom_bar(stat = "identity", 
+           aes(fill = pathway), 
+           position = position_dodge(width = 1)) + 
+  geom_jitter(data = percentage_df2 %>%
+         filter(!gRNA %in% c("LBR1", "LBR2")), 
+              aes(mutation, freq, fill = pathway, 
+                  shape = factor(replicate)), 
+              position = position_dodge(width = 1)) + 
+  scale_fill_manual("legend", values = colors_pathways) + 
+  theme_pubr(border = T) +
+  facet_grid(gRNA~drug)
+```
+
+
+
