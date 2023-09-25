@@ -113,7 +113,7 @@ SetFileName <- function(filename, initials, extension) {
 # Import data from preprocessing script
 file = list.files(in.dir, pattern = "freq_zscores", full.names = T) %>% tail(n = 1)
 
-indel.data <- readRDS("/DATA/projects/DSBrepair/data/R/mt20230921_episcreen/mt20230921_freq_zscores_0.RDS") 
+indel.data <- readRDS("/DATA/projects/DSBrepair/data/R/mt20230921_episcreen/mt20230922_freq_zscores_1.RDS") 
 
 # TRIP_chrom = TRIP_chrom_tib %>% dplyr::select(-binsize, -pool) %>% column_to_rownames("ID")
 # # make clustering with some column rotation for better visualisation
@@ -318,22 +318,28 @@ epistasis_tib = slope.protein.features %>%
   pivot_wider(., names_from = term, values_from = c(indelrate))
 
 epistasis_tib %<>% 
-  #left_join(signif_pcr_hits) %>%# These are p values for a significant CCD by PCR
+  left_join(signif_pcr_hits) %>% # These are p values for a significant CCD by PCR
   left_join(effect_of_compound_tib) %>% 
   left_join(filtered_drug_conc) %>%
-  distinct(#signif.pcr.ratio, signif.pcr.freqCut, # These are p values for a significant CCD by PCR
+  distinct(signif.pcr.freqCut, # These are p values for a significant CCD by PCR
            drug, feature, 
            slope, # The slopes
            TIF_signif, # What effect the compounds have
            effect_on_indelrate) %>% # If the effect is significant in at least 2 IPRs (from above)) %>% 
   mutate(indelrate_slope_plot = case_when(
-      effect_on_indelrate & TIF_signif == "TIF_down" & slope < 0 ~ slope, 
+      effect_on_indelrate & signif.pcr.freqCut & TIF_signif == "TIF_down" & slope < 0 ~ slope, 
       TIF_signif == "TIF_down" & slope > 0 ~ as.double(NA), 
-      effect_on_indelrate & TIF_signif == "TIF_up" & slope > 0 ~ slope, 
+      effect_on_indelrate & signif.pcr.freqCut & TIF_signif == "TIF_up" & slope > 0 ~ slope, 
       TIF_signif == "TIF_up" & slope < 0 ~ as.double(NA), 
-      effect_on_indelrate & TIF_signif == "TIF_both" ~ slope,
+      effect_on_indelrate & signif.pcr.freqCut & TIF_signif == "TIF_both" ~ slope,
       T ~ as.double(NA))) %>%
   distinct(drug, feature, slope, indelrate_slope_plot)
+
+ggplot(ratios_tib_fc,
+       aes(x = dam_LMNB1, y = log2.fc.freqCut)) +
+  geom_point() +
+  geom_smooth(method = "lm") +
+  facet_wrap(~drug)
 
 TIF_CCDs = epistasis_tib %>% 
   filter(!is.na(indelrate_slope_plot)) %>%

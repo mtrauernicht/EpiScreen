@@ -82,6 +82,8 @@ library(broom)
 library(ggpubr)
 library(tidyverse)
 library(ggbeeswarm)
+library(pheatmap)
+library(colorspace)
 ```
 
 ```{r outdir screen}
@@ -211,7 +213,7 @@ mutations.prefilter.dt.top10.bc <- mutations.prefilter.dt %>%
 
 ggplot(mutations.prefilter.dt.top10.bc %>%
          distinct(barcode, median_barcode_count) %>%
-         filter(median_barcode_count > 2500),
+         filter(median_barcode_count > 100 & median_barcode_count < 10000),
        aes(x = reorder(barcode, -median_barcode_count), y = median_barcode_count)) +
   geom_bar(stat = "identity") +
   ylab("Average barcode count per sample") +
@@ -219,7 +221,7 @@ ggplot(mutations.prefilter.dt.top10.bc %>%
 
 
 mutations.prefilter.dt.top10.bc <- mutations.prefilter.dt.top10.bc %>%
-  filter(median_barcode_count > 2500) # random filtering
+  filter(median_barcode_count > 4000) # random filtering
 
 mutations.prefilter.dt <- mutations.prefilter.dt %>%
   filter(barcode %in% mutations.prefilter.dt.top10.bc$barcode)
@@ -388,10 +390,10 @@ dim(screen.indel.dt)
 
 ## R cleanup
 ```{r cleanup screen}
-rm(list = ls()[grep("^mutations", ls())])
-rm(list = ls()[grep("list$", ls())])
-rm(list = ls()[grep("large.indels.dt", ls())])
-rm(list = ls()[grep("mutations.dt", ls())])
+# rm(list = ls()[grep("^mutations", ls())])
+# rm(list = ls()[grep("list$", ls())])
+# rm(list = ls()[grep("large.indels.dt", ls())])
+# rm(list = ls()[grep("mutations.dt", ls())])
 ```
 
 ## Average the control samples to have these also in a combined set (on top of the 24 samples per condition)
@@ -549,10 +551,13 @@ ggplot() +
              filter(!drug %in% c("PCI_1", "PCI_10", "PCI_33")) %>%
              distinct(freqCut_mean, freqCut_dif_mean, drug),
            stat = "identity", 
-           aes(x = reorder(drug, freqCut_mean), y = freqCut_mean, fill = freqCut_dif_mean), alpha = .8, color = "black") +
-  geom_point(data = global_effects %>%
+           aes(x = factor(drug, levels = c("DMSO", "AT9283", "PCI_100", "Tuba")), y = freqCut_mean, fill = freqCut_dif_mean), 
+           alpha = .8, color = "black") +
+  geom_jitter(data = global_effects %>%
                filter(!drug %in% c("PCI_1", "PCI_10", "PCI_33")),
-             aes(x = reorder(drug, freqCut_mean), y = freqCut_global, shape = rep)) +
+             aes(x = factor(drug, levels = c("DMSO", "AT9283", "PCI_100", "Tuba")), y = freqCut_global, shape = rep), 
+             size = 2,
+             position = position_dodge(width = 1)) +
   scale_fill_gradient2(low = "#74733B", mid = "white", high = "#005076") +
   theme_pubr(x.text.angle = 90)
 
@@ -563,17 +568,19 @@ ggplot() +
            stat = "identity", 
            aes(x = factor(drug, levels = c("DMSO", "PCI_1","PCI_10", "PCI_33", "PCI_100")), 
                y = freqCut_mean, fill = freqCut_dif_mean), alpha = .8, color = "black") +
-  geom_point(data = global_effects %>%
+  geom_jitter(data = global_effects %>%
                filter(drug %in% c("DMSO","PCI_1","PCI_10", "PCI_33", "PCI_100")),
-             aes(x = factor(drug, levels = c("DMSO", "PCI_1","PCI_10", "PCI_33", "PCI_100")), y = freqCut_global, shape = rep)) +
+             aes(x = factor(drug, levels = c("DMSO", "PCI_1","PCI_10", "PCI_33", "PCI_100")), y = freqCut_global, shape = rep),
+             size = 2,
+             position = position_dodge(width = 1)) +
   scale_fill_gradient2(low = "#74733B", mid = "white", high = "#005076") +
   theme_pubr(x.text.angle = 90)
 
 
 ### Statistical significance
-pval_df <- data.frame("drug" = unique(global_effects$drug), pval = c("","","","","","",""))
+pval_df <- data.frame("drug" = unique(global_effects$drug[global_effects$drug %in% c("AT9283", "PCI_100", "Tuba")]), pval = c("","",""))
 
-for (i in unique(global_effects$drug)) {
+for (i in unique(pval_df$drug)) {
     pval_df$pval[pval_df$drug == i ] <- 
       t.test(global_effects$freqCut_global[global_effects$drug == "DMSO"], global_effects$freqCut_global[global_effects$drug == i], 
              paired = F, 
@@ -605,20 +612,22 @@ local_effects <- local_effects %>%
   mutate(freqCut_dif_mean = ave(freqCut_dif, barcode, drug, FUN = mean)) %>%
   arrange(desc(DMSO_freq_mean))
 
-barcode_numbering <- local_effects %>%
-  distinct(barcode) %>%
-  mutate(barcode_number = 1:nrow(.))
-
-local_effects <- local_effects %>%
-  left_join(barcode_numbering)
-
 ## Import chromatin data
 rpe_chromatin <- readRDS("/home/x.vergara/XV_P3_ChromDSBScreen/xv_CRISPR_screen_figures/data/revisions/validation_screen/xv20230919_chromatin_data_RPE1.rds")
+
+
 
 local_effects_chromatin <- local_effects %>%
   left_join(rpe_chromatin) %>%
   na.omit() %>%
-  filter(binsize == "10000")
+  filter(binsize == "2000")
+
+barcode_numbering <- local_effects_chromatin %>%
+  distinct(barcode) %>%
+  mutate(barcode_number = 1:nrow(.))
+
+local_effects_chromatin <- local_effects_chromatin %>%
+  left_join(barcode_numbering)
 
 ggplot() +
   geom_bar(data = local_effects_chromatin %>%
@@ -626,6 +635,19 @@ ggplot() +
            stat = "identity", 
            aes(x = reorder(drug, freqCut_mean), y = freqCut_mean, fill = freqCut_dif_mean), alpha = .8, color = "black") +
   geom_point(data = local_effects_chromatin,
+             aes(x = reorder(drug, freqCut_mean), y = freqCut, shape = rep)) +
+  scale_fill_gradient2(low = "#74733B", mid = "white", high = "#005076") +
+  theme_pubr(x.text.angle = 90) +
+  facet_wrap(~barcode_number)
+
+ggplot() +
+  geom_bar(data = local_effects_chromatin %>%
+             filter(drug %in% c("DMSO", "PCI_100", "AT9283", "Tuba")) %>%
+             distinct(freqCut_mean, freqCut_dif_mean, drug, barcode_number, DMSO_freq_mean),
+           stat = "identity", 
+           aes(x = reorder(drug, freqCut_mean), y = freqCut_mean, fill = freqCut_dif_mean), alpha = .8, color = "black") +
+  geom_point(data = local_effects_chromatin %>%
+               filter(drug %in% c("DMSO", "PCI_100", "AT9283", "Tuba")),
              aes(x = reorder(drug, freqCut_mean), y = freqCut, shape = rep)) +
   scale_fill_gradient2(low = "#74733B", mid = "white", high = "#005076") +
   theme_pubr(x.text.angle = 90) +
@@ -654,7 +676,22 @@ pheatmap(local_effects_chromatin_heatmap,
                 cellheight = 10,
                 breaks = myBreaks,
                 na_col = "white",
-                main = 'efficiency change, all concentrations',
+                #annotation_row = target_all,
+                #annotation_col = chromatin,
+                # color = colorRampPalette(c("#e07a5f", "#e5e5e5", "#3d405b"))(palette_length),
+                color = rev(diverge_hcl(palette_length, "Broc")),
+                #annotation_colors = annotation_colors_scr_set,
+                annotation_legend = T)
+
+pheatmap(local_effects_chromatin_heatmap %>%
+           dplyr::select(AT9283, PCI_100, Tuba),
+                #cluster_cols = clone5_map_ipr,
+                cluster_rows = T,
+                border_color = F,
+                cellwidth = 10,
+                cellheight = 10,
+                breaks = myBreaks,
+                na_col = "white",
                 #annotation_row = target_all,
                 #annotation_col = chromatin,
                 # color = colorRampPalette(c("#e07a5f", "#e5e5e5", "#3d405b"))(palette_length),
@@ -663,15 +700,33 @@ pheatmap(local_effects_chromatin_heatmap,
                 annotation_legend = T)
 
 ## Are the changes in TIF stronger if the starting TIF is lower?
-local_effects_chromatin_2 <- local_effects_chromatin %>%
-  filter(!drug %in% c("DMSO", "PCI_1")) %>%
-  distinct(barcode, drug, freqCut_dif_mean, DMSO_freq_mean, dam_LMNB1)
-
-ggplot(local_effects_chromatin_2,
-       aes(x = DMSO_freq_mean, y = freqCut_dif_mean, color = dam_LMNB1)) +
-  geom_point() +
+ggplot(local_effects_chromatin %>%
+         filter(!drug %in% c("DMSO", "PCI_1")),
+       aes(x = DMSO_freq_mean, y = freqCut_dif_mean)) +
+  geom_point(aes(color = dam_LMNB2)) +
+  geom_smooth(method = "lm") + 
   facet_wrap(~drug) +
-  theme_pubr(border = T)
+  theme_pubr(border = T) +
+  scale_color_gradient2(low = "blue", mid = "grey", high = "red")
+
+ggplot(local_effects_chromatin %>%
+         filter(!drug %in% c("DMSO", "PCI_1")),
+       aes(x = DMSO_freq_mean, y = freqCut_dif_mean)) +
+  geom_point(aes(color = dam_H3K9me3)) +
+  geom_smooth(method = "lm") + 
+  facet_wrap(~drug) +
+  theme_pubr(border = T) +
+  scale_color_gradient2(low = "blue", mid = "grey", high = "red")
+
+
+ggplot(local_effects_chromatin %>%
+         filter(!drug %in% c("DMSO", "PCI_1")),
+       aes(x = DMSO_freq_mean, y = freqCut_dif_mean)) +
+  geom_point(aes(color = chip_H3K4me1)) +
+  geom_smooth(method = "lm") + 
+  facet_wrap(~drug) +
+  theme_pubr(border = T) +
+  scale_color_gradient2(low = "blue", mid = "grey", high = "red")
 ```
 
 
@@ -706,25 +761,23 @@ local_effects_chromatin %>%
 
 ## CCD analysis
 ```{r chromatin annotation}
-file = list.files(in.dir, pattern = "CCD_table", full.names = T) %>% tail(n = 1)
-CCD_tib <- readRDS(file)
+CCD_tib <- readRDS("/DATA/projects/DSBrepair/data/R/rs20230921_episcreen/mt20230922_CCD_table_1.RDS")
 
 all_compounds_epistasis_TIF = CCD_tib %>%
   dplyr::select(drug, indelrate_slope_plot, feature) %>%
   group_by(drug) %>%
   mutate(indelrate_slope_plot = ifelse(indelrate_slope_plot < 0, NA, indelrate_slope_plot),
          onlyNA = sum(is.na(indelrate_slope_plot))) %>% 
-  filter(onlyNA != 25) %>%
+  filter(onlyNA != 11) %>%
   reshape2::dcast(drug ~ feature, value.var = "indelrate_slope_plot", fill = 0) %>% 
   column_to_rownames(var = "drug")
 
 quant_breaks <- quantile(all_compounds_epistasis_TIF, c(.01,.99), na.rm = T)
-quant_breaks <- c(-0.01586577, 0.01586577)
 palette_length <- 100
-breaks <- c(seq(quant_breaks[1], 0, length.out=ceiling(palette_length/2) + 1), 
+breaks <- c(seq(-0.01, 0, length.out=ceiling(palette_length/2) + 1), 
             seq(quant_breaks[2]/palette_length, quant_breaks[2], length.out=floor(palette_length/2)))
-colors = diverge_hcl(length(breaks), palette = "Red-Green")
-colors[which(quant_breaks == 0)-1] = "gray90"
+colors = rev(diverge_hcl(length(breaks), palette = "Cork"))
+colors[which(quant_breaks == 0)-1] = "white"
 
 pheatmap(all_compounds_epistasis_TIF,
          border_color = F,
@@ -738,6 +791,87 @@ pheatmap(all_compounds_epistasis_TIF,
          color = colors,
          #annotation_colors = annotation_colors_scr, 
          annotation_legend = T)
+
+
+local_effects_chromatin_ccd <- local_effects_chromatin %>%
+  mutate(log2_freqcut_dif = log2(freqCut_mean) - log2(DMSO_freq_mean))
+
+
+## Example plots
+ggplot(local_effects_chromatin_ccd %>%
+         filter(drug %in% c("AT9283", "PCI_100", "Tuba")),
+       aes(x = chip_H3K4me1, y = log2_freqcut_dif)) +
+  geom_point() +
+  geom_smooth(method = "lm") + 
+  facet_wrap(~drug) +
+  theme_pubr(border = T)
+
+ggplot(local_effects_chromatin_ccd %>%
+         filter(drug %in% c("AT9283", "PCI_100", "Tuba")),
+       aes(x = dam_H3K9me3, y = log2_freqcut_dif)) +
+  geom_point() +
+  geom_smooth(method = "lm") + 
+  facet_wrap(~drug) +
+  theme_pubr(border = T)
+
+ggplot(local_effects_chromatin_ccd %>%
+         filter(drug %in% c("AT9283", "PCI_100", "Tuba")),
+       aes(x = dam_LMNB1, y = log2_freqcut_dif)) +
+  geom_point() +
+  geom_smooth(method = "lm") + 
+  facet_wrap(~drug) +
+  theme_pubr(border = T)
+
+## Compare synergies between RPE-1 and K562
+### Load K562 synergies
+CCD_tib_k562 <- readRDS("/DATA/projects/DSBrepair/data/R/rs20230424_episcreen/rs20230424_CCD_table_0.RDS") %>%
+  filter(drug_conc %in% c("Tubastatin A 10 µM", "PCI-24781 100 nM")) %>%
+  dplyr::select("drug" = drug_conc, "k562_slope" = indelrate_slope_plot, feature) %>%
+  na.omit() %>%
+  filter(!feature %in% c("HDAC3", "CTCF"))
+
+CCD_tib_k562$drug[CCD_tib_k562$drug == "Tubastatin A 10 µM"] <- "Tuba"
+CCD_tib_k562$drug[CCD_tib_k562$drug == "PCI-24781 100 nM"] <- "PCI_100"
+
+CCD_tib_rpe <- CCD_tib %>%
+  filter(drug != "PCI_33", feature != "dam_LMNB2") %>%
+  dplyr::select(drug, indelrate_slope_plot, feature) %>%
+  group_by(drug) %>%
+  mutate(indelrate_slope_plot = ifelse(indelrate_slope_plot < 0, NA, indelrate_slope_plot),
+         onlyNA = sum(is.na(indelrate_slope_plot))) %>% 
+  filter(onlyNA != 11) %>%
+  dplyr::select(drug, "rpe_slope" = indelrate_slope_plot, feature) %>%
+  mutate(feature = gsub(".*_", "", feature)) %>%
+  mutate(feature = gsub("replicating", "late_replicating", feature)) %>%
+  na.omit()
+
+CCD_tib_all <- merge(CCD_tib_k562, CCD_tib_rpe, all = T) %>%
+  pivot_longer(cols = contains("slope"), names_to = "cell", values_to = "slope") %>%
+  mutate(drug = paste(drug, cell, sep = "_")) %>%
+  dplyr::select(-cell) %>%
+  reshape2::dcast(drug ~ feature, value.var = "slope", fill = 0) %>% 
+  column_to_rownames(var = "drug")
+
+quant_breaks <- quantile(CCD_tib_all, c(.01,.99), na.rm = T)
+palette_length <- 100
+breaks <- c(seq(-0.01, 0, length.out=ceiling(palette_length/2) + 1), 
+            seq(quant_breaks[2]/palette_length, quant_breaks[2], length.out=floor(palette_length/2)))
+colors = rev(diverge_hcl(length(breaks), palette = "Cork"))
+colors[which(quant_breaks == 0)-1] = "white"
+
+pheatmap(CCD_tib_all,
+         border_color = F,
+         cellwidth = 8,
+         cellheight = 8,
+         breaks = breaks,
+         #cluster_cols = TRIP_chrom_clust,
+         cluster_rows = F,
+         #annotation_row = target_ctrl,
+         main = "Chromatin synergies - TIF all",
+         color = colors,
+         #annotation_colors = annotation_colors_scr, 
+         annotation_legend = T)
+
 
 ```
 
