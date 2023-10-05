@@ -212,24 +212,38 @@ mutations.prefilter.dt.top10.bc <- mutations.prefilter.dt %>%
   mutate(median_barcode_count = ave(barcode_sum, barcode, FUN = median))
 
 ggplot(mutations.prefilter.dt.top10.bc %>%
-         distinct(barcode, median_barcode_count) %>%
-         filter(median_barcode_count > 100 & median_barcode_count < 10000),
-       aes(x = reorder(barcode, -median_barcode_count), y = median_barcode_count)) +
-  geom_bar(stat = "identity") +
+         distinct(barcode, barcode_sum, exp, median_barcode_count) %>%
+         filter(median_barcode_count > 1000) %>%
+         mutate(cutoff = ifelse(barcode_sum > 7000, "Yes", "No")),
+       aes(x = reorder(barcode, -median_barcode_count), y = log10(barcode_sum))) +
+  geom_bar(stat = "identity", aes(fill = cutoff)) +
+  geom_hline(yintercept = log10(7000)) +
+  scale_fill_manual(values = c("Yes" = "red", "No" = "black")) +
   ylab("Average barcode count per sample") +
-  theme_pubr(x.text.angle = 90)
+  theme_pubr(x.text.angle = 90) +
+  facet_wrap(~exp)
 
+## Rep 3 has only 4-5 barcodes with a lot of counts
+### I will now remove all barcodes that have < 7000 counts in a sample (meaning I keep 5 barcodes from rep 3, and ~20-30 from rep 1 & 2)
+### I defined this threshold by eyeballing the MMEJratios as a function of reads per barcode (code below) - barcodes with <7000 counts seem be more noisy
+mutations.prefilter.dt.top10.bc.filt <- mutations.prefilter.dt.top10.bc %>%
+  filter(barcode_sum > 7000) %>% 
+  mutate(exp_barcode = paste(exp, barcode, sep = "_"))
 
-mutations.prefilter.dt.top10.bc <- mutations.prefilter.dt.top10.bc %>%
-  filter(median_barcode_count > 4000) # random filtering
+mutations.prefilter.dt.filt <- mutations.prefilter.dt %>%
+  mutate(exp_barcode = paste(exp, barcode, sep = "_")) %>%
+  filter(exp_barcode %in% mutations.prefilter.dt.top10.bc.filt$exp_barcode)
 
-mutations.prefilter.dt <- mutations.prefilter.dt %>%
-  filter(barcode %in% mutations.prefilter.dt.top10.bc$barcode)
-
-complete.mutations.dt = mutations.prefilter.dt %>% 
+complete.mutations.dt = mutations.prefilter.dt.filt %>% 
   complete(mutation, nesting(exp, barcode), fill = list(count = 0)) %>% 
   mutate(mut_type = ifelse(mutation < 0, "del", ifelse(mutation > 0, "ins", "wt"))) %>%
   data.table()
+
+barcode_sum <- mutations.prefilter.dt.top10.bc.filt %>%
+  distinct(exp_barcode, barcode_sum)
+
+complete.mutations.dt <- complete.mutations.dt %>%
+  left_join(barcode_sum)
 
 dim(complete.mutations.dt)
 dim(distinct(complete.mutations.dt))
@@ -293,8 +307,26 @@ mutations.dt = left_join(complete.mutations.dt, count_filter) %>%
 # Merge the indel statistics
 mutations.stat.dt = left_join(mutations.dt, indel.statistics.dt %>% setnames("ID", "exp"))
 
+## Remove barcodes with <2 replicates per sample
+keep_samples <- mutations.stat.dt %>%
+  distinct(barcode, exp, drug) %>%
+  mutate(n_rep = ave(barcode, barcode, drug, FUN = length)) %>%
+  filter(n_rep >= 2) %>%
+  mutate(exp_barcode = paste(exp, barcode, sep = "_"))
 
-mutations.screen.dt = mutations.stat.dt[!is.na(mutation), ]
+## Only keep barcodes that are in each condition
+keep_samples2 <- mutations.stat.dt %>%
+  distinct(barcode, drug) %>%
+  filter(drug != "DMSO_25") %>%
+  mutate(n = 1) %>%
+  pivot_wider(names_from = "drug", values_from = "n") %>%
+  na.omit() %>%
+  column_to_rownames("barcode")
+
+mutations.screen.dt = mutations.stat.dt[!is.na(mutation), ] %>%
+  #filter(exp_barcode %in% keep_samples$exp_barcode) %>%
+  filter(barcode %in% rownames(keep_samples2)) %>%
+  dplyr::select(-exp_barcode)
 ```
 
 ## Pooling large indels for indel spectrum plotting
@@ -470,11 +502,24 @@ TIF_ratios_all_tib <- screen.indel.dt %>%
   filter(mutation == "0") %>%
   dplyr::distinct(exp, barcode, freq) %>% 
   mutate(freqCut = 1 - freq,
+         #freqCut2 = freqMMEJ + freqNHEJ / (1 - (freqMMEJ + freqNHEJ)),
          freqCut_global = ave(freqCut, exp, FUN = function(x) mean(x, na.rm=T))) %>%
   distinct(exp, barcode, freqCut, freqCut_global) %>% 
   left_join(ratios_tib_all, by = c("exp", "barcode"))
 ```
 
+## Quality plots - MMEJ ratio as a function of total reads
+```{r}
+## Plot MMEJratio vs barcode reads
+ggplot(screen.indel.dt,
+       aes(x = log10(barcode_sum), y = MMEJratio)) +
+  geom_point() +
+  geom_vline(xintercept = log10(5000)) +
+  geom_vline(xintercept = log10(6000)) +
+  geom_vline(xintercept = log10(7000)) +
+  geom_vline(xintercept = log10(10000)) +
+  theme_pubr()
+```
 
 ## Calculate mean indel frequencies
 ```{r split table for indels}
@@ -606,6 +651,7 @@ dmso_freq <- local_effects %>%
   
 local_effects <- local_effects %>%
   left_join(dmso_freq) %>%
+  na.omit() %>%
   #filter(drug != "DMSO") %>%
   mutate(freqCut_dif = freqCut - DMSO_freq) %>%
   mutate(freqCut_mean = ave(freqCut, barcode, drug, FUN = mean)) %>%
@@ -727,6 +773,24 @@ ggplot(local_effects_chromatin %>%
   facet_wrap(~drug) +
   theme_pubr(border = T) +
   scale_color_gradient2(low = "blue", mid = "grey", high = "red")
+
+ggplot(local_effects_chromatin %>%
+         filter(!drug %in% c("DMSO", "PCI_1")),
+       aes(x = dam_LMNB1, y = freqCut_dif_mean)) +
+  geom_point() +
+  geom_smooth(method = "lm") + 
+  facet_wrap(~drug) +
+  theme_pubr(border = T) +
+  scale_color_gradient2(low = "blue", mid = "grey", high = "red")
+
+ggplot(local_effects_chromatin %>%
+         filter(!drug %in% c("DMSO", "PCI_1")),
+       aes(x = chip_H3K36me3, y = freqCut_dif_mean)) +
+  geom_point() +
+  geom_smooth(method = "lm") + 
+  facet_wrap(~drug) +
+  theme_pubr(border = T) +
+  scale_color_gradient2(low = "blue", mid = "grey", high = "red")
 ```
 
 
@@ -761,7 +825,7 @@ local_effects_chromatin %>%
 
 ## CCD analysis
 ```{r chromatin annotation}
-CCD_tib <- readRDS("/DATA/projects/DSBrepair/data/R/rs20230921_episcreen/mt20230922_CCD_table_1.RDS")
+CCD_tib <- readRDS("/DATA/projects/DSBrepair/data/R/rs20230921_episcreen/mt20231005_CCD_table_0.RDS")
 
 all_compounds_epistasis_TIF = CCD_tib %>%
   dplyr::select(drug, indelrate_slope_plot, feature) %>%
@@ -825,16 +889,17 @@ ggplot(local_effects_chromatin_ccd %>%
 ## Compare synergies between RPE-1 and K562
 ### Load K562 synergies
 CCD_tib_k562 <- readRDS("/DATA/projects/DSBrepair/data/R/rs20230424_episcreen/rs20230424_CCD_table_0.RDS") %>%
-  filter(drug_conc %in% c("Tubastatin A 10 µM", "PCI-24781 100 nM")) %>%
+  filter(drug_conc %in% c("Tubastatin A 10 µM", "PCI-24781 100 nM", "AT9283 100 nM")) %>%
   dplyr::select("drug" = drug_conc, "k562_slope" = indelrate_slope_plot, feature) %>%
   na.omit() %>%
-  filter(!feature %in% c("HDAC3", "CTCF"))
+  filter(!feature %in% c("HDAC3", "CTCF", "SMC3"))
 
 CCD_tib_k562$drug[CCD_tib_k562$drug == "Tubastatin A 10 µM"] <- "Tuba"
 CCD_tib_k562$drug[CCD_tib_k562$drug == "PCI-24781 100 nM"] <- "PCI_100"
+CCD_tib_k562$drug[CCD_tib_k562$drug == "AT9283 100 nM"] <- "AT9283"
 
 CCD_tib_rpe <- CCD_tib %>%
-  filter(drug != "PCI_33", feature != "dam_LMNB2") %>%
+  filter(!drug %in% c("PCI_33", "PCI_10"), feature != "dam_LMNB2") %>%
   dplyr::select(drug, indelrate_slope_plot, feature) %>%
   group_by(drug) %>%
   mutate(indelrate_slope_plot = ifelse(indelrate_slope_plot < 0, NA, indelrate_slope_plot),

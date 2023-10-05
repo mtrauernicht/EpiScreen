@@ -82,7 +82,7 @@ figure_out = "/DATA/projects/DSBrepair/scratch/episcreen/"
 # initials (for file export)
 initials = "mt"
 
-pval_signif = 0.01
+pval_signif = 0.1
 ```
 
 
@@ -113,7 +113,7 @@ SetFileName <- function(filename, initials, extension) {
 # Import data from preprocessing script
 file = list.files(in.dir, pattern = "freq_zscores", full.names = T) %>% tail(n = 1)
 
-indel.data <- readRDS("/DATA/projects/DSBrepair/data/R/mt20230921_episcreen/mt20230922_freq_zscores_1.RDS") 
+indel.data <- readRDS("/DATA/projects/DSBrepair/data/R/mt20230921_episcreen/mt20231005_freq_zscores_2.RDS") 
 
 # TRIP_chrom = TRIP_chrom_tib %>% dplyr::select(-binsize, -pool) %>% column_to_rownames("ID")
 # # make clustering with some column rotation for better visualisation
@@ -184,9 +184,9 @@ ratios_tib <- indel.data %>%
 
 dmso_ratios_tib <- indel.data %>%
   filter(drug == "DMSO") %>%
-  distinct(freqCut_mean, barcode, rep) %>%
-  mutate(DMSO.freqCut.log2 = log2(freqCut_mean)) %>%
-  dplyr::select(-freqCut_mean) %>%
+  distinct(freqCut, barcode, rep) %>%
+  mutate(DMSO.freqCut.log2 = log2(freqCut)) %>%
+  dplyr::select(-freqCut) %>%
   distinct()
 
 ratios_tib <- merge(ratios_tib, dmso_ratios_tib)
