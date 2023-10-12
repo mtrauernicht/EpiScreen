@@ -886,6 +886,16 @@ ggplot(local_effects_chromatin_ccd %>%
   facet_wrap(~drug) +
   theme_pubr(border = T)
 
+
+ggplot(local_effects_chromatin_ccd %>%
+         filter(drug %in% c("PCI_100")),
+       aes(x = dam_LMNB1, y = log2_freqcut_dif)) +
+  geom_hline(yintercept = 0, lty = 2) + 
+  geom_vline(xintercept = 0, lty = 2) + 
+  geom_point() +
+  geom_smooth(method = "lm") + 
+  theme_pubr()
+
 ## Compare synergies between RPE-1 and K562
 ### Load K562 synergies
 CCD_tib_k562 <- readRDS("/DATA/projects/DSBrepair/data/R/rs20230424_episcreen/rs20230424_CCD_table_0.RDS") %>%
