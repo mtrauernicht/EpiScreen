@@ -825,7 +825,7 @@ local_effects_chromatin %>%
 
 ## CCD analysis
 ```{r chromatin annotation}
-CCD_tib <- readRDS("/DATA/projects/DSBrepair/data/R/rs20230921_episcreen/mt20231005_CCD_table_0.RDS")
+CCD_tib <- readRDS("/DATA/projects/DSBrepair/data/R/rs20231010_episcreen/mt20231016_CCD_RPE_table_2.RDS")
 
 all_compounds_epistasis_TIF = CCD_tib %>%
   dplyr::select(drug, indelrate_slope_plot, feature) %>%
@@ -858,13 +858,13 @@ pheatmap(all_compounds_epistasis_TIF,
 
 
 local_effects_chromatin_ccd <- local_effects_chromatin %>%
-  mutate(log2_freqcut_dif = log2(freqCut_mean) - log2(DMSO_freq_mean))
+  mutate(log2_freqcut_ratio = log2(freqCut_mean/(1-freqCut_mean)) - log2(DMSO_freq_mean/(1-DMSO_freq_mean)))
 
 
 ## Example plots
 ggplot(local_effects_chromatin_ccd %>%
          filter(drug %in% c("AT9283", "PCI_100", "Tuba")),
-       aes(x = chip_H3K4me1, y = log2_freqcut_dif)) +
+       aes(x = chip_H3K4me1, y = log2_freqcut_ratio)) +
   geom_point() +
   geom_smooth(method = "lm") + 
   facet_wrap(~drug) +
@@ -872,7 +872,7 @@ ggplot(local_effects_chromatin_ccd %>%
 
 ggplot(local_effects_chromatin_ccd %>%
          filter(drug %in% c("AT9283", "PCI_100", "Tuba")),
-       aes(x = dam_H3K9me3, y = log2_freqcut_dif)) +
+       aes(x = dam_H3K9me3, y = log2_freqcut_ratio)) +
   geom_point() +
   geom_smooth(method = "lm") + 
   facet_wrap(~drug) +
@@ -880,7 +880,7 @@ ggplot(local_effects_chromatin_ccd %>%
 
 ggplot(local_effects_chromatin_ccd %>%
          filter(drug %in% c("AT9283", "PCI_100", "Tuba")),
-       aes(x = dam_LMNB1, y = log2_freqcut_dif)) +
+       aes(x = dam_LMNB1, y = log2_freqcut_ratio)) +
   geom_point() +
   geom_smooth(method = "lm") + 
   facet_wrap(~drug) +
@@ -889,7 +889,7 @@ ggplot(local_effects_chromatin_ccd %>%
 
 ggplot(local_effects_chromatin_ccd %>%
          filter(drug %in% c("PCI_100")),
-       aes(x = dam_LMNB1, y = log2_freqcut_dif)) +
+       aes(x = dam_LMNB1, y = log2_freqcut_ratio)) +
   geom_hline(yintercept = 0, lty = 2) + 
   geom_vline(xintercept = 0, lty = 2) + 
   geom_point() +
@@ -898,7 +898,7 @@ ggplot(local_effects_chromatin_ccd %>%
 
 ## Compare synergies between RPE-1 and K562
 ### Load K562 synergies
-CCD_tib_k562 <- readRDS("/DATA/projects/DSBrepair/data/R/rs20230424_episcreen/rs20230424_CCD_table_0.RDS") %>%
+CCD_tib_k562 <- readRDS("/DATA/projects/DSBrepair/data/R/rs20231010_episcreen/rs20231010_CCD_table_raw_0.RDS") %>%
   filter(drug_conc %in% c("Tubastatin A 10 µM", "PCI-24781 100 nM", "AT9283 100 nM")) %>%
   dplyr::select("drug" = drug_conc, "k562_slope" = indelrate_slope_plot, feature) %>%
   na.omit() %>%

@@ -168,9 +168,10 @@ effect_of_compound_tib = filtered_drug_pvals %>%
   mutate(zscore_TIF = ifelse(adj_pval_TIF >= pval_signif, 0, zscore_TIF)) %>%
   dplyr::summarise(TIF_down_signif = sum(zscore_TIF < -1.96), #Summarise number of significant barcodes per compound for TIF
                    TIF_up_signif = sum(zscore_TIF > 1.96)) %>% 
-  mutate(TIF_signif = case_when(TIF_up_signif <= 1 & TIF_down_signif > 1 ~ "TIF_down", #Annotate how the compounds affects TIF
-                                TIF_down_signif <= 1 & TIF_up_signif > 1 ~ "TIF_up", 
-                                T ~ "TIF_both")) %>%
+  mutate(TIF_signif = case_when(TIF_down_signif >= 1 & TIF_up_signif >= 1 ~ "TIF_both",
+                                TIF_down_signif > 1  & TIF_up_signif <= 1 ~ "TIF_down", 
+                                TIF_down_signif <= 1 & TIF_up_signif > 1 ~ "TIF_up",  
+                                T ~ "no_effect")) %>%
   semi_join(filtered_drug_conc) # Semi-join the filtered drug conc to keep only the significant ones after p adjustment.
 
 ratios_tib <- indel.data %>%
@@ -178,14 +179,14 @@ ratios_tib <- indel.data %>%
   # I take the ratio without mean here because I adjusted for 0 value at that level in the preprocessing script line 1009
   # We don't have that issue with the freqCut. 
   distinct(freqCut, drug, barcode, rep) %>% 
-  mutate(freqCut.log2 = log2(freqCut)) %>%
+  mutate(freqCut.log2 = log2(freqCut/(1-freqCut))) %>%
   dplyr::select(-freqCut) %>%
   distinct()
 
 dmso_ratios_tib <- indel.data %>%
   filter(drug == "DMSO") %>%
   distinct(freqCut, barcode, rep) %>%
-  mutate(DMSO.freqCut.log2 = log2(freqCut)) %>%
+  mutate(DMSO.freqCut.log2 = log2(freqCut/(1-freqCut))) %>%
   dplyr::select(-freqCut) %>%
   distinct()
 
@@ -386,48 +387,48 @@ effect_tib = effect_of_compound_tib %>%
   distinct(drug, TIF_signif)
 ```
 
-### IPR annotation
-```{r IPR annotation}
-chromatin <- readRDS("files_scripts/xv20200915_DDR_data_CHIP.rds") %>% 
-  distinct(barcode, chromatin) %>%
-  left_join(distinct(indel.data, IPR, barcode)) 
+<!-- ### IPR annotation -->
+<!-- ```{r IPR annotation} -->
+<!-- chromatin <- readRDS("../files_scripts/xv20200915_DDR_data_CHIP.rds") %>%  -->
+<!--   distinct(barcode, chromatin) %>% -->
+<!--   left_join(distinct(indel.data, IPR, barcode))  -->
 
-chromatin <- chromatin %>%
-  filter(IPR != "<NA>") %>% 
-  dplyr::select(-barcode) %>%
-  column_to_rownames(var="IPR")
+<!-- chromatin <- chromatin %>% -->
+<!--   filter(IPR != "<NA>") %>%  -->
+<!--   dplyr::select(-barcode) %>% -->
+<!--   column_to_rownames(var="IPR") -->
 
-TIF_IPR = indel.data %>% filter(drug == "DMSO") %>%
-  distinct(replicate, tech, freqCut,MMEJratio, IPR, well, plate) %>%
-  group_by(IPR) %>%
-  summarise(TIF = mean(freqCut),
-            MMEJratio = mean(MMEJratio))
+<!-- TIF_IPR = indel.data %>% filter(drug == "DMSO") %>% -->
+<!--   distinct(replicate, tech, freqCut,MMEJratio, IPR, well, plate) %>% -->
+<!--   group_by(IPR) %>% -->
+<!--   summarise(TIF = mean(freqCut), -->
+<!--             MMEJratio = mean(MMEJratio)) -->
 
-chromatin_TIF = chromatin %>% rownames_to_column(var = "IPR") %>%
-  left_join(TIF_IPR) %>%
-  column_to_rownames("IPR")
-```
+<!-- chromatin_TIF = chromatin %>% rownames_to_column(var = "IPR") %>% -->
+<!--   left_join(TIF_IPR) %>% -->
+<!--   column_to_rownames("IPR") -->
+<!-- ``` -->
 
 # Export
 ```{r export}
 # The mutations list that can be loaded for the indel spectra plots.
-filename <- SetFileName("CCD_table", initials = initials, extension = "RDS")
+filename <- SetFileName("CCD_RPE_table", initials = initials, extension = "RDS")
 saveRDS(epistasis_tib, file = filename)
 
 # The ratios list of the split technical replicates
-filename <- SetFileName("IPR_annotation_heatmap", initials = initials, extension = "RDS")
-saveRDS(chromatin_TIF, file = filename)
+# filename <- SetFileName("IPR_RPE_annotation_heatmap", initials = initials, extension = "RDS")
+# saveRDS(chromatin_TIF, file = filename)
+
+# # The ratios list of the split technical replicates
+# filename <- SetFileName("RPE_compound_annotation_heatmap", initials = initials, extension = "RDS")
+# saveRDS(target, file = filename)
 
 # The ratios list of the split technical replicates
-filename <- SetFileName("compound_annotation_heatmap", initials = initials, extension = "RDS")
-saveRDS(target, file = filename)
-
-# The ratios list of the split technical replicates
-filename <- SetFileName("chrom_cluster_heatmap", initials = initials, extension = "RDS")
-saveRDS(TRIP_chrom_clust, file = filename)
+# filename <- SetFileName("RPE_chrom_cluster_heatmap", initials = initials, extension = "RDS")
+# saveRDS(TRIP_chrom_clust, file = filename)
 
 # Export the FC ratios tibble for plotting
-filename <- SetFileName("FC_ratios", initials = initials, extension = "RDS")
+filename <- SetFileName("FC_RPE_ratios", initials = initials, extension = "RDS")
 saveRDS(ratios_tib_fc, file = filename)
 ```
 
