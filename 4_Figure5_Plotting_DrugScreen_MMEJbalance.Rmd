@@ -2111,7 +2111,67 @@ pheatmap(validation_epistasis_bal[ , order_chrom],
          annotation_legend = T)
 ```
 
+## S5F Aurora Kinase effects (discussion)
 
+```{r S5F Aurora Kinase}
+AurKi = read.table("files_scripts/rs20220711_AurK_inhibitors.txt", header = T, sep = "\t") %>% mutate(group = case_when(AurB == 0 & AurA == 1 ~ "AurK-A", AurB == 1 & AurA == 0 ~ "AurK-B", T ~ "PanAurK"))
+
+
+data2 = indel.data %>% 
+  filter(target == "Aurora Kinase", viab_reproducibility &
+           indel_freq_filter &  pathway_bal_filter) %>% 
+  mutate(drug = gsub(" [(].*[)]", "", drug),
+         drug_conc = paste(drug, conc_char, sep = " "))  %>% 
+  group_by(drug_conc) %>%
+  mutate(MMEJ_log2_FC_mean = ave(MMEJ_log2_FC, FUN = function(x) mean(x, na.rm = TRUE)),
+         freqCut_diff_mean = ave(freqCut_diff_mean, FUN = function(x) mean(x, na.rm = TRUE))) %>% 
+  distinct(drug, conc_char, drug_conc, freqCut_diff_mean, MMEJ_log2_FC_mean) %>% 
+  left_join(AurKi) %>%
+  ungroup()
+
+data2 %>% 
+  filter(conc_char == "100 nM") %>% 
+  ggplot(., aes(freqCut_diff_mean, MMEJ_log2_FC_mean, color = group, label = drug)) + 
+  geom_point(size = 2) + 
+  theme_bw() + 
+  geom_hline(yintercept = 0, linetype = 2) + 
+  geom_vline(xintercept = 0, linetype = 2) + 
+  theme(aspect.ratio = 1) +
+  scale_x_continuous(labels = scales::percent) + 
+  xlab("ΔTIF") + 
+  ylab("MMEJ:NHEJ ratio FC (log2)") + 
+  ggtitle("100 nM") +
+  geom_label_repel()
+
+data2 %>% 
+  filter(conc_char == "1 µM") %>% 
+  ggplot(., aes(freqCut_diff_mean, MMEJ_log2_FC_mean, color = group, label = drug)) + 
+  geom_point(size = 2) + 
+  theme_bw() + 
+  geom_hline(yintercept = 0, linetype = 2) + 
+  geom_vline(xintercept = 0, linetype = 2) + 
+  theme(aspect.ratio = 1) +
+  scale_x_continuous(labels = scales::percent) + 
+  xlab("ΔTIF") + 
+  ylab("MMEJ:NHEJ ratio FC (log2)") + 
+  ggtitle("1 µM") +
+  geom_label_repel()
+
+data2 %>% 
+  filter(conc_char == "10 µM") %>% 
+  ggplot(., aes(freqCut_diff_mean, MMEJ_log2_FC_mean, color = group, label = drug)) + 
+  geom_point(size = 2) + 
+  theme_bw() + 
+  geom_hline(yintercept = 0, linetype = 2) + 
+  geom_vline(xintercept = 0, linetype = 2) + 
+  theme(aspect.ratio = 1) +
+  scale_x_continuous(labels = scales::percent) + 
+  xlab("ΔTIF") + 
+  ylab("MMEJ:NHEJ ratio FC (log2)") + 
+  ggtitle("10 µM") +
+  geom_label_repel()
+
+```
 
 
 # Session Info

@@ -462,12 +462,12 @@ clustering = data.frame(row.names=c('LMNB1', 'late_replicating', 'H3K9me2', 'H3K
 
 ```{r Synergies chromatin prep, fig.width= 10, fig.height= 20}
 all_compounds_epistasis_TIF = CCD_tib %>%
-  dplyr::select(drug_conc, indelrate_slope_plot, feature) %>%
+  dplyr::select(drug_conc, editratio_slope_plot, feature) %>%
   group_by(drug_conc) %>%
-  mutate(indelrate_slope_plot = ifelse(indelrate_slope_plot < 0, NA, indelrate_slope_plot),
-         onlyNA = sum(is.na(indelrate_slope_plot))) %>% 
+  mutate(editratio_slope_plot = ifelse(editratio_slope_plot < 0, NA, editratio_slope_plot),
+         onlyNA = sum(is.na(editratio_slope_plot))) %>% 
   filter(onlyNA != 25) %>%
-  reshape2::dcast(drug_conc ~ feature, value.var = "indelrate_slope_plot", fill = 0) %>% 
+  reshape2::dcast(drug_conc ~ feature, value.var = "editratio_slope_plot", fill = 0) %>% 
   column_to_rownames(var = "drug_conc")
 
 target_ctrl = dplyr::select(target, -conc_char)
@@ -489,13 +489,13 @@ drugs_concs_tib = indel.data %>% distinct(drug, conc_char, target) %>%
 
 clust_CCD = CCD_tib %>%
   filter(drug_conc %in% drugs_concs_tib$drug_conc) %>%
-  dplyr::select(drug_conc, indelrate_slope_plot, feature) %>% 
+  dplyr::select(drug_conc, editratio_slope_plot, feature) %>% 
   left_join(drugs_concs_tib) %>%
-  mutate(indelrate_slope_plot = ifelse(indelrate_slope_plot < 0, NA, indelrate_slope_plot),
-         indelrate_slope_plot = ave(indelrate_slope_plot, drug, feature, 
+  mutate(editratio_slope_plot = ifelse(editratio_slope_plot < 0, NA, editratio_slope_plot),
+         editratio_slope_plot = ave(editratio_slope_plot, drug, feature, 
                                     FUN = function(x) mean(x, na.rm = TRUE))) %>% 
-  distinct(indelrate_slope_plot, feature, drug) %>%
-  pivot_wider(values_from = indelrate_slope_plot, names_from = drug) %>% 
+  distinct(editratio_slope_plot, feature, drug) %>%
+  pivot_wider(values_from = editratio_slope_plot, names_from = drug) %>% 
   dplyr::select(where(~sum(!is.na(.x)) > 0 )) %>% 
   replace(is.na(.), 0) %>%
   column_to_rownames(var = "feature") %>%
@@ -559,10 +559,10 @@ TIF_synergy_cluster <- TIF_synergy_matrix %>%
 ```{r 4B H3K27me3 synergies, fig.width = 8, fig.height = 8}
 rank_dt = CCD_tib %>% 
   left_join(rownames_to_column(target, var = "drug_conc")) %>%
-  filter(feature == "H3K27me3", !is.na(indelrate_slope_plot)) %>%
+  filter(feature == "H3K27me3", !is.na(editratio_slope_plot)) %>%
   distinct() %>%
-  arrange(desc(indelrate_slope_plot)) %>%
-  filter(indelrate_slope_plot > 0) %>%
+  arrange(desc(editratio_slope_plot)) %>%
+  filter(editratio_slope_plot > 0) %>%
   mutate(rank = seq(1:n()))
 
 maxrank = nrow(rank_dt)
@@ -574,7 +574,7 @@ breaks <- c(seq(quant_breaks[1], 0, length.out=ceiling(palette_length/2) + 1),
 colors = colorRampPalette(slope.colors %>% pull(color))(length(breaks))
 colors[which(quant_breaks == 0)-1] = "gray90"
 
-max_slope = max(abs(rank_dt$indelrate_slope_plot))
+max_slope = max(abs(rank_dt$editratio_slope_plot))
 
 p2 = rank_dt %>% 
   ggplot(., aes(x = rank, fill = target)) +
@@ -590,13 +590,13 @@ p2 = rank_dt %>%
         axis.text.x=element_blank(),
         axis.ticks.x=element_blank())+
   # add horizontal line for 0.01 slope cutoff which is highlighted in the heatmap
-  geom_vline(xintercept = rank_dt[rank_dt$indelrate_slope_plot  < -0.01, ]$rank[1] - 0.5)  +
-  geom_vline(xintercept = max(rank_dt[rank_dt$indelrate_slope_plot  > 0.01, ]$rank) + 0.5)
+  geom_vline(xintercept = rank_dt[rank_dt$editratio_slope_plot  < -0.01, ]$rank[1] - 0.5)  +
+  geom_vline(xintercept = max(rank_dt[rank_dt$editratio_slope_plot  > 0.01, ]$rank) + 0.5)
 
 
 p3 = rank_dt %>% 
   filter(rank < 11) %>%
-  ggplot(., aes(x = rank, y = indelrate_slope_plot, fill = target)) +
+  ggplot(., aes(x = rank, y = editratio_slope_plot, fill = target)) +
   geom_bar(stat = "identity") + 
   scale_x_reverse() +
   coord_flip() +
@@ -627,15 +627,15 @@ all_compounds_epistasis_TIF %>%
 ```{r 4C m5C synergies, fig.width = 8, fig.height = 4}
 rank_dt = CCD_tib %>% 
   left_join(rownames_to_column(target, var = "drug_conc")) %>%
-  filter(feature == "m5C", !is.na(indelrate_slope_plot)) %>%
+  filter(feature == "m5C", !is.na(editratio_slope_plot)) %>%
   distinct() %>%
-  arrange(desc(indelrate_slope_plot)) %>%
-  filter(indelrate_slope_plot > 0) %>%
+  arrange(desc(editratio_slope_plot)) %>%
+  filter(editratio_slope_plot > 0) %>%
   mutate(rank = seq(1:n()))
 
 maxrank = nrow(rank_dt)
 
-max_slope = max(abs(rank_dt$indelrate_slope_plot))
+max_slope = max(abs(rank_dt$editratio_slope_plot))
 
 p2 = rank_dt %>% 
   ggplot(., aes(x = rank, fill = target)) +
@@ -651,11 +651,11 @@ p2 = rank_dt %>%
         axis.text.x=element_blank(),
         axis.ticks.x=element_blank()) +
   # add horizontal line for 0.01 slope cutoff which is highlighted in the heatmap
-  geom_vline(xintercept = rank_dt[rank_dt$indelrate_slope_plot  < -0.01, ]$rank[1] - 0.5)  +
-  geom_vline(xintercept = max(rank_dt[rank_dt$indelrate_slope_plot  > 0.01, ]$rank) + 0.5)
+  geom_vline(xintercept = rank_dt[rank_dt$editratio_slope_plot  < -0.01, ]$rank[1] - 0.5)  +
+  geom_vline(xintercept = max(rank_dt[rank_dt$editratio_slope_plot  > 0.01, ]$rank) + 0.5)
 
 p3 = rank_dt %>% 
-  ggplot(., aes(x = rank, y = indelrate_slope_plot, fill = target)) +
+  ggplot(., aes(x = rank, y = editratio_slope_plot, fill = target)) +
   geom_bar(stat = "identity") + 
   scale_x_reverse() +
   coord_flip() +
@@ -690,11 +690,11 @@ DNMT_drugs = target_set_drugs %>%
   ) %>% pull(drug_conc)
 
 TIF_synergy_matrix_DNMT = CCD_tib %>%
-  dplyr::select(drug_conc, indelrate_slope, feature) %>%
+  dplyr::select(drug_conc, editratio_slope, feature) %>%
   group_by(drug_conc) %>%
-  mutate(onlyNA = sum(is.na(indelrate_slope))) %>% 
+  mutate(onlyNA = sum(is.na(editratio_slope))) %>% 
   filter(onlyNA != 25 & drug_conc %in% DNMT_drugs) %>%
-  reshape2::dcast(drug_conc ~ feature, value.var = "indelrate_slope", fill = 0) %>% 
+  reshape2::dcast(drug_conc ~ feature, value.var = "editratio_slope", fill = 0) %>% 
   column_to_rownames(var = "drug_conc")
 
 # Make matrix with drugs from selected target
@@ -730,11 +730,11 @@ DNMT_drugs = target_set_drugs %>%
   ) %>% pull(drug_conc)
 
 TIF_synergy_matrix_DNMT = CCD_tib %>%
-  dplyr::select(drug_conc, indelrate_slope, feature) %>%
+  dplyr::select(drug_conc, editratio_slope, feature) %>%
   group_by(drug_conc) %>%
-  mutate(onlyNA = sum(is.na(indelrate_slope))) %>% 
+  mutate(onlyNA = sum(is.na(editratio_slope))) %>% 
   filter(onlyNA != 25 & drug_conc %in% DNMT_drugs) %>%
-  reshape2::dcast(drug_conc ~ feature, value.var = "indelrate_slope", fill = 0) %>% 
+  reshape2::dcast(drug_conc ~ feature, value.var = "editratio_slope", fill = 0) %>% 
   column_to_rownames(var = "drug_conc")
 
 # Make matrix with drugs from selected target
@@ -769,11 +769,11 @@ DNMT_drugs = target_set_drugs %>%
            conc_char == "10 µM") %>% pull(drug_conc)
 
 TIF_synergy_matrix_DNMT = CCD_tib %>%
-  dplyr::select(drug_conc, indelrate_slope, feature) %>%
+  dplyr::select(drug_conc, editratio_slope, feature) %>%
   group_by(drug_conc) %>%
-  mutate(onlyNA = sum(is.na(indelrate_slope))) %>% 
+  mutate(onlyNA = sum(is.na(editratio_slope))) %>% 
   filter(onlyNA != 25 & drug_conc %in% DNMT_drugs) %>%
-  reshape2::dcast(drug_conc ~ feature, value.var = "indelrate_slope", fill = 0) %>% 
+  reshape2::dcast(drug_conc ~ feature, value.var = "editratio_slope", fill = 0) %>% 
   column_to_rownames(var = "drug_conc")
 
 # Make matrix with drugs from selected target
@@ -811,7 +811,7 @@ DNMT_drugs = target_set_drugs %>%
 
 ratios_tib_fc %>% 
   filter(drug_conc %in% DNMT_drugs)  %>% 
-  ggplot(.,aes(LMNB1, log2.fc.freqCut)) + geom_point() +
+  ggplot(.,aes(LMNB1, log2.fc.editratio)) + geom_point() +
   geom_smooth(method = "lm", se = F) +
   stat_cor(method = "pearson") +
   stat_poly_eq(aes(label = paste(after_stat(eq.label),
@@ -824,7 +824,7 @@ ratios_tib_fc %>%
 
 ratios_tib_fc %>% 
   filter(drug_conc %in% DNMT_drugs)  %>% 
-  ggplot(.,aes(m5C, log2.fc.freqCut)) + geom_point() +
+  ggplot(.,aes(m5C, log2.fc.editratio)) + geom_point() +
   geom_smooth(method = "lm", se = F) +
   stat_cor(method = "pearson") +
   stat_poly_eq(aes(label = paste(after_stat(eq.label),
@@ -841,7 +841,7 @@ ratios_tib_fc %>%
 ```{r S4C Bossing in H3K27me3 specifically,  fig.width = 6, fig.height = 4}
 ratios_tib_fc %>% 
   filter(drug_conc %in% c("Vorinostat 1 µM", "EPZ-6438 10 µM"))  %>% 
-  ggplot(.,aes(H3K27me3, log2.fc.freqCut)) + geom_point() +
+  ggplot(.,aes(H3K27me3, log2.fc.editratio)) + geom_point() +
   geom_smooth(method = "lm", se = F) +
   stat_cor(method = "pearson") +
   stat_poly_eq(aes(label = paste(after_stat(eq.label),
@@ -871,9 +871,9 @@ indel.data %>% filter(!between(zscore_TIF_comb_rep, -3.2905, 3.2905) & conc_char
 for(i in unique(CCD_tib$feature)) {
   rank_dt = CCD_tib %>% 
     left_join(rownames_to_column(target, var = "drug_conc"), by = "drug_conc") %>%
-    filter(feature == i, !is.na(indelrate_slope_plot)) %>%
+    filter(feature == i, !is.na(editratio_slope_plot)) %>%
     distinct() %>%
-    arrange(desc(indelrate_slope_plot))
+    arrange(desc(editratio_slope_plot))
   
   if(nrow(rank_dt) > 1) {
     rank_dt %<>%
@@ -895,14 +895,14 @@ for(i in unique(CCD_tib$feature)) {
             axis.text.x=element_blank(),
             axis.ticks.x=element_blank())+
       # add horizontal line for 0.01 slope cutoff which is highlighted in the heatmap
-      geom_vline(xintercept = rank_dt[rank_dt$indelrate_slope_plot  < -0.01, ]$rank[1] - 0.5)  +
-      geom_vline(xintercept = max(rank_dt[rank_dt$indelrate_slope_plot  > 0.01, ]$rank) + 0.5)
+      geom_vline(xintercept = rank_dt[rank_dt$editratio_slope_plot  < -0.01, ]$rank[1] - 0.5)  +
+      geom_vline(xintercept = max(rank_dt[rank_dt$editratio_slope_plot  > 0.01, ]$rank) + 0.5)
     
     
     p2 = rank_dt %>% 
       filter(!between(rank, 16, maxrank-15)) %>%
       mutate(rank = seq(1:n())) %>% 
-      ggplot(., aes(x = rank, y = indelrate_slope_plot, fill = target)) +
+      ggplot(., aes(x = rank, y = editratio_slope_plot, fill = target)) +
       geom_bar(stat = "identity") + 
       scale_x_reverse() +
       coord_flip() +
@@ -941,11 +941,11 @@ for(i in unique(target$target)) {
     pull(drug_conc)
   
   all_compounds_epistasis_TIF = CCD_tib %>%
-    dplyr::select(drug_conc, indelrate_slope, feature) %>%
+    dplyr::select(drug_conc, editratio_slope, feature) %>%
     group_by(drug_conc) %>%
-    mutate(onlyNA = sum(is.na(indelrate_slope))) %>% 
+    mutate(onlyNA = sum(is.na(editratio_slope))) %>% 
     filter(onlyNA != 25) %>%
-    reshape2::dcast(drug_conc ~ feature, value.var = "indelrate_slope", fill = 0) %>% 
+    reshape2::dcast(drug_conc ~ feature, value.var = "editratio_slope", fill = 0) %>% 
     column_to_rownames(var = "drug_conc")
   
   # Make matrix with drugs from selected target

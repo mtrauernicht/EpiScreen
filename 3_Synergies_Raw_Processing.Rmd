@@ -1,0 +1,767 @@
+---
+title: "DSB epigenetic drug screen - Figure 4 Epistasis"
+author: 
+  - name: "Max Trauernicht & Ruben Schep"
+    email: "m.trauernicht@nki.nl"
+    affiliation: "Netherlands Cancer Institute"
+date: '`r format(Sys.time(), "%d/%m/%Y")`'
+output: 
+  html_document:
+    theme: united
+    highlight: pygments
+    fig_caption: yes
+    code_folding: hide
+    df_print: kable
+    toc: true
+    toc_depth: 4
+    toc_float:
+      collapsed: false
+  pdf_document:
+    toc: yes
+    toc_depth: '4'
+---
+
+*knitr document van Steensel lab*
+
+
+# Introduction
+Clone 5 with ~18 sgRNA target site IPRs was cut and treated with 160 epigenetic drugs. The repair outcomes of that experiment will be visualized here. I previously processed the raw sequencing data, and calculated the repair outcomes. In this script, the main results plots will be generated.
+
+
+## Setup {.tabset}
+
+<!-- little HTML script to do indentation of the table of contents -->
+<script>
+$(document).ready(function() {
+$items = $('div#TOC li');
+$items.each(function(idx) {
+num_ul = $(this).parentsUntil('#TOC').length;
+$(this).css({'text-indent': num_ul * 10, 'padding-left': 0});
+});
+
+});
+</script>
+
+```{css, echo = FALSE}
+div.sourceCode {
+overflow-x: hidden;
+}
+```
+
+# Libraries
+```{r libraries}
+knitr::opts_chunk$set(echo = TRUE)
+StartTime <-Sys.time()
+
+# 8-digit Date tag:
+Date <- substr(gsub("-","",Sys.time()),1,8) 
+
+# libraries:
+library(tidyverse)
+library(data.table)
+library(pheatmap)
+library(ggbeeswarm)
+library(broom)
+library(GGally)
+library(RColorBrewer)
+library(colorspace)
+library(magrittr)
+library(ggpubr)
+library(pls)
+```
+
+```{r outdir}
+## Select outdir
+out.dir = list.dirs(path = "/DATA/projects/DSBrepair/data/R") %>% .[grepl("episcreen", .)] %>% tail(n = 1)
+in.dir = out.dir
+dir.create(out.dir, showWarnings = FALSE)
+
+# Temp figure output folder
+figure_out = "/DATA/projects/DSBrepair/scratch/episcreen/"
+
+# initials (for file export)
+initials = "rs"
+
+pval_signif = 0.01
+```
+
+
+## Custom functions
+```{r functions synergies}
+serialNext = function(prefix, extension){
+  i=0
+  repeat {
+    f = paste0(prefix, "_", i , ".", extension)
+    if(!file.exists(f)){return(f)}
+    i=i+1
+  }
+}
+
+SetFileName <- function(filename, initials, extension) {
+  # Set filename with extension and initials to make filename with date integrated.
+  filename <- substitute(filename)
+  filename <- paste0(out.dir, "/", initials, substr(gsub("-","",Sys.time()),1,8), "_", filename)
+  filename <- serialNext(filename, extension)
+  filename
+}
+```
+
+# Load data
+## Load tables
+```{r}
+#Chromatin data (it needs a IPR column)
+# Import data from preprocessing script
+file = list.files(in.dir, pattern = "episcreen_ratios", full.names = T) %>% tail(n = 1)
+
+indel.data <- readRDS(file) %>% filter(viab_reproducibility) %>%
+  mutate(drug = gsub(" [(].*[)]", "", drug))# %>%
+# We remove the HDAC1 and HDAC2 chromatin features as we do not have a sufficient dynamic range in
+# our clone to make strong conclusions. The max z-score we get are < 80% CI of the z-score in the
+# whole pool.
+# dplyr::select(-HDAC1, -HDAC2)
+
+TRIP_chrom_tib <- readRDS('files_scripts/cl20201026_ChIP_zscore_selection.RDS') # %>% 
+# Same for the TRIP chromatin features
+#dplyr::select(-HDAC1, -HDAC2)
+
+TRIP_chrom = TRIP_chrom_tib %>% dplyr::select(-binsize, -pool) %>% column_to_rownames("ID")
+# make clustering with some column rotation for better visualisation
+TRIP_chrom_clust = hclust(dist(t(TRIP_chrom)), method = "ward.D")
+
+
+
+chromatin.features <- colnames(indel.data)[grepl("[.]zscore", colnames(indel.data))]
+chrom_data = indel.data %>% dplyr::select(IPR, all_of(chromatin.features)) %>% distinct()  %>%
+  rename_with(., ~gsub(".zscore", "", .x))
+
+chromatin.features.short = gsub(".zscore", "", chromatin.features)
+```
+
+## Correlation with TRIP wide
+```{r correlation between features TRIP wide, echo = FALSE, eval = FALSE}
+max_chrom_tib_C5 = chrom_data %>% 
+  as_tibble() %>% 
+  dplyr::select(-IPR) %>%
+  rename_with(., ~gsub(".zscore", "", .x)) %>% 
+  summarise_each(., funs(max(., na.rm=TRUE))) %>% 
+  pivot_longer(cols = everything(), names_to = "name", values_to = "max")
+
+maxmin_chrom_tib_C5 = chrom_data %>% 
+  as_tibble() %>% 
+  dplyr::select(-IPR) %>%
+  rename_with(., ~gsub(".zscore", "", .x)) %>% 
+  summarise_each(., funs(min(., na.rm=TRUE))) %>% 
+  pivot_longer(cols = everything(), names_to = "name", values_to = "min") %>%
+  left_join(max_chrom_tib_C5)
+
+chrom_tib = TRIP_chrom_tib %>% 
+  dplyr::select(-binsize, -pool, -ID) %>% 
+  distinct() %>% 
+  pivot_longer(cols = everything()) %>% 
+  left_join(maxmin_chrom_tib_C5) %>%
+  group_by(name) %>%
+  mutate(max_CI = ecdf(value)(max),
+         min_CI = ecdf(value)(min)) %>%
+  distinct(name, max_CI, min_CI)
+
+chrom_tib %>% filter(max_CI < 0.8)
+
+# From Fede:
+# ggpairs custom functions
+corColor <- function(data, mapping, color = I("black"), sizeRange = c(1, 3), ...) {
+  
+  x   <- eval_data_col(data, mapping$x)
+  y   <- eval_data_col(data, mapping$y)
+  r   <- cor(x, y)
+  rt  <- format(r, digits = 3)
+  tt  <- as.character(rt)
+  cex <- max(sizeRange)
+  
+  # helper function to calculate a useable size
+  percent_of_range <- function(percent, range) {
+    percent * diff(range) + min(range, na.rm = TRUE)
+  }
+  
+  # plot correlation coefficient
+  p <- ggally_text(label = tt, mapping = aes(), xP = 0.5, yP = 0.5,
+                   size = I(percent_of_range(cex * abs(r), sizeRange)), color = color, ...) +
+    theme(panel.grid.minor=element_blank(),
+          panel.grid.major=element_blank())
+  
+  corColors <- RColorBrewer::brewer.pal(n = 7, name = "RdYlBu")[2:6]
+  
+  if (r <= boundaries[1]) {
+    corCol <- corColors[1]
+  } else if (r <= boundaries[2]) {
+    corCol <- corColors[2]
+  } else if (r < boundaries[3]) {
+    corCol <- corColors[3]
+  } else if (r < boundaries[4]) {
+    corCol <- corColors[4]
+  } else {
+    corCol <- corColors[5]
+  }
+  
+  p <- p +
+    theme(panel.background = element_rect(fill = corCol))
+  
+  return(p)
+}
+
+boundaries <- c(-0.7, -.5,0.5,0.7)
+pdf(paste0(figure_out, "rs20220722_chrom_cor_clones.pdf"), width=20, height=20)
+ggpairs(chrom_data[, labels(TRIP_chrom_clust)],
+        upper = list(continuous = corColor),
+        # lower = list(continuous = "density"),
+        lower = list(continuous = function(data, mapping, ...) {
+          ggally_points(data = data, mapping = mapping) +
+            geom_abline(slope = 1, lty = "twodash", col = "grey")
+          # ggally_smooth(data = data, mapping = mapping, method = "lm", color = "red", lty = "dashed", size = 0.5)
+        }),
+        diag = list(continuous = function(data, mapping, ...) {
+          ggally_densityDiag(data = data, mapping = mapping, alpha = 0.3, fill = "red")})) +
+  xlab("Chromatin") +
+  ylab("Chromatin")
+dev.off()
+```
+
+## Annotations
+```{r}
+colors_drugs <- c("#FA8D62", "#65BFA4", "#8CA0C4", "#808184", "#F6D289", "#E5E5E5", "#ACACAC", "#737373")
+conc_control_colors = c("control" = colors_drugs[2], "100 nM" = colors_drugs[7], "1 µM" = colors_drugs[4], "10 µM" = "#000000")
+conc_colors = c("100 nM" = colors_drugs[7], "1 µM" = colors_drugs[4], "10 µM" = "#000000")
+
+group_colors = c("Euchromatin" = "#f7941d",
+                 "other-heterochromatin" = "#838687",
+                 "Triple Heterochromatin" = "#662d91",
+                 "H3K27me3" = "#d21f8a")
+
+viab_colors = sequential_hcl(11, "Peach", rev = TRUE)
+names(viab_colors) = as.numeric(seq(0, 1, by = 0.1))
+
+annotation_colors_scr = list(
+  chromatin = group_colors,
+  target = c(HDAC="#157834", HAT="#C6D0A8", Sirtuin="#802155",
+             HMT="#8EC9AB", DNMT="#9A9932", `Histone Demethylase`="#DECD77",
+             HIF="#E2DBD4", JAK="#CB546F", PIM="#45AB9A", `Aurora Kinase`="#A74694",
+             PARP="#D69C81", `Epigenetic Reader Domain`= "#8ACDEF", `DNA-PK`="#779ed7", 
+             `Negative Control` = "#65BFA4", `MRN` = "#5D79AC"),
+  conc_char = conc_colors,
+  conc_char_ctrl = conc_control_colors,
+  clusters_drugs = sequential_hcl(7, "Plasma"),
+  # viab_rep1 = c('#ffeee9', '#ffdcd4', '#ffcbbe', '#ffb8a8', '#fda693', '#f9947e', '#f4826a', '#ef6f56', '#e95b43', '#e24530'),
+  # viab_rep2 = c('#ffeee9', '#ffdcd4', '#ffcbbe', '#ffb8a8', '#fda693', '#f9947e', '#f4826a', '#ef6f56', '#e95b43', '#e24530'),
+  viab = viab_colors,
+  TIF = colorRampPalette(c("white", "black"))(20),
+  MMEJratio = c('#e1251b', '#d32c2d', '#c5313c', '#b6354a', '#a73857', '#963a65', '#843d72', '#6e3e7f', '#53408d', '#26419a'),
+  group = c(insulator="#a6b5a3", repressive="#304441", euchromatin="#cda4cc",
+            transcribing="#FBB040", HDAC="#aac9e0", accessibility='#cebc85',
+            methylation='#7dc98f'))
+
+
+ordered_marks2 <- c("Negative Control", "MRN", "DNA-PK","Epigenetic Reader Domain", "HDAC",  "Sirtuin", "HAT", 
+                    "Histone Demethylase", "HMT", "DNMT", 
+                    "HIF", "JAK", "PIM",
+                    "Aurora Kinase", "PARP")
+
+
+
+```
+
+## Initial filtering and preparing the tables for mean log2 FC calculation
+```{r, warning=FALSE}
+# List significance
+filtered_drug_pvals = indel.data %>%
+  mutate(drug = case_when(conc_char == "control" & plate %in% c(1:6) ~ 
+                            paste(drug, drug_plate, well, "1", sep = " "), 
+                          conc_char == "control" & plate %in% c(7:12) ~ 
+                            paste(drug, drug_plate, well, "2", sep = " "),
+                          conc_char == "control" & plate %in% c(13:18) ~ 
+                            paste(drug, drug_plate, well, "3", sep = " "),
+                          T ~ drug)) %>%
+  distinct(drug, conc_char, IPR, zscore_TIF_comb_rep, zscore_bal_comb_rep, filter_zscore_TIF_comb_rep, filter_zscore_bal_comb_rep) %>%
+  filter(!is.na(zscore_bal_comb_rep), !is.na(zscore_TIF_comb_rep)) %>%
+  mutate(
+    zscore_TIF_comb_rep_temp = ifelse(filter_zscore_TIF_comb_rep, zscore_TIF_comb_rep, 0),
+    zscore_bal_comb_rep_temp = ifelse(filter_zscore_bal_comb_rep, zscore_bal_comb_rep, 0),
+    p_val_TIF = 2*pnorm(q = abs(zscore_TIF_comb_rep_temp), lower.tail = F),
+    p_val_bal = 2*pnorm(q = abs(zscore_bal_comb_rep_temp), lower.tail = F),
+    # Adjust p value for false discovery rate
+    adj_pval_TIF = p.adjust(p_val_TIF, method = 'BH'),
+    adj_pval_bal = p.adjust(p_val_bal, method = 'BH'))
+
+# Make a table with the orientation of effect, used later for filtering. 
+filtered_drug_conc = filtered_drug_pvals %>%
+  filter(adj_pval_TIF < pval_signif | adj_pval_bal < pval_signif | grepl("DMSO", drug)) %>%
+  mutate(drug_conc = paste(drug, conc_char,sep = " "),
+         # List if they affect the variable.
+         effect_on_indelrate = ifelse(adj_pval_TIF < pval_signif, TRUE, FALSE),
+         effect_on_ratio = ifelse(adj_pval_bal < pval_signif, TRUE, FALSE)) %>%
+  distinct(IPR, drug, conc_char, drug_conc, effect_on_indelrate, effect_on_ratio) %>%
+  mutate(# Count of IPR per compound that have an effect. We want at least 2 (avoid outliers)
+    count_TIF = as.numeric(ave(effect_on_indelrate, drug_conc, FUN = sum)),
+    count_bal = as.numeric(ave(effect_on_ratio, drug_conc, FUN = sum)),
+    # Keep here to at least 2 sites are significant in either TIF or bal
+    keep = ifelse(count_TIF > 1 | count_bal > 1| grepl("DMSO", drug), 
+                  TRUE, FALSE)) %>%
+  filter(keep) %>%
+  # Change the effect if less than 2. 
+  mutate(effect_on_indelrate = ifelse(count_TIF < 2, FALSE, effect_on_indelrate),
+         effect_on_ratio = ifelse(count_bal < 2, FALSE, effect_on_ratio)) %>%
+  distinct(drug, conc_char, drug_conc, effect_on_indelrate, effect_on_ratio) %>% 
+  # There are duplicates, we want to remove them too. To do so let's replace the 
+  # FALSE with TRUE in one column if the other is TRUE. And then unique the set.
+  left_join(count(., drug_conc)) %>% # First count the occurences of the compounds
+  # 1 = only one or the other, 2-3 is both. 
+  # If more than 1 make both TRUE so they are both kept.
+  mutate(effect_on_indelrate = ifelse(n > 1, TRUE, effect_on_indelrate),
+         # same for the ratio
+         effect_on_ratio = ifelse(n > 1, TRUE, effect_on_ratio)) %>%
+  distinct(drug, conc_char, drug_conc, effect_on_indelrate, effect_on_ratio)
+
+
+## From Xabi Vergara to filter on effect and not on intercept.
+effect_of_compound_tib = filtered_drug_pvals %>%
+  dplyr::group_by(drug, conc_char) %>% 
+  # Change the non significant ones to 0, so we filter them out.
+  mutate(zscore_TIF_comb_rep_temp = ifelse(adj_pval_TIF >= pval_signif, 0, zscore_TIF_comb_rep_temp),
+         zscore_bal_comb_rep_temp = ifelse(adj_pval_bal >= pval_signif, 0, zscore_bal_comb_rep_temp)) %>%
+  dplyr::summarise(#Summarise number of significant barcodes per compound for balance
+    NHEJ_signif = sum(zscore_bal_comb_rep_temp < -1.96), 
+    MMEJ_signif = sum(zscore_bal_comb_rep_temp > 1.96), 
+    #Summarise number of significant barcodes per compound for TIF
+    TIF_down_signif = sum(zscore_TIF_comb_rep_temp < -1.96), 
+    #Annotate which pathway the compound boosts
+    TIF_up_signif = sum(zscore_TIF_comb_rep_temp > 1.96)) %>% 
+  mutate(bal_signif = case_when(NHEJ_signif >= 1 & MMEJ_signif >= 1 ~ "both", 
+                                MMEJ_signif <= 1 & NHEJ_signif > 1 ~ "NHEJ", 
+                                NHEJ_signif <= 1 & MMEJ_signif > 1 ~ "MMEJ", 
+                                T ~ "no_effect"),
+         #Annotate how the compounds affects TIF
+         TIF_signif = case_when(TIF_down_signif >= 1 & TIF_up_signif >= 1 ~ "TIF_both",
+                                TIF_up_signif <= 1 & TIF_down_signif > 1 ~ "TIF_down", 
+                                TIF_down_signif <= 1 & TIF_up_signif > 1 ~ "TIF_up",  
+                                T ~ "no_effect")) %>%
+  mutate(drug_conc = paste(drug, conc_char, sep = " ")) %>%
+  # Semi-join the filtered drug conc to keep only the significant ones after p adjustment.
+  semi_join(filtered_drug_conc) 
+
+ratios_tib <- indel.data %>%
+  mutate(drug = case_when(conc_char == "control" & plate %in% c(1:6) ~ 
+                            paste(drug, drug_plate, well, "1", sep = " "), 
+                          conc_char == "control" & plate %in% c(7:12) ~ 
+                            paste(drug, drug_plate, well, "2", sep = " "),
+                          conc_char == "control" & plate %in% c(13:18) ~ 
+                            paste(drug, drug_plate, well, "3", sep = " "),
+                          T ~ drug),
+         drug_conc = paste(drug, conc_char, sep = " ")) %>%
+  semi_join(filtered_drug_conc) %>%
+  # I take the ratio without mean here because I adjusted for 0 value at that level in the preprocessing script line 1009
+  # We don't have that issue with the freqCut. 
+  distinct(MMEJratio, MMEJratio_min, freqCut, drug, conc_char, drug_conc, target, IPR, replicate, tech) %>% 
+  mutate(MMEJratio = ifelse(MMEJratio == 0, MMEJratio_min, MMEJratio),
+         MMEJratio.log2 = log2(MMEJratio),
+         freqCut.log2 = log2(freqCut),
+         editratio.log2 = log2(freqCut/(1-freqCut))) %>%
+  dplyr::select(-MMEJratio, -MMEJratio_min) %>%
+  distinct()
+
+dmso_ratios_tib <- indel.data %>%
+  filter(drug == "DMSO") %>%
+  distinct(MMEJratio_mean, freqCut_mean, IPR, tech, replicate) %>%
+  mutate(DMSO.ratio.log2 = log2(MMEJratio_mean),
+         DMSO.freqCut.log2 = log2(freqCut_mean),
+         DMSO.editratio.log2 = log2(freqCut_mean/(1-freqCut_mean)),
+         DMSO.freqCut = freqCut_mean) %>%
+  dplyr::select(-MMEJratio_mean, -freqCut_mean) %>%
+  distinct()
+
+ratios_tib <- merge(ratios_tib, dmso_ratios_tib)
+```
+
+The log2 distance ratio in our case is positive if it promotes NHEJ and negative if it promotes NHEJ
+
+## Compute the mean log2 fold-change.
+```{r}
+# Each replicate has a different value (compute differences by replicate)
+ratios_tib_fc <- ratios_tib %>% 
+  mutate(log2.fc.ratio = MMEJratio.log2 - DMSO.ratio.log2, 
+         log2.fc.ratio = ave(log2.fc.ratio, IPR, drug_conc, FUN = function(x) mean(x, na.rm = TRUE)), 
+         log2.fc.editratio = editratio.log2 - DMSO.editratio.log2, 
+         log2.fc.editratio = ave(log2.fc.editratio, IPR, drug_conc, FUN = function(x) mean(x, na.rm = TRUE)), 
+         log2.fc.freqCut = freqCut.log2 - DMSO.freqCut.log2,
+         log2.fc.freqCut = ave(log2.fc.freqCut, IPR, drug_conc, FUN = function(x) mean(x, na.rm = TRUE)),
+         diff.freqCut = freqCut - DMSO.freqCut,
+         diff.freqCut = ave(diff.freqCut, IPR, drug_conc, FUN = function(x) mean(x, na.rm = TRUE))) %>%
+  distinct(IPR, drug, conc_char, target, log2.fc.freqCut, log2.fc.ratio, log2.fc.editratio, diff.freqCut) %>%
+  left_join(chrom_data) 
+```
+
+# Calculating the Chromatin Context Dependency (CCD)
+## Extract slopes for all genes
+```{r}
+# Perform analysis across all features for three test genes
+ratios_tib_fc %<>% mutate(drug_conc = paste(drug, conc_char, sep = " "))
+
+slope.protein.features <- tibble(drug_conc = NA, feature = NA,  term = NA, 
+                                 indelrate = NA, p.value.indelrate = NA, 
+                                 indelratediff = NA, p.value.indelratediff = NA, 
+                                 editratio = NA, p.value.editratio = NA,
+                                 ratio = NA, p.value.ratio = NA)
+
+for (i in unique(ratios_tib_fc$drug_conc)) {
+  for (j in chromatin.features.short) {
+    model_tib <- ratios_tib_fc %>% filter(drug_conc == i) 
+    
+    # Indel rates
+    model.indelrate.log2 <- lm(formula = log2.fc.freqCut ~ unlist(model_tib[j]), 
+                               data = model_tib) %>% 
+      tidy()
+    
+    # Indel rates raw
+    model.indelrate <- lm(formula = diff.freqCut ~ unlist(model_tib[j]), 
+                          data = model_tib) %>% 
+      tidy()
+    
+    # Indel rates ratio
+    model.editratio.log2 <- lm(formula = log2.fc.editratio ~ unlist(model_tib[j]), 
+                               data = model_tib) %>% 
+      tidy()
+    
+    
+    # Pathway balance
+    model.ratio.log2 <- lm(formula = log2.fc.ratio ~ unlist(model_tib[j]), 
+                           data = model_tib) %>% 
+      tidy()
+    
+    slope.protein.features <- slope.protein.features %>% 
+      add_row(drug_conc = i, 
+              feature = j, 
+              term = model.indelrate.log2 %>%
+                pull(term),
+              # TIF fc
+              indelrate = model.indelrate.log2 %>% 
+                pull(estimate), 
+              p.value.indelrate = model.indelrate.log2 %>% 
+                pull(p.value),
+              # TIF diff
+              indelratediff = model.indelrate %>% 
+                pull(estimate), 
+              p.value.indelratediff = model.indelrate %>% 
+                pull(p.value),
+              # TIF ratio
+              editratio = model.editratio.log2 %>% 
+                pull(estimate), 
+              p.value.editratio = model.editratio.log2 %>% 
+                pull(p.value),
+              # Ratio
+              ratio = model.ratio.log2 %>% 
+                pull(estimate), 
+              p.value.ratio = model.ratio.log2 %>% 
+                pull(p.value))
+  }
+}
+
+# Remove the 1st NA column
+slope.protein.features %<>% 
+  filter(!is.na(feature)) %>%
+  mutate(term = ifelse(term == "(Intercept)", "intercept", "slope"))
+```
+
+
+### Calculating the Principle Component Regression (PCR)
+```{r}
+CCD_tib = ratios_tib_fc %>% 
+  dplyr::select(IPR, drug_conc, log2.fc.freqCut, diff.freqCut, 
+                log2.fc.ratio, log2.fc.editratio, 
+                all_of(chromatin.features.short)) %>% 
+  ungroup()
+
+#Create an empty dt with CCDs of DDR proteins
+drug_conc_CCDs_dt <- tibble(var = NA, drug_conc = NA, num_comp = NA, 
+                            r.squared = NA, adj.r.squared = NA,p.value = NA)
+# chrom_formula = as.formula(paste("y ~ ", paste(chromatin.features, collapse= "+")))
+
+for (i in unique(CCD_tib$drug_conc)){
+  for (j in c("log2.fc.freqCut", "diff.freqCut", "log2.fc.editratio", "log2.fc.ratio")) {
+    drug_conc_dt <- filter(CCD_tib, drug_conc == i)
+    # Run a model per drug_conc
+    set.seed(1)
+    chrom_formula = reformulate(chromatin.features.short, response = j)
+    PCR_model_DDR_test <- pcr(chrom_formula,
+                              data=drug_conc_dt , 
+                              validation="CV")
+    
+    pcr_pred <- predict(PCR_model_DDR_test, 
+                        drug_conc_dt, ncomp = 3)
+    
+    combined.dt <- tibble(measured = drug_conc_dt %>% pull(j), 
+                          predicted = as.numeric(pcr_pred))
+    
+    pred_vs_estim <- lm(formula = measured ~ predicted, 
+                        data = combined.dt) %>% 
+      glance()
+    
+    drug_conc_CCDs_dt <- drug_conc_CCDs_dt %>% 
+      add_row(var = j,
+              drug_conc = i, 
+              r.squared = pred_vs_estim %>% 
+                pull(r.squared), 
+              adj.r.squared = pred_vs_estim %>% 
+                pull(adj.r.squared), 
+              p.value = pred_vs_estim %>% 
+                pull(p.value))
+  }
+}
+
+#Correct model to adjust for multiple testing correction
+adj_p.value_KO_model <- drug_conc_CCDs_dt %>% 
+  filter(!is.na(var)) %>%
+  dplyr::select(var, num_comp, p.value, drug_conc) %>% 
+  group_by(var) %>%
+  mutate(p.adj = p.adjust(p.value, method = "BH")) %>% 
+  dplyr::select(var, drug_conc,p.value,p.adj)
+
+signif_pcr_hits = adj_p.value_KO_model %>% filter(p.adj < pval_signif) %>% 
+  distinct(drug_conc, var) %>% 
+  ungroup() %>% 
+  mutate(val = TRUE,
+         var = gsub("log2.fc", "signif.pcr", var),
+         var = gsub("diff.freqCut", "signif.pcr.freqCutdiff", var)) %>%
+  pivot_wider(names_from = var, 
+              values_from = val, 
+              values_fill = FALSE) 
+
+TIF_CCDs = adj_p.value_KO_model %>% 
+  filter(var == "log2.fc.freqCut" & 
+           p.adj < pval_signif &
+           !grepl("DNA-PK|DMSO|Mirin", drug_conc)) %>%
+  nrow()
+
+TIFdiff_CCDs = adj_p.value_KO_model %>% 
+  filter(var == "diff.freqCut" & 
+           p.adj < pval_signif &
+           !grepl("DNA-PK|DMSO|Mirin", drug_conc)) %>%
+  nrow()
+
+TIFratio_CCDs = adj_p.value_KO_model %>% 
+  filter(var == "log2.fc.editratio" & 
+           p.adj < pval_signif &
+           !grepl("DNA-PK|DMSO|Mirin", drug_conc)) %>%
+  nrow()
+
+bal_CCDs = adj_p.value_KO_model %>% filter(var == "log2.fc.ratio"& 
+                                             p.adj < pval_signif &
+                                             !grepl("DNA-PK|DMSO|Mirin", drug_conc)) %>%
+  nrow()
+
+paste("Of the 160 drugs,", TIF_CCDs,"had a significant TIF for the balance and", bal_CCDs,"had a significant CCD for the balance")
+
+adj_p.value_KO_model %>% 
+  filter(p.adj < pval_signif &
+           grepl("DMSO", drug_conc))
+```
+
+### Filtering the epistasis
+```{r epistasis filtering}
+# Calculate postition where the linear model crosses y = 0, we do this by -intercept / slope
+epistasis_tib = slope.protein.features %>% 
+  distinct(drug_conc, term, feature, indelrate, indelratediff, editratio, ratio) %>% 
+  pivot_wider(., names_from = term, values_from = c(indelrate, indelratediff,
+                                                    editratio, ratio)) %>%
+  mutate(feature = gsub(".zscore", "", feature))
+
+epistasis_tib %<>% 
+  left_join(signif_pcr_hits) %>%# These are p values for a significant CCD by PCR
+  left_join(effect_of_compound_tib) %>% 
+  left_join(filtered_drug_conc) %>%
+  distinct(# These are p values for a significant CCD by PCR
+    signif.pcr.ratio, signif.pcr.editratio, signif.pcr.freqCut, signif.pcr.freqCutdiff, 
+    drug_conc, feature, 
+    indelrate_slope, indelratediff_slope, ratio_slope, editratio_slope, # The slopes
+    bal_signif, TIF_signif, # What effect the compounds have
+    effect_on_indelrate, effect_on_ratio) %>% # If the effect is significant in at least 2 IPRs (from above)) %>% 
+  mutate(
+    ratio_slope_plot = case_when(
+      effect_on_ratio & signif.pcr.ratio & bal_signif == "MMEJ" & ratio_slope > 0 ~ 
+        ratio_slope,
+      bal_signif == "MMEJ" & ratio_slope < 0 ~ 
+        as.double(NA), 
+      effect_on_ratio & signif.pcr.ratio & bal_signif == "NHEJ" & ratio_slope < 0 ~ 
+        ratio_slope,
+      bal_signif == "NHEJ" & ratio_slope > 0 ~ as.double(NA), 
+      effect_on_ratio & signif.pcr.ratio & bal_signif == "bal_both" ~ 
+        ratio_slope,
+      T ~ as.double(NA)),
+    editratio_slope_plot = case_when(
+      effect_on_indelrate & signif.pcr.editratio & TIF_signif == "TIF_down" & editratio_slope < 0 ~
+        editratio_slope, 
+      TIF_signif == "TIF_down" & editratio_slope < 0 ~ as.double(NA), 
+      effect_on_indelrate & signif.pcr.editratio & TIF_signif == "TIF_up" & editratio_slope > 0 ~ 
+        editratio_slope, 
+      TIF_signif == "TIF_up" & editratio_slope > 0 ~ as.double(NA), 
+      effect_on_indelrate & signif.pcr.editratio & TIF_signif == "TIF_both" ~ 
+        editratio_slope,
+      T ~ as.double(NA)),
+    indelrate_slope_plot = case_when(
+      effect_on_indelrate & signif.pcr.freqCut & TIF_signif == "TIF_down" & 
+        indelrate_slope < 0 ~ indelrate_slope, 
+      TIF_signif == "TIF_down" & indelrate_slope > 0 ~ as.double(NA), 
+      effect_on_indelrate & signif.pcr.freqCut & TIF_signif == "TIF_up" & 
+        indelrate_slope > 0 ~ indelrate_slope, 
+      TIF_signif == "TIF_up" & indelrate_slope < 0 ~ as.double(NA), 
+      effect_on_indelrate & signif.pcr.freqCut & TIF_signif == "TIF_both" ~ indelrate_slope,
+      T ~ as.double(NA)),
+    indelratediff_slope_plot = case_when(
+      effect_on_indelrate & signif.pcr.freqCutdiff & 
+        TIF_signif == "TIF_down" & indelratediff_slope < 0 ~ indelratediff_slope, 
+      TIF_signif == "TIF_down" & indelratediff_slope > 0 ~ as.double(NA), 
+      effect_on_indelrate & signif.pcr.freqCutdiff & 
+        TIF_signif == "TIF_up" & indelratediff_slope > 0 ~ indelratediff_slope, 
+      TIF_signif == "TIF_up" & indelratediff_slope < 0 ~ as.double(NA), 
+      effect_on_indelrate & signif.pcr.freqCutdiff & TIF_signif == "TIF_both" ~ 
+        indelratediff_slope,
+      T ~ as.double(NA))) %>%
+  distinct(drug_conc, feature, indelrate_slope, indelrate_slope_plot, 
+           indelratediff_slope, indelratediff_slope_plot, 
+           editratio_slope, editratio_slope_plot, ratio_slope, ratio_slope_plot)
+
+TIF_CCDs = epistasis_tib %>% 
+  filter(!grepl("DNA-PK|control", drug_conc)) %>% 
+  filter(!is.na(indelrate_slope_plot)) %>%
+  distinct(drug_conc) %>%
+  nrow()
+
+TIFdiff_CCDs = epistasis_tib %>% 
+  filter(!grepl("DNA-PK|control", drug_conc)) %>% 
+  filter(!is.na(indelratediff_slope_plot)) %>%
+  distinct(drug_conc) %>%
+  nrow()
+
+bal_CCDs = epistasis_tib %>% 
+  filter(!grepl("DNA-PK|control", drug_conc)) %>% 
+  filter(!is.na(ratio_slope_plot)) %>%
+  distinct(drug_conc) %>%
+  nrow()
+
+paste("Of the 480 drug:concentration combinations,", TIF_CCDs,"had a significant CCD for the TIF, ", TIFdiff_CCDs, "for TIF diff and", bal_CCDs,"had a significant CCD for the balance")
+
+drug_conc_tib = filtered_drug_pvals %>% distinct(drug, conc_char) %>% 
+  filter(!grepl("DNA-PK|control", drug)) %>% 
+  mutate(drug_conc = paste(drug, conc_char,sep = " "))
+
+TIF_CCDs = drug_conc_tib %>% left_join(epistasis_tib)%>% 
+  filter(!is.na(indelrate_slope_plot)) %>%
+  distinct(drug) %>%
+  nrow()
+
+bal_CCDs = drug_conc_tib %>% left_join(epistasis_tib)%>% 
+  filter(!is.na(ratio_slope_plot)) %>%
+  distinct(drug) %>%
+  nrow()
+
+paste("Of the 160 drugs,", TIF_CCDs,"had a significant CCD for the TIF and", bal_CCDs,"had a significant CCD for the balance")
+
+drug_CCDs = drug_conc_tib %>% left_join(epistasis_tib)%>% 
+  filter(!is.na(ratio_slope_plot) | !is.na(indelrate_slope_plot)) %>%
+  distinct(drug) %>%
+  nrow()
+
+drug_conc_CCDs = drug_conc_tib %>% left_join(epistasis_tib)%>% 
+  filter(!is.na(ratio_slope_plot) | !is.na(indelrate_slope_plot)) %>%
+  distinct(drug_conc) %>%
+  nrow()
+
+paste("Of the 160 drugs,", drug_CCDs,"had a significant CCD for the TIF and/or balance and", drug_conc_CCDs," of the 480 drug-concentrations")
+```
+
+```{r separate control and other samples}
+ctrl_CCDs = epistasis_tib %>% filter(grepl("control", drug_conc))
+
+epistasis_tib = epistasis_tib %>% filter(!grepl("control", drug_conc))
+```
+
+
+## Heatmap annoation
+### Clone 5 clustering
+```{r Clone 5 clustering}
+clone5.matrix = indel.data %>% 
+  dplyr::select(IPR, ends_with(".zscore")) %>% 
+  distinct() %>% 
+  rename_with(., ~gsub(".zscore", "", .x)) %>%
+  column_to_rownames(var="IPR")
+
+clone5_map_ipr = hclust(dist(clone5.matrix), method = "ward.D") %>% 
+  # Rotate the middle node to math better the TIF in CTRL conditions
+  dendextend::rotate(c(1:6, 10:7, 11:18))
+```
+
+### Compound annotation
+```{r compound annotation}
+# Set annotation for heatmap
+viab_drug = indel.data %>% filter(drug != "PAO") %>% 
+  mutate(drug = gsub(" [(].*[)]", "", drug),
+         drug_conc = paste(drug, conc_char, sep = " ")) %>% 
+  distinct(viab_mean, drug_conc, replicate) %>% group_by(drug_conc) %>%
+  summarise(viab = mean(viab_mean))
+
+# Add effect on TIF and balance
+effect_tib = effect_of_compound_tib %>% 
+  ungroup() %>%
+  distinct(drug_conc, TIF_signif, bal_signif)
+
+# Row annotation: annotate drugs with the target group
+target <- indel.data %>% 
+  # filter(!target %in% c("Negative Control", "MRN", "DNA-PK")) %>%
+  mutate(drug = gsub(" [(].*[)]", "", drug),
+         drug_conc = paste(drug, conc_char, sep = " ")) %>%
+  left_join(viab_drug) %>%
+  left_join(effect_tib) %>%
+  distinct(drug_conc, conc_char, target, viab, TIF_signif, bal_signif) %>% 
+  column_to_rownames(var="drug_conc")
+```
+### IPR annotation
+```{r IPR annotation}
+chromatin <- readRDS("files_scripts/xv20200915_DDR_data_CHIP.rds") %>% 
+  distinct(barcode, chromatin) %>%
+  left_join(distinct(indel.data, IPR, barcode)) 
+
+chromatin <- chromatin %>%
+  filter(IPR != "<NA>") %>% 
+  dplyr::select(-barcode) %>%
+  column_to_rownames(var="IPR")
+
+TIF_IPR = indel.data %>% filter(drug == "DMSO") %>%
+  distinct(replicate, tech, freqCut,MMEJratio, IPR, well, plate) %>%
+  group_by(IPR) %>%
+  summarise(TIF = mean(freqCut),
+            MMEJratio = mean(MMEJratio))
+
+chromatin_TIF = chromatin %>% rownames_to_column(var = "IPR") %>%
+  left_join(TIF_IPR) %>%
+  column_to_rownames("IPR")
+```
+
+# Export
+```{r export}
+# The mutations list that can be loaded for the indel spectra plots.
+filename <- SetFileName("CCD_table_raw", initials = initials, extension = "RDS")
+saveRDS(epistasis_tib, file = filename)
+
+# The ratios list of the split technical replicates
+filename <- SetFileName("IPR_annotation_heatmap", initials = initials, extension = "RDS")
+saveRDS(chromatin_TIF, file = filename)
+
+# The ratios list of the split technical replicates
+filename <- SetFileName("compound_annotation_heatmap", initials = initials, extension = "RDS")
+saveRDS(target, file = filename)
+
+# The ratios list of the split technical replicates
+filename <- SetFileName("chrom_cluster_heatmap", initials = initials, extension = "RDS")
+saveRDS(TRIP_chrom_clust, file = filename)
+
+# Export the FC ratios tibble for plotting
+filename <- SetFileName("FC_ratios", initials = initials, extension = "RDS")
+saveRDS(ratios_tib_fc, file = filename)
+```
+
