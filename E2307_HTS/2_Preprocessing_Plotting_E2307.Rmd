@@ -825,7 +825,7 @@ local_effects_chromatin %>%
 
 ## CCD analysis
 ```{r chromatin annotation}
-CCD_tib <- readRDS("/DATA/projects/DSBrepair/data/R/rs20231010_episcreen/mt20231016_CCD_RPE_table_2.RDS")
+CCD_tib <- readRDS("/DATA/usr/m.trauernicht/projects/EpiScreen/data/mt20231017_CCD_RPE_table_0.RDS")
 
 all_compounds_epistasis_TIF = CCD_tib %>%
   dplyr::select(drug, indelrate_slope_plot, feature) %>%
@@ -898,7 +898,8 @@ ggplot(local_effects_chromatin_ccd %>%
 
 ## Compare synergies between RPE-1 and K562
 ### Load K562 synergies
-CCD_tib_k562 <- readRDS("/DATA/projects/DSBrepair/data/R/rs20231010_episcreen/rs20231010_CCD_table_raw_0.RDS") %>%
+file = list.files(in.dir, pattern = "CCD_table", full.names = T) %>% tail(n = 1)
+CCD_tib_k562 <- readRDS(file) %>%
   filter(drug_conc %in% c("Tubastatin A 10 µM", "PCI-24781 100 nM", "AT9283 100 nM")) %>%
   dplyr::select("drug" = drug_conc, "k562_slope" = indelrate_slope_plot, feature) %>%
   na.omit() %>%
