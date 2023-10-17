@@ -377,6 +377,28 @@ ratios_tib_fc <- ratios_tib %>%
   left_join(chrom_data) 
 ```
 
+
+## Check biases in MMEJ:NHEJ ratio towards chromatin features
+```{r}
+dmso_ratios_chrom <- dmso_ratios_tib %>%
+  left_join(chrom_data) %>%
+  mutate(dmso_ratio = ave(DMSO.ratio.log2, IPR, FUN = mean)) %>%
+  distinct(dmso_ratio, IPR, H3K27me3, LMNB1, HDAC1, EZH2)
+
+ggplot(dmso_ratios_chrom,
+       aes(x = H3K27me3, y = dmso_ratio)) +
+  geom_point() +
+  geom_smooth(method = "lm") +
+  theme_pubr()
+
+ggplot(dmso_ratios_chrom,
+       aes(x = LMNB1, y = dmso_ratio)) +
+  geom_point() +
+  geom_smooth(method = "lm") +
+  theme_pubr()
+```
+
+
 # Calculating the Chromatin Context Dependency (CCD)
 ## Extract slopes for all genes
 ```{r}
