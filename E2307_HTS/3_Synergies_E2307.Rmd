@@ -337,6 +337,12 @@ epistasis_tib %<>%
   distinct(drug, feature, slope, indelrate_slope_plot)
 
 ggplot(ratios_tib_fc,
+       aes(x = dam_H3K9me3, y = log2.fc.freqCut)) +
+  geom_point() +
+  geom_smooth(method = "lm") +
+  facet_wrap(~drug)
+
+ggplot(ratios_tib_fc,
        aes(x = dam_LMNB1, y = log2.fc.freqCut)) +
   geom_point() +
   geom_smooth(method = "lm") +
