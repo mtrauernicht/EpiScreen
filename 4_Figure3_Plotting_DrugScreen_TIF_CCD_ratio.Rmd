@@ -577,6 +577,7 @@ CCD_example_tib = indel.data %>%
   filter(drug_conc %in% c("EPZ-6438 10 µM", "Decitabine 1 µM", "Vorinostat 1 µM", "PCI-24781 100 nM", "DMSO control", "SNS-314 Mesylate 1 µM")) %>%
   distinct(IPR, drug, freqCut, H3K27me3.zscore, LMNB1.zscore, m5C.zscore, H3K4me1.zscore, tech, replicate, H3K36me3.zscore) %>%
   mutate(freqCut_mean = ave(freqCut, IPR, drug, FUN = function(x) mean(x, na.rm = TRUE))) %>%
+  mutate(freqCut_mean = freqCut_mean / (1- freqCut_mean)) %>%
   distinct(IPR, drug, freqCut_mean, H3K27me3.zscore, LMNB1.zscore, m5C.zscore, H3K4me1.zscore, H3K36me3.zscore) %>%
   pivot_wider(names_from = drug, values_from = freqCut_mean) %>%
   mutate(Vorinostat_log2_FC_TIF = log2(Vorinostat/DMSO),
