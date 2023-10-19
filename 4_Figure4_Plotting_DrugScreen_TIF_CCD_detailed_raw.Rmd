@@ -501,7 +501,7 @@ clust_CCD = CCD_tib %>%
   column_to_rownames(var = "feature") %>%
   t() %>%
   dist(., method = "euclidean") %>%
-  hclust(., method = "ward.D2")
+  hclust(., method = "complete")
 
 drug_order_grouped = CCD_tib %>% 
   distinct(drug_conc) %>%
@@ -517,7 +517,7 @@ drug_order_grouped = CCD_tib %>%
 ---
 
 # Main figures
-## 4A HDAC CCD Heatmap
+## 4B HDAC CCD Heatmap
 ```{r 4A HDAC CCD, fig.width= 10, fig.height= 10}
 # Make matrix with drugs from selected target
 TIF_synergy_matrix = all_compounds_epistasis_TIF %>% 
@@ -555,7 +555,7 @@ TIF_synergy_cluster <- TIF_synergy_matrix %>%
 ```
 
 
-## 4B K27me3 top CCDs
+## 4A K27me3 top CCDs
 ```{r 4B H3K27me3 synergies, fig.width = 8, fig.height = 8}
 rank_dt = CCD_tib %>% 
   left_join(rownames_to_column(target, var = "drug_conc")) %>%
@@ -621,9 +621,7 @@ all_compounds_epistasis_TIF %>%
 ```
 
 
-
-
-## 4C m5C top CCDs
+## 4E m5C top CCDs
 ```{r 4C m5C synergies, fig.width = 8, fig.height = 4}
 rank_dt = CCD_tib %>% 
   left_join(rownames_to_column(target, var = "drug_conc")) %>%
@@ -680,8 +678,8 @@ all_compounds_epistasis_TIF %>%
   filter(!between(m5C, -0.01, .01)) %>%
   rownames()
 ```
-# Supplementary Figures
-## S4A HMT CCD Heatmap
+
+## 4F HMT CCD Heatmap
 ```{r S4A HMT CCD, fig.width= 8, fig.height= 6}
 DNMT_drugs = target_set_drugs %>% 
   rownames_to_column(var = "drug_conc") %>% 
@@ -803,6 +801,7 @@ p = pheatmap(TIF_synergy_matrix_DNMT[, TRIP_chrom_clust$labels],
              annotation_legend = T)
 ```
 
+# Supplementary Figures
 ## S4B Scatter plot HMT inhibotors 5mC
 ```{r S4B HMT inhibitor synergy with 5mC,  fig.width = 10, fig.height = 6}
 DNMT_drugs = target_set_drugs %>% 

@@ -972,7 +972,7 @@ for (i in c("BMN 673 10 µM", "Apicidin 100 nM")){
 ```{r S3C Example strong synergy hits with LMNB1,  fig.width = 8, fig.height = 4}
 top_hit_drugs = CCD_tib %>% filter(!is.na(ratio_slope_plot) & abs(ratio_slope_plot) > 0.2)  %>% distinct(drug_conc) %>% pull(drug_conc)
 
-# Highligh top 4 strongest hits + and - TIF. In the end we kept only LMNB1, but let's keep this code for flexibility.
+# Highlight top 4 strongest hits + and - TIF. In the end we kept only LMNB1, but let's keep this code for flexibility.
 ratios_tib_fc %>% 
   filter(drug_conc == "Resveratrol 10 µM" |
          drug_conc == "PCI-24781 100 nM"
