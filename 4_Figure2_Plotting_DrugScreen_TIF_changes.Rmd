@@ -1169,6 +1169,18 @@ p2 = indel.data %>% mutate(drug = gsub(" [(].*[)]", "", drug),
   theme(legend.position="none")
 
 plot_grid(p1, p2)
+
+indel.data %>% mutate(drug = gsub(" [(].*[)]", "", drug),
+                           drug_conc = paste(drug, conc_char, sep = " ")) %>% 
+  filter(conc_char != "control" & !is.na(freqCut_diff_global_mean)) %>%
+  distinct(zscore_TIF_global_comb_rep, viab_mean, 
+           replicate, drug_conc, target, drug, conc_char, freqCut_diff_global_mean) %>%
+  group_by(drug_conc, target, drug, conc_char) %>%
+  summarise(viab_mean = mean(viab_mean),
+            freqCut_diff_global_mean = mean(freqCut_diff_global_mean)) %>%
+  filter((viab_mean < max_viab_TIF_down & freqCut_diff_global_mean < 0)) %>%
+  dplyr::select(drug, conc_char, target, viab_mean, freqCut_diff_global_mean) %>%
+  write_excel_csv(., "DecreaseTIF_Filter_S2A.csv")
 ```
 ## S2B gRNA chromatin
 

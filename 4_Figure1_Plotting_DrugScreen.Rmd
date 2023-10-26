@@ -519,9 +519,11 @@ ggplot(targets,
 
 # Supplemental figures
 
-## S1A: Correlate viability data from the 2 replicates
+## S1A: Experimental timeline
+
+## S1B: Correlate viability data from the 2 replicates
 How well does the viability data correlate between the two biological replicates? Did the drugs become less potent after 3 years in the freezer?
-```{r S1A viability correlation, warning = FALSE, fig.height=4, fig.width=8}
+```{r S1B viability correlation, warning = FALSE, fig.height=4, fig.width=8}
 # A: Correlate viability data from the 2 replicates
 indel.data %>%
   filter(sample == "Epigenetic Compound") %>%
@@ -543,6 +545,17 @@ indel.data %>%
   scale_color_manual(values = hcl.colors(4, palette = "Lajolla", rev = F)[2:4]) +
   facet_grid(. ~ conc_char)
 
+indel.data %>%
+  filter(sample == "Epigenetic Compound") %>%
+  distinct(viab_mean, replicate, conc_char, drug, viab_reproducibility,
+           indel_freq_filter, pathway_bal_filter) %>%
+  mutate(filter_viab = case_when(pathway_bal_filter & viab_reproducibility ~ "Balance filter", 
+                                 indel_freq_filter & viab_reproducibility ~ "TIF filter" , 
+                                 T ~ "Discarded"),
+         filter_viab = factor(filter_viab, levels = c("Discarded", "TIF filter" , "Balance filter")),
+         conc_char = factor(conc_char, levels = c("100 nM", "1 µM", "10 µM"))) %>%
+  pivot_wider(names_from = replicate, values_from = viab_mean) %>% 
+  write_excel_csv(., "Viability_Filters_S1B.csv")
 
 indel.data  %>% 
   filter(!indel_freq_filter | !viab_reproducibility) %>% # freqCut is NA if sample didn't pass filter for viability.
@@ -563,10 +576,10 @@ indel.data  %>%
 **Conclusion: Most drugs that were toxic in rep 1 were also toxic in rep 2, so the trends are similar. However, some drugs were especially more toxic in rep 2. These drugs were removed from the analysis.**
 
 
-## S1B: Correlation between viability and TIF
+## S1C: Correlation between viability and TIF
 Is lower viability causing a decrease in TIF? Can we justify our 0.50 viability cutoff based on the correlation between viability and TIF?
 
-```{r S1B TIF correlation with viability, warning=F, fig.height=5, fig.width=5}
+```{r S1C TIF correlation with viability, warning=F, fig.height=5, fig.width=5}
 # F: Correlation between viability and MMEJ ratio
 # load indel data that has no filter on it.
 
@@ -582,10 +595,10 @@ TIF_ratios_all_tib %>% distinct(exp, viab_norm_split, freqCut_global, sample) %>
   xlim(0, 1.2)
 ```
 
-## S1C: Correlation between viability and MMEJ ratio
+## S1D: Correlation between viability and MMEJ ratio
 Is lower viability causing a decrease in MMEJ? Can we justify our 0.50 viability cutoff based on the correlation between viability and MMEJ ratio?
 
-```{r S1C MMEJ ratio correlation with viability, warning=F, fig.height=5, fig.width=5}
+```{r S1D MMEJ ratio correlation with viability, warning=F, fig.height=5, fig.width=5}
 TIF_ratios_all_tib %>% distinct(exp, viab_norm_split, MMEJratio_global, sample) %>% 
   ggplot(., aes(x = viab_norm_split, y = log2(MMEJratio_global), color = sample)) +
   geom_point_rast(raster.dpi = 300) +
@@ -599,9 +612,9 @@ TIF_ratios_all_tib %>% distinct(exp, viab_norm_split, MMEJratio_global, sample) 
 ```
 
 
-## S1D: Comparison between technical replicates of efficiency in DMSO
+## S1E: Comparison between technical replicates of efficiency in DMSO
 
-```{r S1D comparison for mean indel rate across replicates, warning = FALSE, fig.height=5, fig.width=3}
+```{r S1E comparison for mean indel rate across replicates, warning = FALSE, fig.height=5, fig.width=3}
 indel.data %>%
   filter(drug == "DMSO", conc_char == "control") %>%
   mutate(drug = case_when(drug == "DMSO" & plate %in% c(1:6) ~ paste(drug, drug_plate, well, "1", sep = " "), 
@@ -619,9 +632,9 @@ indel.data %>%
   ylim(0,1)
 ```
 
-## S1E: Comparison between replicates of efficiency in DMSO
+## S1F: Comparison between replicates of efficiency in DMSO
 
-```{r S1E control distribution of indel rates across wells and replicates, warning = FALSE, fig.height=3, fig.width=5}
+```{r S1F control distribution of indel rates across wells and replicates, warning = FALSE, fig.height=3, fig.width=5}
 indel.data %>%
   filter(drug == "DMSO", conc_char == "control") %>%
   mutate(IPR = factor(IPR, levels = clone5_map_ipr$labels[clone5_map_ipr$order])) %>%
@@ -635,9 +648,9 @@ indel.data %>%
 ```
 
 
-## S1F: Comparison between replicates MMEJ ratio in DMSO
+## S1G: Comparison between replicates MMEJ ratio in DMSO
 
-```{r S1F control distribution of MMEJ ratio across wells and replicates, warning = FALSE, fig.height=6, fig.width=10}
+```{r S1G control distribution of MMEJ ratio across wells and replicates, warning = FALSE, fig.height=6, fig.width=10}
 indel.data %>%
   filter(drug == "DMSO", conc_char == "control") %>%
   dplyr::distinct(MMEJratio, IPR, exp, replicate) %>%
@@ -649,8 +662,8 @@ indel.data %>%
   theme_classic_lines_90()
 ```
 
-## S1G: Combined TIF z-scores per IPR per concentration
-```{r S1G TIF zscores per IPR, fig.height=3, fig.width=8}
+## S1H: Combined TIF z-scores per IPR per concentration
+```{r S1H TIF zscores per IPR, fig.height=3, fig.width=8}
 zscore_dt = indel.data %>%
   filter(sample %in% c("Epigenetic Compound") & indel_freq_filter) %>%
   distinct(freqCut, IPR, drug, conc_char, tech, sample, replicate, 
@@ -668,8 +681,8 @@ ggplot(zscore_dt,
   ylab("TIF z-score")
 ```
 
-## S1H: Combined balance z-scores per IPR per concentration
-```{r S1H bal zscore per IPR, fig.height=3, fig.width=8}
+## S1I: Combined balance z-scores per IPR per concentration
+```{r S1I bal zscore per IPR, fig.height=3, fig.width=8}
 ggplot(zscore_dt,
        aes(x = IPR, y = zscore_bal_comb_rep, color = sample_conc)) +
   geom_quasirandom_rast(aes(color = sample_conc), dodge.width = 0.75, raster.dpi = 300, size = 1) +
@@ -680,9 +693,9 @@ ggplot(zscore_dt,
   ylab("MMEJ:NHEJ z-score")
 ```
 
-## S1I: Correlation between technical replicates efficiency
+## S1J: Correlation between technical replicates efficiency
 How well does the cutting efficiency correlate between the six technical replicates
-```{r S1I normalized TIF correlation, warning = FALSE, fig.height=5, fig.width=5}
+```{r S1J normalized TIF correlation, warning = FALSE, fig.height=5, fig.width=5}
 # C: Correlation between technical replicates efficiency
 techn_repl <- indel.data %>%
   filter(sample == "Epigenetic Compound" & 
@@ -711,13 +724,13 @@ ggpairs(techn_repl %>% dplyr::select(contains("E1")),
   ylab("deltaTIF")
 ```
 
-*Figure S1C: Correlation of the cutting efficiency between all technical replicates.*
+*Figure S1J: Correlation of the cutting efficiency between all technical replicates.*
 
 **Conclusion: Only for replicate two the cutting efficiency correlates well. We need to further investigate why replicate 1 does not correlate well.**
 
-## S1J: Correlation between technical replicates MMEJ score
+## S1K: Correlation between technical replicates MMEJ score
 How well does the MMEJ score correlate between the six technical replicates?
-```{r S1J normalized MMEJ ratio correlation, warning = FALSE, fig.height=5, fig.width=5}
+```{r S1K normalized MMEJ ratio correlation, warning = FALSE, fig.height=5, fig.width=5}
 # B: Correlation between technical replicates MMEJ score
 techn_repl <- indel.data %>%
   filter(sample == "Epigenetic Compound" & 
@@ -743,12 +756,12 @@ ggpairs(techn_repl %>% dplyr::select(contains("E1")),
   ylab("MMEJ ratio change [log2FC]")
 ```
 
-*Figure S1B: Correlation of the MMEJ score between all technical replicates.*
+*Figure S1K: Correlation of the MMEJ score between all technical replicates.*
 
 **Conclusion: The MMEJ scores correlate relatively well, especially within biological replicates. Even the correlation between biological replicates is good.*
 
 
-## S1K-N: Correlation in MMEJ z-score between biological replicates
+## S1L-O: Correlation in MMEJ z-score between biological replicates
 How well does the MMEJ z-score correlate between the biologcial replicates before combining them?
 ```{r S1LMNO MMEJ z-score correlation, warning = FALSE, fig.height=5, fig.width=5}
 # D: Correlation between biological replicates MMEJ score
@@ -861,11 +874,11 @@ p4 = ggplot(biol_repl_bal_glob,
 plot_grid(p1, p2, p3, p4, ncol = 2, nrow = 2, labels = c("L", "M", "N", "O"))
 ```
 
-*Figure S1D: Correlation of the MMEJ z-scores between the two biological replicates.*
+*Figure S1L: Correlation of the MMEJ z-scores between the two biological replicates.*
 
 Conclusion: MMEJ z-scores correlate well.
 
-*Figure S1E: Correlation of the cutting efficiencies between the two biological replicates.*
+*Figure S1M: Correlation of the cutting efficiencies between the two biological replicates.*
 
 **Conclusion: Cutting efficiencies do not correlate well.**
 
