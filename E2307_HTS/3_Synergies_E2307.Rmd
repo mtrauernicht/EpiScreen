@@ -82,7 +82,7 @@ figure_out = "/DATA/projects/DSBrepair/scratch/episcreen/"
 # initials (for file export)
 initials = "mt"
 
-pval_signif = 0.1
+pval_signif = 0.15
 ```
 
 
@@ -344,6 +344,12 @@ ggplot(ratios_tib_fc,
 
 ggplot(ratios_tib_fc,
        aes(x = dam_LMNB1, y = log2.fc.freqCut)) +
+  geom_point() +
+  geom_smooth(method = "lm") +
+  facet_wrap(~drug)
+
+ggplot(ratios_tib_fc,
+       aes(x = dam_H3K27me3, y = log2.fc.freqCut)) +
   geom_point() +
   geom_smooth(method = "lm") +
   facet_wrap(~drug)

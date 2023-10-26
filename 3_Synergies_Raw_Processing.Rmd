@@ -555,7 +555,7 @@ bal_CCDs = adj_p.value_KO_model %>% filter(var == "log2.fc.ratio"&
                                              !grepl("DNA-PK|DMSO|Mirin", drug_conc)) %>%
   nrow()
 
-paste("Of the 160 drugs,", TIF_CCDs,"had a significant TIF for the balance and", bal_CCDs,"had a significant CCD for the balance")
+paste("Of the 160 drugs,", TIFratio_CCDs,"had a significant TIF for the balance and", bal_CCDs,"had a significant CCD for the balance")
 
 adj_p.value_KO_model %>% 
   filter(p.adj < pval_signif &
@@ -628,7 +628,7 @@ epistasis_tib %<>%
 
 TIF_CCDs = epistasis_tib %>% 
   filter(!grepl("DNA-PK|control", drug_conc)) %>% 
-  filter(!is.na(indelrate_slope_plot)) %>%
+  filter(!is.na(editratio_slope_plot)) %>%
   distinct(drug_conc) %>%
   nrow()
 
@@ -651,7 +651,7 @@ drug_conc_tib = filtered_drug_pvals %>% distinct(drug, conc_char) %>%
   mutate(drug_conc = paste(drug, conc_char,sep = " "))
 
 TIF_CCDs = drug_conc_tib %>% left_join(epistasis_tib)%>% 
-  filter(!is.na(indelrate_slope_plot)) %>%
+  filter(!is.na(editratio_slope_plot)) %>%
   distinct(drug) %>%
   nrow()
 
@@ -663,12 +663,12 @@ bal_CCDs = drug_conc_tib %>% left_join(epistasis_tib)%>%
 paste("Of the 160 drugs,", TIF_CCDs,"had a significant CCD for the TIF and", bal_CCDs,"had a significant CCD for the balance")
 
 drug_CCDs = drug_conc_tib %>% left_join(epistasis_tib)%>% 
-  filter(!is.na(ratio_slope_plot) | !is.na(indelrate_slope_plot)) %>%
+  filter(!is.na(ratio_slope_plot) | !is.na(editratio_slope_plot)) %>%
   distinct(drug) %>%
   nrow()
 
 drug_conc_CCDs = drug_conc_tib %>% left_join(epistasis_tib)%>% 
-  filter(!is.na(ratio_slope_plot) | !is.na(indelrate_slope_plot)) %>%
+  filter(!is.na(ratio_slope_plot) | !is.na(editratio_slope_plot)) %>%
   distinct(drug_conc) %>%
   nrow()
 
