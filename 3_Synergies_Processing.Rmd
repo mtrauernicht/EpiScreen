@@ -292,29 +292,30 @@ filtered_drug_conc = filtered_drug_pvals %>%
   filter(adj_pval_TIF < pval_signif | adj_pval_bal < pval_signif | grepl("DMSO", drug)) %>%
   mutate(drug_conc = paste(drug, conc_char,sep = " "),
          # List if they affect the variable.
-         effect_on_indelrate = ifelse(adj_pval_TIF < pval_signif, TRUE, FALSE),
+         effect_on_editratio = ifelse(adj_pval_TIF < pval_signif, TRUE, FALSE),
          effect_on_ratio = ifelse(adj_pval_bal < pval_signif, TRUE, FALSE)) %>%
-  distinct(IPR, drug, conc_char, drug_conc, effect_on_indelrate, effect_on_ratio) %>%
+  distinct(IPR, drug, conc_char, drug_conc, effect_on_editratio, effect_on_ratio) %>%
   mutate(# Count of IPR per compound that have an effect. We want at least 2 (avoid outliers)
-    count_TIF = as.numeric(ave(effect_on_indelrate, drug_conc, FUN = sum)),
+    count_TIF = as.numeric(ave(effect_on_editratio, drug_conc, FUN = sum)),
     count_bal = as.numeric(ave(effect_on_ratio, drug_conc, FUN = sum)),
     # Keep here to at least 2 sites are significant in either TIF or bal
     keep = ifelse(count_TIF > 1 | count_bal > 1| grepl("DMSO", drug), 
                   TRUE, FALSE)) %>%
   filter(keep) %>%
   # Change the effect if less than 2. 
-  mutate(effect_on_indelrate = ifelse(count_TIF < 2, FALSE, effect_on_indelrate),
+  mutate(effect_on_editratio = ifelse(count_TIF < 2, FALSE, effect_on_editratio),
          effect_on_ratio = ifelse(count_bal < 2, FALSE, effect_on_ratio)) %>%
-  distinct(drug, conc_char, drug_conc, effect_on_indelrate, effect_on_ratio) %>% 
+  distinct(drug, conc_char, drug_conc, effect_on_editratio, effect_on_ratio) %>% 
   # There are duplicates, we want to remove them too. To do so let's replace the 
   # FALSE with TRUE in one column if the other is TRUE. And then unique the set.
-    left_join(count(., drug_conc)) %>% # First count the occurences of the compounds
-                                      # 1 = only one or the other, 2-3 is both. 
+    left_join(count(., drug_conc)) %>% 
+  # First count the occurences of the compounds
+  # 1 = only one or the other, 2-3 is both. 
   # If more than 1 make both TRUE so they are both kept.
-  mutate(effect_on_indelrate = ifelse(n > 1, TRUE, effect_on_indelrate),
+  mutate(effect_on_editratio = ifelse(n > 1, TRUE, effect_on_editratio),
          # same for the ratio
          effect_on_ratio = ifelse(n > 1, TRUE, effect_on_ratio)) %>%
-  distinct(drug, conc_char, drug_conc, effect_on_indelrate, effect_on_ratio)
+  distinct(drug, conc_char, drug_conc, effect_on_editratio, effect_on_ratio)
 
 
 ## From Xabi Vergara to filter on effect and not on intercept.
@@ -323,16 +324,24 @@ effect_of_compound_tib = filtered_drug_pvals %>%
   # Change the non significant ones to 0, so we filter them out.
   mutate(zscore_TIF_comb_rep_temp = ifelse(adj_pval_TIF >= pval_signif, 0, zscore_TIF_comb_rep_temp),
          zscore_bal_comb_rep_temp = ifelse(adj_pval_bal >= pval_signif, 0, zscore_bal_comb_rep_temp)) %>%
-  dplyr::summarise(NHEJ_signif = sum(zscore_bal_comb_rep_temp < -1.96), #Summarise number of significant barcodes per compound for balance
-                   MMEJ_signif = sum(zscore_bal_comb_rep_temp > 1.96), 
-                   TIF_down_signif = sum(zscore_TIF_comb_rep_temp < -1.96), #Summarise number of significant barcodes per compound for TIF
-                   TIF_up_signif = sum(zscore_TIF_comb_rep_temp > 1.96)) %>% 
-  mutate(bal_signif = case_when(MMEJ_signif <= 1 & NHEJ_signif > 1 ~ "NHEJ", #Annotate which pathway the compound boosts
-                                NHEJ_signif <= 1 & MMEJ_signif > 1 ~ "MMEJ", 
-                                T ~ "both"),
-         TIF_signif = case_when(TIF_up_signif <= 1 & TIF_down_signif > 1 ~ "TIF_down", #Annotate how the compounds affects TIF
-                                TIF_down_signif <= 1 & TIF_up_signif > 1 ~ "TIF_up", 
-                                T ~ "TIF_both")) %>%
+  dplyr::summarise(
+    #Summarise number of significant barcodes per compound for balance
+    NHEJ_signif = sum(zscore_bal_comb_rep_temp < -1.96), 
+    MMEJ_signif = sum(zscore_bal_comb_rep_temp > 1.96), 
+    #Summarise number of significant barcodes per compound for TIF
+    TIF_down_signif = sum(zscore_TIF_comb_rep_temp < -1.96), 
+    TIF_up_signif = sum(zscore_TIF_comb_rep_temp > 1.96)) %>% 
+  mutate(
+    #Annotate how the compounds affects TIF
+    bal_signif = case_when(NHEJ_signif >= 1 & MMEJ_signif >= 1 ~ "both", 
+                           MMEJ_signif <= 1 & NHEJ_signif > 1 ~ "NHEJ", 
+                           NHEJ_signif <= 1 & MMEJ_signif > 1 ~ "MMEJ", 
+                           T ~ "no_effect"),
+    #Annotate how the compounds affects TIF
+    TIF_signif = case_when(TIF_down_signif >= 1 & TIF_up_signif >= 1 ~ "TIF_both",
+                           TIF_up_signif <= 1 & TIF_down_signif > 1 ~ "TIF_down", 
+                           TIF_down_signif <= 1 & TIF_up_signif > 1 ~ "TIF_up",  
+                           T ~ "no_effect")) %>%
   mutate(drug_conc = paste(drug, conc_char, sep = " ")) %>%
   semi_join(filtered_drug_conc) # Semi-join the filtered drug conc to keep only the significant ones after p adjustment.
 
@@ -348,7 +357,7 @@ ratios_tib <- indel.data %>%
   distinct(MMEJratio, MMEJratio_min, freqCut, drug, conc_char, drug_conc, target, IPR, replicate, tech) %>% 
   mutate(MMEJratio = ifelse(MMEJratio == 0, MMEJratio_min, MMEJratio),
          MMEJratio.log2 = log2(MMEJratio),
-         freqCut.log2 = log2(freqCut)) %>%
+         editratio.log2 = log2(freqCut/(1-freqCut))) %>%
   dplyr::select(-MMEJratio, -MMEJratio_min, -freqCut) %>%
   distinct()
 
@@ -356,7 +365,7 @@ dmso_ratios_tib <- indel.data %>%
   filter(drug == "DMSO") %>%
   distinct(MMEJratio_mean, freqCut_mean, IPR, tech, replicate) %>%
   mutate(DMSO.ratio.log2 = log2(MMEJratio_mean),
-         DMSO.freqCut.log2 = log2(freqCut_mean)) %>%
+         DMSO.editratio.log2 = log2(freqCut_mean/(1-freqCut_mean))) %>%
   dplyr::select(-MMEJratio_mean, -freqCut_mean) %>%
   distinct()
 
@@ -370,10 +379,12 @@ The log2 distance ratio in our case is positive if it promotes NHEJ and negative
 # Each replicate has a different value (compute differences by replicate)
 ratios_tib_fc <- ratios_tib %>% 
   mutate(log2.fc.ratio = MMEJratio.log2 - DMSO.ratio.log2, 
-         log2.fc.ratio = ave(log2.fc.ratio, IPR, drug_conc, FUN = function(x) mean(x, na.rm = TRUE)), 
-         log2.fc.freqCut = freqCut.log2 - DMSO.freqCut.log2,
-         log2.fc.freqCut = ave(log2.fc.freqCut, IPR, drug_conc, FUN = function(x) mean(x, na.rm = TRUE))) %>%
-  distinct(IPR, drug, conc_char, target, log2.fc.freqCut, log2.fc.ratio) %>%
+         log2.fc.ratio = ave(log2.fc.ratio, IPR, drug_conc, 
+                             FUN = function(x) mean(x, na.rm = TRUE)), 
+         log2.fc.editratio = editratio.log2 - DMSO.editratio.log2, 
+         log2.fc.editratio = ave(log2.fc.editratio, IPR, drug_conc, 
+                                 FUN = function(x) mean(x, na.rm = TRUE))) %>%
+  distinct(IPR, drug, conc_char, target, log2.fc.editratio, log2.fc.ratio) %>%
   left_join(chrom_data) 
 ```
 
@@ -406,7 +417,7 @@ ggplot(dmso_ratios_chrom,
 ratios_tib_fc %<>% mutate(drug_conc = paste(drug, conc_char, sep = " "))
 
 slope.protein.features <- tibble(drug_conc = NA, feature = NA,  term = NA, 
-                                 indelrate = NA, p.value.indelrate = NA, 
+                                 editratio = NA, p.value.editratio = NA, 
                                  ratio = NA, p.value.ratio = NA)
 
 for (i in unique(ratios_tib_fc$drug_conc)) {
@@ -414,7 +425,7 @@ for (i in unique(ratios_tib_fc$drug_conc)) {
     model_tib <- ratios_tib_fc %>% filter(drug_conc == i) 
 
     # Indel rates
-    model.indelrate.log2 <- lm(formula = log2.fc.freqCut ~ unlist(model_tib[j]), 
+    model.editratio.log2 <- lm(formula = log2.fc.editratio ~ unlist(model_tib[j]), 
                                data = model_tib) %>% 
       tidy()
     
@@ -426,11 +437,11 @@ for (i in unique(ratios_tib_fc$drug_conc)) {
     slope.protein.features <- slope.protein.features %>% 
       add_row(drug_conc = i, 
               feature = j, 
-              term = model.indelrate.log2 %>%
+              term = model.editratio.log2 %>%
                 pull(term),
-              indelrate = model.indelrate.log2 %>% 
+              editratio = model.editratio.log2 %>% 
                 pull(estimate), 
-              p.value.indelrate = model.indelrate.log2 %>% 
+              p.value.editratio = model.editratio.log2 %>% 
                 pull(p.value),
               ratio = model.ratio.log2 %>% 
                 pull(estimate), 
@@ -448,14 +459,14 @@ slope.protein.features %<>%
 
 ### Calculating the Principle Component Regression (PCR)
 ```{r}
-CCD_tib = ratios_tib_fc %>% dplyr::select(IPR, drug_conc, log2.fc.freqCut, log2.fc.ratio, all_of(chromatin.features.short)) %>% ungroup()
+CCD_tib = ratios_tib_fc %>% dplyr::select(IPR, drug_conc, log2.fc.editratio, log2.fc.ratio, all_of(chromatin.features.short)) %>% ungroup()
 
 #Create an empty dt with CCDs of DDR proteins
 drug_conc_CCDs_dt <- tibble(var = NA, drug_conc = NA, num_comp = NA, r.squared = NA, adj.r.squared = NA,p.value = NA)
 # chrom_formula = as.formula(paste("y ~ ", paste(chromatin.features, collapse= "+")))
 
 for (i in unique(CCD_tib$drug_conc)){
-  for (j in c("log2.fc.freqCut", "log2.fc.ratio")) {
+  for (j in c("log2.fc.editratio", "log2.fc.ratio")) {
     drug_conc_dt <- filter(CCD_tib, drug_conc == i)
     # Run a model per drug_conc
     set.seed(1)
@@ -504,7 +515,7 @@ signif_pcr_hits = adj_p.value_KO_model %>% filter(p.adj < pval_signif) %>%
               values_fill = FALSE) 
 
 TIF_CCDs = adj_p.value_KO_model %>% 
-  filter(var == "log2.fc.freqCut" & 
+  filter(var == "log2.fc.editratio" & 
            p.adj < pval_signif &
            !grepl("DNA-PK|DMSO|Mirin", drug_conc)) %>%
 nrow()
@@ -525,19 +536,19 @@ adj_p.value_KO_model %>%
 ```{r epistasis filtering}
 # Calculate postition where the linear model crosses y = 0, we do this by -intercept / slope
 epistasis_tib = slope.protein.features %>% 
-  distinct(drug_conc, term, feature, indelrate, ratio) %>% 
-  pivot_wider(., names_from = term, values_from = c(indelrate, ratio)) %>%
+  distinct(drug_conc, term, feature, editratio, ratio) %>% 
+  pivot_wider(., names_from = term, values_from = c(editratio, ratio)) %>%
   mutate(feature = gsub(".zscore", "", feature))
 
 epistasis_tib %<>% 
   left_join(signif_pcr_hits) %>%# These are p values for a significant CCD by PCR
   left_join(effect_of_compound_tib) %>% 
   left_join(filtered_drug_conc) %>%
-  distinct(signif.pcr.ratio, signif.pcr.freqCut, # These are p values for a significant CCD by PCR
+  distinct(signif.pcr.ratio, signif.pcr.editratio, # These are p values for a significant CCD by PCR
            drug_conc, feature, 
-           indelrate_slope, ratio_slope, # The slopes
+           editratio_slope, ratio_slope, # The slopes
            bal_signif, TIF_signif, # What effect the compounds have
-           effect_on_indelrate, effect_on_ratio) %>% # If the effect is significant in at least 2 IPRs (from above)) %>% 
+           effect_on_editratio, effect_on_ratio) %>% # If the effect is significant in at least 2 IPRs (from above)) %>% 
   mutate(ratio_slope_plot = case_when(
       effect_on_ratio & signif.pcr.ratio & bal_signif == "MMEJ" & ratio_slope > 0 ~ ratio_slope, 
       bal_signif == "MMEJ" & ratio_slope < 0 ~ as.double(NA), 
@@ -545,18 +556,18 @@ epistasis_tib %<>%
       bal_signif == "NHEJ" & ratio_slope > 0 ~ as.double(NA), 
       effect_on_ratio & signif.pcr.ratio & bal_signif == "bal_both" ~ ratio_slope,
       T ~ as.double(NA)),
-    indelrate_slope_plot = case_when(
-      effect_on_indelrate & signif.pcr.freqCut & TIF_signif == "TIF_down" & indelrate_slope < 0 ~ indelrate_slope, 
-      TIF_signif == "TIF_down" & indelrate_slope > 0 ~ as.double(NA), 
-      effect_on_indelrate & signif.pcr.freqCut & TIF_signif == "TIF_up" & indelrate_slope > 0 ~ indelrate_slope, 
-      TIF_signif == "TIF_up" & indelrate_slope < 0 ~ as.double(NA), 
-      effect_on_indelrate & signif.pcr.freqCut & TIF_signif == "TIF_both" ~ indelrate_slope,
+    editratio_slope_plot = case_when(
+      effect_on_editratio & signif.pcr.editratio & TIF_signif == "TIF_down" & editratio_slope < 0 ~ editratio_slope, 
+      TIF_signif == "TIF_down" & editratio_slope > 0 ~ as.double(NA), 
+      effect_on_editratio & signif.pcr.editratio & TIF_signif == "TIF_up" & editratio_slope > 0 ~ editratio_slope, 
+      TIF_signif == "TIF_up" & editratio_slope < 0 ~ as.double(NA), 
+      effect_on_editratio & signif.pcr.editratio & TIF_signif == "TIF_both" ~ editratio_slope,
       T ~ as.double(NA))) %>%
-  distinct(drug_conc, feature, indelrate_slope, indelrate_slope_plot, ratio_slope, ratio_slope_plot)
+  distinct(drug_conc, feature, editratio_slope, editratio_slope_plot, ratio_slope, ratio_slope_plot)
 
 TIF_CCDs = epistasis_tib %>% 
     filter(!grepl("DNA-PK|control", drug_conc)) %>% 
-  filter(!is.na(indelrate_slope_plot)) %>%
+  filter(!is.na(editratio_slope_plot)) %>%
   distinct(drug_conc) %>%
 nrow()
 
@@ -573,7 +584,7 @@ drug_conc_tib = filtered_drug_pvals %>% distinct(drug, conc_char) %>%
   mutate(drug_conc = paste(drug, conc_char,sep = " "))
   
 TIF_CCDs = drug_conc_tib %>% left_join(epistasis_tib)%>% 
-  filter(!is.na(indelrate_slope_plot)) %>%
+  filter(!is.na(editratio_slope_plot)) %>%
   distinct(drug) %>%
   nrow()
 
@@ -585,12 +596,12 @@ bal_CCDs = drug_conc_tib %>% left_join(epistasis_tib)%>%
 paste("Of the 160 drugs,", TIF_CCDs,"had a significant CCD for the TIF and", bal_CCDs,"had a significant CCD for the balance")
 
 drug_CCDs = drug_conc_tib %>% left_join(epistasis_tib)%>% 
-  filter(!is.na(ratio_slope_plot) | !is.na(indelrate_slope_plot)) %>%
+  filter(!is.na(ratio_slope_plot) | !is.na(editratio_slope_plot)) %>%
   distinct(drug) %>%
   nrow()
 
 drug_conc_CCDs = drug_conc_tib %>% left_join(epistasis_tib)%>% 
-  filter(!is.na(ratio_slope_plot) | !is.na(indelrate_slope_plot)) %>%
+  filter(!is.na(ratio_slope_plot) | !is.na(editratio_slope_plot)) %>%
   distinct(drug_conc) %>%
   nrow()
 
