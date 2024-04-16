@@ -20,5 +20,5 @@ Scripts related to the calculation of the chromatin context dependencies.
 **Scripts #4: Statistics & Plotting**\
 All the plots are generated with these scripts, split up by figure.
 
-[![DOI](https://zenodo.org/badge/298230427.svg)](https://zenodo.org/badge/latestdoi/298230427)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.10082590.svg)](https://doi.org/10.5281/zenodo.10082590)
 
