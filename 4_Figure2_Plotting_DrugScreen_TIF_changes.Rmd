@@ -1342,6 +1342,124 @@ ggplot(drug_df,
   facet_grid(. ~ conc_char)
 ```
 
+---
+
+### ChIP analysis
+```{r ChIP, fig.width= 6, fig.height=4, echo = FALSE, eval=FALSE}
+## Import computed scores (from Seb)
+h3k27ac_files <- list.files(path = "/DATA/usr/m.trauernicht/projects/EpiScreen/data/chip_scores/", 
+                            pattern ="density.normalized.scores_H3K27ac_.*",
+                            full.names = T)
+
+# Read all files using lapply and fread
+h3k27ac_files <- lapply(h3k27ac_files, fread)
+h3k27ac_all <- bind_rows(h3k27ac_files) %>%
+  dplyr::select(chr, start, sample, group, "signal" = mean.by.region) %>%
+  mutate(start = start + 1) %>%
+  mutate(integration = paste("chr", chr, "_", start, sep = "")) %>%
+  mutate(chromatin_mark = "H3K27ac") %>%
+  mutate(radius = gsub("H3K27ac ", "", group)) %>%
+  mutate(sample = gsub("H3K27ac_", "", sample)) %>%
+  distinct(integration, sample, chromatin_mark, signal, radius)
+
+h3k27me3_files <- list.files(path = "/DATA/usr/m.trauernicht/projects/EpiScreen/data/chip_scores/", 
+                            pattern ="density.normalized.scores_H3K27me3_.*",
+                            full.names = T)
+
+# Read all files using lapply and fread
+h3k27me3_files <- lapply(h3k27me3_files, fread)
+h3k27me3_all <- bind_rows(h3k27me3_files) %>%
+  dplyr::select(chr, start, sample, group, "signal" = mean.by.region) %>%
+  mutate(start = start + 1) %>%
+  mutate(integration = paste("chr", chr, "_", start, sep = "")) %>%
+  mutate(chromatin_mark = "H3K27me3") %>%
+  mutate(radius = gsub("H3K27me3 ", "", group)) %>%
+  mutate(sample = gsub("H3K27me3_", "", sample)) %>%
+  distinct(integration, sample, chromatin_mark, signal, radius)
+
+chromatin_scores <- rbind(h3k27ac_all, h3k27me3_all)
+
+## Import IPR data
+ipr_data <- read_table("/DATA/projects/DSBrepair/Drug_screen_rev2/HDAC_ChIP/data/IPR_value/xv20230608_coordinates_clone5.txt") %>%
+  mutate(integration = paste(chr, start, sep = "_")) %>%
+  dplyr::select("barcode" = IPR_barcode, integration)
+
+bc_ipr <- read_table("/DATA/usr/m.trauernicht/projects/EpiScreen/data/bc_ipr_chromatin.txt")
+
+ipr_data <- ipr_data %>%
+  left_join(bc_ipr)
+
+## Load efficiency changes
+eff_changes <- eff.data.heatmap %>%
+  filter(drug_conc %in% c("PCI-24781 100 nM", "Tubastatin A 10 µM")) %>%
+  dplyr::select(IPR, "sample" = drug, freqCut_diff_mean) %>%
+  mutate(sample = ifelse(sample == "PCI-24781", "PCI", "TubA"))
+
+## Combine data
+chromatin_scores <- chromatin_scores %>%
+  left_join(ipr_data) %>%
+  left_join(eff_changes)
+
+## Compute DMSO scores and drug-induced changes
+dmso_chromatin_scores <- chromatin_scores %>%
+  filter(sample == "DMSO") %>%
+  mutate(dmso_signal =  signal) %>%
+  dplyr::select(-signal, -freqCut_diff_mean, -sample)
+
+chromatin_scores <- chromatin_scores %>%
+  filter(sample != "DMSO") %>%
+  left_join(dmso_chromatin_scores) %>%
+  mutate(chromatin_fc = (signal) / (dmso_signal))
+
+
+## Display chromatin change per window size, separate per chromatin mark and drug
+for (i in unique(chromatin_scores$IPR)) {
+  p <- ggplot(chromatin_scores %>%
+                filter(IPR == i) %>%
+                mutate(radius = gsub(" bp", "", radius)) %>%
+                mutate(radius = as.numeric(radius)),
+       aes(x = radius, y = chromatin_fc, group = IPR)) +
+    geom_hline(yintercept = 1, lty = 2) +    
+    geom_point() +
+    geom_line() +
+    facet_grid(sample ~ chromatin_mark) +
+    theme_pubr(border = T, x.text.angle = 90) +
+    ggtitle(i)
+  
+  print(p)
+}
+
+## Plot changes in chromatin signal vs. changes in TIF
+for (i in unique(chromatin_scores$radius)) {
+  p <- ggplot(chromatin_scores %>%
+                filter(chromatin_mark == "H3K27me3", radius == i),
+       aes(x = freqCut_diff_mean, y = chromatin_fc)) +
+    geom_hline(yintercept = 1, lty = 2) +
+    geom_point(aes(size = dmso_signal)) +
+    facet_wrap(~ sample) +
+    theme_pubr(border = T) +
+    ggtitle(i)
+  
+  print(p)
+}
+
+for (i in unique(chromatin_scores$radius)) {
+  p <- ggplot(chromatin_scores %>%
+                filter(chromatin_mark == "H3K27ac", radius == i),
+       aes(x = freqCut_diff_mean, y = chromatin_fc)) +
+    geom_hline(yintercept = 1, lty = 2) +
+    geom_point(aes(size = dmso_signal)) +
+    facet_wrap(~ sample) +
+    theme_pubr(border = T) +
+    ggtitle(i)
+  
+  print(p)
+}
+
+```
+
+
+
 
 # Session Info
 ```{r}
