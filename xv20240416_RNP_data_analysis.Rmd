@@ -1,0 +1,418 @@
+---
+title: "xv20220623_CCD_preprocessing"
+author: "x.vergara"
+date: "`r format(Sys.time(), '%Y-%m-%d')`"
+output:
+  html_document:
+    theme: journal #cerulean
+    highlight: monochrome
+    toc: true
+    toc_float: true
+    code_folding: show
+  editor_options:
+    chunk_output_type: console
+---
+
+In this document, I will go over different calculations of epistasis.4 different workflows:
+First decision is whether to use log2 MMEJscore or MMEJscore
+Second decision is comparing slopes or statistic differences between WT vs. KO slopes
+```{r setup, include=FALSE} 
+knitr::opts_chunk$set(warning = FALSE, message = FALSE) 
+```
+
+
+```{r}
+knitr::opts_chunk$set(root.dir = '/DATA/projects/DSBrepair/Drug_screen_rev2/RNP_transfection/rmarkdown/')
+
+StartTime <-Sys.time()
+library(knitr)
+
+# 8-digit Date tag:
+Date <- substr(gsub("-","",Sys.time()),1,8)
+
+#Check if output contain datetag
+saveRDS_proof <- function(object, file) {
+  document_path <- rstudioapi::getSourceEditorContext()$path %>% str_split(pattern = "/") %>% unlist()
+  document_name <- document_path[length(document_path)]
+  log_path <- paste0(in.dir,"log")
+  sys_time <- Sys.time()
+  if (grepl(Date, file) == T) {
+    #print(mode(log_path))
+    #base::write(c("test", as.character(sys_time),"Output", object), file = log_path, ncolumns = 4, sep = "\t", append = T)
+    saveRDS(object, file)
+  }
+  else {
+    print("Incorrect datetag!")
+  }
+}
+
+#Read rds check through different versions
+readRDS_proof <- function(path, pat) {
+  full.path <- paste0(in.dir, path)
+  document_path <- rstudioapi::getSourceEditorContext()$path %>% str_split(pattern = "/") %>% unlist()
+  document_name <- document_path[length(document_path)]
+  sys_time <- Sys.time()
+  
+  if(file.exists(full.path) == T){
+    if(paste0(in.dir,path) != getwd()){
+      setwd(paste0(in.dir, path))
+  }
+    file.list <- list.files(pattern = pat)
+    correct_file <- str_sort(file.list, decreasing = T)[1]
+    print(correct_file)
+    write(c(document_name,as.character(sys_time) ,"Input", correct_file), file = paste0(in.dir,"log"), ncolumns = 4, sep = "\t", append = T)
+    readRDS(correct_file)
+    
+  }
+  else{
+  setwd(path)
+  file.list <- list.files(pattern = pat)
+  correct_file <- str_sort(file.list, decreasing = T)[1]
+  print(correct_file)
+  write(c(document_name, as.character(sys_time),"Input", correct_file),file = paste0(in.dir,"log"), ncolumns = 4, sep = "\t", append = T)
+  readRDS(correct_file)
+  }
+}
+```
+
+# Libraries
+```{r libraries, warning = FALSE}
+# libraries:
+library(tidyverse)
+library(reshape2)
+library(broom)
+library(dendextend)
+library(pls)
+library(broom)
+library(stats)
+library(MASS)
+library(rstatix)
+library(parallel)
+library(data.table)
+library(readxl)
+library(ggpubr)
+library(ggbeeswarm)
+```
+
+
+# Import raw indel counts from snakemake pipeline from C. Leemans
+```{r import}
+# Set directory to the mutation output folder of the CRISPR-TRIP snakemake script
+setwd("/DATA/projects/DSBrepair/Drug_screen_rev2/RNP_transfection/data/processed/indelPCR_counts/")
+# Import files in list and make individual tables
+# I use this if all the samples are good. Here however I do not use all the samples. 
+file.list <- list.files("/DATA/projects/DSBrepair/Drug_screen_rev2/RNP_transfection/data/processed/indelPCR_counts",
+    pattern='*[.]co', full.names=T)
+
+# import the data
+df.list.indel <- mclapply(file.list, read.table, col.names=c('barcode', 'call', 'indel', 'count'), mc.cores = 20, stringsAsFactors = FALSE, header=T)
+
+# rename the lists
+names(df.list.indel) <- str_extract(file.list,"K562.*(?=.co)")
+
+# count the sample number
+n.samples.indel <- length(df.list.indel)
+
+#Import other data
+clone5_z.score_chrom_tib <- readRDS('/DATA/projects/DSBrepair/data/R/cl20201026_ChIP_zscore_selection.RDS')
+
+#Import data from the screen for the matching drugs and doses.
+screen_data <- read.table("/DATA/projects/DSBrepair/Drug_screen_rev2/RNP_transfection/import/pci_at_tuba_screen_TIF.txt", header = T) %>%
+  mutate(drug = case_when(grepl("PCI",drug) ~ "PCI",
+                             grepl("AT", drug) ~ "AT9283",
+                             grepl("Tub", drug) ~ "Tuba"))
+
+#Import IPR number and code
+IPR_barcode <- read_table(file = "/DATA/projects/DSBrepair/Drug_screen_rev2/RNP_transfection/import/bc_ipr_chromatin.txt")
+
+#Import basal DMSO TIF frequencies in the screen
+DMSO_TIF_screen <- read_table(file = "/DATA/projects/DSBrepair/Drug_screen_rev2/RNP_transfection/import/TIF_DMSO_screen.txt") %>%
+  mutate(screenCut = freqCut) %>%
+  select(-freqCut)
+
+```
+
+### Process indel calling and filter for real data
+Set everything in a dataframe that contains barcodes, indel ratios, and efficiencies.
+```{r indeldataframe}
+# Generate a datatable with the number of indelreads per mutations, sample and barcode (For this script I will modify this function, to sum replicates with the same ID)
+mut.list = mclapply(names(df.list.indel), function(exp){
+    dt = data.table(df.list.indel[[exp]])
+    dt[, indel:=as.character(indel)]
+    dt[call=='wt' & indel=='2', indel:='ssODN']
+    sum_count = data.table(exp=exp,
+                           dt[, list(count=sum(count)),by=c('barcode', 'indel')])
+    count_cast = data.table::dcast(sum_count[!is.na(indel),], exp + barcode ~ indel,
+                      value.var='count')
+    return(count_cast)
+}, mc.cores=10)
+
+#Bind all data frames (one per sample) together
+
+indels.dt = do.call(rbind, c(mut.list, fill=T))
+indels.dt[is.na(indels.dt)] = 0
+
+#Change colnames in indels.dt
+
+indel_cols <- names(indels.dt)[grep("[0-9]|ssODN|Inf", names(indels.dt))]
+indel_cols <- gsub("-", "del_", indel_cols)
+indel_cols[grep("^[0-9].*", indel_cols)] <- gsub("^", "ins_", indel_cols[grep("^[0-9].*", indel_cols)])
+indel_cols[grep("ins_0", indel_cols)] <- "wt"
+names(indels.dt) <- c("exp", "barcode", indel_cols)
+
+
+# List of barcodes that are in the clone #5 
+
+barcodes.list <- c("AGGGCGTAAAATATTT", "TATGGCTGTCGGGTAG", "TGTCCCTTAGTACTTT", "AGAAAATAATATGACG", "CGGCCTGAAGGTCAGG", "TTGAACGCGGGCTCGG", "GCTAACATCACGAATC", "GCGCACCCTTTAATTG", "ACTGTCGAGTTGTCCG", "CCGGGGACGTATGCAC", "TCTTTTGAGGAGCTGA", "ATATCGTTGCTGGAGA", "CATCCACCACACTTCA", "ACCCCTAAAGGCGCTG", "ATACTATATTTAACGG", "GAGCGCGTCACCGGGT", "GTACCTCTCGATAGTG", "TGGCCAATATTTGTCT", "CATTTCTGATCAATAA")
+
+# Filter both indels and counts dt for the barcodes in the clone
+
+indels.dt <- indels.dt %>% filter(barcode %in% barcodes.list)
+
+# Generate indel frequency data table
+
+indels.frequencies.dt = data.frame(indels.dt[,c('exp', 'barcode')],
+                                  indels.dt[, -c(1:2)] /
+                                    rowSums(indels.dt[, -c(1:2)]))
+
+# Rename indels.frequencies.dt
+indel_pct_cols <- gsub("^", "pct_", indel_cols)
+names(indels.frequencies.dt)[3:length(names(indels.frequencies.dt))] <- indel_pct_cols
+
+# Dimensions check
+
+dim(indels.dt)
+dim(indels.frequencies.dt)
+
+# Save all three data frames as a single tibble
+indels.tib <- as_tibble(indels.dt)
+indels.frequencies.tib <- as_tibble(indels.frequencies.dt)
+
+# Join indels & descr.variables
+
+indels.tib$exp <- gsub("indel_","", indels.tib$exp)
+indels.frequencies.tib$exp <- gsub("indel_","", indels.frequencies.tib$exp)
+
+screen.tib <- left_join(indels.tib,indels.frequencies.tib, by = c("exp","barcode"))
+
+dim(screen.tib)
+```
+
+#Fix to summarize values
+```{R}
+#Distribution per sample (number of reads per IPR)
+summary_read_number <- indels.dt %>% filter(grepl("r1", exp)) %>% mutate(proccessed_read = rowSums(.[,c(-1,-2)]), indel_reads = rowSums(.[,c("ins_1","del_7")])) %>% dplyr::select(exp, barcode, proccessed_read, indel_reads, del_7, ins_1, wt)
+distribution_total_reads_sample <- summary_read_number %>% dplyr::group_by(exp) %>% dplyr::summarise(pr = sum(proccessed_read)) %>% pull(pr) %>% quantile(c(0.05,0.25,0.5,0.75,0.95)) %>% round()
+distribution_reads <- quantile(summary_read_number$proccessed_read, c(0.05,0.25,0.5,0.75,0.95)) %>% round()
+distribution_indels <- quantile(summary_read_number$indel_reads, c(0.05,0.25,0.5,0.75,0.95)) %>% round()
+distribution_del_7 <- quantile(summary_read_number$del_7, c(0.05,0.25,0.5,0.75,0.95)) %>% round()
+distribution_ins_1 <- quantile(summary_read_number$ins_1, c(0.05,0.25,0.5,0.75,0.95)) %>% round()
+distribution_wt <- quantile(summary_read_number$wt, c(0.05,0.25,0.5,0.75,0.95)) %>% round()
+
+R1_distribution_table <- tibble(quantile = names(distribution_del_7), 
+                                   processed_reads_sample = distribution_total_reads_sample,
+                                   processed_reads_IPR = distribution_reads,
+                                   insertion_1nt = distribution_ins_1,
+                                   deletion_7nt = distribution_del_7,
+                                   intact = distribution_wt)
+
+
+#Distribution per sample (number of reads per IPR) R2
+R2_summary_read_number <- indels.dt %>% filter(grepl("r2", exp)) %>% mutate(proccessed_read = rowSums(.[,c(-1,-2)]), indel_reads = rowSums(.[,c("ins_1","del_7")])) %>% dplyr::select(exp, barcode, proccessed_read, indel_reads, del_7, ins_1, wt)
+R2_distribution_reads <- quantile(R2_summary_read_number$proccessed_read, c(0.05,0.25,0.5,0.75,0.95)) %>% round()
+R2_distribution_total_reads_sample <- R2_summary_read_number %>% dplyr::group_by(exp) %>% dplyr::summarise(pr = sum(proccessed_read)) %>% pull(pr) %>% quantile(c(0.05,0.25,0.5,0.75,0.95)) %>% round()
+R2_distribution_indels <- quantile(R2_summary_read_number$indel_reads, c(0.05,0.25,0.5,0.75,0.95)) %>% round()
+R2_distribution_del_7 <- quantile(R2_summary_read_number$del_7, c(0.05,0.25,0.5,0.75,0.95)) %>% round()
+R2_distribution_ins_1 <- quantile(R2_summary_read_number$ins_1, c(0.05,0.25,0.5,0.75,0.95)) %>% round()
+R2_distribution_wt <- quantile(R2_summary_read_number$wt, c(0.05,0.25,0.5,0.75,0.95)) %>% round()
+
+R2_distribution_table <- tibble(quantile = names(R2_distribution_del_7), 
+                                   processed_reads_sample = R2_distribution_total_reads_sample,
+                                   processed_reads_IPR = R2_distribution_reads,
+                                   insertion_1nt = R2_distribution_ins_1,
+                                   deletion_7nt = R2_distribution_del_7,
+                                   intact = R2_distribution_wt)
+
+#Distribution per sample (number of reads per IPR) R2
+R3_summary_read_number <- indels.dt %>% filter(grepl("r3", exp)) %>% mutate(proccessed_read = rowSums(.[,c(-1,-2)]), indel_reads = rowSums(.[,c("ins_1","del_7")])) %>% dplyr::select(exp, barcode, proccessed_read, indel_reads, del_7, ins_1, wt)
+R3_distribution_total_reads_sample <- R3_summary_read_number %>% dplyr::group_by(exp) %>% dplyr::summarise(pr = sum(proccessed_read)) %>% pull(pr) %>% quantile(c(0.05,0.25,0.5,0.75,0.95)) %>% round()
+R3_distribution_reads <- quantile(R3_summary_read_number$proccessed_read, c(0.05,0.25,0.5,0.75,0.95)) %>% round()
+R3_distribution_indels <- quantile(R3_summary_read_number$indel_reads, c(0.05,0.25,0.5,0.75,0.95)) %>% round()
+R3_distribution_del_7 <- quantile(R3_summary_read_number$del_7, c(0.05,0.25,0.5,0.75,0.95)) %>% round()
+R3_distribution_ins_1 <- quantile(R3_summary_read_number$ins_1, c(0.05,0.25,0.5,0.75,0.95)) %>% round()
+R3_distribution_wt <- quantile(R3_summary_read_number$wt, c(0.05,0.25,0.5,0.75,0.95)) %>% round()
+
+R3_distribution_table <- tibble(quantile = names(R3_distribution_del_7), 
+                                   processed_reads_sample = R3_distribution_total_reads_sample,
+                                   processed_reads_IPR = R3_distribution_reads,
+                                   insertion_1nt = R3_distribution_ins_1,
+                                   deletion_7nt = R3_distribution_del_7,
+                                   intact = R3_distribution_wt)
+
+```
+
+#Step 3: Calculation of changes in MMEJ:NHEJ balance and annotations
+
+### Repair metric calculations (Formulas #1 & #2), filtering and annotation of samples
+```{r}
+# Remove unnecesary columns and add gene info - Filter out wells with less that 30 mutation reads
+screen.data.ddr <- screen.tib %>% 
+  separate(exp, into = c("cell_line","drug","replicate"), remove = F) %>% #Separate sample tag into different elements
+  filter(del_7 + ins_1 > 30) %>% #Apply the read number filtering step
+  mutate(indelreads = rowSums(.[, indel_cols]),
+         freqCut = 1 - pct_wt, #Compute two needed parameters
+         log2MMEJNHEJratio = log2(del_7 / ins_1)) 
+
+#QC keep what is filter out (Nothing is filtered out!)
+# Remove unnecesary columns and add gene info - Filter out wells with less that 30 mutation reads
+screen.data.ddr.out <- screen.tib %>% 
+  separate(exp, into = c("cell_line","drug","replicate"), remove = F) %>% #Separate sample tag into different elements
+  filter(del_7 + ins_1 < 30) %>% #Apply the read number filtering step
+  mutate(indelreads = rowSums(.[, indel_cols]),
+         freqCut = 1 - pct_wt, #Compute two needed parameters
+         log2MMEJNHEJratio = log2(del_7 / ins_1))
+
+#Filter wells with mean cutting efficiency lower than 25%
+filter.out.wells <- screen.data.ddr %>% 
+  dplyr::group_by(cell_line,drug,replicate) %>%
+  dplyr::summarise(mean.cut = mean(freqCut, na.rm = T)) %>%
+  filter(mean.cut < 0.25) %>% 
+  dplyr::select(cell_line, drug,replicate)
+
+#Filter based on cutting efficiency
+filtered.screen.dr <- screen.data.ddr %>% 
+  anti_join(filter.out.wells, by = c("cell_line","drug","replicate"))
+
+#Add DR library info
+screen.data.names.tib <- filtered.screen.dr %>%
+  left_join(clone5_z.score_chrom_tib, by = c("barcode" = "ID"))
+
+#Summary numbers
+samples_per_replicate <- screen.data.names.tib %>% dplyr::select(cell_line, drug, replicate) %>% distinct() %>% dplyr::group_by(replicate) %>% dplyr::summarise(counts = n(), percentage = round(((n()/4)*100), digits = 2))
+replicates_per_sample <- screen.data.names.tib %>% dplyr::select(cell_line,drug,replicate) %>% distinct() %>% dplyr::group_by(cell_line,drug) %>% dplyr::summarise(counts = n()) %>% pull(counts) %>% mean() %>% round(digits = 2)
+IPR_per_sample <- screen.data.names.tib %>% dplyr::select(barcode,cell_line,drug,replicate) %>% distinct() %>% dplyr::group_by(cell_line,drug,replicate) %>% dplyr::summarise(counts = n()) %>% pull(counts) %>% mean() %>% round(digits = 2)
+
+#Print
+print(samples_per_replicate)
+print(replicates_per_sample)
+print(IPR_per_sample)
+
+```
+
+### Calculation of differentials of freqCut (Formula #3)
+```{r}
+#Extract non-targetting samples from this dataset
+wt.set.edit <- filter(screen.data.names.tib , drug == "DMSO") %>% dplyr::group_by(barcode, replicate, LMNB1, H3K27ac,H3K27me3) %>% dplyr::summarise(wt.freqCut = mean(freqCut, na.rm = T))
+
+# Compute log2 fold changes in different set ups for all the KO samples
+# Per replicate
+log2.distance.editing <- screen.data.names.tib %>% 
+  na.omit() %>% #Remove NA
+  left_join(wt.set.edit, by = c("replicate", "barcode","LMNB1","H3K27ac","H3K27me3")) %>% #Join mock KOs
+  mutate(freqCut.logchange = freqCut - wt.freqCut) %>% #Calculate differential of log2MMEJ:NHEJ per replicate
+  dplyr::group_by(barcode,drug) %>%
+  dplyr::summarise(mean.freqCut = mean(freqCut.logchange,na.rm = T), n_rep = n()) %>% #Compute differential of log2MMEJ:NHEJ
+  ungroup()
+```
+
+#Are IPRs editing frequency saturated?
+```{r}
+#Calculate mean wt efficiency
+mean_wt_edit <- wt.set.edit %>%
+  dplyr::group_by(barcode, LMNB1) %>%
+  dplyr::summarise(mean_wt = mean(wt.freqCut)) %>%
+  left_join(IPR_barcode) %>%
+  left_join(DMSO_TIF_screen)
+
+#Plot data
+pdf("/DATA/projects/DSBrepair/Drug_screen_rev2/RNP_transfection/export/xv20240415_FigS2F_saturation_effect_TIF.pdf", width = 3, height = 3)
+ggplot(mean_wt_edit, aes(screenCut*100,mean_wt*100)) +
+  geom_point() +
+  ylab("TIF % (RNP)") + xlab("TIF % (Screen)") +
+  theme_bw() +
+  ylim(c(40,100)) + xlim(c(40,100)) + coord_fixed(expand = F) +
+  theme(panel.grid = element_blank())
+dev.off()
+
+```
+CONCLUSION: There is saturation in many of the IPR. The window to increase efficiency in euchromatin is almost not existing.
+
+#Do effects correlate with the screen?
+```{R}
+#Left join with data
+distance_values_correlation <- log2.distance.editing %>% left_join(IPR_barcode, by = "barcode") %>% left_join(screen_data, by = c("drug", "IPR"))
+
+#Plot correlation between screen and RNP
+pdf("/DATA/projects/DSBrepair/Drug_screen_rev2/RNP_transfection/export/xv20240415_FigS2G_correlation_individual_IPR.pdf")
+ggplot(distance_values_correlation %>% filter(drug != "DMSO"), aes((mean.freqCut)*100, freqCut_diff_mean)) +
+  geom_point() +
+  stat_cor(method = "spearman", label.y = 17) +
+  geom_smooth(method = "lm", se = F) +
+  facet_wrap(~ drug) +
+  theme_bw()+
+  coord_fixed() +
+  xlab("∆TIF % (RNP)") +
+  ylab("∆TIF % (Screen)") + xlim(c(0,20)) + ylim(c(0,20)) +
+  theme(panel.grid = element_blank()) +
+  geom_hline(yintercept = 0, linetype = 2) + geom_vline(xintercept = 0, linetype = 2)
+dev.off()
+```
+Conclusion: The effect of PCI is clear and consistent with the screen at IPR level.
+
+
+#Plot effect by drug
+```{r, message = F, warning=F}
+# Plot the general data with RNP 
+ggplot(distance_values_correlation %>% filter(drug !="DMSO"), aes(fct_relevel(drug, c("AT9283","PCI","Tuba")),mean.freqCut*100)) +
+  stat_summary(geom = "col") +
+  geom_quasirandom(aes(color = chromatin)) +
+  theme_bw() + 
+  ylab("∆TIF % (RNP)") + xlab("drug") + ylim(c(0, 20))
+
+#Test (This test with 19 IPRs is significant)
+t_test_IPR <- distance_values_correlation %>%
+  filter(drug !="DMSO") %>%
+  dplyr::group_by(drug) %>%
+  t_test(mean.freqCut ~ 0)
+
+# Plot the general data in the screen (reference)
+ggplot(distance_values_correlation %>% filter(drug !="DMSO"), aes(fct_relevel(drug, c("AT9283","PCI","Tuba")),freqCut_diff_mean)) +
+  stat_summary(geom = "col") +
+  geom_quasirandom(aes(color = chromatin)) +
+  theme_bw() + 
+  ylab("∆TIF % (Screen)") + xlab("drug") + ylim(c(0,20))
+```
+
+
+Conclusion: Despite having a clear reduction in effect sizes, AT9283 and Tubastatin also increase TIF significantly
+
+
+#Repeate the same per chromatin type
+```{r, message = F, warning=F}
+# Plot the general data with RNP 
+ggplot(distance_values_correlation %>% filter(drug !="DMSO"), aes(chromatin,mean.freqCut*100)) +
+  stat_summary(geom = "col") +
+  geom_quasirandom(aes(color = chromatin)) +
+  theme_bw() + 
+  facet_wrap(~ fct_relevel(drug, c("AT9283","PCI","Tuba"))) +
+  ylab("∆TIF % (RNP)")+
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5)) + ylim(c(0,20))
+
+#Test (This test with 19 IPRs is significant)
+t_test_chromatin <- distance_values_correlation %>%
+  mutate(delta_tiff = mean.freqCut*100) %>%
+  filter(drug !="DMSO") %>%
+  dplyr::group_by(drug, chromatin) %>%
+  t_test(delta_tiff ~ 0)
+
+# Plot the general data in the screen (reference)
+ggplot(distance_values_correlation %>% filter(drug !="DMSO"), aes(chromatin,freqCut_diff_mean)) +
+  stat_summary(geom = "col") +
+  geom_quasirandom(aes(color = chromatin)) +
+  theme_bw() + 
+  facet_wrap(~ fct_relevel(drug, c("AT9283","PCI","Tuba"))) +
+  ylab("∆TIF % (Screen)")+
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5)) + ylim(c(0,20))
+```
+
+CONCLUSION: Window to increase in euchromatin is minimal, but overall changes are consistent
