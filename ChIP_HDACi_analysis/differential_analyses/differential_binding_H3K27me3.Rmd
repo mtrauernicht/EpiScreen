@@ -1,0 +1,721 @@
+---
+title: <font color="#ff8000">**GCF-7637 - Differential H3K27me3 - K562 treated with HDAC inhibitors**</font>
+author: <font color="gray">Sebastian Gregoricchio</font>
+date: <font color="gray">`r format(Sys.time(), '%d %B, %Y')`</font>
+output:
+  html_document:
+    toc: yes
+    toc_float: yes
+    number_sections: true
+    df_print: paged
+    theme: "united"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, rows.print=10, warning = F, message = F)
+```
+
+------------------------------
+
+**Environment details**
+```{r global_vars, message=FALSE, warning=FALSE}
+# Working dir
+wd = "/DATA/s.gregoricchio/GCF-7637_K562_ChIP/"
+wd = gsub("/$","",wd)
+setwd(wd)
+
+diffBind_dir = "06_differential_analyses/H3K27me3"
+diffBind_dir = gsub("/$","",diffBind_dir)
+dir.create(path = paste0(wd,"/",diffBind_dir), showWarnings = F, recursive = T)
+
+prefix_analyses = "diffbind_K562_H3K27me3"
+
+
+## Analyses setup
+constrast_list = list("PCI.vs.DMSO" = c("Condition", "PCI", "DMSO"),
+                      "Tuba.vs.DMSO" = c("Condition", "Tuba", "DMSO"))
+
+FDR_threshold = 0.05
+FC_threshold = 2 #linear value
+promoter_range = c(-2000, 1000)
+
+
+# Attach packages
+require(dplyr)
+require(DiffBind)
+require(ggplot2)
+
+
+# Color palettes
+conditions = c("DMSO", "PCI", "Tuba")
+cell_colors = rainbow(length(conditions))
+names(cell_colors) = conditions
+
+rep_colors = colorRampPalette(c("#c4e6e6", "#1a6875"))(3)
+names(rep_colors) = as.character(1:3)
+
+
+n.colors = 101
+
+Spectral = colorRampPalette(RColorBrewer::brewer.pal(n = 11, name = "Spectral"))(n.colors)
+RdYlGn = colorRampPalette(RColorBrewer::brewer.pal(n = 11, name = "RdYlGn"))(n.colors)
+RdYlBu = colorRampPalette(RColorBrewer::brewer.pal(n = 11, name = "RdYlBu"))(n.colors)
+RdGy = colorRampPalette(RColorBrewer::brewer.pal(n = 11, name = "RdGy"))(n.colors)
+RdBu = colorRampPalette(RColorBrewer::brewer.pal(n = 11, name = "RdBu"))(n.colors)
+PuOr = colorRampPalette(RColorBrewer::brewer.pal(n = 11, name = "PuOr"))(n.colors)
+PRGn = colorRampPalette(RColorBrewer::brewer.pal(n = 11, name = "PRGn"))(n.colors)
+PiYG = colorRampPalette(RColorBrewer::brewer.pal(n = 11, name = "PiYG"))(n.colors)
+BrBG = colorRampPalette(RColorBrewer::brewer.pal(n = 11, name = "BrBG"))(n.colors)
+
+YlOrRd = colorRampPalette(RColorBrewer::brewer.pal(n = 9, name = "YlOrRd"))(n.colors)
+YlOrBr = colorRampPalette(RColorBrewer::brewer.pal(n = 9, name = "YlOrBr"))(n.colors)
+YlGnBu = colorRampPalette(RColorBrewer::brewer.pal(n = 9, name = "YlGnBu"))(n.colors)
+YlGn = colorRampPalette(RColorBrewer::brewer.pal(n = 9, name = "YlGn"))(n.colors)
+Reds = colorRampPalette(RColorBrewer::brewer.pal(n = 9, name = "Reds"))(n.colors)
+RdPu = colorRampPalette(RColorBrewer::brewer.pal(n = 9, name = "RdPu"))(n.colors)
+Purples = colorRampPalette(RColorBrewer::brewer.pal(n = 9, name = "Purples"))(n.colors)
+PuRd = colorRampPalette(RColorBrewer::brewer.pal(n = 9, name = "PuRd"))(n.colors)
+PuBuGn = colorRampPalette(RColorBrewer::brewer.pal(n = 9, name = "PuBuGn"))(n.colors)
+PuBu = colorRampPalette(RColorBrewer::brewer.pal(n = 9, name = "PuBu"))(n.colors)
+OrRd = colorRampPalette(RColorBrewer::brewer.pal(n = 9, name = "OrRd"))(n.colors)
+Oranges = colorRampPalette(RColorBrewer::brewer.pal(n = 9, name = "Oranges"))(n.colors)
+Greys = colorRampPalette(RColorBrewer::brewer.pal(n = 9, name = "Greys"))(n.colors)
+Greens = colorRampPalette(RColorBrewer::brewer.pal(n = 9, name = "Greens"))(n.colors)
+GnBu = colorRampPalette(RColorBrewer::brewer.pal(n = 9, name = "GnBu"))(n.colors)
+BuPu = colorRampPalette(RColorBrewer::brewer.pal(n = 9, name = "BuPu"))(n.colors)
+BuGn = colorRampPalette(RColorBrewer::brewer.pal(n = 9, name = "BuGn"))(n.colors)
+Blues = colorRampPalette(RColorBrewer::brewer.pal(n = 9, name = "Blues"))(n.colors)
+```
+
+--------------------------------------
+
+<br>
+
+# <font color="#074fa5">**DBA object set-up**</font>
+```{r sample_tb_config, warning=FALSE}
+## Read sample table configuration
+sample_tb =
+  read.delim(paste0(wd, "/06_differential_analyses/diffBind_sample_sheet.txt"), h=T, sep="\t") %>%
+  dplyr::filter(Factor == "H3K27me3")
+
+sample_tb
+
+
+
+## Generate DBA object
+dba_setup = dba(sampleSheet = sample_tb,
+                config = data.frame(AnalysisMethod = DBA_DESEQ2,
+                                    th = FDR_threshold,
+                                    design = TRUE,
+                                    cores = 30,
+                                    RunParallel = TRUE,
+                                    doBlacklist = TRUE,
+                                    doGreylist = FALSE))
+```
+```
+K562_H3K27me3_DMSO_rep1 K562 H3K27me3 DMSO  1 narrow
+K562_H3K27me3_DMSO_rep2 K562 H3K27me3 DMSO  2 narrow
+K562_H3K27me3_DMSO_rep3 K562 H3K27me3 DMSO  3 narrow
+K562_H3K27me3_PCI_rep1 K562 H3K27me3 PCI  1 narrow
+K562_H3K27me3_PCI_rep2 K562 H3K27me3 PCI  2 narrow
+K562_H3K27me3_PCI_rep3 K562 H3K27me3 PCI  3 narrow
+K562_H3K27me3_Tuba_rep1 K562 H3K27me3 Tuba  1 narrow
+K562_H3K27me3_Tuba_rep2 K562 H3K27me3 Tuba  2 narrow
+K562_H3K27me3_Tuba_rep3 K562 H3K27me3 Tuba  3 narrow
+```
+
+```{r warning=FALSE}
+dba_setup
+```
+
+<br>
+
+
+
+## Apply Blacklist
+Pay attention that the blacklist cmust be compatibale with tour data (e.g., genome building and, presence or not of chr in the bams). <br> Typical problem here is that it removes almost everythng from your data. This would mean that the balck list is not the good one.
+```{r deblacklisting, message=FALSE, warning=FALSE}
+deblacklisted_dba = dba.blacklist(dba_setup, blacklist = DBA_BLACKLIST_GRCH38)
+```
+```
+Genome detected: Hsapiens.NCBI.GRCh38
+Applying blacklist...
+Removed: 1691 of 1324217 intervals.
+Removed: 674 merged (of 311198) and 85 (of 121802) consensus.
+```
+```{r show_deblacklisted, warning=FALSE}
+deblacklisted_dba
+```
+
+<br>
+
+
+
+# <font color="#074fa5">**Global occupancy analysis**</font>
+## Global correlation at peaks
+```{r global_corr_plot, warning=FALSE, fig.height=5, fig.width=5, fig.align='center'}
+dba.plotHeatmap(deblacklisted_dba,
+                attributes = DBA_CONDITION,
+                correlations = T,
+                colScheme = GnBu,
+                ColAttributes = DBA_CONDITION,
+                colSideCols = cell_colors,
+                RowAttributes = DBA_REPLICATE,
+                rowSideCols = rep_colors,
+                minval = 0,
+                maxval = 1)
+```
+```{r export_global_corr_plot, include=FALSE}  
+dir.create(paste0(wd, "/",diffBind_dir, "/plots/global_analyses/"), showWarnings = F, recursive = T)
+pdf(file = paste0(wd, "/",diffBind_dir, "/plots/global_analyses/heatmap_global_correlation.pdf"),
+    width = 7, height = 7.5)
+dba.plotHeatmap(deblacklisted_dba,
+                attributes = DBA_CONDITION,
+                correlations = T,
+                colScheme = GnBu,
+                ColAttributes = DBA_CONDITION,
+                colSideCols = cell_colors,
+                RowAttributes = DBA_REPLICATE,
+                rowSideCols = rep_colors,
+                minval = 0,
+                maxval = 1)
+dev.off()
+
+### export tables
+dir.create(paste0(wd, "/",diffBind_dir, "/tables_and_counts/"), showWarnings = F, recursive = T)
+correlations = dba.plotHeatmap(deblacklisted_dba, correlations = T, olPlot = DBA_COR)
+write.table(x = data.frame(correlations),
+            file = paste0(wd, "/",diffBind_dir, "/tables_and_counts/heatmap_global_correlation.txt"),
+            sep = "\t", col.names = T, row.names = T, quote = F)
+#perc_overlap = dba.plotHeatmap(deblacklisted_dba, correlations = T, olPlot = DBA_OLAP)
+#num_common_peaks = dba.plotHeatmap(deblacklisted_dba, correlations = T, olPlot = DBA_INALL)
+```
+
+<br>
+
+## Global PCA at peaks
+```{r global_PCA, warning=FALSE, fig.height=5, fig.width=5, fig.align='center'}
+for (i in list(c(1,2), c(2,3), c(3,4), c(4,5))) {
+  dba.plotPCA(deblacklisted_dba,
+              attributes = DBA_CONDITION,
+              vColors = cell_colors,
+              label = DBA_REPLICATE,
+              components = i)
+}
+```
+```{r export_global_PCA, include=FALSE}
+for (i in list(c(1,2), c(2,3), c(3,4), c(4,5), c(5,6), c(6,7))) {
+  dir.create(paste0(wd, "/",diffBind_dir, "/plots/global_analyses/"), showWarnings = F, recursive = T)
+  pdf(file = paste0(wd, "/",diffBind_dir, "/plots/global_analyses/global_PCA.",i[1],"-", i[2],".pdf"),
+      width = 7, height = 7.5)
+  dba.plotPCA(deblacklisted_dba,
+              attributes = DBA_CONDITION,
+              vColors = cell_colors,
+              label = DBA_REPLICATE,
+              components = i)
+  dev.off()
+}
+```
+
+
+<br>
+
+# <font color="#074fa5">**Differential analysis**</font>
+## Count reads in peaks *(it takes a while!)*
+Usually I compute the counts with the following code and I save it in a Rdata file.
+```{r compute_counts, warning=FALSE, eval=F}
+counts = dba.count(deblacklisted_dba, bParallel = TRUE)
+
+dir.create(paste0(wd, "/",diffBind_dir, "/tables_and_counts/"), showWarnings = F, recursive = F)
+
+dba.save(counts,
+         file = prefix_analyses,
+         dir = paste0(wd, "/",diffBind_dir, "/tables_and_counts/"),
+         pre = "dba_count_",
+         ext = "RData")
+```
+```
+## Computing summits...
+## Re-centering peaks...
+## Reads will be counted as Paired-end.
+```
+
+So then I can reload it if I need it
+```{r read_counts, warning=FALSE}
+counts = dba.load(file = prefix_analyses,
+                  dir = paste0(wd, "/",diffBind_dir, "/tables_and_counts/"),
+                  pre = "dba_count_",
+                  ext = "RData")
+
+counts
+```
+
+
+<font color="red">**Please note**</font> that `dba.count` default filters peaks with CPM (Count Per Million) < 1.
+
+<br>
+
+## Data normalization
+Default method for normalization uses library sizes
+```{r normalize_data, warning=FALSE}
+## get library sizes
+info = dba.show(counts)
+lib.sizes = cbind(LibReads = info$Reads,
+                  FRiP = info$FRiP,
+                  PeakReads = round(info$Reads * info$FRiP))
+
+rownames(lib.sizes) = info$ID
+lib.sizes
+
+
+## Normalize the data
+norm_dba = dba.normalize(counts)
+```
+
+<br>
+
+## Evaluate contrast
+```{r evaluate_contrast, eval=FALSE}
+constrast_results_list = list()
+constrast_norms_used_list = list()
+
+for (i in 1:length(constrast_list)) {
+  cat(paste0("-----------------------------------------------------------------------------\n",
+             names(constrast_list)[i],
+             "\n-----------------------------------------------------------------------------\n"))
+  
+  constrast_results_list[[i]] =
+    dba.contrast(norm_dba,
+                 contrast = constrast_list[[i]]) 
+  print(constrast_results_list[[i]])
+  
+  ## Get normalization methods used for your own information
+  constrast_norms_used_list[[i]] = dba.normalize(constrast_results_list[[i]], bRetrieve = TRUE)
+  print(constrast_norms_used_list[[i]])
+}
+
+names(constrast_results_list) = names(constrast_list)
+names(constrast_norms_used_list) = names(constrast_list)
+
+
+## Save analyses:
+saveRDS(constrast_results_list,
+        file=paste0(wd,"/",diffBind_dir, "/tables_and_counts/",prefix_analyses,"_contrast.analyses.list.RData"))
+```
+
+```{r contrast_import, echo=FALSE}
+# import contrast_results_list
+constrast_results_list = 
+  readRDS(paste0(wd,"/",diffBind_dir, "/tables_and_counts/",prefix_analyses,"_contrast.analyses.list.RData"))
+constrast_norms_used_list = list()
+
+for (i in 1:length(constrast_list)) {
+  cat(paste0("-----------------------------------------------------------------------------\n",
+             names(constrast_list)[i],
+             "\n-----------------------------------------------------------------------------\n"))
+  
+  print(constrast_results_list[[i]])
+  
+  ## Get normalization methods used for your own information
+  constrast_norms_used_list[[i]] = dba.normalize(constrast_results_list[[i]], bRetrieve = TRUE)
+  print(head(constrast_norms_used_list[[i]]))
+}
+```
+
+
+<br>
+
+## Differential binding analysis
+```{r diff_analyses, warning=FALSE}
+diffBind_analyses_results_list = list()
+
+for (i in 1:length(constrast_list)) {
+  cat(paste0("-----------------------------------------------------------------------------\n",
+             names(constrast_list)[i],
+             "\n-----------------------------------------------------------------------------\n"))
+  diffBind_analyses_results_list[[i]] = dba.analyze(constrast_results_list[[i]])
+  #print(head(diffBind_analyses_results_list[[i]]))
+}
+
+
+# ## Save analyses:
+# saveRDS(diffBind_analyses_results_list,
+#         file=paste0(wd,"/",diffBind_dir, "/tables_and_counts/",prefix_analyses,"_contrast.analyses.list_analyzed.RData"))
+```
+
+```{r diff_analyses_import, echo=FALSE}
+# # import contrast_results_list
+# diffBind_analyses_results_list = 
+#   readRDS(paste0(wd,"/",diffBind_dir, "/tables_and_counts/",prefix_analyses,"_contrast.analyses.list_analyzed.RData"))
+# 
+# 
+# for (i in 1:length(constrast_list)) {
+#   cat(paste0("-----------------------------------------------------------------------------\n",
+#              names(constrast_list)[i],
+#              "\n-----------------------------------------------------------------------------\n"))
+#   print(head(diffBind_analyses_results_list[[i]]))
+# }
+```
+
+
+<!-- To see the overlaps of peaks among samples (available for max 4 samples): -->
+```{r venn_diagram_overlaps, eval=FALSE, fig.align='center', fig.height=4.5, fig.width=5, warning=FALSE, include=FALSE}
+#dba.plotVenn(diffBind_analyses_results_list[[i]], diffBind_analyses_results_list[[i]]$masks$Consensus)
+```
+
+<br>
+
+## Correlation at *differential* peaks
+### Corrlplot
+Notice that you could perform the contrast with a list of contrasts, thus the 'contrast = 1' indicates that we want to plot the first contrast in your list.
+
+```{r diff_corr_plot, warning=FALSE, fig.height=5, fig.width=5, fig.align='center'}
+for (i in 1:length(constrast_list)) {
+  dba.plotHeatmap(diffBind_analyses_results_list[[i]],
+                  attributes = DBA_CONDITION,
+                  correlations = T,
+                  colScheme = PRGn,
+                  ColAttributes = DBA_CONDITION,
+                  colSideCols = cell_colors,
+                  RowAttributes = DBA_REPLICATE,
+                  rowSideCols = rep_colors,
+                  minval = 0,
+                  maxval = 1)
+  
+  
+  # Export plot
+  dir.create(paste0(wd, "/",diffBind_dir, "/plots/differential_analyses/"), showWarnings = F, recursive = T)
+  pdf(file = paste0(wd, "/",diffBind_dir, "/plots/differential_analyses/heatmap_diffPeaks_correlation_", names(constrast_list)[i], ".pdf"),
+      width = 7, height = 7.5)
+  dba.plotHeatmap(diffBind_analyses_results_list[[i]],
+                  attributes = DBA_CONDITION,
+                  correlations = T,
+                  colScheme = PRGn,
+                  ColAttributes = DBA_CONDITION,
+                  colSideCols = cell_colors,
+                  RowAttributes = DBA_REPLICATE,
+                  rowSideCols = rep_colors,
+                  minval = 0,
+                  maxval = 1)
+  dev.off()
+  
+  
+  ### export tables
+  correlations_diffPeaks = dba.plotHeatmap(diffBind_analyses_results_list[[i]], correlations = T, olPlot = DBA_COR)
+  write.table(x = data.frame(correlations_diffPeaks),
+              file = paste0(wd, "/",diffBind_dir, "/tables_and_counts/heatmap_diffPeaks_correlation_", names(constrast_list)[i], ".txt"),
+              sep = "\t", col.names = T, row.names = T, quote = F)
+  #perc_overlap = dba.plotHeatmap(diffbind_MCF7.vs.Ishikawa, correlations = T, olPlot = DBA_OLAP)
+  #num_common_peaks = dba.plotHeatmap(diffbind_MCF7.vs.Ishikawa, correlations = T, olPlot = DBA_INALL)
+}
+```
+
+
+### Heatmap individual peaks
+```{r diff_heatmaps, warning=FALSE, fig.height=5, fig.width=5, fig.align='center'}
+for (i in 1:length(constrast_list)) {
+  dba.plotHeatmap(diffBind_analyses_results_list[[i]],
+                  attributes = DBA_CONDITION,
+                  contrast = 1,
+                  correlations = F,
+                  colScheme = GnBu,
+                  ColAttributes = c(DBA_CONDITION, DBA_REPLICATE),
+                  colSideCols = list(rev(cell_colors[names(cell_colors) %in% constrast_list[[i]][2:3]]),
+                                     rep_colors),
+                  score = DBA_SCORE_NORMALIZED)
+  
+  
+  # Export the plot
+  pdf(file = paste0(wd, "/",diffBind_dir, "/plots/differential_analyses/heatmap_diffPeaks_scores_individual_peaks_", names(constrast_list)[i], ".pdf"),
+      width = 7, height = 7.5)
+  dba.plotHeatmap(diffBind_analyses_results_list[[i]],
+                  attributes = DBA_CONDITION,
+                  contrast = 1,
+                  correlations = F,
+                  colScheme = GnBu,
+                  ColAttributes = c(DBA_CONDITION, DBA_REPLICATE),
+                  colSideCols = list(rev(cell_colors[names(cell_colors) %in% constrast_list[[i]][2:3]]),
+                                     rep_colors),
+                  score = DBA_SCORE_NORMALIZED)
+  dev.off()
+}
+```
+
+
+### Plot MA
+```{r DB_diff_MAplot, fig.align='center', fig.height=5, fig.width=5, warning=FALSE}
+for (i in 1:length(constrast_list)) {
+  dba.plotMA(diffBind_analyses_results_list[[i]], th = FDR_threshold, contrast = 1)
+
+  pdf(file = paste0(wd, "/",diffBind_dir, "/plots/differential_analyses/MAplot_diffPeaks_", names(constrast_list)[i], ".pdf"),
+      width = 5, height = 4)
+  dba.plotMA(diffBind_analyses_results_list[[i]], th = FDR_threshold, contrast = 1)
+  dev.off()
+}
+```
+
+
+### Plot volcano
+```{r DB_diff_volcano, fig.align='center', fig.height=5, fig.width=5, warning=FALSE}
+for (i in 1:length(constrast_list)) {
+  dba.plotVolcano(diffBind_analyses_results_list[[i]], th = FDR_threshold, contrast = 1)
+  
+  pdf(file = paste0(wd, "/",diffBind_dir, "/plots/differential_analyses/volcanoDiffBind_diffPeaks_", names(constrast_list)[i], ".pdf"),
+      width = 5, height = 4)
+  dba.plotVolcano(diffBind_analyses_results_list[[i]], th = FDR_threshold, contrast = 1)
+  dev.off()
+}
+```
+
+
+
+### Plot PCA
+```{r PCA_diff, fig.align='center', fig.height=5, fig.width=5, warning=FALSE}
+for (i in 1:length(constrast_list)) {
+  dba.plotPCA(diffBind_analyses_results_list[[i]],
+              DBA_CONDITION,
+              th = FDR_threshold,
+              contrast = 1,
+              components = c(1,2),
+              label = DBA_REPLICATE,
+              vColors = rev(cell_colors[names(cell_colors) %in% constrast_list[[i]][2:3]]))
+  
+  pdf(file = paste0(wd, "/",diffBind_dir, "/plots/differential_analyses/PCA_diffPeaks_", names(constrast_list)[i], "_PC1-2.pdf"),
+      width = 7, height = 7)
+  dba.plotPCA(diffBind_analyses_results_list[[i]],
+              DBA_CONDITION,
+              th = FDR_threshold,
+              contrast = 1,
+              components = c(1,2),
+              label = DBA_REPLICATE,
+              vColors = rev(cell_colors[names(cell_colors) %in% constrast_list[[i]][2:3]]))
+  dev.off()
+}
+
+
+for (i in 1:length(constrast_list)) {
+  dba.plotPCA(diffBind_analyses_results_list[[i]],
+              DBA_CONDITION,
+              th = FDR_threshold,
+              contrast = 1,
+              components = c(2,3),
+              label = DBA_REPLICATE,
+              vColors = rev(cell_colors[names(cell_colors) %in% constrast_list[[i]][2:3]]))
+  
+  pdf(file = paste0(wd, "/",diffBind_dir, "/plots/differential_analyses/PCA_diffPeaks_", names(constrast_list)[i], "_PC2-3.pdf"),
+      width = 7, height = 7)
+  dba.plotPCA(diffBind_analyses_results_list[[i]],
+              DBA_CONDITION,
+              th = FDR_threshold,
+              contrast = 1,
+              components = c(2,3),
+              label = DBA_REPLICATE,
+              vColors = rev(cell_colors[names(cell_colors) %in% constrast_list[[i]][2:3]]))
+  dev.off()
+}
+```
+
+
+
+## Get the raw data for custum analyses/plotting
+### Get the normalized binding data
+```{r export_norm_data_tb, warning=FALSE}
+# the CHR names will be from 1 to 24 because X,Y, MT, etc are just indicated as indexes,
+# so we need to get the names and put back in the table
+
+count_tables_list = list()
+
+for (i in 1:length(constrast_list)) {
+  count_tables_list[[i]] = 
+    dplyr::left_join(as.data.frame(diffBind_analyses_results_list[[i]]$binding),
+                     data.frame(CHR = 1:length(unique(as.data.frame(diffBind_analyses_results_list[[i]]$binding)$CHR)),
+                                chr.ID = diffBind_analyses_results_list[[i]]$chrmap),
+                     by = "CHR") %>%
+    dplyr::mutate(CHR = chr.ID) %>%
+    dplyr::select(-chr.ID)
+  
+  
+  cat(paste0("-----------------------------------------------------------------------------\n",
+             names(constrast_list)[i],
+             "\n-----------------------------------------------------------------------------\n"))
+  #print(head(count_tables_list[[i]]))
+  
+  
+  # Save the table
+  write.table(x = count_tables_list[[i]],
+              file = paste0(wd, "/",diffBind_dir, "/tables_and_counts/normalized_counts_at_peaks_",
+                            names(constrast_list)[i], ".txt"),
+              quote = F, sep = "\t", row.names = F, col.names = T)
+}
+
+names(count_tables_list) = names(constrast_list)
+```
+
+<br>
+
+### Get differential binding data (no threholds)
+```{r export_diff_binding_data__and_RePlotting, warning=FALSE}
+report_list = list()
+
+for (i in 1:length(constrast_list)) {
+  report_list[[i]] = dba.report(diffBind_analyses_results_list[[i]],
+                                               contrast = 1,
+                                               DataType = DBA_DATA_FRAME,
+                                               th = 1) # "fake" threshold FDR == 1
+  
+  colnames(report_list[[i]])[7] = paste0("log2FoldChange_",
+                                                        paste0(gsub("Conc_",
+                                                                    "",
+                                                                    colnames(report_list[[i]][5:6])),
+                                                               collapse = ".vs."))
+  
+  report_list[[i]] =
+    report_list[[i]] %>%
+    dplyr::mutate(diff.status = Rseb::DE.status(log2FC = .[[7]],
+                                                p.value.adjusted = FDR,
+                                                FC_threshold = FC_threshold,
+                                                p.value_threshold = FDR_threshold,
+                                                low.FC.status.label = paste("down", constrast_list[[i]][2]),
+                                                high.FC.status.label = paste("up", constrast_list[[i]][2])))
+  
+  print(report_list[[i]] %>%
+          dplyr::group_by(diff.status) %>%
+          dplyr::summarise(n = n()))
+  
+  
+  ## Save the table
+  write.table(x = report_list[[i]],
+              file = paste0(wd, "/",diffBind_dir, "/tables_and_counts/diffbind_differential_analyses_",
+                            names(constrast_list)[i], ".txt"),
+              quote = F,
+              sep = "\t",
+              row.names = F,
+              col.names = T)
+  
+  
+  ##############
+  ## Re-plot the volcano
+  # rename column for plot
+  tb = report_list[[i]]
+  names(tb)[7] = "log2FC"
+  
+  colors_plot = c("down" = cell_colors[grep(paste0("^",constrast_list[[i]][3],"$"), names(cell_colors))],
+                  "up" = cell_colors[grep(paste0("^",constrast_list[[i]][2],"$"), names(cell_colors))],
+                  "NoResp" = "lightskyblue",
+                  "NULL" = "gray")
+  
+  names(colors_plot)[1:2] = c(paste("down", constrast_list[[i]][2]),
+                              paste("up", constrast_list[[i]][2]))
+  
+  
+  volcano_diff =
+    ggplot(data = dplyr::mutate(tb, diff.status = factor(diff.status, levels = names(colors_plot))),
+           aes(x = log2FC,
+               y = -log10(FDR),
+               color = diff.status)) +
+    geom_point(alpha = 0.5,
+               size = 2,
+               stroke = NA) +
+    geom_hline(yintercept = -log10(FDR_threshold), linetype = 3) +
+    geom_vline(xintercept = c(-1,1)*log2(FC_threshold), linetype = 3) +
+    scale_color_manual(values = colors_plot,
+                       drop = F) +
+    theme_classic() +
+    ggtitle(paste("Differential peaks", names(constrast_list)[i])) +
+    theme(axis.line = element_line(color = "black"),
+          axis.text = element_text(color = "black"),
+          axis.ticks = element_line(color = "black"))
+  
+  volcano_diff =
+    volcano_diff +
+    xlim(c(-1,1) * max(abs(ggplot_build(volcano_diff)$layout$panel_params[[1]]$x.range)))
+  
+  print(volcano_diff)
+  
+  pdf(file = paste0(wd, "/",diffBind_dir, "/plots/differential_analyses/volcano_reMade_diffPeaks_",
+                            names(constrast_list)[i], ".pdf"),
+      width = 7, height = 7)
+  print(volcano_diff)
+  dev.off()
+}
+```
+
+
+
+# <font color="#074fa5">**Differential peaks annotations and genomic distribution**</font> 
+## Differential peaks annotation
+```{r diff_peaks_annotation}
+require(ChIPseeker)
+txdb = TxDb.Hsapiens.UCSC.hg38.knownGene::TxDb.Hsapiens.UCSC.hg38.knownGene
+
+peak_anno_list = list()
+diff_peak_anno_list = list()
+
+for (i in 1:length(constrast_list)) {
+  bed_formatted_tb = 
+    GenomicRanges::makeGRangesFromDataFrame(dplyr::mutate(report_list[[i]][,1:3],
+                                                          Chr = paste0("chr", Chr)))
+  
+  peak_anno_list[[i]] = ChIPseeker::annotatePeak(bed_formatted_tb,
+                                                 tssRegion = promoter_range,
+                                                 TxDb = txdb,
+                                                 annoDb = "org.Hs.eg.db",
+                                                 addFlankGeneInfo = TRUE,
+                                                 flankDistance = 2000,
+                                                 assignGenomicAnnotation = TRUE,
+                                                 verbose = FALSE)
+  
+  
+  # export the annotated bed
+  write.table(x = as.data.frame(peak_anno_list[[i]]),
+              file = paste0(wd, "/",diffBind_dir, "/tables_and_counts/annotated_diffbind_peaks_",
+                            names(constrast_list)[i], ".txt"),
+              col.names = TRUE,
+              row.names = FALSE,
+              sep = "\t", quote = FALSE)
+  
+  
+  # Differential table with annotations
+  diff_peak_anno_list[[i]] =
+    Rseb::move.df.col(data.frame = dplyr::left_join(x = report_list[[i]] %>% dplyr::mutate(Chr = gsub("chr","",Chr)),
+                                                    y = as.data.frame(peak_anno_list[[i]]) %>% dplyr::mutate(seqnames = gsub("chr","",seqnames)),
+                                                    by = c("Chr" = "seqnames", "Start" = "start", "End" = "end")),
+                      move.command = "width after End; strand after width")
+  
+  write.table(x = diff_peak_anno_list[[i]],
+              file = paste0(wd, "/",diffBind_dir, "/tables_and_counts/annotated_diffBind_analyses_",
+                            names(constrast_list)[i], ".txt"),
+              col.names = TRUE,
+              row.names = FALSE,
+              sep = "\t", quote = FALSE)
+}
+
+names(peak_anno_list) = names(constrast_list)
+names(diff_peak_anno_list) = names(constrast_list)
+
+
+# Export lists
+saveRDS(object = peak_anno_list,
+        file = paste0(wd, "/",diffBind_dir, "/tables_and_counts/annotated_diffbind_peaks_list.RData"))
+
+saveRDS(object = diff_peak_anno_list,
+        file = paste0(wd, "/",diffBind_dir, "/tables_and_counts/annotated_diffBind_analyses_list.RData"))
+```
+
+
+
+<br>
+
+--------------------------------------
+
+# **Session info**
+```{r session_info, echo=FALSE}
+Rseb::pkg.version(print.versions = T)
+```
+
+
+
+
+
+
+
