@@ -567,8 +567,8 @@ viab_drug = indel.data %>% filter(drug != "PAO") %>%
   mutate(drug = gsub(" [(].*[)]", "", drug),
          drug_conc = paste(drug, conc_char, sep = " ")) %>% 
   distinct(viab_mean, drug_conc, replicate) %>% 
-  group_by(drug_conc) %>%
-  summarise(viab = mean(viab_mean))
+  dplyr::group_by(drug_conc) %>%
+  dplyr::summarise(viab = mean(viab_mean))
 
 # Row annotation: annotate drugs with the target group
 target_set_drugs <- indel.data %>% 
@@ -691,7 +691,7 @@ pvals_drug_conc = indel.data %>%
   mutate(drug = gsub(" [(].*[)]", "", drug),
          drug_conc = paste(drug, conc_char, sep = " ")) %>%
   distinct(drug_conc, IPR, zscore_bal_comb_rep, filter_zscore_bal_comb_rep) %>%
-  group_by(drug_conc) %>%
+  dplyr::group_by(drug_conc) %>%
   mutate(zscore_bal_comb_rep_temp = ifelse(filter_zscore_bal_comb_rep, zscore_bal_comb_rep, 0),
          p_value = 2*pnorm(q = abs(zscore_bal_comb_rep_temp), lower.tail = F)) %>%
   filter(!is.na(zscore_bal_comb_rep)) %>%
@@ -721,7 +721,8 @@ number_drugs = indel.data %>%
          zscore_bal_comb_rep_temp = ifelse(filter_zscore_bal_comb_rep, zscore_bal_comb_rep, 0),
          p_value = 2*pnorm(q = abs(zscore_bal_comb_rep_temp), lower.tail = F),
          # Adjust p value for false discovery rate
-         adj_pvalue = p.adjust(p_value, method = 'BH'))
+         adj_pvalue = p.adjust(p_value, method = 'BH')) %>%
+  ungroup()
 
 MMEJboost = number_drugs %>% 
   # Add filtering for significant increases
@@ -1085,29 +1086,73 @@ number_drugs = indel.data %>%
     zscore_bal_global_comb_rep_temp = ifelse(filter_zscore_bal_global_comb_rep, zscore_bal_global_comb_rep, 0),
     p_value = 2*pnorm(q = abs(zscore_bal_global_comb_rep_temp), lower.tail = F),
     # Adjust p value for false discovery rate
-    adj_pvalue = p.adjust(p_value, method = 'BH'))
+    adj_pvalue = p.adjust(p_value, method = 'BH')) %>%
+  ungroup()
 
 MMEJboost = number_drugs %>% 
   # Add filtering for significant increases
   filter(adj_pvalue < 0.01 & zscore_bal_global_comb_rep_temp > 1) %>% 
   # unique the drugs
-  distinct(drug, adj_pvalue, zscore_bal_global_comb_rep_temp) %>% 
-  # count the rows
-  nrow()
+  distinct(drug, drug_conc, adj_pvalue, zscore_bal_global_comb_rep_temp) 
 
 NHEJboost = number_drugs %>% 
   # Add filtering for significant increases
   filter(adj_pvalue < 0.01 & zscore_bal_global_comb_rep_temp < -1) %>% 
   # unique the drugs
-  distinct(drug, adj_pvalue, zscore_bal_global_comb_rep_temp) %>% 
-  # count the rows
-  nrow()
+  distinct(drug, drug_conc, adj_pvalue, zscore_bal_global_comb_rep_temp)
 
 # Statement
 paste("Of the 160 epigenetic compounds significantly altering the MMEJ:NHEJ ratio globally,", 
-      MMEJboost, "boosted the ratio and", NHEJboost, "decreased the ratio.")
+      length(unique(MMEJboost$drug)), "boosted the ratio and", length(unique(NHEJboost$drug)), "decreased the ratio.")
+
+# Export data table S10
+export_ratios <- indel.data %>%
+    mutate(drug = gsub(" [(].*[)]", "", drug),
+           drug_conc = paste(drug, conc_char, sep = " ")) %>%
+  filter(!drug %in% c("DNA-PKi", "Mirin", "PAO"), conc_char != "control") %>%
+  distinct(drug_conc, IPR, freqMMEJ, freqNHEJ) %>%
+  na.omit() %>%
+  mutate(freqMMEJ = ave(freqMMEJ, drug_conc, IPR, FUN = function(x) mean(x, na.rm = T)),
+         freqNHEJ = ave(freqNHEJ, drug_conc, IPR, FUN = function(x) mean(x, na.rm = T))) %>%
+  distinct()
+
+ratios_dmso <- export_ratios %>%
+  filter(drug_conc == "DMSO 1 µM") %>%
+  dplyr::select(IPR, "dmsoMMEJ" = freqMMEJ, "dmsoNHEJ" = freqNHEJ)
+
+export_ratios <- export_ratios %>%
+  filter(drug_conc != "DMSO 1 µM") %>%
+  left_join(ratios_dmso) %>%
+  mutate(difMMEJ = freqMMEJ - dmsoMMEJ,
+         difNHEJ = freqNHEJ - dmsoNHEJ) %>%
+  distinct(drug_conc, IPR, difMMEJ, difNHEJ)
+
+number_drugs_exp <- indel.data %>%
+  #filter(!target %in% c("Aurora Kinase", "JAK", "PARP", "PIM", "HIF")) %>%
+  mutate(drug = gsub(" [(].*[)]", "", drug),
+         drug_conc = paste(drug, conc_char, sep = " ")) %>%
+  filter(pathway_bal_filter == TRUE & conc_char != "control") %>%
+  distinct(drug_conc, IPR, zscore_bal_comb_rep, MMEJ_log2_FC) %>%
+  na.omit() %>%
+  mutate(zscore_bal_comb_rep = ave(zscore_bal_comb_rep, drug_conc, IPR, FUN = function(x) mean(x, na.rm = T))) %>%
+  mutate(MMEJ_log2_FC = ave(MMEJ_log2_FC, drug_conc, IPR, FUN = function(x) mean(x, na.rm = T))) %>%
+  distinct()
+           
+export_ratios2 <- export_ratios %>%
+  left_join(number_drugs_exp)
+
+export_ratios3 <- export_ratios2 %>%
+  mutate(sign_effect = ifelse(drug_conc %in% MMEJboost$drug_conc, "up", "unchanged")) %>%
+  mutate(sign_effect = ifelse(drug_conc %in% NHEJboost$drug_conc, "down", sign_effect))
+  
+ggplot(export_ratios3 %>% filter(sign_effect == "down"), aes(x = difMMEJ, y = difNHEJ)) + 
+  geom_point() +
+  theme_pubr()
+  
+write.csv(export_ratios3, file = "data/mmejfreq_s10.csv", row.names = FALSE)
 ```
 *Conclusion Figure 4C: Many AURKi are the most stron MMEJ ratio reducers. Also Decitabine and a HDAC inhibitor are amongst the strongest.*
+
 
 
 ```{r 5B HTS Decitabine + NU7441, fig.width = 12, fig.height = 10, eval = FALSE}
